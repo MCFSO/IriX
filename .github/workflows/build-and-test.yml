@@ -62,9 +62,7 @@ jobs:
           cargo build --release
 
       - name: Copy Rust DLL
-        run: |
-          mkdir -p windows/runner
-          cp rust/target/release/xmc_backup.dll windows/runner/
+        run: Copy-Item rust/target/release/xmc_backup.dll windows/runner/ -Force
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
