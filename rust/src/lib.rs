@@ -4,11 +4,9 @@
 
 use std::ffi::{CStr, CString};
 use std::fs::File;
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::path::Path;
-use std::ptr;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 
 use walkdir::WalkDir;
 use xz2::write::XzEncoder;
@@ -152,7 +150,7 @@ fn do_backup(
         }
 
         let path = entry.path();
-        let file = File::open(path)?;
+        let mut file = File::open(path)?;
         let metadata = file.metadata()?;
         let len = metadata.len();
 
@@ -161,7 +159,9 @@ fn do_backup(
         let rel_path = path.strip_prefix(src_path).unwrap_or(path);
         let path_bytes = rel_path.to_string_lossy().into_owned();
         writeln!(encoder, "FILE: {}", path_bytes)?;
-        io::copy(&mut &file[..], &mut encoder)?;
+        
+        // 使用 read_to_end 或 io::copy
+        io::copy(&mut file, &mut encoder)?;
 
         processed_bytes += len;
 
