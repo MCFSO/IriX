@@ -3,7 +3,6 @@
 // 第二个 Tab 为配置文件编辑器。
 
 import 'dart:async';
-import 'dart:ffi';
 import 'dart:io';
 
 import 'package:flutter/material.dart';

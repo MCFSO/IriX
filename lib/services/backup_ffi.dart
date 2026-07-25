@@ -3,11 +3,9 @@
 
 import 'dart:ffi';
 import 'dart:io';
-import 'dart:isolate';
 
 import 'package:ffi/ffi.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
 /// FFI 函数签名定义
 typedef BackupDirectoryC = Int32 Function(
@@ -41,9 +39,6 @@ class BackupService {
 
   /// 进度回调
   void Function(double progress)? onProgress;
-
-  /// 是否已取消
-  bool _cancelled = false;
 
   BackupService._() {
     _lib = _openLibrary();
@@ -147,7 +142,6 @@ class BackupService {
     List<String> files, {
     void Function(double progress)? onProgress,
   }) async {
-    _cancelled = false;
     this.onProgress = onProgress;
 
     // 分配 native 内存
@@ -185,7 +179,6 @@ class BackupService {
 
   /// 取消备份
   void cancel() {
-    _cancelled = true;
     _cancelBackup();
   }
 
