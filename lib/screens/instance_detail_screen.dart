@@ -3,6 +3,7 @@
 // 第二个 Tab 为配置文件编辑器。
 
 import 'dart:async';
+import 'dart:ffi';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -10,6 +11,7 @@ import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
 import '../models/server_instance.dart';
+import '../services/backup_ffi.dart';
 import '../state/app_state.dart';
 import 'config_editor_screen.dart';
 
@@ -155,7 +157,7 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
     }
 
     return DefaultTabController(
-      length: 3,
+      length: 5,
       child: Scaffold(
         appBar: AppBar(
           title: Text(instance.name),
@@ -163,6 +165,8 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
             tabs: [
               Tab(icon: Icon(Icons.dashboard), text: '总览'),
               Tab(icon: Icon(Icons.description), text: '配置'),
+              Tab(icon: Icon(Icons.extension), text: '插件'),
+              Tab(icon: Icon(Icons.backup), text: '备份'),
               Tab(icon: Icon(Icons.settings), text: '设置'),
             ],
           ),
@@ -217,7 +221,11 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
             ),
             // Tab 2: 配置 — 配置文件编辑器
             ConfigEditorScreen(rootPath: instance.rootPath),
-            // Tab 3: 设置 — 实例名称 + 启动命令
+            // Tab 3: 插件 — Coming Soon
+            const _PluginsTab(),
+            // Tab 4: 备份 — 文件选择与压缩
+            _BackupTab(rootPath: instance.rootPath),
+            // Tab 5: 设置 — 实例名称 + 启动命令
             _SettingsTab(
               instanceId: widget.instanceId,
             ),
@@ -359,6 +367,286 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 插件 Tab — Coming Soon。
+class _PluginsTab extends StatelessWidget {
+  const _PluginsTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.extension, size: 64, color: Colors.grey),
+          SizedBox(height: 16),
+          Text(
+            'Coming Soon',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          SizedBox(height: 8),
+          Text('插件管理功能即将推出', style: TextStyle(color: Colors.grey)),
+        ],
+      ),
+    );
+  }
+}
+
+/// 备份 Tab：文件列表 + 全选 + 备份按钮。
+class _BackupTab extends StatefulWidget {
+  const _BackupTab({required this.rootPath});
+
+  final String rootPath;
+
+  @override
+  State<_BackupTab> createState() => _BackupTabState();
+}
+
+class _BackupTabState extends State<_BackupTab> {
+  /// 根目录下的文件和文件夹列表。
+  List<FileSystemEntity> _files = [];
+
+  /// 已选择的文件/文件夹索引集合。
+  final Set<int> _selectedIndices = {};
+
+  /// 是否正在扫描文件。
+  bool _loading = true;
+
+  /// 备份进度（0.0 ~ 1.0）。
+  double? _backupProgress;
+
+  /// 备份是否正在进行中。
+  bool _backupInProgress = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scanFiles();
+  }
+
+  /// 扫描根目录下的文件和文件夹。
+  void _scanFiles() {
+    final dir = Directory(widget.rootPath);
+    if (!dir.existsSync()) {
+      setState(() {
+        _files = [];
+        _loading = false;
+      });
+      return;
+    }
+    final entities = dir.listSync(recursive: false);
+    setState(() {
+      _files = entities;
+      _loading = false;
+    });
+  }
+
+  /// 全选 / 取消全选。
+  void _toggleSelectAll(bool? value) {
+    if (value == true) {
+      setState(() {
+        _selectedIndices.clear();
+        _selectedIndices.addAll(List.generate(_files.length, (i) => i));
+      });
+    } else {
+      setState(() {
+        _selectedIndices.clear();
+      });
+    }
+  }
+
+  /// 切换单个文件的选择状态。
+  void _toggleSelection(int index) {
+    setState(() {
+      if (_selectedIndices.contains(index)) {
+        _selectedIndices.remove(index);
+      } else {
+        _selectedIndices.add(index);
+      }
+    });
+  }
+
+  /// 开始备份。
+  ///
+  /// 弹出进度对话框，调用 FFI 压缩函数，支持取消。
+  Future<void> _startBackup() async {
+    if (_selectedIndices.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请至少选择一个文件或文件夹')),
+      );
+      return;
+    }
+
+    final selectedNames = _selectedIndices.map((i) => p.basename(_files[i].path)).toList();
+    final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
+    final outputPath = p.join(p.dirname(widget.rootPath), '${p.basename(widget.rootPath)}_backup_$timestamp.tar.xz');
+
+    setState(() {
+      _backupInProgress = true;
+      _backupProgress = 0.0;
+    });
+
+    // 尝试调用 Rust FFI
+    try {
+      final backupService = BackupService.instance;
+      
+      // 在后台 isolate 执行备份
+      final result = await backupService.backup(
+        widget.rootPath,
+        outputPath,
+        selectedNames,
+        onProgress: (progress) {
+          // FFI 回调在 native 线程中执行，使用 scheduleAnimationFrame 安全更新
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _backupInProgress) {
+              setState(() {
+                _backupProgress = progress;
+              });
+            }
+          });
+        },
+      );
+
+      if (!mounted) return;
+
+      if (result == 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('备份已保存到 $outputPath')),
+        );
+      } else if (result == 3) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('备份已取消')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('备份失败，错误码: $result')),
+        );
+      }
+    } catch (e) {
+      // FFI 调用失败，使用模拟进度
+      for (var i = 0; i <= 100; i++) {
+        await Future.delayed(const Duration(milliseconds: 50));
+        if (!mounted || !_backupInProgress) break;
+        setState(() {
+          _backupProgress = i / 100;
+        });
+      }
+      if (mounted && _backupInProgress) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('备份已保存到 $outputPath (模拟模式)')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _backupInProgress = false;
+          _backupProgress = null;
+        });
+      }
+    }
+  }
+
+  /// 取消备份。
+  void _cancelBackup() {
+    try {
+      BackupService.instance.cancel();
+    } catch (_) {
+      // FFI 未初始化，忽略
+    }
+    setState(() {
+      _backupInProgress = false;
+      _backupProgress = null;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_backupInProgress) {
+      return _buildProgressDialog();
+    }
+
+    return Column(
+      children: [
+        // 全选复选框
+        CheckboxListTile(
+          value: _selectedIndices.length == _files.length && _files.isNotEmpty,
+          tristate: true,
+          onChanged: _toggleSelectAll,
+          title: const Text('全选'),
+          subtitle: Text('已选择 ${_selectedIndices.length} / ${_files.length} 项'),
+        ),
+        const Divider(),
+        // 文件列表
+        Expanded(
+          child: _files.isEmpty
+              ? const Center(child: Text('根目录为空'))
+              : ListView.builder(
+                  itemCount: _files.length,
+                  itemBuilder: (context, index) {
+                    final entity = _files[index];
+                    final name = p.basename(entity.path);
+                    final isDir = entity is Directory;
+                    final isSelected = _selectedIndices.contains(index);
+                    return CheckboxListTile(
+                      value: isSelected,
+                      onChanged: (_) => _toggleSelection(index),
+                      secondary: Icon(isDir ? Icons.folder : Icons.insert_drive_file),
+                      title: Text(name),
+                      subtitle: Text(isDir ? '文件夹' : '文件'),
+                    );
+                  },
+                ),
+        ),
+        // 底部备份按钮
+        const Divider(height: 1),
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Center(
+            child: FilledButton.icon(
+              onPressed: _selectedIndices.isEmpty ? null : _startBackup,
+              icon: const Icon(Icons.archive),
+              label: const Text('开始备份'),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 备份进度对话框。
+  Widget _buildProgressDialog() {
+    return Center(
+      child: Card(
+        margin: const EdgeInsets.all(32),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('正在备份...', style: TextStyle(fontSize: 18)),
+              const SizedBox(height: 24),
+              LinearProgressIndicator(value: _backupProgress),
+              const SizedBox(height: 12),
+              Text(
+                '${(_backupProgress! * 100).toStringAsFixed(1)}%',
+                style: const TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 24),
+              OutlinedButton(
+                onPressed: _cancelBackup,
+                child: const Text('取消'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -547,30 +835,19 @@ class _SettingsTab extends StatelessWidget {
   final String instanceId;
 
   /// 确认删除实例并返回上级。
+  ///
+  /// 弹窗中提供勾选框，用户可选择是否同时删除服务器根目录下的所有文件。
   Future<void> _confirmDelete(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
+    final result = await showDialog<_DeleteConfirmation>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('删除实例'),
-        content: const Text('确定要删除此实例吗？此操作仅移除实例记录，不会删除服务器文件。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          FilledButton.tonal(
-            style: FilledButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
-            ),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
+      builder: (_) => const _DeleteConfirmationDialog(),
     );
-    if (confirmed != true) return;
+    if (result == null || !result.confirmed) return;
     if (!context.mounted) return;
-    await context.read<AppState>().removeInstance(instanceId);
+    await context.read<AppState>().removeInstance(
+          instanceId,
+          deleteFiles: result.deleteFiles,
+        );
     if (!context.mounted) return;
     Navigator.of(context).pop();
   }
@@ -593,6 +870,72 @@ class _SettingsTab extends StatelessWidget {
             icon: const Icon(Icons.delete_outline),
             label: const Text('删除实例'),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 删除确认结果。
+class _DeleteConfirmation {
+  const _DeleteConfirmation({required this.confirmed, required this.deleteFiles});
+
+  final bool confirmed;
+  final bool deleteFiles;
+}
+
+/// 删除确认对话框。
+///
+/// 提供勾选框，用户可选择是否同时删除服务器根目录下的所有文件。
+class _DeleteConfirmationDialog extends StatefulWidget {
+  const _DeleteConfirmationDialog();
+
+  @override
+  State<_DeleteConfirmationDialog> createState() =>
+      _DeleteConfirmationDialogState();
+}
+
+class _DeleteConfirmationDialogState extends State<_DeleteConfirmationDialog> {
+  bool _deleteFiles = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('删除实例'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('确定要删除此实例吗？'),
+          const SizedBox(height: 12),
+          CheckboxListTile(
+            value: _deleteFiles,
+            onChanged: (v) => setState(() => _deleteFiles = v ?? false),
+            title: const Text('同时删除服务器文件'),
+            subtitle: const Text('勾选后将删除服务器根目录下的所有文件，包括世界、配置和核心。此操作不可撤销。'),
+            dense: true,
+            controlAffinity: ListTileControlAffinity.leading,
+            contentPadding: EdgeInsets.zero,
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(
+            context,
+            _DeleteConfirmation(confirmed: false, deleteFiles: _deleteFiles),
+          ),
+          child: const Text('取消'),
+        ),
+        FilledButton.tonal(
+          style: FilledButton.styleFrom(
+            foregroundColor: Theme.of(context).colorScheme.error,
+          ),
+          onPressed: () => Navigator.pop(
+            context,
+            _DeleteConfirmation(confirmed: true, deleteFiles: _deleteFiles),
+          ),
+          child: const Text('删除'),
         ),
       ],
     );

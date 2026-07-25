@@ -3,6 +3,7 @@
 // 通过 ChangeNotifier 向 UI 暴露响应式状态，所有状态变更均会通知监听者并按需持久化。
 
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -133,7 +134,10 @@ class AppState extends ChangeNotifier {
   }
 
   /// 删除指定实例：强制终止进程、释放并移除其进程管理器，从持久化与内存列表中清除。
-  Future<void> removeInstance(String id) async {
+  ///
+  /// 当 [deleteFiles] 为 true 时，同时删除服务器根目录下的所有文件。
+  Future<void> removeInstance(String id, {bool deleteFiles = false}) async {
+    final instance = _instanceById(id);
     final manager = _managers.remove(id);
     if (manager != null) {
       // 先强制终止正在运行的进程，避免产生孤儿进程。
@@ -144,6 +148,17 @@ class AppState extends ChangeNotifier {
     _instances.removeWhere((e) => e.id == id);
     if (_selected?.id == id) {
       _selected = null;
+    }
+    // 可选：删除服务器根目录下的所有文件。
+    if (deleteFiles && instance != null && instance.rootPath.isNotEmpty) {
+      try {
+        final dir = Directory(instance.rootPath);
+        if (await dir.exists()) {
+          await dir.delete(recursive: true);
+        }
+      } catch (_) {
+        // 删除文件失败不影响实例记录的移除，忽略错误。
+      }
     }
     notifyListeners();
   }
