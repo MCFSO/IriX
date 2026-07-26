@@ -206,103 +206,88 @@ fn do_backup_inner(
     let mut writer = File::create(dst_path)?;
     let mut central_dir: Vec<u8> = Vec::new();
     let mut offset: u64 = 0;
-    let mut entry_count: u64 = 0;
 
-    // 3. 分批：并行压缩一批 → 顺序写入 → 释放内存 → 下一批
-    //    批大小 = 并行度 (平衡吞吐与内存), 限制在 [4, 32]
-    let batch_size = std::thread::available_parallelism()
-        .map(|n| n.get())
-        .unwrap_or(4)
-        .max(4)
-        .min(32);
-
-    for chunk in entries_to_compress.chunks(batch_size) {
-        // 批级取消检查
-        if CANCELLED.load(Ordering::SeqCst) {
-            return Err(io::Error::new(io::ErrorKind::Other, "cancelled"));
-        }
-
-        // 并行压缩本批文件 (CPU 密集部分真正并行)
-        let entries: Vec<Entry> = chunk
-            .par_iter()
-            .map(|entry| -> io::Result<Entry> {
-                // 文件级取消检查
-                if CANCELLED.load(Ordering::SeqCst) {
-                    return Err(io::Error::new(io::ErrorKind::Other, "cancelled"));
-                }
-
-                let path = entry.path();
-                // 归档内相对路径：去掉源目录前缀，并转为正斜杠
-                let rel_path = path.strip_prefix(src_path).unwrap_or(path);
-                let name = rel_path.to_string_lossy().replace('\\', "/");
-
-                // 读取文件内容
-                let mut file = File::open(path)?;
-                let mut data = Vec::new();
-                file.read_to_end(&mut data)?;
-                let real_size = data.len() as u64;
-
-                // 校正总量：若实际大小 > 估算 (文件增长或 metadata 曾失败)，补差
-                // 避免进度回调 >100%
-                let est = entry.metadata().ok().map(|m| m.len()).unwrap_or(0);
-                if real_size > est {
-                    total_bytes.fetch_add(real_size - est, Ordering::Relaxed);
-                }
-
-                // CRC32 (ZIP 规范要求)
-                let mut hasher = Hasher::new();
-                hasher.update(&data);
-                let crc32 = hasher.finalize();
-
-                // Deflate 压缩 (raw deflate, 无 zlib header, 级别 6)
-                let mut encoder = DeflateEncoder::new(Vec::new(), Compression::new(6));
-                encoder.write_all(&data)?;
-                let compressed = encoder.finish()?;
-
-                // DOS 时间戳 (ZIP 规范) - 元数据失败回退 1980-01-01
-                let (dos_time, dos_date) = entry
-                    .metadata()
-                    .ok()
-                    .and_then(|m| m.modified().ok())
-                    .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-                    .map(|d| epoch_to_dos(d.as_secs()))
-                    .unwrap_or((0, 0x0021)); // 1980-01-01 作为回退
-
-                // 进度 (原子累加)
-                processed_bytes.fetch_add(real_size, Ordering::Relaxed);
-                progress_cb(
-                    processed_bytes.load(Ordering::Relaxed),
-                    total_bytes.load(Ordering::Relaxed),
-                );
-
-                Ok(Entry {
-                    name,
-                    compressed,
-                    uncompressed_size: real_size,
-                    crc32,
-                    dos_time,
-                    dos_date,
-                })
-            })
-            .collect::<Result<_, _>>()?;
-
-        // 顺序写入本批 + 累积中央目录 (写盘阶段也响应取消)
-        for entry in &entries {
+    // 3. 并行压缩所有文件 (rayon 自动用满所有 CPU 核心)
+    //    所有压缩数据驻留内存直到写盘，换取最大并行吞吐
+    let entries: Vec<Entry> = entries_to_compress
+        .par_iter()
+        .map(|entry| -> io::Result<Entry> {
+            // 文件级取消检查
             if CANCELLED.load(Ordering::SeqCst) {
                 return Err(io::Error::new(io::ErrorKind::Other, "cancelled"));
             }
-            write_entry(&mut writer, entry, &mut offset, &mut central_dir)?;
-            entry_count += 1;
+
+            let path = entry.path();
+            // 归档内相对路径：去掉源目录前缀，并转为正斜杠
+            let rel_path = path.strip_prefix(src_path).unwrap_or(path);
+            let name = rel_path.to_string_lossy().replace('\\', "/");
+
+            // 读取文件内容
+            let mut file = File::open(path)?;
+            let mut data = Vec::new();
+            file.read_to_end(&mut data)?;
+            let real_size = data.len() as u64;
+
+            // 校正总量：若实际大小 > 估算 (文件增长或 metadata 曾失败)，补差
+            // 避免进度回调 >100%
+            let est = entry.metadata().ok().map(|m| m.len()).unwrap_or(0);
+            if real_size > est {
+                total_bytes.fetch_add(real_size - est, Ordering::Relaxed);
+            }
+
+            // CRC32 (ZIP 规范要求)
+            let mut hasher = Hasher::new();
+            hasher.update(&data);
+            let crc32 = hasher.finalize();
+
+            // Deflate 压缩 (raw deflate, 无 zlib header, 级别 6)
+            let mut encoder = DeflateEncoder::new(Vec::new(), Compression::new(6));
+            encoder.write_all(&data)?;
+            let compressed = encoder.finish()?;
+
+            // DOS 时间戳 (ZIP 规范) - 元数据失败回退 1980-01-01
+            let (dos_time, dos_date) = entry
+                .metadata()
+                .ok()
+                .and_then(|m| m.modified().ok())
+                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                .map(|d| epoch_to_dos(d.as_secs()))
+                .unwrap_or((0, 0x0021)); // 1980-01-01 作为回退
+
+            // 进度 (原子累加)
+            processed_bytes.fetch_add(real_size, Ordering::Relaxed);
+            progress_cb(
+                processed_bytes.load(Ordering::Relaxed),
+                total_bytes.load(Ordering::Relaxed),
+            );
+
+            Ok(Entry {
+                name,
+                compressed,
+                uncompressed_size: real_size,
+                crc32,
+                dos_time,
+                dos_date,
+            })
+        })
+        .collect::<Result<_, _>>()?;
+
+    // 4. 串行写入 ZIP 归档 (写盘阶段也响应取消)
+    for entry in &entries {
+        if CANCELLED.load(Ordering::SeqCst) {
+            return Err(io::Error::new(io::ErrorKind::Other, "cancelled"));
         }
-        // entries 在此离开作用域，压缩数据被释放，避免全量驻留内存
+        write_entry(&mut writer, entry, &mut offset, &mut central_dir)?;
     }
 
-    // 4. 写入中央目录
+    let entry_count = entries.len() as u64;
+
+    // 5. 写入中央目录
     let cd_offset = offset;
     let cd_size = central_dir.len() as u64;
     writer.write_all(&central_dir)?;
 
-    // 5. ZIP64 结尾记录 (任一字段溢出 32/16 位时需要)
+    // 6. ZIP64 结尾记录 (任一字段溢出 32/16 位时需要)
     let entries_overflow = entry_count > 0xFFFF;
     let cd_size_overflow = cd_size > 0xFFFFFFFF;
     let cd_offset_overflow = cd_offset > 0xFFFFFFFF;
@@ -328,7 +313,7 @@ fn do_backup_inner(
         writer.write_all(&1u32.to_le_bytes())?; // 总盘数
     }
 
-    // 6. 普通 EOCD (溢出字段填 0xFFFF/0xFFFFFFFF 指示查 ZIP64)
+    // 7. 普通 EOCD (溢出字段填 0xFFFF/0xFFFFFFFF 指示查 ZIP64)
     writer.write_all(&0x06054b50u32.to_le_bytes())?; // 签名
     writer.write_all(&0u16.to_le_bytes())?; // 盘号
     writer.write_all(&0u16.to_le_bytes())?; // 中央目录所在盘
