@@ -489,53 +489,46 @@ class _BackupTabState extends State<_BackupTab> {
       _backupProgress = 0.0;
     });
 
-    // 尝试调用 Rust FFI
+    // 尝试调用 Rust FFI (在后台 isolate 执行，不阻塞 UI)
     try {
       final backupService = BackupService.instance;
-      
-      // 在后台 isolate 执行备份
+
       final result = await backupService.backup(
         widget.rootPath,
         outputPath,
         selectedNames,
         onProgress: (progress) {
-          // FFI 回调在 native 线程中执行，使用 scheduleAnimationFrame 安全更新
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && _backupInProgress) {
-              setState(() {
-                _backupProgress = progress;
-              });
-            }
-          });
+          // 进度消息在主 isolate 事件循环触发，可直接更新 UI
+          if (mounted && _backupInProgress) {
+            setState(() {
+              _backupProgress = progress;
+            });
+          }
         },
       );
 
       if (!mounted) return;
 
-      if (result == 0) {
+      if (result.isSuccess) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('备份已保存到 $outputPath')),
         );
-      } else if (result == 3) {
+      } else if (result.isCancelled) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('备份已取消')),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('备份失败，错误码: $result')),
+          SnackBar(
+              content: Text(
+                  '备份失败: ${result.error ?? '错误码 ${result.code}'}')),
         );
       }
     } catch (e) {
-      // FFI 调用失败，显示错误信息
-      String errorMsg = e.toString();
-      try {
-        errorMsg = BackupService.instance.getLastError() ?? errorMsg;
-      } catch (_) {
-        // FFI 未初始化，使用异常信息
-      }
+      // isolate 启动失败等异常
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('备份失败: $errorMsg')),
+          SnackBar(content: Text('备份失败: $e')),
         );
       }
     } finally {

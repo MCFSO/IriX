@@ -38,3 +38,14 @@ target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)
+
+# 把 Rust 备份模块 DLL 复制到 exe 输出目录 (构建后自动执行)
+# 仅在 DLL 已存在时生效 (需先运行 build_rust.bat 编译 Rust)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/xmc_backup.dll")
+  add_custom_command(TARGET ${BINARY_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${CMAKE_CURRENT_SOURCE_DIR}/xmc_backup.dll"
+      "$<TARGET_FILE_DIR:${BINARY_NAME}>/xmc_backup.dll"
+    COMMENT "Copying xmc_backup.dll to output directory"
+  )
+endif()

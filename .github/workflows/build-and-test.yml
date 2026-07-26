@@ -77,6 +77,9 @@ jobs:
       - name: Build Windows
         run: flutter build windows --release
 
+      - name: Copy Rust DLL to build output
+        run: Copy-Item windows/runner/xmc_backup.dll build/windows/x64/runner/Release/ -Force
+
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v5
         with:

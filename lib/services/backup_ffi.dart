@@ -1,8 +1,11 @@
 // Rust FFI 备份压缩绑定
 // 通过 dart:ffi 调用 Rust 编译的动态库实现 ZIP (Deflate) 压缩
+// 所有 FFI 调用在后台 isolate 执行，避免阻塞 UI 线程
 
+import 'dart:async';
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:ffi/ffi.dart';
 import 'package:path/path.dart' as p;
@@ -33,26 +36,52 @@ typedef FreeStringC = Void Function(Pointer<Utf8> ptr);
 typedef FreeStringDart = void Function(Pointer<Utf8> ptr);
 
 typedef ProgressCallbackC = Void Function(Uint64, Uint64);
-typedef ProgressCallbackDart = void Function(int, int);
+
+/// 备份结果
+class BackupResult {
+  /// 0=成功, 1=路径无效, 2=IO错误, 3=已取消, 4=其他
+  final int code;
+
+  /// 失败时的错误信息 (来自 Rust get_last_error)
+  final String? error;
+
+  const BackupResult(this.code, this.error);
+
+  bool get isSuccess => code == 0;
+  bool get isCancelled => code == 3;
+}
+
+/// 传递给后台 isolate 的请求
+class _BackupRequest {
+  final String srcPath;
+  final String dstPath;
+  final List<String> files;
+  final SendPort sendPort;
+
+  const _BackupRequest(this.srcPath, this.dstPath, this.files, this.sendPort);
+}
+
+/// 进度消息 (后台 isolate → 主 isolate)
+class _ProgressMsg {
+  final double progress;
+
+  const _ProgressMsg(this.progress);
+}
 
 /// 备份服务 - Rust FFI 封装
+///
+/// 所有耗时的 FFI 调用都在后台 isolate 执行，UI 线程不会阻塞。
+/// 进度通过 NativeCallable + SendPort 实时回传主 isolate。
 class BackupService {
   static BackupService? _instance;
   static DynamicLibrary? _lib;
 
-  late final BackupDirectoryDart _backupDirectory;
   late final CancelBackupDart _cancelBackup;
   late final GetLastErrorDart _getLastError;
   late final FreeStringDart _freeString;
 
-  /// 进度回调
-  void Function(double progress)? onProgress;
-
   BackupService._() {
     _lib = _openLibrary();
-    _backupDirectory = _lib!.lookupFunction<BackupDirectoryC, BackupDirectoryDart>(
-      'backup_directory',
-    );
     _cancelBackup = _lib!.lookupFunction<CancelBackupC, CancelBackupDart>(
       'cancel_backup',
     );
@@ -151,66 +180,126 @@ class BackupService {
     return paths;
   }
 
-  /// 执行备份
+  /// 执行备份 (在后台 isolate，不阻塞 UI)
   ///
   /// [srcPath] 源目录
   /// [dstPath] 目标文件路径
   /// [files] 要备份的文件/文件夹列表
-  /// [onProgress] 进度回调 (0.0 ~ 1.0)
+  /// [onProgress] 进度回调 (0.0 ~ 1.0)，在主 isolate 触发
   ///
-  /// 返回值:
-  /// - 0: 成功
-  /// - 1: 路径无效
-  /// - 2: IO 错误
-  /// - 3: 用户取消
-  /// - 4: 其他错误
-  Future<int> backup(
+  /// 返回 [BackupResult]，包含结果码和（失败时）错误信息
+  Future<BackupResult> backup(
     String srcPath,
     String dstPath,
     List<String> files, {
     void Function(double progress)? onProgress,
   }) async {
-    this.onProgress = onProgress;
+    final responsePort = ReceivePort();
+    final completer = Completer<BackupResult>();
 
-    // 分配 native 内存
-    final srcPtr = srcPath.toNativeUtf8();
-    final dstPtr = dstPath.toNativeUtf8();
+    late StreamSubscription sub;
+    sub = responsePort.listen((msg) {
+      if (msg is _ProgressMsg) {
+        onProgress?.call(msg.progress);
+      } else if (msg is BackupResult) {
+        completer.complete(msg);
+      }
+    });
 
-    // 创建文件列表指针数组
-    final filesPtr = calloc<Pointer<Utf8>>(files.length);
-    for (var i = 0; i < files.length; i++) {
-      filesPtr[i] = files[i].toNativeUtf8();
-    }
+    await Isolate.spawn(
+      _backupIsolate,
+      _BackupRequest(srcPath, dstPath, files, responsePort.sendPort),
+    );
 
-    // 创建进度回调
-    final progressCb = Pointer.fromFunction<ProgressCallbackC>(_progressCallback);
+    final result = await completer.future;
+    await sub.cancel();
+    responsePort.close();
+    return result;
+  }
+
+  /// 后台 isolate 入口：打开库、调用 FFI、发送结果与进度
+  ///
+  /// FFI 调用在此 isolate 同步执行，但因为是后台 isolate，
+  /// 不会阻塞主 isolate 的 UI。进度通过 NativeCallable 回调
+  /// 经 SendPort 实时发回主 isolate。
+  static void _backupIsolate(_BackupRequest req) {
+    Pointer<Utf8>? srcPtr;
+    Pointer<Utf8>? dstPtr;
+    Pointer<Pointer<Utf8>>? filesPtr;
+    NativeCallable<ProgressCallbackC>? cb;
 
     try {
-      final result = _backupDirectory(
+      // 后台 isolate 独立打开库 (DynamicLibrary 句柄不能跨 isolate 传递)
+      final lib = _openLibrary();
+      final backupDirectory =
+          lib.lookupFunction<BackupDirectoryC, BackupDirectoryDart>(
+        'backup_directory',
+      );
+      final getLastError =
+          lib.lookupFunction<GetLastErrorC, GetLastErrorDart>('get_last_error');
+      final freeString =
+          lib.lookupFunction<FreeStringC, FreeStringDart>('free_string');
+
+      // 分配 native 内存
+      srcPtr = req.srcPath.toNativeUtf8();
+      dstPtr = req.dstPath.toNativeUtf8();
+      filesPtr = calloc<Pointer<Utf8>>(req.files.length);
+      for (var i = 0; i < req.files.length; i++) {
+        filesPtr[i] = req.files[i].toNativeUtf8();
+      }
+
+      // NativeCallable.isolateLocal：回调在本 isolate 执行，
+      // 闭包可捕获 SendPort，把进度发回主 isolate
+      cb = NativeCallable<ProgressCallbackC>.isolateLocal(
+        (int processed, int total) {
+          final progress = total > 0 ? processed / total : 0.0;
+          req.sendPort.send(_ProgressMsg(progress));
+        },
+      );
+
+      final code = backupDirectory(
         srcPtr,
         dstPtr,
         filesPtr,
-        files.length,
-        progressCb,
+        req.files.length,
+        cb.nativeFunction,
       );
-      return result;
-    } finally {
-      // 释放内存
-      calloc.free(srcPtr);
-      calloc.free(dstPtr);
-      for (var i = 0; i < files.length; i++) {
-        calloc.free(filesPtr[i]);
+
+      // 在后台 isolate 获取错误信息 (thread_local 属于此 isolate 的线程)
+      String? error;
+      if (code != 0 && code != 3) {
+        final errPtr = getLastError();
+        if (errPtr != nullptr) {
+          try {
+            error = errPtr.toDartString();
+          } finally {
+            freeString(errPtr);
+          }
+        }
       }
-      calloc.free(filesPtr);
+      req.sendPort.send(BackupResult(code, error));
+    } catch (e) {
+      req.sendPort.send(BackupResult(4, '后台 isolate 异常: $e'));
+    } finally {
+      cb?.close();
+      if (srcPtr != null) calloc.free(srcPtr);
+      if (dstPtr != null) calloc.free(dstPtr);
+      if (filesPtr != null) {
+        // 逐个释放字符串指针，再释放指针数组本身
+        for (var i = 0; i < req.files.length; i++) {
+          calloc.free(filesPtr[i]);
+        }
+        calloc.free(filesPtr);
+      }
     }
   }
 
-  /// 取消备份
+  /// 取消备份 (设置全局标志，后台 isolate 的压缩线程会检测到)
   void cancel() {
     _cancelBackup();
   }
 
-  /// 获取最后的错误信息
+  /// 获取最后的错误信息 (主 isolate 调用，仅用于未进入后台 isolate 的场景)
   String? getLastError() {
     final ptr = _getLastError();
     if (ptr == nullptr) return null;
@@ -219,11 +308,5 @@ class BackupService {
     } finally {
       _freeString(ptr);
     }
-  }
-
-  /// 进度回调 (native 调用)
-  static void _progressCallback(int processed, int total) {
-    final progress = total > 0 ? processed / total : 0.0;
-    instance.onProgress?.call(progress);
   }
 }
