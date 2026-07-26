@@ -26,6 +26,12 @@ typedef BackupDirectoryDart = int Function(
 typedef CancelBackupC = Void Function();
 typedef CancelBackupDart = void Function();
 
+typedef GetLastErrorC = Pointer<Utf8> Function();
+typedef GetLastErrorDart = Pointer<Utf8> Function();
+
+typedef FreeStringC = Void Function(Pointer<Utf8> ptr);
+typedef FreeStringDart = void Function(Pointer<Utf8> ptr);
+
 typedef ProgressCallbackC = Void Function(Uint64, Uint64);
 typedef ProgressCallbackDart = void Function(int, int);
 
@@ -36,6 +42,8 @@ class BackupService {
 
   late final BackupDirectoryDart _backupDirectory;
   late final CancelBackupDart _cancelBackup;
+  late final GetLastErrorDart _getLastError;
+  late final FreeStringDart _freeString;
 
   /// 进度回调
   void Function(double progress)? onProgress;
@@ -47,6 +55,12 @@ class BackupService {
     );
     _cancelBackup = _lib!.lookupFunction<CancelBackupC, CancelBackupDart>(
       'cancel_backup',
+    );
+    _getLastError = _lib!.lookupFunction<GetLastErrorC, GetLastErrorDart>(
+      'get_last_error',
+    );
+    _freeString = _lib!.lookupFunction<FreeStringC, FreeStringDart>(
+      'free_string',
     );
   }
 
@@ -180,6 +194,17 @@ class BackupService {
   /// 取消备份
   void cancel() {
     _cancelBackup();
+  }
+
+  /// 获取最后的错误信息
+  String? getLastError() {
+    final ptr = _getLastError();
+    if (ptr == nullptr) return null;
+    try {
+      return ptr.toDartString();
+    } finally {
+      _freeString(ptr);
+    }
   }
 
   /// 进度回调 (native 调用)

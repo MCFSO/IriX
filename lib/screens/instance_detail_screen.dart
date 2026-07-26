@@ -526,17 +526,16 @@ class _BackupTabState extends State<_BackupTab> {
         );
       }
     } catch (e) {
-      // FFI 调用失败，使用模拟进度
-      for (var i = 0; i <= 100; i++) {
-        await Future.delayed(const Duration(milliseconds: 50));
-        if (!mounted || !_backupInProgress) break;
-        setState(() {
-          _backupProgress = i / 100;
-        });
+      // FFI 调用失败，显示错误信息
+      String errorMsg = e.toString();
+      try {
+        errorMsg = BackupService.instance.getLastError() ?? errorMsg;
+      } catch (_) {
+        // FFI 未初始化，使用异常信息
       }
-      if (mounted && _backupInProgress) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('备份已保存到 $outputPath (模拟模式)')),
+          SnackBar(content: Text('备份失败: $errorMsg')),
         );
       }
     } finally {
