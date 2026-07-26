@@ -1,0 +1,10 @@
+^D:\XMCSERVERLANCHER\RUST\TARGET\RELEASE\BUILD\LIBZ-NG-SYS-BA5946CB9DA820FC\OUT\BUILD\CMAKEFILES\B98C55B853D21AF446D5F14EDF084EAB\INSTALL_FORCE.RULE
+setlocal
+cd .
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

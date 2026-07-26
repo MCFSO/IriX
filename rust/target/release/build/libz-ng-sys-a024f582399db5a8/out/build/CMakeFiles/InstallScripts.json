@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"D:/xmcserverlancher/rust/target/release/build/libz-ng-sys-a024f582399db5a8/out/build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

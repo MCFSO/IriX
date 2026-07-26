@@ -51,6 +51,9 @@ jobs:
         with:
           targets: x86_64-pc-windows-msvc
 
+      - name: Setup MSVC C compiler
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2
         with:
@@ -152,6 +155,9 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-apple-darwin, aarch64-apple-darwin
+
+      - name: Setup C compiler and build tools
+        run: brew install cmake
 
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2

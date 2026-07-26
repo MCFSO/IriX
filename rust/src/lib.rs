@@ -1,18 +1,22 @@
 //! XMC Server Launcher 备份压缩模块
 //!
 //! 提供 ZIP (Deflate) 格式的压缩功能，供 Flutter 通过 FFI 调用。
-//! 生成可被任意标准工具解压的 .zip 归档。
+//! 使用 rayon 并行压缩多个文件，再串行写入标准 ZIP 归档，
+//! 输出可被任意标准工具解压的 .zip 文件。
 
 use std::cell::RefCell;
 use std::ffi::{CStr, CString};
 use std::fs::File;
-use std::io;
+use std::io::{self, Read, Write};
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::time::UNIX_EPOCH;
 
+use crc32fast::Hasher;
+use flate2::write::DeflateEncoder;
+use flate2::Compression;
+use rayon::prelude::*;
 use walkdir::WalkDir;
-use zip::write::SimpleFileOptions;
-use zip::{CompressionMethod, ZipWriter};
 
 thread_local! {
     static LAST_ERROR: RefCell<Option<CString>> = const { RefCell::new(None) };
@@ -133,11 +137,45 @@ pub extern "C" fn free_string(s: *mut libc::c_char) {
     }
 }
 
+/// 已压缩的文件条目 (用于串行写入 ZIP)
+struct Entry {
+    /// 归档内路径 (正斜杠分隔)
+    name: String,
+    /// 压缩后数据
+    compressed: Vec<u8>,
+    /// 原始大小
+    uncompressed_size: u64,
+    /// CRC32 校验值
+    crc32: u32,
+    /// DOS 时间
+    dos_time: u16,
+    /// DOS 日期
+    dos_date: u16,
+}
+
 /// 内部备份实现
 ///
-/// 使用 `zip` crate 生成标准 ZIP 归档 (Deflate 压缩)，
-/// 输出合法的 .zip 文件，可被任意标准工具解压。
+/// 使用 rayon 分批并行压缩 (CPU 密集部分)，每批压缩完立即顺序写入磁盘
+/// 并释放内存，避免全部压缩数据驻留 RAM。支持 ZIP64 (大归档/大文件/多条目)。
 fn do_backup(
+    src_dir: &str,
+    dst_file: &str,
+    files: &[&str],
+    progress_cb: ProgressCallback,
+) -> io::Result<()> {
+    let result = do_backup_inner(src_dir, dst_file, files, progress_cb);
+    // 取消时删除半成品文件
+    if is_cancelled_err(&result) {
+        let _ = std::fs::remove_file(dst_file);
+    }
+    result
+}
+
+fn is_cancelled_err(result: &io::Result<()>) -> bool {
+    matches!(result, Err(e) if e.kind() == io::ErrorKind::Other && e.to_string() == "cancelled")
+}
+
+fn do_backup_inner(
     src_dir: &str,
     dst_file: &str,
     files: &[&str],
@@ -146,67 +184,392 @@ fn do_backup(
     let src_path = Path::new(src_dir);
     let dst_path = Path::new(dst_file);
 
-    // 创建目标文件
-    let dst = File::create(dst_path)?;
-    let mut zip = ZipWriter::new(dst);
-
-    // ZIP 条目选项：Deflate 压缩，级别 6
-    let options = SimpleFileOptions::default()
-        .compression_method(CompressionMethod::Deflated)
-        .compression_level(Some(6));
-
-    // 统计总字节数，用于进度回调
-    let mut total_bytes: u64 = 0;
+    // 1. 收集所有待压缩文件 + 估算总字节数 (metadata 失败按 0 计，后续在并行阶段校正)
     let mut entries_to_compress: Vec<walkdir::DirEntry> = Vec::new();
-
+    let mut estimated_total: u64 = 0;
     for file_name in files {
         let full_path = src_path.join(file_name);
         if full_path.exists() {
             for entry in WalkDir::new(&full_path).into_iter().filter_map(|e| e.ok()) {
                 if entry.file_type().is_file() {
-                    if let Ok(metadata) = entry.metadata() {
-                        total_bytes += metadata.len();
-                    }
+                    let est = entry.metadata().map(|m| m.len()).unwrap_or(0);
+                    estimated_total += est;
                     entries_to_compress.push(entry);
                 }
             }
         }
     }
+    let total_bytes = AtomicU64::new(estimated_total.max(1));
+    let processed_bytes = AtomicU64::new(0);
 
-    if total_bytes == 0 {
-        total_bytes = 1; // 避免除零
-    }
+    // 2. 创建输出文件 + 中央目录累加器
+    let mut writer = File::create(dst_path)?;
+    let mut central_dir: Vec<u8> = Vec::new();
+    let mut offset: u64 = 0;
+    let mut entry_count: u64 = 0;
 
-    let mut processed_bytes: u64 = 0;
+    // 3. 分批：并行压缩一批 → 顺序写入 → 释放内存 → 下一批
+    //    批大小 = 并行度 (平衡吞吐与内存), 限制在 [4, 32]
+    let batch_size = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4)
+        .max(4)
+        .min(32);
 
-    for entry in &entries_to_compress {
-        // 检查取消
+    for chunk in entries_to_compress.chunks(batch_size) {
+        // 批级取消检查
         if CANCELLED.load(Ordering::SeqCst) {
             return Err(io::Error::new(io::ErrorKind::Other, "cancelled"));
         }
 
-        let path = entry.path();
-        // 归档内的相对路径：去掉源目录前缀
-        let rel_path = path.strip_prefix(src_path).unwrap_or(path);
-        // ZIP 标准使用正斜杠作为路径分隔符
-        let archive_name = rel_path.to_string_lossy().replace('\\', "/");
+        // 并行压缩本批文件 (CPU 密集部分真正并行)
+        let entries: Vec<Entry> = chunk
+            .par_iter()
+            .map(|entry| -> io::Result<Entry> {
+                // 文件级取消检查
+                if CANCELLED.load(Ordering::SeqCst) {
+                    return Err(io::Error::new(io::ErrorKind::Other, "cancelled"));
+                }
 
-        // 开始新 ZIP 条目
-        zip.start_file(archive_name, options)?;
+                let path = entry.path();
+                // 归档内相对路径：去掉源目录前缀，并转为正斜杠
+                let rel_path = path.strip_prefix(src_path).unwrap_or(path);
+                let name = rel_path.to_string_lossy().replace('\\', "/");
 
-        // 复制文件内容到 ZIP 流
-        let mut f = File::open(path)?;
-        io::copy(&mut f, &mut zip)?;
+                // 读取文件内容
+                let mut file = File::open(path)?;
+                let mut data = Vec::new();
+                file.read_to_end(&mut data)?;
+                let real_size = data.len() as u64;
 
-        if let Ok(metadata) = entry.metadata() {
-            processed_bytes += metadata.len();
+                // 校正总量：若实际大小 > 估算 (文件增长或 metadata 曾失败)，补差
+                // 避免进度回调 >100%
+                let est = entry.metadata().ok().map(|m| m.len()).unwrap_or(0);
+                if real_size > est {
+                    total_bytes.fetch_add(real_size - est, Ordering::Relaxed);
+                }
+
+                // CRC32 (ZIP 规范要求)
+                let mut hasher = Hasher::new();
+                hasher.update(&data);
+                let crc32 = hasher.finalize();
+
+                // Deflate 压缩 (raw deflate, 无 zlib header, 级别 6)
+                let mut encoder = DeflateEncoder::new(Vec::new(), Compression::new(6));
+                encoder.write_all(&data)?;
+                let compressed = encoder.finish()?;
+
+                // DOS 时间戳 (ZIP 规范) - 元数据失败回退 1980-01-01
+                let (dos_time, dos_date) = entry
+                    .metadata()
+                    .ok()
+                    .and_then(|m| m.modified().ok())
+                    .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                    .map(|d| epoch_to_dos(d.as_secs()))
+                    .unwrap_or((0, 0x0021)); // 1980-01-01 作为回退
+
+                // 进度 (原子累加)
+                processed_bytes.fetch_add(real_size, Ordering::Relaxed);
+                progress_cb(
+                    processed_bytes.load(Ordering::Relaxed),
+                    total_bytes.load(Ordering::Relaxed),
+                );
+
+                Ok(Entry {
+                    name,
+                    compressed,
+                    uncompressed_size: real_size,
+                    crc32,
+                    dos_time,
+                    dos_date,
+                })
+            })
+            .collect::<Result<_, _>>()?;
+
+        // 顺序写入本批 + 累积中央目录 (写盘阶段也响应取消)
+        for entry in &entries {
+            if CANCELLED.load(Ordering::SeqCst) {
+                return Err(io::Error::new(io::ErrorKind::Other, "cancelled"));
+            }
+            write_entry(&mut writer, entry, &mut offset, &mut central_dir)?;
+            entry_count += 1;
         }
-
-        // 调用进度回调
-        progress_cb(processed_bytes, total_bytes);
+        // entries 在此离开作用域，压缩数据被释放，避免全量驻留内存
     }
 
-    // 完成 ZIP 归档写入 (写入中央目录记录)
-    zip.finish()?;
+    // 4. 写入中央目录
+    let cd_offset = offset;
+    let cd_size = central_dir.len() as u64;
+    writer.write_all(&central_dir)?;
+
+    // 5. ZIP64 结尾记录 (任一字段溢出 32/16 位时需要)
+    let entries_overflow = entry_count > 0xFFFF;
+    let cd_size_overflow = cd_size > 0xFFFFFFFF;
+    let cd_offset_overflow = cd_offset > 0xFFFFFFFF;
+    let needs_zip64 = entries_overflow || cd_size_overflow || cd_offset_overflow;
+
+    if needs_zip64 {
+        let zip64_eocd_offset = cd_offset + cd_size;
+        // ZIP64 EOCD (固定部分 44 字节)
+        writer.write_all(&0x06064b50u32.to_le_bytes())?; // 签名
+        writer.write_all(&44u64.to_le_bytes())?; // 记录大小 (后续固定字段)
+        writer.write_all(&45u16.to_le_bytes())?; // 生成版本 (4.5)
+        writer.write_all(&45u16.to_le_bytes())?; // 需求版本 (4.5)
+        writer.write_all(&0u32.to_le_bytes())?; // 盘号
+        writer.write_all(&0u32.to_le_bytes())?; // 中央目录所在盘
+        writer.write_all(&entry_count.to_le_bytes())?; // 本盘条目数
+        writer.write_all(&entry_count.to_le_bytes())?; // 总条目数
+        writer.write_all(&cd_size.to_le_bytes())?; // 中央目录大小
+        writer.write_all(&cd_offset.to_le_bytes())?; // 中央目录偏移
+        // ZIP64 EOCD 定位器
+        writer.write_all(&0x07064b50u32.to_le_bytes())?; // 签名
+        writer.write_all(&0u32.to_le_bytes())?; // ZIP64 EOCD 所在盘
+        writer.write_all(&zip64_eocd_offset.to_le_bytes())?; // 偏移
+        writer.write_all(&1u32.to_le_bytes())?; // 总盘数
+    }
+
+    // 6. 普通 EOCD (溢出字段填 0xFFFF/0xFFFFFFFF 指示查 ZIP64)
+    writer.write_all(&0x06054b50u32.to_le_bytes())?; // 签名
+    writer.write_all(&0u16.to_le_bytes())?; // 盘号
+    writer.write_all(&0u16.to_le_bytes())?; // 中央目录所在盘
+    writer.write_all(
+        &(if entries_overflow {
+            0xFFFF
+        } else {
+            entry_count as u16
+        })
+        .to_le_bytes(),
+    )?; // 本盘条目数
+    writer.write_all(
+        &(if entries_overflow {
+            0xFFFF
+        } else {
+            entry_count as u16
+        })
+        .to_le_bytes(),
+    )?; // 总条目数
+    writer.write_all(
+        &(if cd_size_overflow {
+            0xFFFFFFFF
+        } else {
+            cd_size as u32
+        })
+        .to_le_bytes(),
+    )?; // 中央目录大小
+    writer.write_all(
+        &(if cd_offset_overflow {
+            0xFFFFFFFF
+        } else {
+            cd_offset as u32
+        })
+        .to_le_bytes(),
+    )?; // 中央目录偏移
+    writer.write_all(&0u16.to_le_bytes())?; // 注释长度
+
+    writer.flush()?;
     Ok(())
+}
+
+/// 写入单个条目的本地文件头 + 数据，并累积中央目录头。
+/// 支持 ZIP64 (单文件 >4GB 或本地头偏移 >4GB)。
+fn write_entry(
+    writer: &mut File,
+    entry: &Entry,
+    offset: &mut u64,
+    central_dir: &mut Vec<u8>,
+) -> io::Result<()> {
+    let lfh_offset = *offset;
+    let comp_size = entry.compressed.len() as u64;
+    let uncomp_size = entry.uncompressed_size;
+    let needs_entry_zip64 = comp_size > 0xFFFFFFFF || uncomp_size > 0xFFFFFFFF;
+
+    // --- 本地文件头 ---
+    // LFH 的 ZIP64 extra (仅含 uncomp_size + comp_size, 8+8=16 字节)
+    let mut lfh_extra: Vec<u8> = Vec::new();
+    if needs_entry_zip64 {
+        lfh_extra.extend_from_slice(&0x0001u16.to_le_bytes()); // ZIP64 头 ID
+        lfh_extra.extend_from_slice(&16u16.to_le_bytes()); // 数据长度
+        lfh_extra.extend_from_slice(&uncomp_size.to_le_bytes());
+        lfh_extra.extend_from_slice(&comp_size.to_le_bytes());
+    }
+    let comp_field = if needs_entry_zip64 {
+        0xFFFFFFFF
+    } else {
+        comp_size as u32
+    };
+    let uncomp_field = if needs_entry_zip64 {
+        0xFFFFFFFF
+    } else {
+        uncomp_size as u32
+    };
+
+    writer.write_all(&0x04034b50u32.to_le_bytes())?; // 签名
+    writer.write_all(&(if needs_entry_zip64 { 45u16 } else { 20u16 }).to_le_bytes())?; // 需求版本
+    writer.write_all(&0u16.to_le_bytes())?; // 通用标志位
+    writer.write_all(&8u16.to_le_bytes())?; // 压缩方法: Deflate
+    writer.write_all(&entry.dos_time.to_le_bytes())?;
+    writer.write_all(&entry.dos_date.to_le_bytes())?;
+    writer.write_all(&entry.crc32.to_le_bytes())?; // CRC32 始终为实际值
+    writer.write_all(&comp_field.to_le_bytes())?; // 压缩大小
+    writer.write_all(&uncomp_field.to_le_bytes())?; // 未压缩大小
+    writer.write_all(&(entry.name.len() as u16).to_le_bytes())?; // 文件名长度
+    writer.write_all(&(lfh_extra.len() as u16).to_le_bytes())?; // 额外字段长度
+    writer.write_all(entry.name.as_bytes())?;
+    writer.write_all(&lfh_extra)?;
+
+    *offset += 30 + entry.name.len() as u64 + lfh_extra.len() as u64;
+
+    // 压缩数据
+    writer.write_all(&entry.compressed)?;
+    *offset += entry.compressed.len() as u64;
+
+    // --- 中央目录头 ---
+    let needs_cd_offset_zip64 = lfh_offset > 0xFFFFFFFF;
+    let any_cd_zip64 = needs_entry_zip64 || needs_cd_offset_zip64;
+    // CDH 的 ZIP64 extra: 仅包含被掩码的字段 (uncomp, comp, offset 按需)
+    let mut cdh_extra: Vec<u8> = Vec::new();
+    if any_cd_zip64 {
+        let mut data: Vec<u8> = Vec::new();
+        if needs_entry_zip64 {
+            data.extend_from_slice(&uncomp_size.to_le_bytes());
+            data.extend_from_slice(&comp_size.to_le_bytes());
+        }
+        if needs_cd_offset_zip64 {
+            data.extend_from_slice(&lfh_offset.to_le_bytes());
+        }
+        cdh_extra.extend_from_slice(&0x0001u16.to_le_bytes());
+        cdh_extra.extend_from_slice(&(data.len() as u16).to_le_bytes());
+        cdh_extra.extend_from_slice(&data);
+    }
+    let cdh_comp = if needs_entry_zip64 {
+        0xFFFFFFFF
+    } else {
+        comp_size as u32
+    };
+    let cdh_uncomp = if needs_entry_zip64 {
+        0xFFFFFFFF
+    } else {
+        uncomp_size as u32
+    };
+    let cdh_off = if needs_cd_offset_zip64 {
+        0xFFFFFFFF
+    } else {
+        lfh_offset as u32
+    };
+
+    central_dir.extend_from_slice(&0x02014b50u32.to_le_bytes()); // 签名
+    central_dir.extend_from_slice(&(if any_cd_zip64 { 45u16 } else { 20u16 }).to_le_bytes()); // 生成版本
+    central_dir.extend_from_slice(&(if any_cd_zip64 { 45u16 } else { 20u16 }).to_le_bytes()); // 需求版本
+    central_dir.extend_from_slice(&0u16.to_le_bytes()); // 标志位
+    central_dir.extend_from_slice(&8u16.to_le_bytes()); // 压缩方法
+    central_dir.extend_from_slice(&entry.dos_time.to_le_bytes());
+    central_dir.extend_from_slice(&entry.dos_date.to_le_bytes());
+    central_dir.extend_from_slice(&entry.crc32.to_le_bytes());
+    central_dir.extend_from_slice(&cdh_comp.to_le_bytes());
+    central_dir.extend_from_slice(&cdh_uncomp.to_le_bytes());
+    central_dir.extend_from_slice(&(entry.name.len() as u16).to_le_bytes());
+    central_dir.extend_from_slice(&(cdh_extra.len() as u16).to_le_bytes());
+    central_dir.extend_from_slice(&0u16.to_le_bytes()); // 注释
+    central_dir.extend_from_slice(&0u16.to_le_bytes()); // 起始盘号
+    central_dir.extend_from_slice(&0u16.to_le_bytes()); // 内部属性
+    central_dir.extend_from_slice(&0u32.to_le_bytes()); // 外部属性
+    central_dir.extend_from_slice(&cdh_off.to_le_bytes()); // 本地头偏移
+    central_dir.extend_from_slice(entry.name.as_bytes());
+    central_dir.extend_from_slice(&cdh_extra);
+
+    Ok(())
+}
+
+/// Unix epoch 秒数 → DOS 时间戳 (time, date)
+/// ZIP 规范使用 MS-DOS 时间格式 (16 位时间 + 16 位日期)
+fn epoch_to_dos(secs: u64) -> (u16, u16) {
+    let days = (secs / 86400) as i64;
+    let secs = secs % 86400;
+    let hour = secs / 3600;
+    let minute = (secs % 3600) / 60;
+    let second = secs % 60;
+
+    let (y, m, d) = civil_from_days(days);
+    let dos_date = if y >= 1980 {
+        (((y - 1980) as u16) << 9) | ((m as u16) << 5) | (d as u16)
+    } else {
+        0x0021 // 1980-01-01 (ZIP 不支持更早的日期)
+    };
+    let dos_time = ((hour as u16) << 11) | ((minute as u16) << 5) | ((second / 2) as u16);
+    (dos_time, dos_date)
+}
+
+/// 天数 (自 1970-01-01) → 公历 (年, 月, 日)
+/// H. Hinnant 算法, 见 http://howardhinnant.github.io/date_algorithms.html
+fn civil_from_days(z: i64) -> (i64, u32, u32) {
+    let z = z + 719468;
+    let era = if z >= 0 { z } else { z - 146096 } / 146097;
+    let doe = (z - era * 146097) as i64; // [0, 146096]
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365; // [0, 399]
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100); // [0, 365]
+    let mp = (5 * doy + 2) / 153; // [0, 11]
+    let d = (doy - (153 * mp + 2) / 5 + 1) as u32; // [1, 31]
+    let m = if mp < 10 { mp + 3 } else { mp - 9 } as u32; // [1, 12]
+    let y = if m <= 2 { y + 1 } else { y };
+    (y, m, d)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    /// 测试用的空进度回调
+    extern "C" fn noop_cb(_: u64, _: u64) {}
+
+    /// 验证并行压缩生成的 zip 可被标准 zip 库正确读取，且内容/CRC 完整。
+    #[test]
+    fn parallel_backup_produces_valid_zip() {
+        let tmp = std::env::temp_dir().join("xmc_backup_test");
+        let _ = fs::remove_dir_all(&tmp);
+        let src = tmp.join("src");
+        fs::create_dir_all(&src).unwrap();
+
+        // 写两个测试文件 (内容可压缩且足够长以体现并行)
+        let content_a = b"hello world from file A ".repeat(500);
+        let content_b = b"file B content chunk ".repeat(300);
+        fs::write(src.join("a.txt"), &content_a).unwrap();
+        fs::write(src.join("b.txt"), &content_b).unwrap();
+
+        let dst = tmp.join("out.zip");
+        let result = do_backup(
+            src.to_str().unwrap(),
+            dst.to_str().unwrap(),
+            &["a.txt", "b.txt"],
+            noop_cb,
+        );
+        assert!(result.is_ok(), "do_backup 失败: {:?}", result.err());
+
+        // 用 zip crate 读取验证格式合法性
+        let file = File::open(&dst).unwrap();
+        let mut archive = zip::ZipArchive::new(file).expect("生成的 zip 无法被 zip crate 读取");
+
+        // 条目数
+        assert_eq!(archive.len(), 2, "条目数应为 2，实际 {}", archive.len());
+
+        // 名称与内容 (ZipFile 持有 archive 的可变借用，用块限制作用域)
+        let buf_a = {
+            let mut a = archive.by_name("a.txt").expect("找不到 a.txt");
+            let mut buf = Vec::new();
+            std::io::Read::read_to_end(&mut a, &mut buf).unwrap();
+            buf
+        };
+        assert_eq!(buf_a, content_a, "a.txt 内容/CRC 不匹配");
+
+        let buf_b = {
+            let mut b = archive.by_name("b.txt").expect("找不到 b.txt");
+            let mut buf = Vec::new();
+            std::io::Read::read_to_end(&mut b, &mut buf).unwrap();
+            buf
+        };
+        assert_eq!(buf_b, content_b, "b.txt 内容/CRC 不匹配");
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
 }

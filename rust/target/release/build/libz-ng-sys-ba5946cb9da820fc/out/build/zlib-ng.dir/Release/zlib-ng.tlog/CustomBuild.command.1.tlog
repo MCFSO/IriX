@@ -1,0 +1,10 @@
+^C:\USERS\HJCDU\.CARGO\REGISTRY\SRC\INDEX.CRATES.IO-1949CF8C6B5B557F\LIBZ-NG-SYS-1.1.29\SRC\ZLIB-NG\CMAKELISTS.TXT
+setlocal
+"D:\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -SC:/Users/hjcdu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libz-ng-sys-1.1.29/src/zlib-ng -BD:/xmcserverlancher/rust/target/release/build/libz-ng-sys-ba5946cb9da820fc/out/build --check-stamp-file D:/xmcserverlancher/rust/target/release/build/libz-ng-sys-ba5946cb9da820fc/out/build/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

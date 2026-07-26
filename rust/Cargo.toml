@@ -7,9 +7,16 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-zip = "2"
+rayon = "1"
+# 用 zlib-ng 后端 (C 库, 含 SSE2/AVX2 优化的 deflate, 运行时 cpuid 检测并自动降级)
+flate2 = { version = "1", default-features = false, features = ["zlib-ng"] }
+# crc32fast 默认在 stable 上用 PCLMULQDQ (运行时 is_x86_feature_detected! 检测) 加速 CRC32
+crc32fast = "1"
 walkdir = "2.5"
 libc = "0.2"
+
+[dev-dependencies]
+zip = "2"
 
 [profile.release]
 opt-level = 3
