@@ -57,15 +57,17 @@ class _BackupRequest {
   final String dstPath;
   final List<String> files;
   final SendPort sendPort;
+  /// 主 isolate 创建的 NativeCallable 的 native 函数指针地址。
+  /// Rust (rayon 线程) 调用它时，参数投递到主 isolate 实时处理。
+  final int progressCbAddress;
 
-  const _BackupRequest(this.srcPath, this.dstPath, this.files, this.sendPort);
-}
-
-/// 进度消息 (后台 isolate → 主 isolate)
-class _ProgressMsg {
-  final double progress;
-
-  const _ProgressMsg(this.progress);
+  const _BackupRequest(
+    this.srcPath,
+    this.dstPath,
+    this.files,
+    this.sendPort,
+    this.progressCbAddress,
+  );
 }
 
 /// 备份服务 - Rust FFI 封装
@@ -197,36 +199,51 @@ class BackupService {
     final responsePort = ReceivePort();
     final completer = Completer<BackupResult>();
 
+    // 在主 isolate 创建 NativeCallable.listener：native 函数被调用时，
+    // 参数通过内部 SendPort 投递到主 isolate (未阻塞)，回调实时执行。
+    // 可从任意线程 (含 rayon 工作线程) 并发安全调用。
+    // 必须在主 isolate 创建：回调在此 isolate 执行，主 isolate 空闲才能实时处理。
+    late NativeCallable<ProgressCallbackC> cb;
+    cb = NativeCallable<ProgressCallbackC>.listener((int processed, int total) {
+      final progress = total > 0 ? processed / total : 0.0;
+      onProgress?.call(progress);
+    });
+
     late StreamSubscription sub;
     sub = responsePort.listen((msg) {
-      if (msg is _ProgressMsg) {
-        onProgress?.call(msg.progress);
-      } else if (msg is BackupResult) {
+      if (msg is BackupResult) {
         completer.complete(msg);
       }
     });
 
     await Isolate.spawn(
       _backupIsolate,
-      _BackupRequest(srcPath, dstPath, files, responsePort.sendPort),
+      _BackupRequest(
+        srcPath,
+        dstPath,
+        files,
+        responsePort.sendPort,
+        cb.nativeFunction.address,
+      ),
     );
 
     final result = await completer.future;
     await sub.cancel();
     responsePort.close();
+    cb.close();
     return result;
   }
 
-  /// 后台 isolate 入口：打开库、调用 FFI、发送结果与进度
+  /// 后台 isolate 入口：打开库、调用 FFI、发送结果
   ///
   /// FFI 调用在此 isolate 同步执行，但因为是后台 isolate，
-  /// 不会阻塞主 isolate 的 UI。进度通过 NativeCallable 回调
-  /// 经 SendPort 实时发回主 isolate。
+  /// 不会阻塞主 isolate 的 UI。进度回调由主 isolate 创建的
+  /// NativeCallable 处理 (地址通过请求传入)，rayon 线程调用它时
+  /// 实时投递到主 isolate。
   static void _backupIsolate(_BackupRequest req) {
     Pointer<Utf8>? srcPtr;
     Pointer<Utf8>? dstPtr;
     Pointer<Pointer<Utf8>>? filesPtr;
-    NativeCallable<ProgressCallbackC>? cb;
 
     try {
       // 后台 isolate 独立打开库 (DynamicLibrary 句柄不能跨 isolate 传递)
@@ -248,13 +265,9 @@ class BackupService {
         filesPtr[i] = req.files[i].toNativeUtf8();
       }
 
-      // NativeCallable.isolateLocal：回调在本 isolate 执行，
-      // 闭包可捕获 SendPort，把进度发回主 isolate
-      cb = NativeCallable<ProgressCallbackC>.isolateLocal(
-        (int processed, int total) {
-          final progress = total > 0 ? processed / total : 0.0;
-          req.sendPort.send(_ProgressMsg(progress));
-        },
+      // 由主 isolate 创建的进度回调 native 函数指针
+      final progressCb = Pointer<NativeFunction<ProgressCallbackC>>.fromAddress(
+        req.progressCbAddress,
       );
 
       final code = backupDirectory(
@@ -262,7 +275,7 @@ class BackupService {
         dstPtr,
         filesPtr,
         req.files.length,
-        cb.nativeFunction,
+        progressCb,
       );
 
       // 在后台 isolate 获取错误信息 (thread_local 属于此 isolate 的线程)
@@ -281,7 +294,6 @@ class BackupService {
     } catch (e) {
       req.sendPort.send(BackupResult(4, '后台 isolate 异常: $e'));
     } finally {
-      cb?.close();
       if (srcPtr != null) calloc.free(srcPtr);
       if (dstPtr != null) calloc.free(dstPtr);
       if (filesPtr != null) {
