@@ -69,66 +69,80 @@ class BackupService {
 
   /// 打开动态库
   static DynamicLibrary _openLibrary() {
-    // 尝试多个可能的路径
-    final possiblePaths = _getPossibleLibraryPaths();
+    final attempts = <String>[];
 
-    for (final libPath in possiblePaths) {
+    // 尝试多个可能的路径
+    for (final libPath in _getPossibleLibraryPaths()) {
       try {
         final file = File(libPath);
         if (file.existsSync()) {
           return DynamicLibrary.open(libPath);
+        } else {
+          attempts.add('$libPath (文件不存在)');
         }
-      } catch (_) {
-        // 继续尝试下一个路径
+      } catch (e) {
+        attempts.add('$libPath (加载失败: $e)');
       }
     }
 
     // 如果都找不到，尝试使用系统默认搜索路径
+    final sysName = Platform.isWindows
+        ? 'xmc_backup.dll'
+        : Platform.isMacOS
+            ? 'libxmc_backup.dylib'
+            : 'libxmc_backup.so';
     try {
-      if (Platform.isWindows) {
-        return DynamicLibrary.open('xmc_backup.dll');
-      } else if (Platform.isMacOS) {
-        return DynamicLibrary.open('libxmc_backup.dylib');
-      } else {
-        return DynamicLibrary.open('libxmc_backup.so');
-      }
-    } catch (_) {
-      throw UnsupportedError(
-        'Rust backup library not found. '
-        'Please ensure xmc_backup.dll/.so/.dylib is in the application directory.',
-      );
+      return DynamicLibrary.open(sysName);
+    } catch (e) {
+      attempts.add('系统搜索路径 "$sysName" (加载失败: $e)');
     }
+
+    throw UnsupportedError(
+      'Rust backup library not found.\n'
+      'cwd: ${Directory.current.path}\n'
+      'exe: ${Platform.resolvedExecutable}\n'
+      '尝试的路径:\n${attempts.map((a) => '  - $a').join('\n')}',
+    );
   }
 
   /// 获取可能的库路径列表
   static List<String> _getPossibleLibraryPaths() {
     final paths = <String>[];
+    final libName = Platform.isWindows
+        ? 'xmc_backup.dll'
+        : Platform.isMacOS
+            ? 'libxmc_backup.dylib'
+            : 'libxmc_backup.so';
 
     // 当前工作目录
     final cwd = Directory.current.path;
+    paths.add(p.join(cwd, libName));
     if (Platform.isWindows) {
-      paths.add(p.join(cwd, 'xmc_backup.dll'));
-      paths.add(p.join(cwd, 'windows', 'runner', 'xmc_backup.dll'));
+      paths.add(p.join(cwd, 'windows', 'runner', libName));
     } else if (Platform.isMacOS) {
-      paths.add(p.join(cwd, 'libxmc_backup.dylib'));
-      paths.add(p.join(cwd, 'macos', 'libxmc_backup.dylib'));
+      paths.add(p.join(cwd, 'macos', libName));
     } else {
-      paths.add(p.join(cwd, 'libxmc_backup.so'));
-      paths.add(p.join(cwd, 'linux', 'libxmc_backup.so'));
+      paths.add(p.join(cwd, 'linux', libName));
     }
 
-    // 可执行文件目录
+    // 从 exe 目录开始向上逐级查找
+    // (flutter run 时 exe 位于 build/windows/runner/Debug 等子目录，需向上找项目根)
     try {
       final exePath = Platform.resolvedExecutable;
-      final exeDir = p.dirname(exePath);
-      if (Platform.isWindows) {
-        paths.add(p.join(exeDir, 'xmc_backup.dll'));
-      } else if (Platform.isMacOS) {
-        // macOS 应用包内部
-        paths.add(p.join(exeDir, '..', 'Frameworks', 'libxmc_backup.dylib'));
-        paths.add(p.join(exeDir, 'libxmc_backup.dylib'));
-      } else {
-        paths.add(p.join(exeDir, 'libxmc_backup.so'));
+      var dir = p.dirname(exePath);
+      for (var i = 0; i < 10; i++) {
+        paths.add(p.join(dir, libName));
+        if (Platform.isWindows) {
+          paths.add(p.join(dir, 'windows', 'runner', libName));
+        } else if (Platform.isMacOS) {
+          paths.add(p.join(dir, 'macos', libName));
+          paths.add(p.join(dir, '..', 'Frameworks', libName));
+        } else {
+          paths.add(p.join(dir, 'linux', libName));
+        }
+        final parent = p.dirname(dir);
+        if (parent == dir) break; // 到达文件系统根
+        dir = parent;
       }
     } catch (_) {
       // 忽略
