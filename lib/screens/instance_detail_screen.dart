@@ -482,7 +482,7 @@ class _BackupTabState extends State<_BackupTab> {
 
     final selectedNames = _selectedIndices.map((i) => p.basename(_files[i].path)).toList();
     final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
-    final outputPath = p.join(p.dirname(widget.rootPath), '${p.basename(widget.rootPath)}_backup_$timestamp.tar.xz');
+    final outputPath = p.join(p.dirname(widget.rootPath), '${p.basename(widget.rootPath)}_backup_$timestamp.zip');
 
     setState(() {
       _backupInProgress = true;

@@ -1,7 +1,7 @@
 //! XMC Server Launcher 备份压缩模块
 //!
-//! 提供 LZMA2 (xz) 格式的压缩功能，供 Flutter 通过 FFI 调用。
-//! 使用标准 tar 格式，生成可被任意标准工具解压的 .tar.xz 归档。
+//! 提供 ZIP (Deflate) 格式的压缩功能，供 Flutter 通过 FFI 调用。
+//! 生成可被任意标准工具解压的 .zip 归档。
 
 use std::cell::RefCell;
 use std::ffi::{CStr, CString};
@@ -10,9 +10,9 @@ use std::io;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use tar::Builder;
 use walkdir::WalkDir;
-use xz2::write::XzEncoder;
+use zip::write::SimpleFileOptions;
+use zip::{CompressionMethod, ZipWriter};
 
 thread_local! {
     static LAST_ERROR: RefCell<Option<CString>> = const { RefCell::new(None) };
@@ -32,7 +32,7 @@ fn set_last_error(msg: impl AsRef<str>) {
     });
 }
 
-/// 压缩目录到 .tar.xz 文件
+/// 压缩目录到 .zip 文件
 ///
 /// # 参数
 /// - `src_path`: 源目录路径 (UTF-8 C 字符串)
@@ -135,8 +135,8 @@ pub extern "C" fn free_string(s: *mut libc::c_char) {
 
 /// 内部备份实现
 ///
-/// 使用 `tar` crate 生成标准 tar 归档，再经 xz2 (LZMA2) 流式压缩，
-/// 最终输出合法的 .tar.xz 文件。
+/// 使用 `zip` crate 生成标准 ZIP 归档 (Deflate 压缩)，
+/// 输出合法的 .zip 文件，可被任意标准工具解压。
 fn do_backup(
     src_dir: &str,
     dst_file: &str,
@@ -148,12 +148,12 @@ fn do_backup(
 
     // 创建目标文件
     let dst = File::create(dst_path)?;
+    let mut zip = ZipWriter::new(dst);
 
-    // 创建 XZ 编码器 (LZMA2, 压缩级别 6)
-    let encoder = XzEncoder::new(dst, 6);
-
-    // tar 构建器，写入到 xz 编码器
-    let mut builder = Builder::new(encoder);
+    // ZIP 条目选项：Deflate 压缩，级别 6
+    let options = SimpleFileOptions::default()
+        .compression_method(CompressionMethod::Deflated)
+        .compression_level(Some(6));
 
     // 统计总字节数，用于进度回调
     let mut total_bytes: u64 = 0;
@@ -188,9 +188,15 @@ fn do_backup(
         let path = entry.path();
         // 归档内的相对路径：去掉源目录前缀
         let rel_path = path.strip_prefix(src_path).unwrap_or(path);
+        // ZIP 标准使用正斜杠作为路径分隔符
+        let archive_name = rel_path.to_string_lossy().replace('\\', "/");
 
-        // 写入标准 tar 条目 (含 512 字节头)
-        builder.append_path_with_name(path, rel_path)?;
+        // 开始新 ZIP 条目
+        zip.start_file(archive_name, options)?;
+
+        // 复制文件内容到 ZIP 流
+        let mut f = File::open(path)?;
+        io::copy(&mut f, &mut zip)?;
 
         if let Ok(metadata) = entry.metadata() {
             processed_bytes += metadata.len();
@@ -200,9 +206,7 @@ fn do_backup(
         progress_cb(processed_bytes, total_bytes);
     }
 
-    // 完成 tar 归档写入 (补齐结尾 1024 字节空白块)
-    let encoder = builder.into_inner()?;
-    // 完成 xz 流
-    encoder.finish()?;
+    // 完成 ZIP 归档写入 (写入中央目录记录)
+    zip.finish()?;
     Ok(())
 }

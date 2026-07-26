@@ -1,5 +1,5 @@
 // Rust FFI 备份压缩绑定
-// 通过 dart:ffi 调用 Rust 编译的动态库实现 LZMA2 压缩
+// 通过 dart:ffi 调用 Rust 编译的动态库实现 ZIP (Deflate) 压缩
 
 import 'dart:ffi';
 import 'dart:io';
