@@ -32,7 +32,11 @@ type ProgressCallback = extern "C" fn(u64, u64);
 /// 设置最后的错误信息
 fn set_last_error(msg: impl AsRef<str>) {
     LAST_ERROR.with(|cell| {
-        *cell.borrow_mut() = CString::new(msg.as_ref().as_bytes()).ok();
+        // 若消息含 nul 字节 (罕见)，回退到占位提示，避免错误信息完全丢失
+        *cell.borrow_mut() = match CString::new(msg.as_ref()) {
+            Ok(cstr) => Some(cstr),
+            Err(_) => CString::new("错误消息包含 nul 字节").ok(),
+        };
     });
 }
 
@@ -199,7 +203,7 @@ fn do_backup_inner(
             }
         }
     }
-    let total_bytes = AtomicU64::new(estimated_total.max(1));
+    let total_bytes = AtomicU64::new(estimated_total);
     let processed_bytes = AtomicU64::new(0);
 
     // 2. 创建输出文件 + 中央目录累加器
