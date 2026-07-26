@@ -609,7 +609,7 @@ class _BackupTabState extends State<_BackupTab> {
           padding: const EdgeInsets.all(16),
           child: Center(
             child: FilledButton.icon(
-              onPressed: _selectedIndices.isEmpty ? null : _startBackup,
+              onPressed: _startBackup,
               icon: const Icon(Icons.archive),
               label: const Text('开始备份'),
             ),
