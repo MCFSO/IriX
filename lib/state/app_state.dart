@@ -10,6 +10,7 @@ import 'package:flutter/foundation.dart';
 
 import '../data/server_cores.dart';
 import '../models/server_instance.dart';
+import '../services/download_settings.dart';
 import '../services/instance_store.dart';
 import '../services/server_process.dart';
 import '../utils/naming.dart';
@@ -38,6 +39,18 @@ class AppState extends ChangeNotifier {
   /// 当前选中的实例（可空）。
   ServerInstance? get selected => _selected;
 
+  /// 下载线程数 (1-32)，控制多线程分片断点续传下载的并发数。
+  int _downloadThreads = DownloadSettings.defaultThreads;
+
+  /// 下载线程数 (只读视图)。
+  int get downloadThreads => _downloadThreads;
+
+  /// 动画效果是否启用，控制 Apple 风格组件的弹簧/过渡动画。
+  bool _animationsEnabled = true;
+
+  /// 动画效果是否启用 (只读视图)。
+  bool get animationsEnabled => _animationsEnabled;
+
   /// 设置当前选中的实例，变更后通知监听者。
   set selected(ServerInstance? value) {
     if (_selected == value) return;
@@ -61,12 +74,36 @@ class AppState extends ChangeNotifier {
     return null;
   }
 
-  /// 初始化：从持久化层加载实例列表。
+  /// 初始化：从持久化层加载实例列表与全局设置。
   ///
   /// 加载后实例状态均为 [InstanceStatus.stopped]（由反序列化处理）。
   /// 不在此处创建进程管理器；管理器在 [startInstance] 时按需创建。
   Future<void> init() async {
     _instances = await _store.loadInstances();
+    _downloadThreads = await DownloadSettings.getThreads();
+    _animationsEnabled = await DownloadSettings.getAnimationsEnabled();
+    notifyListeners();
+  }
+
+  /// 设置下载线程数并持久化。
+  ///
+  /// 自动 clamp 到 [DownloadSettings.minThreads] - [DownloadSettings.maxThreads]。
+  Future<void> setDownloadThreads(int threads) async {
+    final clamped = threads.clamp(
+      DownloadSettings.minThreads,
+      DownloadSettings.maxThreads,
+    );
+    if (_downloadThreads == clamped) return;
+    _downloadThreads = clamped;
+    await DownloadSettings.setThreads(clamped);
+    notifyListeners();
+  }
+
+  /// 设置动画效果开关并持久化。
+  Future<void> setAnimationsEnabled(bool enabled) async {
+    if (_animationsEnabled == enabled) return;
+    _animationsEnabled = enabled;
+    await DownloadSettings.setAnimationsEnabled(enabled);
     notifyListeners();
   }
 

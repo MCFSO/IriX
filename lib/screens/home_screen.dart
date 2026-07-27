@@ -1,72 +1,141 @@
-// 实例列表主页
-// 以圆角卡片形式展示所有服务器实例，点击进入详情页；提供「+ 新建实例」入口。
+// 实例列表主页 + 左侧导航栏
+// 左侧 NavigationRail 切换"实例列表"和"Mod/插件市场"
+// 右上角设置入口可调节下载线程数与动画效果开关
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/server_instance.dart';
+import '../services/download_settings.dart';
 import '../state/app_state.dart';
 import 'instance_detail_screen.dart';
+import 'marketplace_screen.dart';
 import 'onboarding_screen.dart';
 
-/// 实例列表主页。
-///
-/// 展示全部实例的圆角卡片（名称 + 状态标签），点击卡片进入
-/// [InstanceDetailScreen]；右上角「+」按钮进入 [OnboardingScreen] 新建实例。
-class HomeScreen extends StatelessWidget {
+/// 主页 — 左侧 NavigationRail + 右侧内容区。
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  int _selectedIndex = 0;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('XMCServerLauncher'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            tooltip: '新建实例',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute<void>(
-                builder: (_) => const OnboardingScreen(),
+      body: Row(
+        children: [
+          // 左侧导航栏
+          NavigationRail(
+            selectedIndex: _selectedIndex,
+            onDestinationSelected: (index) {
+              setState(() => _selectedIndex = index);
+            },
+            labelType: NavigationRailLabelType.all,
+            leading: Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 16),
+              child: IconButton(
+                icon: const Icon(Icons.add),
+                tooltip: '新建实例',
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => const OnboardingScreen(),
+                  ),
+                ),
               ),
             ),
+            destinations: const [
+              NavigationRailDestination(
+                icon: Icon(Icons.storage_outlined),
+                selectedIcon: Icon(Icons.storage),
+                label: Text('实例'),
+              ),
+              NavigationRailDestination(
+                icon: Icon(Icons.store_outlined),
+                selectedIcon: Icon(Icons.store),
+                label: Text('Mod/插件市场'),
+              ),
+            ],
+          ),
+          const VerticalDivider(thickness: 1, width: 1),
+          // 右侧内容区
+          Expanded(
+            child: _buildContent(),
           ),
         ],
       ),
-      body: Consumer<AppState>(
-        builder: (context, state, _) {
-          final instances = state.instances;
-          if (instances.isEmpty) {
-            // 无实例时直接展示引导界面内容（新建/导入入口）。
-            return const OnboardingScreen(embedded: true);
-          }
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: instances.length,
-            itemBuilder: (context, index) {
-              final instance = instances[index];
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _InstanceCard(
-                  instance: instance,
-                  onTap: () {
-                    state.selectInstance(instance.id);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute<void>(
-                        builder: (_) => InstanceDetailScreen(
-                          instanceId: instance.id,
-                        ),
-                      ),
-                    );
-                  },
+    );
+  }
+
+  Widget _buildContent() {
+    switch (_selectedIndex) {
+      case 0:
+        return _buildInstancesPage();
+      case 1:
+        return const MarketplaceScreen();
+      default:
+        return _buildInstancesPage();
+    }
+  }
+
+  /// 实例列表页
+  Widget _buildInstancesPage() {
+    return Consumer<AppState>(
+      builder: (context, state, _) {
+        final instances = state.instances;
+        if (instances.isEmpty) {
+          return const OnboardingScreen(embedded: true);
+        }
+        return CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              title: const Text('XMCServerLauncher'),
+              floating: true,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.settings_outlined),
+                  tooltip: '设置',
+                  onPressed: () => showDialog<void>(
+                    context: context,
+                    builder: (_) => const _SettingsDialog(),
+                  ),
                 ),
-              );
-            },
-          );
-        },
-      ),
+                const SizedBox(width: 4),
+              ],
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.all(16),
+              sliver: SliverList.builder(
+                itemCount: instances.length,
+                itemBuilder: (context, index) {
+                  final instance = instances[index];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _InstanceCard(
+                      instance: instance,
+                      onTap: () {
+                        state.selectInstance(instance.id);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute<void>(
+                            builder: (_) => InstanceDetailScreen(
+                              instanceId: instance.id,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -142,6 +211,88 @@ class _StatusChip extends StatelessWidget {
         status.label,
         style: TextStyle(color: color, fontSize: 12),
       ),
+    );
+  }
+}
+
+/// 设置对话框 — 调节下载线程数与动画效果开关。
+///
+/// 下载线程数控制多线程分片断点续传下载的并发数 (1-32)；
+/// 动画效果开关控制 Apple 风格组件的弹簧/过渡动画是否启用。
+/// 修改即时生效并持久化 (SharedPreferences)。
+class _SettingsDialog extends StatefulWidget {
+  const _SettingsDialog();
+
+  @override
+  State<_SettingsDialog> createState() => _SettingsDialogState();
+}
+
+class _SettingsDialogState extends State<_SettingsDialog> {
+  late double _threads;
+  late bool _animations;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    final state = context.read<AppState>();
+    _threads = state.downloadThreads.toDouble();
+    _animations = state.animationsEnabled;
+    _loading = false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const AlertDialog(content: CircularProgressIndicator());
+    }
+    return AlertDialog(
+      title: const Text('设置'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 下载线程数
+          Text(
+            '下载线程数: ${_threads.round()}',
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          const SizedBox(height: 4),
+          Slider(
+            value: _threads,
+            min: DownloadSettings.minThreads.toDouble(),
+            max: DownloadSettings.maxThreads.toDouble(),
+            divisions: DownloadSettings.maxThreads - DownloadSettings.minThreads,
+            label: '${_threads.round()}',
+            onChanged: (v) => setState(() => _threads = v),
+            onChangeEnd: (v) =>
+                context.read<AppState>().setDownloadThreads(v.round()),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '多线程分片断点续传；服务端不支持 Range 时自动回退单线程。',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 16),
+          // 动画效果开关
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('动画效果'),
+            subtitle: const Text('关闭后界面将不使用弹簧/过渡动画'),
+            value: _animations,
+            onChanged: (v) {
+              setState(() => _animations = v);
+              context.read<AppState>().setAnimationsEnabled(v);
+            },
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('关闭'),
+        ),
+      ],
     );
   }
 }

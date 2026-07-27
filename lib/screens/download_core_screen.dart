@@ -92,6 +92,9 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
     final version = _selectedVersion;
     if (core == null || version == null) return;
 
+    // 在任何 await 之前读取下载线程数，避免跨异步间隙使用 BuildContext。
+    final threads = context.read<AppState>().downloadThreads;
+
     setState(() {
       _step = 1;
       _downloading = true;
@@ -119,6 +122,7 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
             _progress = progress;
           });
         },
+        threads: threads,
       );
 
       _coreFilePath = savedPath;

@@ -1,8 +1,14 @@
 // Apple 风格 UI 组件
 // 提供符合 Apple Designing Fluid Interfaces 原则的响应式控件
 // 包括：即时反馈按钮、半透明材质、弹性卡片等
+//
+// 所有动画均受全局设置 animationsEnabled 控制 (见 AppState)；
+// 关闭动画时，按下/悬停的过渡即时完成，无弹簧/淡入效果。
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../state/app_state.dart';
 
 /// Apple 风格响应式按钮
 ///
@@ -30,6 +36,7 @@ class _AppleButtonState extends State<AppleButton>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
+  bool _animationsEnabled = true;
 
   @override
   void initState() {
@@ -51,22 +58,28 @@ class _AppleButtonState extends State<AppleButton>
   }
 
   void _onTapDown(TapDownDetails details) {
-    if (widget.onPressed != null) {
+    if (widget.onPressed != null && _animationsEnabled) {
       _controller.forward();
     }
   }
 
   void _onTapUp(TapUpDetails details) {
-    _controller.reverse();
+    if (_animationsEnabled) {
+      _controller.reverse();
+    }
     widget.onPressed?.call();
   }
 
   void _onTapCancel() {
-    _controller.reverse();
+    if (_animationsEnabled) {
+      _controller.reverse();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    _animationsEnabled =
+        context.select<AppState, bool>((s) => s.animationsEnabled);
     return GestureDetector(
       onTapDown: _onTapDown,
       onTapUp: _onTapUp,
@@ -116,6 +129,7 @@ class _AppleCardState extends State<AppleCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _elevationAnimation;
+  bool _animationsEnabled = true;
 
   @override
   void initState() {
@@ -136,6 +150,7 @@ class _AppleCardState extends State<AppleCard>
   }
 
   void _onHover(bool hovering) {
+    if (!_animationsEnabled) return;
     if (hovering) {
       _controller.forward();
     } else {
@@ -145,6 +160,8 @@ class _AppleCardState extends State<AppleCard>
 
   @override
   Widget build(BuildContext context) {
+    _animationsEnabled =
+        context.select<AppState, bool>((s) => s.animationsEnabled);
     return AnimatedBuilder(
       animation: _elevationAnimation,
       builder: (context, _) {
@@ -192,8 +209,12 @@ class AppleSwitch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final animationsEnabled =
+        context.select<AppState, bool>((s) => s.animationsEnabled);
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
+      duration: animationsEnabled
+          ? const Duration(milliseconds: 200)
+          : Duration.zero,
       curve: Curves.easeOut,
       child: Switch(
         value: value,
