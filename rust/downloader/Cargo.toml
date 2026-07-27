@@ -1,0 +1,13 @@
+[package]
+name = "xmc_downloader"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+libc = "0.2"
+# 纯 Rust HTTP 客户端 (无 OpenSSL 依赖)，使用 rustls 后端
+# tls 特性启用 HTTPS 支持；禁用默认特性避免引入 charset/encoding 等多余功能
+ureq = { version = "2", default-features = false, features = ["tls", "gzip"] }

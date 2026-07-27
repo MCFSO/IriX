@@ -474,7 +474,7 @@ fn write_entry(
     Ok(())
 }
 
-/// Unix epoch 秒数 → DOS 时间戳 (time, date)
+/// Unix epoch 秒数 -> DOS 时间戳 (time, date)
 /// ZIP 规范使用 MS-DOS 时间格式 (16 位时间 + 16 位日期)
 fn epoch_to_dos(secs: u64) -> (u16, u16) {
     let days = (secs / 86400) as i64;
@@ -493,7 +493,7 @@ fn epoch_to_dos(secs: u64) -> (u16, u16) {
     (dos_time, dos_date)
 }
 
-/// 天数 (自 1970-01-01) → 公历 (年, 月, 日)
+/// 天数 (自 1970-01-01) -> 公历 (年, 月, 日)
 /// H. Hinnant 算法, 见 http://howardhinnant.github.io/date_algorithms.html
 fn civil_from_days(z: i64) -> (i64, u32, u32) {
     let z = z + 719468;
