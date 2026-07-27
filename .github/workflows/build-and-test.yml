@@ -65,7 +65,9 @@ jobs:
           cargo build --release
 
       - name: Copy Rust DLL
-        run: Copy-Item rust/target/release/xmc_backup.dll windows/runner/ -Force
+        run: |
+          Copy-Item rust/target/release/xmc_backup.dll windows/runner/ -Force
+          Copy-Item rust/target/release/xmc_downloader.dll windows/runner/ -Force
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -81,7 +83,9 @@ jobs:
         run: flutter build windows --release
 
       - name: Copy Rust DLL to build output
-        run: Copy-Item windows/runner/xmc_backup.dll build/windows/x64/runner/Release/ -Force
+        run: |
+          Copy-Item windows/runner/xmc_backup.dll build/windows/x64/runner/Release/ -Force
+          Copy-Item windows/runner/xmc_downloader.dll build/windows/x64/runner/Release/ -Force
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v5
@@ -122,6 +126,7 @@ jobs:
         run: |
           mkdir -p linux
           cp rust/target/release/libxmc_backup.so linux/
+          cp rust/target/release/libxmc_downloader.so linux/
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -181,6 +186,10 @@ jobs:
             rust/target/x86_64-apple-darwin/release/libxmc_backup.dylib \
             rust/target/aarch64-apple-darwin/release/libxmc_backup.dylib \
             -output macos/libxmc_backup.dylib
+          lipo -create \
+            rust/target/x86_64-apple-darwin/release/libxmc_downloader.dylib \
+            rust/target/aarch64-apple-darwin/release/libxmc_downloader.dylib \
+            -output macos/libxmc_downloader.dylib
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
