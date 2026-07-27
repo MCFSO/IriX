@@ -5,12 +5,15 @@
 // 键格式：`文件名.配置项路径`，嵌套用 `.` 分隔。
 // 例如：`server.properties.max-players`、`paper-global.yml.anticheat.obfuscation.enable-item-obfuscation`
 
-/// 根据文件名和配置项路径获取中文说明。
+/// 根据文件名和配置项路径获取硬编码的中文说明。
+///
+/// 仅查找硬编码的内置注释。要获取包含 CSV 导入注释的完整查找，
+/// 使用 `ConfigAnnotationService.instance.get()`。
 ///
 /// [fileName] 配置文件名（如 `server.properties`）。
 /// [keyPath] 配置项路径，嵌套用 `.` 分隔（如 `max-players` 或 `anticheat.obfuscation`）。
 /// 返回中文说明，未找到时返回 null。
-String? getConfigDescription(String fileName, String keyPath) {
+String? getConfigDescriptionHardcoded(String fileName, String keyPath) {
   return _descriptions['$fileName.$keyPath'];
 }
 

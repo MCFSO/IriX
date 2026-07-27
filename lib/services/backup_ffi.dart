@@ -16,6 +16,7 @@ typedef BackupDirectoryC = Int32 Function(
   Pointer<Utf8> dstPath,
   Pointer<Pointer<Utf8>> files,
   IntPtr filesCount,
+  Uint32 compressionLevel,
   Pointer<NativeFunction<ProgressCallbackC>> progressCb,
 );
 typedef BackupDirectoryDart = int Function(
@@ -23,6 +24,7 @@ typedef BackupDirectoryDart = int Function(
   Pointer<Utf8> dstPath,
   Pointer<Pointer<Utf8>> files,
   int filesCount,
+  int compressionLevel,
   Pointer<NativeFunction<ProgressCallbackC>> progressCb,
 );
 
@@ -56,6 +58,7 @@ class _BackupRequest {
   final String srcPath;
   final String dstPath;
   final List<String> files;
+  final int compressionLevel;
   final SendPort sendPort;
   /// 主 isolate 创建的 NativeCallable 的 native 函数指针地址。
   /// Rust (rayon 线程) 调用它时，参数投递到主 isolate 实时处理。
@@ -65,6 +68,7 @@ class _BackupRequest {
     this.srcPath,
     this.dstPath,
     this.files,
+    this.compressionLevel,
     this.sendPort,
     this.progressCbAddress,
   );
@@ -187,6 +191,7 @@ class BackupService {
   /// [srcPath] 源目录
   /// [dstPath] 目标文件路径
   /// [files] 要备份的文件/文件夹列表
+  /// [compressionLevel] Deflate 压缩级别 (0-9, 0=仅存储, 6=标准, 9=最佳)
   /// [onProgress] 进度回调 (0.0 ~ 1.0)，在主 isolate 触发
   ///
   /// 返回 [BackupResult]，包含结果码和（失败时）错误信息
@@ -194,6 +199,7 @@ class BackupService {
     String srcPath,
     String dstPath,
     List<String> files, {
+    int compressionLevel = 6,
     void Function(double progress)? onProgress,
   }) async {
     final responsePort = ReceivePort();
@@ -222,6 +228,7 @@ class BackupService {
         srcPath,
         dstPath,
         files,
+        compressionLevel,
         responsePort.sendPort,
         cb.nativeFunction.address,
       ),
@@ -275,6 +282,7 @@ class BackupService {
         dstPtr,
         filesPtr,
         req.files.length,
+        req.compressionLevel,
         progressCb,
       );
 

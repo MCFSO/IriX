@@ -2,9 +2,12 @@
 // 提供图形表单与原始文本两种编辑模式，支持 YAML 和 Properties 文件。
 // 左侧为文件列表，右侧为编辑区域。
 
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
-import '../data/config_descriptions.dart';
+import '../services/config_annotation_service.dart';
 import '../services/config_service.dart';
 
 /// 配置编辑器界面。
@@ -138,6 +141,34 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
     setState(() => _dirty = true);
   }
 
+  /// 导入 CSV 注释文件。
+  ///
+  /// CSV 格式：`key,description` (第一行可为表头)。
+  /// 导入后覆盖硬编码注释，持久化到本地文件。
+  Future<void> _importCsv() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['csv', 'txt'],
+    );
+    if (result == null || result.files.single.path == null) return;
+
+    try {
+      final content = await File(result.files.single.path!).readAsString();
+      final count = await ConfigAnnotationService.instance.importCsv(content);
+      if (!mounted) return;
+      // 刷新表单以显示新注释
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已导入 $count 条注释')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('导入失败：$e')),
+      );
+    }
+  }
+
   /// 切换文件时的未保存提示。
   Future<bool> _confirmDiscard() async {
     if (!_dirty) return true;
@@ -214,6 +245,11 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
                         onPressed: () async {
                           if (await _confirmDiscard()) _loadFiles();
                         },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.upload_file, size: 18),
+                        tooltip: '导入CSV注释',
+                        onPressed: _importCsv,
                       ),
                     ],
                   ),
@@ -481,7 +517,7 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
       return;
     }
     // 叶节点：判断是否匹配
-    final desc = getConfigDescription(fileName, keyPath) ?? '';
+    final desc = ConfigAnnotationService.instance.get(fileName, keyPath) ?? '';
     if (keyPath.toLowerCase().contains(query) ||
         desc.toLowerCase().contains(query)) {
       results.add(_SearchResult(
@@ -580,9 +616,9 @@ class _ConfigFieldState extends State<_ConfigField> {
   /// 焦点节点，用于判断是否正在编辑。
   final FocusNode _focusNode = FocusNode();
 
-  /// 当前字段的中文说明。
+  /// 当前字段的中文说明 (含 CSV 导入的注释)。
   String? get description =>
-      getConfigDescription(widget.fileName, widget.keyPath);
+      ConfigAnnotationService.instance.get(widget.fileName, widget.keyPath);
 
   @override
   void initState() {

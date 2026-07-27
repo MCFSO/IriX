@@ -11,6 +11,7 @@ import 'package:provider/provider.dart';
 
 import '../models/server_instance.dart';
 import '../services/backup_ffi.dart';
+import '../services/backup_settings.dart';
 import '../state/app_state.dart';
 import 'config_editor_screen.dart';
 
@@ -223,7 +224,10 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
             // Tab 3: 插件 — Coming Soon
             const _PluginsTab(),
             // Tab 4: 备份 — 文件选择与压缩
-            _BackupTab(rootPath: instance.rootPath),
+            _BackupTab(
+              rootPath: instance.rootPath,
+              instanceId: widget.instanceId,
+            ),
             // Tab 5: 设置 — 实例名称 + 启动命令
             _SettingsTab(
               instanceId: widget.instanceId,
@@ -397,9 +401,10 @@ class _PluginsTab extends StatelessWidget {
 
 /// 备份 Tab：文件列表 + 全选 + 备份按钮。
 class _BackupTab extends StatefulWidget {
-  const _BackupTab({required this.rootPath});
+  const _BackupTab({required this.rootPath, required this.instanceId});
 
   final String rootPath;
+  final String instanceId;
 
   @override
   State<_BackupTab> createState() => _BackupTabState();
@@ -492,11 +497,14 @@ class _BackupTabState extends State<_BackupTab> {
     // 尝试调用 Rust FFI (在后台 isolate 执行，不阻塞 UI)
     try {
       final backupService = BackupService.instance;
+      final compressionLevel =
+          await BackupSettings.getLevel(widget.instanceId);
 
       final result = await backupService.backup(
         widget.rootPath,
         outputPath,
         selectedNames,
+        compressionLevel: compressionLevel,
         onProgress: (progress) {
           // 进度消息在主 isolate 事件循环触发，可直接更新 UI
           if (mounted && _backupInProgress) {
@@ -850,6 +858,7 @@ class _SettingsTab extends StatelessWidget {
         _InstanceNameCard(instanceId: instanceId),
         _StartCommandCard(instanceId: instanceId),
         _EulaCard(instanceId: instanceId),
+        _CompressionSettingsCard(instanceId: instanceId),
         const SizedBox(height: 24),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1001,6 +1010,105 @@ class _InstanceNameCardState extends State<_InstanceNameCard> {
               onPressed: _dirty ? _save : null,
               icon: const Icon(Icons.check),
               label: const Text('保存'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 压缩设置卡片 — 调节备份压缩比率/速度 (每实例独立)。
+class _CompressionSettingsCard extends StatefulWidget {
+  const _CompressionSettingsCard({required this.instanceId});
+
+  final String instanceId;
+
+  @override
+  State<_CompressionSettingsCard> createState() =>
+      _CompressionSettingsCardState();
+}
+
+class _CompressionSettingsCardState extends State<_CompressionSettingsCard> {
+  int _level = 6;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLevel();
+  }
+
+  Future<void> _loadLevel() async {
+    final level = await BackupSettings.getLevel(widget.instanceId);
+    if (mounted) {
+      setState(() {
+        _level = level;
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _onChanged(double value) async {
+    final newLevel = value.round();
+    setState(() => _level = newLevel);
+    await BackupSettings.setLevel(widget.instanceId, newLevel);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Card(
+        margin: EdgeInsets.all(8),
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    return Card(
+      margin: const EdgeInsets.all(8),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.compress),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    '备份压缩级别',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                Text(
+                  compressionLevelLabel(_level),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Slider(
+              value: _level.toDouble(),
+              min: 0,
+              max: 9,
+              divisions: 9,
+              label: '$_level',
+              onChanged: _onChanged,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '级别越低压缩越快但文件更大，级别越高压缩比越好但更慢。0=不压缩(仅存储)，6=标准，9=最佳压缩比。',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+              ),
             ),
           ],
         ),

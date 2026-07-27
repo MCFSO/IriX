@@ -53,6 +53,9 @@ dependencies:
   yaml: ^3.1.0
   yaml_writer: ^2.0.0
 
+  # CSV parsing for config annotation import
+  csv: ^6.0.0
+
   # FFI for Rust backup
   ffi: ^2.1.0
 

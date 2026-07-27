@@ -47,6 +47,7 @@ fn set_last_error(msg: impl AsRef<str>) {
 /// - `dst_path`: 目标文件路径 (UTF-8 C 字符串)
 /// - `files_to_backup`: 要备份的文件/文件夹名数组 (UTF-8 C 字符串指针数组)
 /// - `files_count`: 文件数组长度
+/// - `compression_level`: Deflate 压缩级别 (0-9, 0=仅存储, 6=标准, 9=最佳)
 /// - `progress_cb`: 进度回调函数
 ///
 /// # 返回值
@@ -61,6 +62,7 @@ pub extern "C" fn backup_directory(
     dst_path: *const libc::c_char,
     files_to_backup: *const *const libc::c_char,
     files_count: usize,
+    compression_level: u32,
     progress_cb: ProgressCallback,
 ) -> libc::c_int {
     // 重置取消标志
@@ -97,8 +99,9 @@ pub extern "C" fn backup_directory(
         }
     }
 
-    // 执行备份
-    match do_backup(src, dst, &files, progress_cb) {
+    // 执行备份 (级别限制在 0-9)
+    let level = compression_level.min(9);
+    match do_backup(src, dst, &files, level, progress_cb) {
         Ok(_) => 0,
         Err(e) if e.kind() == io::ErrorKind::Other && e.to_string() == "cancelled" => 3,
         Err(e) => {
@@ -165,9 +168,10 @@ fn do_backup(
     src_dir: &str,
     dst_file: &str,
     files: &[&str],
+    compression_level: u32,
     progress_cb: ProgressCallback,
 ) -> io::Result<()> {
-    let result = do_backup_inner(src_dir, dst_file, files, progress_cb);
+    let result = do_backup_inner(src_dir, dst_file, files, compression_level, progress_cb);
     // 取消时删除半成品文件
     if is_cancelled_err(&result) {
         let _ = std::fs::remove_file(dst_file);
@@ -183,6 +187,7 @@ fn do_backup_inner(
     src_dir: &str,
     dst_file: &str,
     files: &[&str],
+    compression_level: u32,
     progress_cb: ProgressCallback,
 ) -> io::Result<()> {
     let src_path = Path::new(src_dir);
@@ -244,8 +249,8 @@ fn do_backup_inner(
             hasher.update(&data);
             let crc32 = hasher.finalize();
 
-            // Deflate 压缩 (raw deflate, 无 zlib header, 级别 6)
-            let mut encoder = DeflateEncoder::new(Vec::new(), Compression::new(6));
+            // Deflate 压缩 (raw deflate, 无 zlib header, 级别由调用方指定)
+            let mut encoder = DeflateEncoder::new(Vec::new(), Compression::new(compression_level));
             encoder.write_all(&data)?;
             let compressed = encoder.finish()?;
 
@@ -531,6 +536,7 @@ mod tests {
             src.to_str().unwrap(),
             dst.to_str().unwrap(),
             &["a.txt", "b.txt"],
+            6,
             noop_cb,
         );
         assert!(result.is_ok(), "do_backup 失败: {:?}", result.err());

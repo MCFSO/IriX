@@ -6,9 +6,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'screens/home_screen.dart';
+import 'services/config_annotation_service.dart';
 import 'state/app_state.dart';
 
 void main() {
+  // 初始化配置注释服务 (加载 CSV 导入的注释)
+  ConfigAnnotationService.instance.init();
   runApp(const MyApp());
 }
 
