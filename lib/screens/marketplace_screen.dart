@@ -339,24 +339,26 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         decoration: InputDecoration(
           hintText: '搜索 Mod / 插件...',
           prefixIcon: const Icon(Icons.search),
-          suffixIcon: _searchController.text.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.clear),
-                  onPressed: () {
-                    _searchController.clear();
-                    _search();
-                  },
-                )
-              : null,
+          suffixIcon: ValueListenableBuilder<TextEditingValue>(
+            valueListenable: _searchController,
+            builder: (context, value, child) {
+              return value.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _searchController.clear();
+                        _search();
+                      },
+                    )
+                  : const SizedBox.shrink();
+            },
+          ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
           ),
           filled: true,
         ),
-        onChanged: (value) {
-          setState(() {});
-          _onSearchChanged(value);
-        },
+        onChanged: _onSearchChanged,
         onSubmitted: (_) => _search(),
       ),
     );

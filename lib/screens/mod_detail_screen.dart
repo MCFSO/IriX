@@ -140,9 +140,10 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
     final threads = context.read<AppState>().downloadThreads;
 
     // 选择主文件（优先 primary）
+    if (version.files.isEmpty) return;
     final file = version.files.firstWhere(
-      (f) => f.primary,
-      orElse: () => version.files.first,
+        (f) => f.primary,
+        orElse: () => version.files.first,
     );
 
     final instance = await _pickInstance();

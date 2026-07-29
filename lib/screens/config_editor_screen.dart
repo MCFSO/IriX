@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import '../services/config_annotation_service.dart';
 import '../services/config_service.dart';
 import '../utils/apple_widgets.dart';
+import '../utils/code_highlight.dart';
 
 /// 配置编辑器界面。
 ///
@@ -40,7 +41,8 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
   bool _textMode = false;
 
   /// 文本编辑控制器。
-  final TextEditingController _textController = TextEditingController();
+  final HighlightTextEditingController _textController =
+      HighlightTextEditingController();
 
   /// 搜索框控制器。
   final TextEditingController _searchController = TextEditingController();
@@ -90,6 +92,7 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
       setState(() {
         _selectedIndex = index;
         _configData = data;
+        _textController.fileName = file.name;
         _textController.text = raw;
         _textMode = false;
         _dirty = false;
@@ -100,6 +103,7 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
       setState(() {
         _selectedIndex = index;
         _configData = {};
+        _textController.fileName = file.name;
         _textController.text = raw;
         _textMode = true;
         _dirty = false;

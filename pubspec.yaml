@@ -56,6 +56,9 @@ dependencies:
   # CSV parsing for config annotation import
   csv: ^6.0.0
 
+  # UUID generation
+  uuid: ^4.5.1
+
   # FFI for Rust backup
   ffi: ^2.1.0
 

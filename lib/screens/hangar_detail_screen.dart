@@ -118,12 +118,15 @@ class _HangarDetailScreenState extends State<HangarDetailScreen> {
   }
 
   Future<void> _downloadPlatform(HangarVersion version, HangarPlatformDownload pd) async {
+    final project = _project;
+    if (project == null) return;
+
     final threads = context.read<AppState>().downloadThreads;
     final instance = await _pickInstance();
     if (instance == null) return;
 
     final targetDir = p.join(instance.rootPath, 'plugins');
-    final filename = '${_project!.slug}-${version.name}-${pd.platform}.jar';
+    final filename = '${project.slug}-${version.name}-${pd.platform}.jar';
     final targetPath = p.join(targetDir, filename);
     final progressKey = '${version.name}:${pd.platform}';
 

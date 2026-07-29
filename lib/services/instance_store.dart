@@ -5,6 +5,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
@@ -48,26 +49,31 @@ class InstanceStore {
       return List<ServerInstance>.of(_cache!);
     }
 
-    final file = await _getFile();
-    if (!await file.exists()) {
-      _cache = <ServerInstance>[];
+    try {
+      final file = await _getFile();
+      if (!await file.exists()) {
+        _cache = <ServerInstance>[];
+        return List<ServerInstance>.of(_cache!);
+      }
+
+      final content = await file.readAsString();
+      if (content.trim().isEmpty) {
+        _cache = <ServerInstance>[];
+        return List<ServerInstance>.of(_cache!);
+      }
+
+      final list = jsonDecode(content) as List<dynamic>;
+      _cache = list.map((item) {
+        // 兼容数组元素为 JSON 字符串或对象两种格式
+        final source = item is String ? item : jsonEncode(item);
+        return ServerInstance.fromJson(source);
+      }).toList();
+
       return List<ServerInstance>.of(_cache!);
+    } catch (e) {
+      debugPrint('Failed to load instances: $e');
+      return _cache ?? [];
     }
-
-    final content = await file.readAsString();
-    if (content.trim().isEmpty) {
-      _cache = <ServerInstance>[];
-      return List<ServerInstance>.of(_cache!);
-    }
-
-    final list = jsonDecode(content) as List<dynamic>;
-    _cache = list.map((item) {
-      // 兼容数组元素为 JSON 字符串或对象两种格式
-      final source = item is String ? item : jsonEncode(item);
-      return ServerInstance.fromJson(source);
-    }).toList();
-
-    return List<ServerInstance>.of(_cache!);
   }
 
   /// 保存实例列表到文件。
@@ -75,13 +81,17 @@ class InstanceStore {
   /// 将 [instances] 序列化为 JSON 对象数组并写入 `instances.json`，
   /// 同时更新内存缓存（保存传入列表的副本）。
   Future<void> saveInstances(List<ServerInstance> instances) async {
-    final file = await _getFile();
-    // 以对象数组形式持久化：先将每个实例的 JSON 字符串解码为对象，再整体编码
-    final encoded = jsonEncode(
-      instances.map((e) => jsonDecode(e.toJson())).toList(),
-    );
-    await file.writeAsString(encoded);
-    _cache = List<ServerInstance>.of(instances);
+    try {
+      final file = await _getFile();
+      // 以对象数组形式持久化：先将每个实例的 JSON 字符串解码为对象，再整体编码
+      final encoded = jsonEncode(
+        instances.map((e) => jsonDecode(e.toJson())).toList(),
+      );
+      await file.writeAsString(encoded);
+      _cache = List<ServerInstance>.of(instances);
+    } catch (e) {
+      debugPrint('Failed to save instances: $e');
+    }
   }
 
   /// 添加单个实例并保存。

@@ -18,6 +18,10 @@ REM 复制 DLL 到 Flutter 应用目录
 echo Copying DLLs to Flutter app...
 copy /Y target\release\xmc_backup.dll ..\windows\runner\
 copy /Y target\release\xmc_downloader.dll ..\windows\runner\
+copy /Y target\release\xmc_file_ops.dll ..\windows\runner\
+copy /Y target\release\xmc_backup.dll ..\
+copy /Y target\release\xmc_downloader.dll ..\
+copy /Y target\release\xmc_file_ops.dll ..\
 
 echo Done! DLLs copied to windows\runner\
 pause

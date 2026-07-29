@@ -221,8 +221,7 @@ class AppState extends ChangeNotifier {
 
   /// 选中指定 id 的实例。
   void selectInstance(String id) {
-    _selected = _instanceById(id);
-    notifyListeners();
+    selected = _instanceById(id);
   }
 
   /// 为指定实例挂载进程退出监听。
@@ -232,7 +231,8 @@ class AppState extends ChangeNotifier {
   /// 在重启过程中（状态为 [InstanceStatus.restarting]）跳过处理，
   /// 由 [restartInstance] 在重启结束后重新挂载监听。
   void _watchExit(String id, ServerProcessManager manager) {
-    unawaited(manager.onExit.then((code) {
+    final captured = manager;
+    unawaited(captured.onExit.then((code) {
       final instance = _instanceById(id);
       if (instance == null) return;
       if (instance.status == InstanceStatus.restarting) {
@@ -241,8 +241,10 @@ class AppState extends ChangeNotifier {
         return;
       }
       instance.status = InstanceStatus.stopped;
-      _managers.remove(id);
-      manager.dispose();
+      if (_managers[id] == captured) {
+        _managers.remove(id);
+        captured.dispose();
+      }
       notifyListeners();
     }));
   }
@@ -255,7 +257,7 @@ class AppState extends ChangeNotifier {
   Future<void> startInstance(String id) async {
     final instance = _instanceById(id);
     if (instance == null) return;
-    if (instance.status.isActive) return;
+    if (instance.status.isActive || instance.status == InstanceStatus.restarting) return;
 
     var manager = _managers[id];
     if (manager == null) {
@@ -340,6 +342,16 @@ class AppState extends ChangeNotifier {
 
   /// 获取指定实例的日志流（可空）。
   Stream<String>? logsFor(String id) => _managers[id]?.logs;
+
+  /// 释放所有管理器资源。
+  @override
+  void dispose() {
+    for (final manager in _managers.values) {
+      manager.dispose();
+    }
+    _managers.clear();
+    super.dispose();
+  }
 
   /// 向指定实例的进程发送命令；进程未运行时为空操作。
   void sendCommand(String id, String command) {

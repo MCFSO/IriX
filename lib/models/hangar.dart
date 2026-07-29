@@ -56,18 +56,19 @@ class HangarProjectHit {
 
   factory HangarProjectHit.fromJson(Map<String, dynamic> json) {
     final stats = json['stats'] as Map<String, dynamic>? ?? const {};
+    final supportedPlatforms =
+        json['supportedPlatforms'] as Map<String, dynamic>? ?? const {};
     return HangarProjectHit(
-      slug: json['slug'] as String? ?? '',
+      slug: json['name'] as String? ?? '',
       name: json['name'] as String? ?? '',
       description: json['description'] as String? ?? '',
-      namespace: (json['namespace'] as Map<String, dynamic>?)?['owner'] as String?,
+      namespace:
+          (json['namespace'] as Map<String, dynamic>?)?['owner'] as String?,
       category: json['category'] as String? ?? '',
       downloads: (stats['downloads'] as num?)?.toInt() ?? 0,
       stars: (stats['stars'] as num?)?.toInt() ?? 0,
-      avatarUrl: json['avatar_url'] as String?,
-      platforms: ((json['platforms'] as List<dynamic>?) ?? const [])
-          .map((e) => e.toString())
-          .toList(),
+      avatarUrl: json['avatarUrl'] as String?,
+      platforms: supportedPlatforms.keys.toList(),
     );
   }
 }
@@ -102,32 +103,49 @@ class HangarProject {
 
   factory HangarProject.fromJson(Map<String, dynamic> json) {
     final stats = json['stats'] as Map<String, dynamic>? ?? const {};
-    final links = json['links'] as Map<String, dynamic>? ?? const {};
+    final supportedPlatforms =
+        json['supportedPlatforms'] as Map<String, dynamic>? ?? const {};
     return HangarProject(
-      slug: json['slug'] as String? ?? '',
+      slug: json['name'] as String? ?? '',
       name: json['name'] as String? ?? '',
       description: json['description'] as String? ?? '',
-      namespace: (json['namespace'] as Map<String, dynamic>?)?['owner'] as String?,
+      namespace:
+          (json['namespace'] as Map<String, dynamic>?)?['owner'] as String?,
       category: json['category'] as String? ?? '',
       downloads: (stats['downloads'] as num?)?.toInt() ?? 0,
       stars: (stats['stars'] as num?)?.toInt() ?? 0,
-      avatarUrl: json['avatar_url'] as String?,
-      platforms: ((json['platforms'] as List<dynamic>?) ?? const [])
-          .map((e) => e.toString())
-          .toList(),
-      homepage: links['homepage'] as String?,
-      repo: links['issues'] as String?,
+      avatarUrl: json['avatarUrl'] as String?,
+      platforms: supportedPlatforms.keys.toList(),
+      homepage: _findJsonLink(json, 'homepage'),
+      repo: _findJsonLink(json, 'source'),
     );
   }
 }
 
+String? _findJsonLink(Map<String, dynamic> json, String linkName) {
+  final settings = json['settings'] as Map<String, dynamic>?;
+  if (settings == null) return null;
+  final links = settings['links'] as List<dynamic>?;
+  if (links == null) return null;
+  for (final group in links) {
+    final g = group as Map<String, dynamic>?;
+    if (g == null) continue;
+    for (final link in (g['links'] as List<dynamic>? ?? const [])) {
+      final l = link as Map<String, dynamic>?;
+      if (l == null) continue;
+      final name = l['name'] as String? ?? '';
+      if (name.toLowerCase() == linkName.toLowerCase()) {
+        return l['url'] as String?;
+      }
+    }
+  }
+  return null;
+}
+
 /// Hangar 版本中的单个平台下载项。
 class HangarPlatformDownload {
-  /// 平台名 (paper / velocity / waterfall / folia / sponge)。
   final String platform;
-  /// 该平台支持的 MC 版本列表。
   final List<String> gameVersions;
-  /// 下载 URL（由 API 直接给出或按规则拼接）。
   final String downloadUrl;
 
   const HangarPlatformDownload({
@@ -176,14 +194,12 @@ class HangarVersion {
     String projectSlug,
   ) {
     final downloads = json['downloads'] as Map<String, dynamic>? ?? const {};
-    final platformEntries = downloads['platforms'] as List<dynamic>? ?? const [];
-    final stats = json['stats'] as Map<String, dynamic>?;
+    final platformEntries =
+        downloads['platforms'] as List<dynamic>? ?? const [];
     return HangarVersion(
       name: json['name'] as String? ?? '',
       createdAt: json['created_at'] as String?,
-      downloads: (downloads['total'] as num?)?.toInt() ??
-          (stats?['downloads'] as num?)?.toInt() ??
-          0,
+      downloads: (downloads['total'] as num?)?.toInt() ?? 0,
       description: json['description'] as String?,
       downloadsPerPlatform: platformEntries
           .map((e) => HangarPlatformDownload.fromJson(

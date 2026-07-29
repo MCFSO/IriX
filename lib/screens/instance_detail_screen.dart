@@ -12,9 +12,11 @@ import 'package:provider/provider.dart';
 import '../models/server_instance.dart';
 import '../services/backup_ffi.dart';
 import '../services/backup_settings.dart';
+import '../services/background_tasks.dart';
 import '../state/app_state.dart';
 import '../utils/apple_widgets.dart';
 import 'config_editor_screen.dart';
+import 'file_manager_screen.dart';
 
 /// 实例详情页。
 ///
@@ -56,10 +58,14 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
   /// 进程下次启动时（状态变为 starting/running）重置为 false。
   bool _stopClicked = false;
 
+  /// 后台文件任务管理器。
+  final BackgroundTaskManager _taskManager = BackgroundTaskManager();
+
   @override
   void initState() {
     super.initState();
     _subscribeLogs();
+    context.read<AppState>().addListener(_onAppStateChanged);
   }
 
   @override
@@ -75,10 +81,12 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
 
   @override
   void dispose() {
+    context.read<AppState>().removeListener(_onAppStateChanged);
     _logSub?.cancel();
     _scrollController.dispose();
     _commandController.dispose();
     _focusNode.dispose();
+    _taskManager.dispose();
     super.dispose();
   }
 
@@ -109,6 +117,30 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
         }
       });
     });
+  }
+
+  void _onAppStateChanged() {
+    if (!mounted) return;
+    final state = context.read<AppState>();
+    final instance = state.instances
+        .where((e) => e.id == widget.instanceId)
+        .firstOrNull;
+    if (instance == null) return;
+    final status = instance.status;
+
+    if (status == InstanceStatus.starting ||
+        status == InstanceStatus.stopped) {
+      _stopClicked = false;
+    }
+
+    if (status.isActive && _logSub == null) {
+      _subscribeLogs();
+    }
+
+    if (status == InstanceStatus.stopped && _logSub != null) {
+      _logSub!.cancel();
+      _logSub = null;
+    }
   }
 
   /// 发送命令到服务器进程。
@@ -158,7 +190,7 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
     }
 
     return DefaultTabController(
-      length: 5,
+      length: 6,
       child: Scaffold(
         appBar: AppBar(
           title: Text(instance.name),
@@ -167,6 +199,7 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
               Tab(icon: Icon(Icons.dashboard), text: '总览'),
               Tab(icon: Icon(Icons.description), text: '配置'),
               Tab(icon: Icon(Icons.extension), text: '插件'),
+              Tab(icon: Icon(Icons.folder), text: '文件'),
               Tab(icon: Icon(Icons.backup), text: '备份'),
               Tab(icon: Icon(Icons.settings), text: '设置'),
             ],
@@ -183,26 +216,6 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
                   )
                   .status,
               builder: (context, status, _) {
-                // 进程已完全关闭（stopped）时，重置为「停止」按钮。
-                // 当进程重新启动时（starting/running），也重置为 false。
-                if (status == InstanceStatus.starting ||
-                    status == InstanceStatus.stopped) {
-                  _stopClicked = false;
-                }
-
-                // 实例进入活跃状态时，若日志流尚未订阅则重新订阅。
-                // 这处理「在详情页中启动实例」的场景：initState 时 manager 不存在，
-                // 启动后 manager 创建、日志开始流动，需要在此重新建立订阅。
-                if (status.isActive && _logSub == null) {
-                  _subscribeLogs();
-                }
-
-                // 进程已停止时清除旧订阅，以便下次启动时能重新订阅新的日志流。
-                if (status == InstanceStatus.stopped && _logSub != null) {
-                  _logSub!.cancel();
-                  _logSub = null;
-                }
-
                 return Row(
                   children: [
                     // 左侧：日志 + 命令输入
@@ -224,12 +237,16 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
             ConfigEditorScreen(rootPath: instance.rootPath),
             // Tab 3: 插件 — Coming Soon
             const _PluginsTab(),
-            // Tab 4: 备份 — 文件选择与压缩
+            // Tab 4: 文件管理
+            FileManagerScreen(
+              rootPath: instance.rootPath,
+            ),
+            // Tab 5: 备份 — 文件选择与压缩
             _BackupTab(
               rootPath: instance.rootPath,
               instanceId: widget.instanceId,
             ),
-            // Tab 5: 设置 — 实例名称 + 启动命令
+            // Tab 6: 设置 — 实例名称 + 启动命令
             _SettingsTab(
               instanceId: widget.instanceId,
             ),
@@ -636,7 +653,7 @@ class _BackupTabState extends State<_BackupTab> {
               LinearProgressIndicator(value: _backupProgress),
               const SizedBox(height: 12),
               Text(
-                '${(_backupProgress! * 100).toStringAsFixed(1)}%',
+                '${((_backupProgress ?? 0) * 100).toStringAsFixed(1)}%',
                 style: const TextStyle(fontSize: 16),
               ),
               const SizedBox(height: 24),

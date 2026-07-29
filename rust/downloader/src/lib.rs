@@ -45,6 +45,10 @@ pub extern "C" fn download_file(
 ) -> libc::c_int {
     DOWNLOAD_CANCELLED.store(false, Ordering::SeqCst);
 
+    if url.is_null() {
+        set_last_error("URL 为空指针");
+        return 1;
+    }
     let url_str = match unsafe { CStr::from_ptr(url) }.to_str() {
         Ok(s) => s,
         Err(_) => {
@@ -52,6 +56,10 @@ pub extern "C" fn download_file(
             return 1;
         }
     };
+    if target_path.is_null() {
+        set_last_error("目标路径为空指针");
+        return 1;
+    }
     let target = match unsafe { CStr::from_ptr(target_path) }.to_str() {
         Ok(s) => s,
         Err(_) => {
@@ -107,7 +115,11 @@ pub extern "C" fn free_string(s: *mut libc::c_char) {
 }
 
 fn build_agent(user_agent: &str) -> ureq::Agent {
-    ureq::AgentBuilder::new().user_agent(user_agent).build()
+    ureq::AgentBuilder::new()
+        .user_agent(user_agent)
+        .timeout_connect(Duration::from_secs(30))
+        .timeout_read(Duration::from_secs(60))
+        .build()
 }
 
 fn do_download(
@@ -162,6 +174,10 @@ pub extern "C" fn download_file_multipart(
     DOWNLOAD_CANCELLED.store(false, Ordering::SeqCst);
     MULTIPART_DOWNLOADED.store(0, Ordering::SeqCst);
 
+    if url.is_null() {
+        set_last_error("URL 为空指针");
+        return 1;
+    }
     let url_str = match unsafe { CStr::from_ptr(url) }.to_str() {
         Ok(s) => s,
         Err(_) => {
@@ -169,6 +185,10 @@ pub extern "C" fn download_file_multipart(
             return 1;
         }
     };
+    if target_path.is_null() {
+        set_last_error("目标路径为空指针");
+        return 1;
+    }
     let target = match unsafe { CStr::from_ptr(target_path) }.to_str() {
         Ok(s) => s,
         Err(_) => {
@@ -308,16 +328,29 @@ fn do_download_multipart(
     progress_stop.store(true, Ordering::Release);
     let _ = progress_handle.join();
 
-    if let Some(e) = worker_err {
-        return Err(e);
-    }
-    if DOWNLOAD_CANCELLED.load(Ordering::SeqCst) {
-        return Err(io::Error::new(io::ErrorKind::Other, "cancelled"));
-    }
-
     let part_paths: Vec<String> = (0..thread_count)
         .map(|i| format!("{}.part{}", target, i))
         .collect();
+
+    if let Some(e) = worker_err {
+        for part_path in &part_paths {
+            let _ = std::fs::remove_file(part_path);
+        }
+        return Err(e);
+    }
+    if DOWNLOAD_CANCELLED.load(Ordering::SeqCst) {
+        for part_path in &part_paths {
+            let _ = std::fs::remove_file(part_path);
+        }
+        return Err(io::Error::new(io::ErrorKind::Other, "cancelled"));
+    }
+
+    if DOWNLOAD_CANCELLED.load(Ordering::SeqCst) {
+        for part_path in &part_paths {
+            let _ = std::fs::remove_file(part_path);
+        }
+        return Err(io::Error::new(io::ErrorKind::Other, "cancelled"));
+    }
 
     let mut out = File::create(target_path)?;
     let mut merge_buf = vec![0u8; 256 * 1024];

@@ -1,6 +1,7 @@
 // 下载设置 - 全局持久化
 // 使用 SharedPreferences 存储下载线程数与动画效果开关
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// 下载与界面设置服务。
@@ -23,27 +24,45 @@ class DownloadSettings {
 
   /// 获取下载线程数，未设置时返回 [defaultThreads]。
   static Future<int> getThreads() async {
-    final prefs = await SharedPreferences.getInstance();
-    final v = prefs.getInt(_keyThreads);
-    if (v == null) return defaultThreads;
-    return v.clamp(minThreads, maxThreads);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final v = prefs.getInt(_keyThreads);
+      if (v == null) return defaultThreads;
+      return v.clamp(minThreads, maxThreads);
+    } catch (e) {
+      debugPrint('Failed to get threads: $e');
+      return defaultThreads;
+    }
   }
 
   /// 设置下载线程数，自动 clamp 到合法区间。
   static Future<void> setThreads(int threads) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_keyThreads, threads.clamp(minThreads, maxThreads));
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_keyThreads, threads.clamp(minThreads, maxThreads));
+    } catch (e) {
+      debugPrint('Failed to set threads: $e');
+    }
   }
 
   /// 获取动画效果是否启用，未设置时默认为 true。
   static Future<bool> getAnimationsEnabled() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_keyAnimations) ?? true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_keyAnimations) ?? true;
+    } catch (e) {
+      debugPrint('Failed to get animations enabled: $e');
+      return true;
+    }
   }
 
   /// 设置动画效果开关。
   static Future<void> setAnimationsEnabled(bool enabled) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_keyAnimations, enabled);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_keyAnimations, enabled);
+    } catch (e) {
+      debugPrint('Failed to set animations enabled: $e');
+    }
   }
 }

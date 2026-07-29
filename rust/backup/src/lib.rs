@@ -46,6 +46,10 @@ pub extern "C" fn backup_directory(
 ) -> libc::c_int {
     CANCELLED.store(false, Ordering::SeqCst);
 
+    if src_path.is_null() {
+        set_last_error("源路径为空指针");
+        return 1;
+    }
     let src = match unsafe { CStr::from_ptr(src_path) }.to_str() {
         Ok(s) => s,
         Err(_) => {
@@ -53,6 +57,10 @@ pub extern "C" fn backup_directory(
             return 1;
         }
     };
+    if dst_path.is_null() {
+        set_last_error("目标路径为空指针");
+        return 1;
+    }
     let dst = match unsafe { CStr::from_ptr(dst_path) }.to_str() {
         Ok(s) => s,
         Err(_) => {

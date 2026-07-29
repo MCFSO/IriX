@@ -37,6 +37,8 @@ class ServerProcessManager {
   /// 进程退出完成器；在 [start] 时创建，进程退出时完成。
   Completer<int>? _exitCompleter;
 
+  bool _disposed = false;
+
   /// 创建一个进程管理器。
   ///
   /// [instance] 为该管理器所托管的服务器实例。
@@ -201,6 +203,8 @@ class ServerProcessManager {
   ///
   /// 由上层状态层在销毁该管理器时调用；不会终止正在运行的进程。
   void dispose() {
+    if (_disposed) return;
+    _disposed = true;
     _logController.close();
   }
 }
