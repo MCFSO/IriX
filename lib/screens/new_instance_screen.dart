@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../utils/apple_widgets.dart';
 import 'download_core_screen.dart';
 import 'import_core_screen.dart';
 
@@ -32,11 +33,9 @@ class NewInstanceScreen extends StatelessWidget {
                       icon: Icons.download,
                       title: '下载',
                       description: '自动下载核心并新建服务器实例',
-                      onTap: () => Navigator.push(
+                      onTap: () => pushPage(
                         context,
-                        MaterialPageRoute<void>(
-                          builder: (_) => const DownloadCoreScreen(),
-                        ),
+                        (_) => const DownloadCoreScreen(),
                       ),
                     ),
                   ),
@@ -46,11 +45,9 @@ class NewInstanceScreen extends StatelessWidget {
                       icon: Icons.file_download_done,
                       title: '导入',
                       description: '导入一个服务器核心新建服务器实例',
-                      onTap: () => Navigator.push(
+                      onTap: () => pushPage(
                         context,
-                        MaterialPageRoute<void>(
-                          builder: (_) => const ImportCoreScreen(),
-                        ),
+                        (_) => const ImportCoreScreen(),
                       ),
                     ),
                   ),

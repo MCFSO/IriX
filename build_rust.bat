@@ -1,12 +1,12 @@
 @echo off
-REM Rust 备份模块编译脚本
-REM 编译 Rust FFI 库并复制到 Flutter 应用目录
+REM Rust 模块编译脚本 (workspace: backup + downloader)
+REM 编译两个独立的 Rust FFI 库并复制到 Flutter 应用目录
 
-echo Compiling Rust backup module...
+echo Compiling Rust workspace (backup + downloader)...
 
 cd rust
 
-REM 编译 Release 版本
+REM 编译 Release 版本 (workspace 一次编译所有成员)
 cargo build --release
 
 if %ERRORLEVEL% NEQ 0 (
@@ -15,8 +15,9 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 REM 复制 DLL 到 Flutter 应用目录
-echo Copying DLL to Flutter app...
+echo Copying DLLs to Flutter app...
 copy /Y target\release\xmc_backup.dll ..\windows\runner\
+copy /Y target\release\xmc_downloader.dll ..\windows\runner\
 
-echo Done! DLL copied to windows\runner\
+echo Done! DLLs copied to windows\runner\
 pause

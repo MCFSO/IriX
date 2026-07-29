@@ -1,31 +1,27 @@
-// Mod/插件市场 — 搜索页面
-// 提供搜索栏 + 筛选器（项目类型 / 加载器 / 游戏版本 / 排序） + 结果列表
+// 市场 — 搜索页面
+// 提供来源切换 (Modrinth / Hangar) + 搜索栏 + 筛选器 + 结果列表
 import 'dart:async';
 import 'package:flutter/material.dart';
 
+import '../models/hangar.dart';
 import '../models/modrinth.dart';
+import '../services/hangar_api_service.dart';
 import '../services/modrinth_api_service.dart';
+import '../utils/apple_widgets.dart';
+import 'hangar_detail_screen.dart';
 import 'mod_detail_screen.dart';
 
 /// 项目类型筛选选项
 enum _ProjectTypeFilter {
-  all('全部'),
   mod('Mod'),
-  plugin('插件'),
-  modpack('整合包'),
-  resourcepack('资源包'),
-  shader('光影');
+  plugin('插件');
 
   final String label;
   const _ProjectTypeFilter(this.label);
 
   String? get apiValue => switch (this) {
-        _ProjectTypeFilter.all => null,
         _ProjectTypeFilter.mod => 'mod',
         _ProjectTypeFilter.plugin => 'plugin',
-        _ProjectTypeFilter.modpack => 'modpack',
-        _ProjectTypeFilter.resourcepack => 'resourcepack',
-        _ProjectTypeFilter.shader => 'shader',
       };
 }
 
@@ -49,7 +45,7 @@ enum _SortIndex {
       };
 }
 
-/// Mod/插件市场搜索页面
+/// 市场搜索页面
 class MarketplaceScreen extends StatefulWidget {
   const MarketplaceScreen({super.key});
 
@@ -57,12 +53,40 @@ class MarketplaceScreen extends StatefulWidget {
   State<MarketplaceScreen> createState() => _MarketplaceScreenState();
 }
 
+/// 搜索结果的统一视图，屏蔽 Modrinth / Hangar 差异。
+class _MarketHit {
+  final String id;
+  final String slug;
+  final String title;
+  final String description;
+  final String? iconUrl;
+  final int downloads;
+  final int stars;
+  final String category;
+  final MarketplaceSource source;
+
+  const _MarketHit({
+    required this.id,
+    required this.slug,
+    required this.title,
+    required this.description,
+    this.iconUrl,
+    required this.downloads,
+    required this.stars,
+    required this.category,
+    required this.source,
+  });
+}
+
 class _MarketplaceScreenState extends State<MarketplaceScreen> {
-  final ModrinthApiService _api = ModrinthApiService();
+  final ModrinthApiService _modrinthApi = ModrinthApiService();
+  final HangarApiService _hangarApi = HangarApiService();
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
-  List<ModrinthSearchHit> _hits = [];
+  MarketplaceSource _source = MarketplaceSource.modrinth;
+
+  List<_MarketHit> _hits = [];
   bool _isLoading = false;
   bool _isLoadingMore = false;
   bool _hasMore = true;
@@ -70,7 +94,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
   _ProjectTypeFilter _typeFilter = _ProjectTypeFilter.mod;
   _SortIndex _sortIndex = _SortIndex.relevance;
-  String? _loaderFilter; // 例如 'fabric', 'forge', 'paper', 'purpur'
+  String? _loaderFilter; // Modrinth 加载器（例如 'fabric', 'paper'）
   String? _gameVersionFilter; // 例如 '1.20.1'
 
   List<ModrinthTag> _loaders = [];
@@ -92,17 +116,36 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     _searchController.dispose();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
-    _api.dispose();
+    _modrinthApi.dispose();
+    _hangarApi.dispose();
     super.dispose();
   }
 
+  /// 切换来源：清空当前结果并重新搜索。
+  void _switchSource(MarketplaceSource source) {
+    if (_source == source) return;
+    setState(() {
+      _source = source;
+      _hits = [];
+      _error = null;
+      _hasMore = true;
+    });
+    _search();
+  }
+
+  static const _deprecatedLoaders = {
+    'liteloader',
+    "risugami's modloader",
+  };
+
   Future<void> _loadTags() async {
     try {
-      final loaders = await _api.getLoaderTags();
-      final versions = await _api.getGameVersionTags();
+      final loaders = await _modrinthApi.getLoaderTags();
+      final versions = await _modrinthApi.getGameVersionTags();
       if (mounted) {
         setState(() {
-          _loaders = loaders;
+          _loaders =
+              loaders.where((l) => !_deprecatedLoaders.contains(l.name)).toList();
           _gameVersions = versions.where((v) => v.major).toList();
         });
       }
@@ -137,16 +180,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     });
 
     try {
-      final result = await _api.search(
-        query: _searchController.text.trim(),
-        facets: _buildFacets(),
-        index: _sortIndex.apiValue,
-        offset: 0,
-        limit: 20,
-      );
+      final result = await _fetchPage(0, 20);
       setState(() {
         _hits = result.hits;
-        _hasMore = result.hits.length < result.totalHits;
+        _hasMore = result.hasMore;
         _isLoading = false;
       });
     } catch (e) {
@@ -162,20 +199,77 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     setState(() => _isLoadingMore = true);
 
     try {
-      final result = await _api.search(
-        query: _searchController.text.trim(),
-        facets: _buildFacets(),
-        index: _sortIndex.apiValue,
-        offset: _hits.length,
-        limit: 20,
-      );
+      final result = await _fetchPage(_hits.length, 20);
       setState(() {
         _hits.addAll(result.hits);
-        _hasMore = _hits.length < result.totalHits && result.hits.isNotEmpty;
+        _hasMore = result.hasMore && result.hits.isNotEmpty;
         _isLoadingMore = false;
       });
     } catch (_) {
       setState(() => _isLoadingMore = false);
+    }
+  }
+
+  /// 统一的分页获取入口，根据当前来源调用对应 API 并适配为 [_MarketHit]。
+  Future<({List<_MarketHit> hits, bool hasMore})> _fetchPage(
+    int offset,
+    int limit,
+  ) async {
+    final query = _searchController.text.trim();
+    switch (_source) {
+      case MarketplaceSource.modrinth:
+        final result = await _modrinthApi.search(
+          query: query,
+          facets: _buildFacets(),
+          index: _sortIndex.apiValue,
+          offset: offset,
+          limit: limit,
+        );
+        final hits = result.hits
+            .map((h) => _MarketHit(
+                  id: h.projectId,
+                  slug: h.slug,
+                  title: h.title,
+                  description: h.description,
+                  iconUrl: h.iconUrl,
+                  downloads: h.downloads,
+                  stars: h.follows,
+                  category: h.projectType,
+                  source: MarketplaceSource.modrinth,
+                ))
+            .toList();
+        return (hits: hits, hasMore: result.hits.length < result.totalHits);
+
+      case MarketplaceSource.hangar:
+        final sortMap = {
+          _SortIndex.newest: 'newest',
+          _SortIndex.updated: 'updated',
+          _SortIndex.downloads: 'downloads',
+          _SortIndex.follows: 'stars',
+          _SortIndex.relevance: 'newest',
+        };
+        final platform = _loaderFilter;
+        final result = await _hangarApi.search(
+          query: query,
+          platform: platform,
+          sort: sortMap[_sortIndex] ?? 'newest',
+          offset: offset,
+          limit: limit,
+        );
+        final hits = result.hits
+            .map((h) => _MarketHit(
+                  id: h.slug,
+                  slug: h.slug,
+                  title: h.name,
+                  description: h.description,
+                  iconUrl: h.avatarUrl,
+                  downloads: h.downloads,
+                  stars: h.stars,
+                  category: h.category,
+                  source: MarketplaceSource.hangar,
+                ))
+            .toList();
+        return (hits: hits, hasMore: _hits.length + hits.length < result.total);
     }
   }
 
@@ -208,9 +302,30 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     return Scaffold(
       body: Column(
         children: [
+          _buildSourceSwitcher(),
           _buildSearchBar(),
           _buildFilters(),
           Expanded(child: _buildBody()),
+        ],
+      ),
+    );
+  }
+
+  /// 来源切换 (Modrinth / Hangar)。
+  Widget _buildSourceSwitcher() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Row(
+        children: [
+          for (final src in MarketplaceSource.values) ...[
+            FilterChip(
+              label: Text(src.label),
+              selected: _source == src,
+              showCheckmark: false,
+              onSelected: (_) => _switchSource(src),
+            ),
+            const SizedBox(width: 8),
+          ],
         ],
       ),
     );
@@ -337,7 +452,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       },
       itemBuilder: (context) => [
         const PopupMenuItem(value: null, child: Text('全部')),
-        ..._gameVersions.take(40).map((v) => PopupMenuItem(
+        ..._gameVersions.map((v) => PopupMenuItem(
               value: v.version,
               child: Text('${v.version} (${v.versionType})'),
             )),
@@ -404,17 +519,23 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
               child: Center(child: CircularProgressIndicator()),
             );
           }
+          final hit = _hits[index];
           return _SearchResultCard(
-            hit: _hits[index],
+            hit: hit,
             onTap: () async {
-              await Navigator.push(
+              Widget screen;
+              switch (hit.source) {
+                case MarketplaceSource.modrinth:
+                  screen = ModDetailScreen(
+                    projectId: hit.id,
+                    projectSlug: hit.slug,
+                  );
+                case MarketplaceSource.hangar:
+                  screen = HangarDetailScreen(slug: hit.slug);
+              }
+              await pushPage<void>(
                 context,
-                MaterialPageRoute<void>(
-                  builder: (_) => ModDetailScreen(
-                    projectId: _hits[index].projectId,
-                    projectSlug: _hits[index].slug,
-                  ),
-                ),
+                (_) => screen,
               );
             },
           );
@@ -428,7 +549,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 class _SearchResultCard extends StatelessWidget {
   const _SearchResultCard({required this.hit, required this.onTap});
 
-  final ModrinthSearchHit hit;
+  final _MarketHit hit;
   final VoidCallback onTap;
 
   @override
@@ -483,8 +604,9 @@ class _SearchResultCard extends StatelessWidget {
                         _infoChip(
                             '${_formatNumber(hit.downloads)} 下载', Icons.download),
                         _infoChip(
-                            '${_formatNumber(hit.follows)} 关注', Icons.star),
-                        _infoChip(hit.projectType, Icons.category),
+                            '${_formatNumber(hit.stars)} 收藏', Icons.star),
+                        _infoChip(hit.category, Icons.category),
+                        _infoChip(hit.source.label, Icons.cloud),
                       ],
                     ),
                   ],

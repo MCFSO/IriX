@@ -22,14 +22,25 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Analyze code
+      - name: Analyze Dart code
         run: flutter analyze
 
-      - name: Run tests
+      - name: Run Dart tests
         run: flutter test --coverage
+
+      - name: Run Rust tests
+        run: cd rust && cargo test --release
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v5

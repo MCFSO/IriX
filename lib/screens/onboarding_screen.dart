@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../utils/apple_widgets.dart';
 import 'import_instance_screen.dart';
 import 'new_instance_screen.dart';
 
@@ -25,10 +26,7 @@ class OnboardingScreen extends StatelessWidget {
 
   /// 推入子界面，待其返回后再 pop 本界面，使底层 HomeScreen 刷新。
   Future<void> _pushAndReturn(BuildContext context, WidgetBuilder builder) async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute<void>(builder: builder),
-    );
+    await pushPage(context, builder);
     if (!context.mounted) return;
     // 子流程结束（已创建/导入实例或取消）后返回上层，触发 HomeScreen 刷新。
     // 嵌入模式下不 pop（因为本就是 HomeScreen 的一部分）。

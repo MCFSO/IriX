@@ -64,7 +64,7 @@ class ModrinthApiService {
     return ModrinthProject.fromJson(response as Map<String, dynamic>);
   }
 
-  /// 获取项目的版本列表
+  /// 获取项目的版本列表（所有版本，自动分页加载）
   ///
   /// [gameVersions] 过滤游戏版本
   /// [loaders] 过滤加载器
@@ -73,20 +73,30 @@ class ModrinthApiService {
     List<String>? gameVersions,
     List<String>? loaders,
   }) async {
-    final uri = Uri.parse('$_baseUrl/project/$idOrSlug/version').replace(
-      queryParameters: <String, String>{
-        if (gameVersions != null && gameVersions.isNotEmpty)
-          'game_versions': jsonEncode(gameVersions),
-        if (loaders != null && loaders.isNotEmpty)
-          'loaders': jsonEncode(loaders),
-      },
-    );
-
-    final response = await _get(uri);
-    final list = response as List<dynamic>;
-    return list
-        .map((e) => ModrinthVersion.fromJson(e as Map<String, dynamic>))
-        .toList();
+    const pageSize = 100;
+    final all = <ModrinthVersion>[];
+    int offset = 0;
+    while (true) {
+      final uri = Uri.parse('$_baseUrl/project/$idOrSlug/version').replace(
+        queryParameters: <String, String>{
+          if (gameVersions != null && gameVersions.isNotEmpty)
+            'game_versions': jsonEncode(gameVersions),
+          if (loaders != null && loaders.isNotEmpty)
+            'loaders': jsonEncode(loaders),
+          'offset': offset.toString(),
+          'limit': pageSize.toString(),
+        },
+      );
+      final response = await _get(uri);
+      final list = response as List<dynamic>;
+      final page = list
+          .map((e) => ModrinthVersion.fromJson(e as Map<String, dynamic>))
+          .toList();
+      all.addAll(page);
+      if (page.length < pageSize) break;
+      offset += pageSize;
+    }
+    return all;
   }
 
   /// 获取单个版本详情

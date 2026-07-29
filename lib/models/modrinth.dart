@@ -4,19 +4,13 @@
 /// 项目类型
 enum ModrinthProjectType {
   mod,
-  modpack,
   plugin,
-  resourcepack,
-  shader,
   unknown;
 
   static ModrinthProjectType fromString(String? type) {
     return switch (type) {
       'mod' => ModrinthProjectType.mod,
-      'modpack' => ModrinthProjectType.modpack,
       'plugin' => ModrinthProjectType.plugin,
-      'resourcepack' => ModrinthProjectType.resourcepack,
-      'shader' => ModrinthProjectType.shader,
       _ => ModrinthProjectType.unknown,
     };
   }

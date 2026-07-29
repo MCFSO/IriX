@@ -78,8 +78,12 @@ class _AppleButtonState extends State<AppleButton>
 
   @override
   Widget build(BuildContext context) {
+    final previous = _animationsEnabled;
     _animationsEnabled =
         context.select<AppState, bool>((s) => s.animationsEnabled);
+    if (_animationsEnabled == false && previous == true) {
+      _controller.reset();
+    }
     return GestureDetector(
       onTapDown: _onTapDown,
       onTapUp: _onTapUp,
@@ -160,8 +164,12 @@ class _AppleCardState extends State<AppleCard>
 
   @override
   Widget build(BuildContext context) {
+    final previous = _animationsEnabled;
     _animationsEnabled =
         context.select<AppState, bool>((s) => s.animationsEnabled);
+    if (_animationsEnabled == false && previous == true) {
+      _controller.reset();
+    }
     return AnimatedBuilder(
       animation: _elevationAnimation,
       builder: (context, _) {
@@ -313,4 +321,47 @@ class AppleProgressIndicator extends StatelessWidget {
             borderRadius: BorderRadius.circular(4),
           );
   }
+}
+
+/// 页面跳转，遵守动画开关。关闭动画时过渡直接跳过。
+Future<T?> pushPage<T>(BuildContext context, WidgetBuilder builder) {
+  final animationsEnabled = context.read<AppState>().animationsEnabled;
+  final duration =
+      animationsEnabled ? const Duration(milliseconds: 300) : Duration.zero;
+  return Navigator.push<T>(
+    context,
+    PageRouteBuilder<T>(
+      pageBuilder: (_, _, _) => builder(context),
+      transitionDuration: duration,
+      reverseTransitionDuration: duration,
+      transitionsBuilder: (_, animation, _, child) {
+        if (!animationsEnabled) return child;
+        return SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(1.0, 0.0),
+            end: Offset.zero,
+          ).animate(CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeInOut,
+          )),
+          child: child,
+        );
+      },
+    ),
+  );
+}
+
+/// 弹出对话框，遵守动画开关。关闭动画时无过渡。
+Future<T?> showAppDialog<T>(BuildContext context, WidgetBuilder builder) {
+  final animationsEnabled = context.read<AppState>().animationsEnabled;
+  return showGeneralDialog<T>(
+    context: context,
+    pageBuilder: (_, _, _) => builder(context),
+    transitionDuration:
+        animationsEnabled ? const Duration(milliseconds: 150) : Duration.zero,
+    transitionBuilder: (_, animation, _, child) {
+      if (!animationsEnabled) return child;
+      return FadeTransition(opacity: animation, child: child);
+    },
+  );
 }

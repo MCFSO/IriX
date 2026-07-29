@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 
 import '../services/config_annotation_service.dart';
 import '../services/config_service.dart';
+import '../utils/apple_widgets.dart';
 
 /// 配置编辑器界面。
 ///
@@ -172,18 +173,18 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
   /// 切换文件时的未保存提示。
   Future<bool> _confirmDiscard() async {
     if (!_dirty) return true;
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
+    final result = await showAppDialog<bool>(
+      context,
+      (ctx) => AlertDialog(
         title: const Text('未保存的修改'),
         content: const Text('当前文件有未保存的修改，是否丢弃？'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(ctx, false),
             child: const Text('取消'),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(ctx, true),
             child: const Text('丢弃'),
           ),
         ],

@@ -9,6 +9,7 @@ import '../models/server_instance.dart';
 import '../services/downloader.dart';
 import '../services/modrinth_api_service.dart';
 import '../state/app_state.dart';
+import '../utils/apple_widgets.dart';
 
 /// Mod 详情页面
 class ModDetailScreen extends StatefulWidget {
@@ -79,9 +80,6 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
     return switch (projectType) {
       'plugin' => 'plugins',
       'mod' => 'mods',
-      'modpack' => 'modpacks',
-      'resourcepack' => 'resourcepacks',
-      'shader' => 'shaderpacks',
       _ => 'mods',
     };
   }
@@ -102,9 +100,9 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
     if (state.selected != null) return state.selected;
 
     if (!mounted) return null;
-    return showDialog<ServerInstance>(
-      context: context,
-      builder: (context) {
+    return showAppDialog<ServerInstance>(
+      context,
+      (ctx) {
         return AlertDialog(
           title: const Text('选择目标实例'),
           content: SizedBox(
@@ -118,14 +116,14 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
                   leading: const Icon(Icons.storage),
                   title: Text(instance.name),
                   subtitle: Text(instance.rootPath),
-                  onTap: () => Navigator.pop(context, instance),
+                  onTap: () => Navigator.pop(ctx, instance),
                 );
               },
             ),
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(ctx),
               child: const Text('取消'),
             ),
           ],

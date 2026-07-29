@@ -38,7 +38,6 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
         title: 'XMCServerLauncher',
         debugShowCheckedModeBanner: false,
-        // 终端风格深色主题：以绿色为种子色生成暗色 ColorScheme。
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(
             seedColor: Colors.green,

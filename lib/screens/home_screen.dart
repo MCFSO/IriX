@@ -1,6 +1,5 @@
 // 实例列表主页 + 左侧导航栏
-// 左侧 NavigationRail 切换"实例列表"和"Mod/插件市场"
-// 右上角设置入口可调节下载线程数与动画效果开关
+// 左侧 NavigationRail 切换"实例列表"和"市场"
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -8,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../models/server_instance.dart';
 import '../services/download_settings.dart';
 import '../state/app_state.dart';
+import '../utils/apple_widgets.dart';
 import 'instance_detail_screen.dart';
 import 'marketplace_screen.dart';
 import 'onboarding_screen.dart';
@@ -35,19 +35,6 @@ class _HomeScreenState extends State<HomeScreen> {
               setState(() => _selectedIndex = index);
             },
             labelType: NavigationRailLabelType.all,
-            leading: Padding(
-              padding: const EdgeInsets.only(top: 8, bottom: 16),
-              child: IconButton(
-                icon: const Icon(Icons.add),
-                tooltip: '新建实例',
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute<void>(
-                    builder: (_) => const OnboardingScreen(),
-                  ),
-                ),
-              ),
-            ),
             destinations: const [
               NavigationRailDestination(
                 icon: Icon(Icons.storage_outlined),
@@ -57,7 +44,7 @@ class _HomeScreenState extends State<HomeScreen> {
               NavigationRailDestination(
                 icon: Icon(Icons.store_outlined),
                 selectedIcon: Icon(Icons.store),
-                label: Text('Mod/插件市场'),
+                label: Text('市场'),
               ),
             ],
           ),
@@ -97,11 +84,19 @@ class _HomeScreenState extends State<HomeScreen> {
               floating: true,
               actions: [
                 IconButton(
+                  icon: const Icon(Icons.add),
+                  tooltip: '新建实例',
+                  onPressed: () => pushPage(
+                    context,
+                    (_) => const OnboardingScreen(),
+                  ),
+                ),
+                IconButton(
                   icon: const Icon(Icons.settings_outlined),
                   tooltip: '设置',
-                  onPressed: () => showDialog<void>(
-                    context: context,
-                    builder: (_) => const _SettingsDialog(),
+                  onPressed: () => showAppDialog<void>(
+                    context,
+                    (_) => const _SettingsDialog(),
                   ),
                 ),
                 const SizedBox(width: 4),
@@ -119,12 +114,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       instance: instance,
                       onTap: () {
                         state.selectInstance(instance.id);
-                        Navigator.push(
+                        pushPage(
                           context,
-                          MaterialPageRoute<void>(
-                            builder: (_) => InstanceDetailScreen(
-                              instanceId: instance.id,
-                            ),
+                          (_) => InstanceDetailScreen(
+                            instanceId: instance.id,
                           ),
                         );
                       },
@@ -218,7 +211,7 @@ class _StatusChip extends StatelessWidget {
 /// 设置对话框 — 调节下载线程数与动画效果开关。
 ///
 /// 下载线程数控制多线程分片断点续传下载的并发数 (1-32)；
-/// 动画效果开关控制 Apple 风格组件的弹簧/过渡动画是否启用。
+/// 动画效果开关控制界面弹簧/过渡动画是否启用。
 /// 修改即时生效并持久化 (SharedPreferences)。
 class _SettingsDialog extends StatefulWidget {
   const _SettingsDialog();

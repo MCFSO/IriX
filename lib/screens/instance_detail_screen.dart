@@ -13,6 +13,7 @@ import '../models/server_instance.dart';
 import '../services/backup_ffi.dart';
 import '../services/backup_settings.dart';
 import '../state/app_state.dart';
+import '../utils/apple_widgets.dart';
 import 'config_editor_screen.dart';
 
 /// 实例详情页。
@@ -837,9 +838,9 @@ class _SettingsTab extends StatelessWidget {
   ///
   /// 弹窗中提供勾选框，用户可选择是否同时删除服务器根目录下的所有文件。
   Future<void> _confirmDelete(BuildContext context) async {
-    final result = await showDialog<_DeleteConfirmation>(
-      context: context,
-      builder: (_) => const _DeleteConfirmationDialog(),
+    final result = await showAppDialog<_DeleteConfirmation>(
+      context,
+      (_) => const _DeleteConfirmationDialog(),
     );
     if (result == null || !result.confirmed) return;
     if (!context.mounted) return;
