@@ -254,6 +254,9 @@ jobs:
       - name: Install Fastforge
         run: dart pub global activate fastforge
 
+      - name: Install appdmg
+        run: npm install -g appdmg
+
       - name: Package DMG
         run: fastforge package --platform macos --targets dmg
 

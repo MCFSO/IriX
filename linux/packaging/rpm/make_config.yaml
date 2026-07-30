@@ -4,6 +4,7 @@ group: Applications/System
 vendor: MCFSO
 license: MIT
 url: https://github.com/MCFSO/xmcserverlancher
+icon: macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_512.png
 generic_name: Minecraft Server Manager
 keywords:
   - minecraft
