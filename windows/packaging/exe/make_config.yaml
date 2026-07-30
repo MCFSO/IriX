@@ -1,0 +1,7 @@
+app_id: com.mcfso.xmcserverlancher
+display_name: X Minecraft Server Launcher
+publisher_name: MCFSO
+setup_icon_file: windows\runner\resources\app_icon.ico
+create_desktop_icon: true
+architectures_allowed: x64compatible
+architectures_install_in_64bit_mode: x64compatible
