@@ -212,7 +212,9 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
 
     try {
       final newPath = p.join(p.dirname(oldPath), newName);
-      await File(oldPath).rename(newPath);
+      final isDir =
+          FileSystemEntity.typeSync(oldPath) == FileSystemEntityType.directory;
+      await (isDir ? Directory(oldPath) : File(oldPath)).rename(newPath);
       if (_selectedPaths.contains(oldPath)) {
         _selectedPaths.remove(oldPath);
         _selectedPaths.add(newPath);
@@ -264,6 +266,51 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
     }
     if (!mounted) return;
     _refresh();
+  }
+
+  Future<void> _handleNewFile() async {
+    final controller = TextEditingController(text: '新文件.txt');
+    controller.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: controller.text.length,
+    );
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('新建文件'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(border: OutlineInputBorder()),
+          onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('创建'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (name == null || name.isEmpty) return;
+
+    try {
+      final filePath = p.join(_currentPath, name);
+      await File(filePath).create();
+      if (!mounted) return;
+      _refresh();
+      showTextEditor(context, filePath);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('创建文件失败: $e')),
+      );
+    }
   }
 
   void _handleCopy(FileSystemEntity entity) {
@@ -325,7 +372,7 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
     }
   }
 
-  void _openConfigEditor(String filePath) {
+  void _openTextEditor(String filePath) {
     showTextEditor(context, filePath);
   }
 
@@ -406,46 +453,67 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
         return Icons.data_object;
       case '.yml':
       case '.yaml':
+      case '.ini':
         return Icons.settings;
       case '.properties':
       case '.toml':
+      case '.conf':
+      case '.cfg':
         return Icons.tune;
       case '.txt':
       case '.log':
+      case '.md':
+      case '.csv':
         return Icons.description;
       case '.zip':
       case '.gz':
       case '.tar':
+      case '.rar':
+      case '.7z':
         return Icons.archive;
       case '.png':
       case '.jpg':
       case '.jpeg':
       case '.gif':
+      case '.bmp':
+      case '.ico':
+      case '.webp':
         return Icons.image;
       case '.lua':
       case '.js':
+      case '.ts':
       case '.py':
       case '.java':
       case '.dart':
+      case '.sh':
+      case '.bash':
+      case '.xml':
+      case '.html':
+      case '.css':
+      case '.sql':
         return Icons.code;
       case '.lock':
         return Icons.lock;
+      case '.bat':
+      case '.cmd':
+      case '.ps1':
+        return Icons.terminal;
       default:
         return Icons.insert_drive_file;
     }
   }
 
-  bool _isConfigFile(String path) {
+  /// 判断是否为二进制文件（不可用文本编辑器打开）。
+  bool _isBinaryFile(String path) {
     final ext = p.extension(path).toLowerCase();
-    return [
-      '.yml',
-      '.yaml',
-      '.properties',
-      '.json',
-      '.toml',
-      '.conf',
-      '.cfg',
-    ].contains(ext);
+    return const {
+      '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.webp',
+      '.db', '.sqlite', '.dat', '.bin',
+      '.class', '.nbt', '.mca', '.mcr',
+      '.gz', '.tar', '.rar', '.7z',
+      '.mp3', '.wav', '.ogg', '.mp4', '.avi',
+      '.dll', '.so', '.dylib', '.exe',
+    }.contains(ext);
   }
 
   List<String> _pathSegments() {
@@ -476,7 +544,7 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
             child: _menuItem(Icons.delete, '删除', color: Colors.red)),
         PopupMenuItem(
             value: 'rename', child: _menuItem(Icons.edit, '重命名')),
-        if (target is! Directory && _isConfigFile(target.path))
+        if (target is! Directory && !_isBinaryFile(target.path))
           PopupMenuItem(
               value: 'editConfig',
               child: _menuItem(Icons.text_snippet, '编辑')),
@@ -495,6 +563,9 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
         PopupMenuItem(
             value: 'newFolder',
             child: _menuItem(Icons.create_new_folder, '新建文件夹')),
+        PopupMenuItem(
+            value: 'newFile',
+            child: _menuItem(Icons.note_add, '新建文件')),
         const PopupMenuDivider(),
         PopupMenuItem(
             value: 'refresh', child: _menuItem(Icons.refresh, '刷新')),
@@ -528,7 +599,7 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
         case 'rename':
           _handleRename(target.path);
         case 'editConfig':
-          _openConfigEditor(target.path);
+          _openTextEditor(target.path);
         case 'properties':
           _showProperties(target);
       }
@@ -538,6 +609,8 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
           _handlePaste();
         case 'newFolder':
           _handleNewFolder();
+        case 'newFile':
+          _handleNewFile();
         case 'refresh':
           _refresh();
       }
@@ -687,6 +760,11 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
             icon: const Icon(Icons.create_new_folder),
             tooltip: '新建文件夹',
             onPressed: _handleNewFolder,
+          ),
+          IconButton(
+            icon: const Icon(Icons.note_add),
+            tooltip: '新建文件',
+            onPressed: _handleNewFile,
           ),
           IconButton(
             icon: const Icon(Icons.info_outline),
@@ -844,12 +922,9 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
                   builder: (_) => ArchiveViewerScreen(filePath: entity.path),
                 ),
               );
+            } else if (!_isBinaryFile(entity.path)) {
+              _openTextEditor(entity.path);
             }
-          }
-        },
-        onDoubleTap: () {
-          if (!_selectionMode && !isDir && _isConfigFile(entity.path)) {
-            _openConfigEditor(entity.path);
           }
         },
         onLongPress: () => _onItemLongPress(entity),

@@ -129,11 +129,35 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       _hits = [];
       _error = null;
       _hasMore = true;
+      _loaderFilter = null;
     });
     _search();
   }
 
-  static const _essentialLoaders = {'fabric', 'forge', 'quilt', 'neoforge'};
+  /// Mod 加载器集合（Modrinth API 支持的 loader 名称）。
+  static const _modLoaders = {'fabric', 'forge', 'quilt', 'neoforge'};
+
+  /// 插件加载器集合（Modrinth API 支持的 loader 名称）。
+  static const _pluginLoaders = {
+    'paper', 'spigot', 'purpur', 'bukkit', 'folia',
+    'waterfall', 'velocity', 'bungeecord',
+  };
+
+  /// 加载器显示名称映射。
+  static const _loaderDisplayNames = {
+    'fabric': 'Fabric',
+    'forge': 'Forge',
+    'quilt': 'Quilt',
+    'neoforge': 'NeoForge',
+    'paper': 'Paper',
+    'spigot': 'Spigot',
+    'purpur': 'Purpur',
+    'bukkit': 'CraftBukkit',
+    'folia': 'Folia',
+    'waterfall': 'Waterfall',
+    'velocity': 'Velocity',
+    'bungeecord': 'BungeeCord',
+  };
 
   Future<void> _loadTags() async {
     try {
@@ -141,14 +165,33 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       final versions = await _modrinthApi.getGameVersionTags();
       if (mounted) {
         setState(() {
-          _loaders =
-              loaders.where((l) => _essentialLoaders.contains(l.name)).toList();
+          _loaders = loaders;
           _gameVersions = versions.where((v) => v.major).toList();
         });
       }
     } catch (_) {
-      // 标签加载失败不阻塞主流程
+      // 标签加载失败不阻塞主流程，回退到硬编码集合
     }
+  }
+
+  /// 根据当前项目类型返回适用的加载器名称列表。
+  ///
+  /// 优先使用 API 返回的 loader（确保 API 支持），
+  /// API 不可用时回退到已知集合（均为 Modrinth 支持的 loader 名称）。
+  List<String> get _relevantLoaders {
+    final set =
+        _typeFilter == _ProjectTypeFilter.mod ? _modLoaders : _pluginLoaders;
+    if (_loaders.isEmpty) return set.toList()..sort();
+    final names = _loaders.map((l) => l.name).toSet();
+    final result = names.intersection(set).toList()..sort();
+    return result.isEmpty ? (set.toList()..sort()) : result;
+  }
+
+  /// 加载器名称转展示名。
+  String _loaderDisplayName(String name) {
+    final mapped = _loaderDisplayNames[name];
+    if (mapped != null) return mapped;
+    return name.isEmpty ? name : name[0].toUpperCase() + name.substring(1);
   }
 
   void _onScroll() {
@@ -381,7 +424,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     return PopupMenuButton<_ProjectTypeFilter>(
       child: _filterChip('类型: ${_typeFilter.label}', active: true),
       onSelected: (value) {
-        setState(() => _typeFilter = value);
+        setState(() {
+          _typeFilter = value;
+          _loaderFilter = null;
+        });
         _search();
       },
       itemBuilder: (context) => _ProjectTypeFilter.values
@@ -420,9 +466,12 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   }
 
   Widget _buildLoaderChip() {
+    final relevant = _relevantLoaders;
     return PopupMenuButton<String?>(
       child: _filterChip(
-        _loaderFilter == null ? '核心' : '核心: $_loaderFilter',
+        _loaderFilter == null
+            ? '核心'
+            : '核心: ${_loaderDisplayName(_loaderFilter!)}',
         active: _loaderFilter != null,
       ),
       onSelected: (value) {
@@ -431,9 +480,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       },
       itemBuilder: (context) => [
         const PopupMenuItem(value: null, child: Text('全部')),
-        ..._loaders.map((l) => PopupMenuItem(
-              value: l.name,
-              child: Text(l.name),
+        ...relevant.map((name) => PopupMenuItem(
+              value: name,
+              child: Text(_loaderDisplayName(name)),
             )),
       ],
     );
