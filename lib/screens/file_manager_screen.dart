@@ -520,7 +520,6 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
       switch (value) {
         case 'open':
           navigator.push(
-            context,
             MaterialPageRoute(
               builder: (_) => ArchiveViewerScreen(filePath: target.path),
             ),
