@@ -3,9 +3,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
-import '../screens/config_editor_screen.dart';
 import '../services/trash_store.dart';
 import 'archive_viewer_screen.dart';
+import 'text_editor_dialog.dart';
 
 class FileManagerScreen extends StatefulWidget {
   final String rootPath;
@@ -326,12 +326,7 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
   }
 
   void _openConfigEditor(String filePath) {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => ConfigEditorScreen(
-        rootPath: _rootPath,
-        initialFilePath: filePath,
-      ),
-    ));
+    showTextEditor(context, filePath);
   }
 
   void _showProperties(FileSystemEntity entity) {
