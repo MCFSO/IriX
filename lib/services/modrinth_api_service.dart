@@ -23,7 +23,7 @@ class ModrinthApiService {
 
   static const String _baseUrl = 'https://api.modrinth.com/v2';
   static const String _userAgent =
-      'xmcserverlancher/1.0.0 (https://github.com/mcfso/xmcserverlancher)';
+      'xmcserverlauncher/1.0.0 (https://github.com/mcfso/xmcserverlancher)';
 
   final http.Client _client;
 

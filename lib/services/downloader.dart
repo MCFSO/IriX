@@ -145,7 +145,7 @@ class _CompletionMessage {
 /// 独立的下载动态库 (xmc_downloader.dll)，与备份库解耦。
 class Downloader {
   static const String _defaultUserAgent =
-      'xmcserverlancher/1.0.0 (https://github.com/mcfso/xmcserverlancher)';
+      'xmcserverlauncher/1.0.0 (https://github.com/mcfso/xmcserverlancher)';
 
   /// 打开动态库 (xmc_downloader)
   static DynamicLibrary _openLibrary() {

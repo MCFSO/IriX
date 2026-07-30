@@ -1,4 +1,4 @@
-app_id: com.mcfso.xmcserverlancher
+app_id: com.mcfso.xmcserverlauncher
 display_name: X Minecraft Server Launcher
 publisher_name: MCFSO
 setup_icon_file: windows\runner\resources\app_icon.ico

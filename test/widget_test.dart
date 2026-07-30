@@ -3,7 +3,7 @@
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:xmcserverlancher/main.dart';
+import 'package:xmcserverlauncher/main.dart';
 
 void main() {
   testWidgets('MyApp 能够正常构建', (WidgetTester tester) async {
