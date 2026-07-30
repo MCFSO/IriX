@@ -75,7 +75,7 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
   void _onDownloadSourceChanged(String? source) {
     if (source == null || source == _downloadSource) return;
     setState(() {
-      _downloadSource = source!;
+      _downloadSource = source;
       _selectedCore = null;
       _selectedVersion = null;
       _selectedMslCore = null;
@@ -354,7 +354,7 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
               'https://mslmc.cn/favicon.ico',
               width: 14,
               height: 14,
-              errorBuilder: (_, __, ___) => const Icon(Icons.cloud, size: 14),
+              errorBuilder: (_, _, _) => const Icon(Icons.cloud, size: 14),
             ),
             const SizedBox(width: 6),
             Text(
