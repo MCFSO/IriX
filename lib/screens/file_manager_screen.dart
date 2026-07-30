@@ -514,7 +514,7 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
       ),
       items: items,
     ).then((value) {
-      if (value == null) return;
+      if (value == null || !mounted) return;
       if (target != null) {
         switch (value) {
           case 'open':

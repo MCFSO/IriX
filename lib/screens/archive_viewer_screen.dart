@@ -268,12 +268,7 @@ class _ArchiveViewerScreenState extends State<ArchiveViewerScreen> {
           ),
           Expanded(
             flex: 1,
-            child: Text('原始大小',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-          ),
-          Expanded(
-            flex: 1,
-            child: Text('压缩大小',
+            child: Text('大小',
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
           ),
           Expanded(
@@ -327,18 +322,9 @@ class _ArchiveViewerScreenState extends State<ArchiveViewerScreen> {
                 ),
               ),
               Expanded(
-                flex: 1,
-                child: Text(
-                  _formatSize(entry.compressedSize),
-                  style: TextStyle(
-                      fontSize: 12, color: theme.colorScheme.outline),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              Expanded(
                 flex: 2,
                 child: Text(
-                  _formatDate(entry.lastModTime),
+                  _formatDate(entry.lastModDateTime),
                   style: TextStyle(
                       fontSize: 12, color: theme.colorScheme.outline),
                   overflow: TextOverflow.ellipsis,
