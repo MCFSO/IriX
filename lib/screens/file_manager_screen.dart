@@ -461,7 +461,7 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
   }
 
   Future<void> _showContextMenu(BuildContext context, Offset position,
-      {FileSystemEntity? target}) {
+      {FileSystemEntity? target}) async {
     final overlay =
         Overlay.of(context).context.findRenderObject() as RenderBox;
     final overlayRect = Rect.fromPoints(
