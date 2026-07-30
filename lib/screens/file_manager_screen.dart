@@ -506,6 +506,7 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
       ]);
     }
 
+    final navigator = Navigator.of(context);
     final value = await showMenu<String>(
       context: context,
       position: RelativeRect.fromRect(
@@ -518,7 +519,7 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
     if (target != null) {
       switch (value) {
         case 'open':
-          Navigator.push(
+          navigator.push(
             context,
             MaterialPageRoute(
               builder: (_) => ArchiveViewerScreen(filePath: target.path),
