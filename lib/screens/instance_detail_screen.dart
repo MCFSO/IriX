@@ -17,6 +17,7 @@ import '../state/app_state.dart';
 import '../utils/apple_widgets.dart';
 import 'config_editor_screen.dart';
 import 'file_manager_screen.dart';
+import 'plugins_tab.dart';
 
 /// 实例详情页。
 ///
@@ -235,8 +236,8 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
             ),
             // Tab 2: 配置 — 配置文件编辑器
             ConfigEditorScreen(rootPath: instance.rootPath),
-            // Tab 3: 插件/Mod — Coming Soon
-            const _PluginsTab(),
+            // Tab 3: 插件/Mod — 卡片网格
+            PluginsTab(rootPath: instance.rootPath),
             // Tab 4: 文件管理
             FileManagerScreen(
               rootPath: instance.rootPath,
@@ -387,30 +388,6 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 插件/Mod Tab — Coming Soon。
-class _PluginsTab extends StatelessWidget {
-  const _PluginsTab();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.extension, size: 64, color: Colors.grey),
-          SizedBox(height: 16),
-          Text(
-            'Coming Soon',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
-          SizedBox(height: 8),
-          Text('插件/Mod 管理功能即将推出', style: TextStyle(color: Colors.grey)),
         ],
       ),
     );

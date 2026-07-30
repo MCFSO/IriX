@@ -16,13 +16,31 @@ import '../utils/code_highlight.dart';
 ///
 /// 接收实例根目录路径，扫描其中的配置文件并以图形表单或文本形式编辑。
 class ConfigEditorScreen extends StatefulWidget {
-  const ConfigEditorScreen({super.key, required this.rootPath, this.initialFilePath});
+  const ConfigEditorScreen({
+    super.key,
+    required this.rootPath,
+    this.initialFilePath,
+    this.onBack,
+    this.scanAll = false,
+    this.nameFilter,
+  });
 
   /// 实例根目录路径。
   final String rootPath;
 
   /// 要初始打开的文件路径（可选）。
   final String? initialFilePath;
+
+  /// 返回回调。设置后工具栏左侧显示返回按钮，用于嵌入到子页面时返回。
+  final VoidCallback? onBack;
+
+  /// 是否扫描根目录下所有文本文件（不限扩展名）。
+  /// 用于插件 / Mod 配置目录中格式较杂的场景。
+  final bool scanAll;
+
+  /// 文件名过滤词（不区分大小写）。设置后只展示文件名包含该词的文件。
+  /// 用于在共享目录（如 config/）中筛选某个 Mod 的配置。
+  final String? nameFilter;
 
   @override
   State<ConfigEditorScreen> createState() => _ConfigEditorScreenState();
@@ -85,8 +103,19 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
   /// 扫描配置文件列表。
   void _loadFiles() {
     final initialPath = widget.initialFilePath;
+    final all = _service.scanConfigFiles(
+      widget.rootPath,
+      scanAll: widget.scanAll,
+    );
+    // 应用文件名过滤（如 config/ 目录中筛选某个 Mod 的配置）
+    final filter = widget.nameFilter?.toLowerCase();
+    final filtered = filter == null || filter.isEmpty
+        ? all
+        : all
+            .where((f) => f.name.toLowerCase().contains(filter))
+            .toList();
     setState(() {
-      _files = _service.scanConfigFiles(widget.rootPath);
+      _files = filtered;
       _selectedIndex = 0;
       _dirty = false;
     });
@@ -259,6 +288,15 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
     return result ?? false;
   }
 
+  /// 配置文件类型对应的小图标。
+  IconData _fileTypeIcon(ConfigFileType type) => switch (type) {
+        ConfigFileType.yaml => Icons.description,
+        ConfigFileType.properties => Icons.tune,
+        ConfigFileType.json => Icons.data_object,
+        ConfigFileType.toml => Icons.data_object,
+        ConfigFileType.text => Icons.notes,
+      };
+
   @override
   Widget build(BuildContext context) {
     if (_files.isEmpty) {
@@ -269,12 +307,21 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
             const Icon(Icons.folder_off, size: 64, color: Colors.grey),
             const SizedBox(height: 16),
             Text(
-              '实例目录中暂无配置文件',
+              '该目录中暂无配置文件',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
             const Text('启动服务器后会生成配置文件'),
             const SizedBox(height: 16),
+            if (widget.onBack != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: FilledButton.tonalIcon(
+                  onPressed: widget.onBack,
+                  icon: const Icon(Icons.arrow_back),
+                  label: const Text('返回'),
+                ),
+              ),
             FilledButton.icon(
               onPressed: _loadFiles,
               icon: const Icon(Icons.refresh),
@@ -332,9 +379,7 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
                         dense: true,
                         selected: selected,
                         leading: Icon(
-                          file.type == ConfigFileType.yaml
-                              ? Icons.description
-                              : Icons.settings,
+                          _fileTypeIcon(file.type),
                           size: 20,
                         ),
                         title: Text(
@@ -365,6 +410,16 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
                       horizontal: 12, vertical: 8),
                   child: Row(
                     children: [
+                      // 返回按钮（嵌入到子页面时显示）
+                      if (widget.onBack != null)
+                        IconButton(
+                          icon: const Icon(Icons.arrow_back, size: 20),
+                          tooltip: '返回',
+                          onPressed: () async {
+                            if (await _confirmDiscard()) widget.onBack!();
+                          },
+                        ),
+                      if (widget.onBack != null) const SizedBox(width: 4),
                       Text(
                         _files[_selectedIndex].name,
                         style: Theme.of(context).textTheme.titleSmall,

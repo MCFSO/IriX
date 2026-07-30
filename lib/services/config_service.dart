@@ -11,7 +11,7 @@ import 'package:yaml/yaml.dart';
 import 'package:yaml_writer/yaml_writer.dart';
 
 /// 配置文件类型。
-enum ConfigFileType { yaml, properties, json, toml }
+enum ConfigFileType { yaml, properties, json, toml, text }
 
 /// 配置文件信息。
 class ConfigFileInfo {
@@ -37,25 +37,35 @@ class ConfigFileInfo {
 class ConfigService {
   /// 扫描实例根目录下的配置文件。
   ///
-  /// 扫描根目录与 `config/` 子目录下的 `.yml`、`.yaml`、`.properties` 文件。
+  /// 默认模式：扫描根目录顶层文件 + `config/` 子目录（递归），
   /// 返回按文件名排序的列表，name 字段为相对根目录的路径（如 `config/config.yml`）。
-  List<ConfigFileInfo> scanConfigFiles(String rootPath) {
+  ///
+  /// 当 [scanAll] 为 true 时，递归扫描根目录下所有文本文件（不限扩展名），
+  /// 用于插件 / Mod 配置目录中格式较杂的场景，未知格式标记为 [ConfigFileType.text]，
+  /// 并跳过二进制 / 媒体 / 锁文件。
+  List<ConfigFileInfo> scanConfigFiles(
+    String rootPath, {
+    bool scanAll = false,
+  }) {
     final dir = Directory(rootPath);
     if (!dir.existsSync()) return [];
 
     final files = <ConfigFileInfo>[];
 
-    // 扫描根目录（不递归）
-    for (final entity in dir.listSync(followLinks: false)) {
-      if (entity is File) {
-        _tryAddConfig(entity, rootPath, files);
+    if (scanAll) {
+      // scanAll 模式：递归扫描根目录下所有文本文件
+      _scanDirectory(dir, rootPath, files, scanAll: true);
+    } else {
+      // 默认模式：扫描根目录顶层 + config/ 子目录（递归），兼容旧逻辑
+      for (final entity in dir.listSync(followLinks: false)) {
+        if (entity is File) {
+          _tryAddConfig(entity, rootPath, files);
+        }
       }
-    }
-
-    // 扫描 config/ 子目录（递归）
-    final configDir = Directory(p.join(rootPath, 'config'));
-    if (configDir.existsSync()) {
-      _scanDirectory(configDir, rootPath, files);
+      final configDir = Directory(p.join(rootPath, 'config'));
+      if (configDir.existsSync()) {
+        _scanDirectory(configDir, rootPath, files);
+      }
     }
 
     files.sort((a, b) => a.name.compareTo(b.name));
@@ -66,19 +76,25 @@ class ConfigService {
   void _scanDirectory(
     Directory dir,
     String rootPath,
-    List<ConfigFileInfo> files,
-  ) {
+    List<ConfigFileInfo> files, {
+    bool scanAll = false,
+  }) {
     for (final entity in dir.listSync(followLinks: false)) {
       if (entity is File) {
-        _tryAddConfig(entity, rootPath, files);
+        _tryAddConfig(entity, rootPath, files, scanAll: scanAll);
       } else if (entity is Directory) {
-        _scanDirectory(entity, rootPath, files);
+        _scanDirectory(entity, rootPath, files, scanAll: scanAll);
       }
     }
   }
 
   /// 尝试将文件添加到配置列表（按扩展名过滤）。
-  void _tryAddConfig(File file, String rootPath, List<ConfigFileInfo> files) {
+  void _tryAddConfig(
+    File file,
+    String rootPath,
+    List<ConfigFileInfo> files, {
+    bool scanAll = false,
+  }) {
     final ext = p.extension(file.path).toLowerCase();
     switch (ext) {
       case '.yml':
@@ -112,13 +128,37 @@ class ConfigService {
           type: ConfigFileType.toml,
         ));
         break;
+      default:
+        // scanAll 模式下，未知扩展名也纳入（作为纯文本处理），
+        // 但跳过明显的二进制 / 媒体 / 锁文件。
+        if (scanAll && !_isBinaryExt(ext) && ext != '.jar') {
+          files.add(ConfigFileInfo(
+            path: file.path,
+            name: p.basename(file.path),
+            type: ConfigFileType.text,
+          ));
+        }
+        break;
     }
+  }
+
+  /// 判断是否为常见二进制扩展名（应跳过）。
+  bool _isBinaryExt(String ext) {
+    const binary = {
+      '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.webp',
+      '.db', '.sqlite', '.dat', '.bin',
+      '.lock', '.lck',
+      '.class', '.nbt', '.mca', '.mcr',
+      '.zip', '.gz', '.tar',
+    };
+    return binary.contains(ext);
   }
 
   /// 读取配置文件为可变的 Map 结构。
   ///
   /// - YAML：解析为 `Map<String, dynamic>`，嵌套结构保留。
   /// - Properties：解析为 `Map<String, dynamic>`，值为 String。
+  /// - text：返回空 Map，迫使编辑器回退到文本模式编辑。
   ///
   /// 解析失败时抛出异常，调用方应捕获并提示用户。
   Map<String, dynamic> readConfig(String path) {
@@ -132,6 +172,10 @@ class ConfigService {
     if (ext == '.properties' || ext == '.conf' || ext == '.cfg') {
       return _parseProperties(content);
     }
+    // text 类型（未知扩展名）：返回空 Map，编辑器将回退到文本模式。
+    if (!_isKnownConfigExt(ext)) {
+      return {};
+    }
     return _parseYaml(content);
   }
 
@@ -144,6 +188,7 @@ class ConfigService {
   ///
   /// - YAML：使用 yaml_writer 序列化。
   /// - Properties：以 key=value 格式写入。
+  /// - text：不通过 Map 写入，调用方应使用 [writeRaw]。
   void writeConfig(String path, Map<String, dynamic> data) {
     final ext = p.extension(path).toLowerCase();
     String content;
@@ -151,10 +196,29 @@ class ConfigService {
       content = _serializeJson(data);
     } else if (ext == '.properties' || ext == '.conf' || ext == '.cfg') {
       content = _serializeProperties(data);
+    } else if (!_isKnownConfigExt(ext)) {
+      // text 类型：Map 写入无意义，直接序列化为 YAML 形式以免数据丢失。
+      content = _serializeYaml(data);
     } else {
       content = _serializeYaml(data);
     }
     File(path).writeAsStringSync(content);
+  }
+
+  /// 判断扩展名是否为已知配置格式（yml/yaml/properties/conf/cfg/json/toml）。
+  bool _isKnownConfigExt(String ext) {
+    switch (ext) {
+      case '.yml':
+      case '.yaml':
+      case '.properties':
+      case '.conf':
+      case '.cfg':
+      case '.json':
+      case '.toml':
+        return true;
+      default:
+        return false;
+    }
   }
 
   /// 将原始文本写回配置文件。
