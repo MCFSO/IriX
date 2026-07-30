@@ -42,6 +42,9 @@ app.*.map.json
 # Rust build artifacts
 rust/target/
 
+# Fastforge output
+/dist/
+
 # Android Studio will place build artifacts here
 /android/app/debug
 /android/app/profile
