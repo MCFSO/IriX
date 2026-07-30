@@ -1,5 +1,5 @@
 title: X Minecraft Server Launcher
-icon: macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_512.png
+icon: app_icon_512.png
 icon-size: 80
 window:
   size:
