@@ -460,7 +460,7 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
     return [rootName, ...rel.replaceAll('\\', '/').split('/')];
   }
 
-  Future<void> _showContextMenu(BuildContext context, Offset position,
+  Future<void> _showContextMenu(Offset position,
       {FileSystemEntity? target}) async {
     final overlay =
         Overlay.of(context).context.findRenderObject() as RenderBox;
@@ -746,7 +746,7 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
         Expanded(
           child: GestureDetector(
             onSecondaryTapUp: (details) {
-              _showContextMenu(context, details.globalPosition);
+              _showContextMenu(details.globalPosition);
             },
             child: RefreshIndicator(
               onRefresh: () async => _refresh(),
@@ -832,7 +832,7 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
 
     return GestureDetector(
       onSecondaryTapUp: (details) {
-        _showContextMenu(context, details.globalPosition, target: entity);
+        _showContextMenu(details.globalPosition, target: entity);
       },
       child: InkWell(
         onTap: () {
