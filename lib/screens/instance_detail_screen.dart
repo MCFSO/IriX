@@ -198,7 +198,7 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
             tabs: [
               Tab(icon: Icon(Icons.dashboard), text: '总览'),
               Tab(icon: Icon(Icons.description), text: '配置'),
-              Tab(icon: Icon(Icons.extension), text: '插件'),
+              Tab(icon: Icon(Icons.extension), text: '插件/Mod'),
               Tab(icon: Icon(Icons.folder), text: '文件'),
               Tab(icon: Icon(Icons.backup), text: '备份'),
               Tab(icon: Icon(Icons.settings), text: '设置'),
@@ -235,7 +235,7 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
             ),
             // Tab 2: 配置 — 配置文件编辑器
             ConfigEditorScreen(rootPath: instance.rootPath),
-            // Tab 3: 插件 — Coming Soon
+            // Tab 3: 插件/Mod — Coming Soon
             const _PluginsTab(),
             // Tab 4: 文件管理
             FileManagerScreen(
@@ -393,7 +393,7 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
   }
 }
 
-/// 插件 Tab — Coming Soon。
+/// 插件/Mod Tab — Coming Soon。
 class _PluginsTab extends StatelessWidget {
   const _PluginsTab();
 
@@ -410,7 +410,7 @@ class _PluginsTab extends StatelessWidget {
             style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
           SizedBox(height: 8),
-          Text('插件管理功能即将推出', style: TextStyle(color: Colors.grey)),
+          Text('插件/Mod 管理功能即将推出', style: TextStyle(color: Colors.grey)),
         ],
       ),
     );
