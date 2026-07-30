@@ -343,25 +343,25 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
   }
 
   Widget _mslAttribution() {
+    final theme = Theme.of(context);
     return Card(
-      color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.4),
+      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         child: Row(
           children: [
             Image.network(
               'https://mslmc.cn/favicon.ico',
-              width: 24,
-              height: 24,
-              errorBuilder: (_, __, ___) => const Icon(Icons.cloud, size: 24),
+              width: 14,
+              height: 14,
+              errorBuilder: (_, __, ___) => const Icon(Icons.cloud, size: 14),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                '本服务由 MSL 开服器提供',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
+            const SizedBox(width: 6),
+            Text(
+              '本服务由 MSL 开服器提供',
+              style: TextStyle(
+                fontSize: 10,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.25),
               ),
             ),
           ],
