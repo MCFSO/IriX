@@ -130,7 +130,12 @@ jobs:
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build libgtk-3-dev liblzma-dev libstdc++-12-dev libxdo-dev
+          sudo apt-get install -y cmake ninja-build libgtk-3-dev liblzma-dev libstdc++-12-dev libxdo-dev rpm libfuse2
+
+      - name: Install appimagetool
+        run: |
+          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O /usr/local/bin/appimagetool
+          chmod +x /usr/local/bin/appimagetool
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
