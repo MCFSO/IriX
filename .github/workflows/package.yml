@@ -125,6 +125,12 @@ jobs:
       - name: Build Linux
         run: flutter build linux --release
 
+      - name: Copy Rust so to build output
+        run: |
+          cp linux/libxmc_backup.so build/linux/x64/release/bundle/
+          cp linux/libxmc_downloader.so build/linux/x64/release/bundle/
+          cp linux/libxmc_file_ops.so build/linux/x64/release/bundle/
+
       - name: Install Fastforge
         run: dart pub global activate fastforge
 

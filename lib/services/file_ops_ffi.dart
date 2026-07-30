@@ -204,6 +204,7 @@ abstract class _FileOpsLib {
     final paths = <String>[];
     final cwd = Directory.current.path;
     paths.add(p.join(cwd, libName));
+    paths.add(p.join(cwd, 'lib', libName));
     if (Platform.isWindows) {
       paths.add(p.join(cwd, 'windows', 'runner', libName));
     } else if (Platform.isMacOS) {
@@ -217,6 +218,7 @@ abstract class _FileOpsLib {
       var dir = p.dirname(exePath);
       for (var i = 0; i < 10; i++) {
         paths.add(p.join(dir, libName));
+        paths.add(p.join(dir, 'lib', libName));
         if (Platform.isWindows) {
           paths.add(p.join(dir, 'windows', 'runner', libName));
         } else if (Platform.isMacOS) {
