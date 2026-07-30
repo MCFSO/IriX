@@ -3,7 +3,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
+import '../screens/config_editor_screen.dart';
 import '../services/trash_store.dart';
+import 'archive_viewer_screen.dart';
 
 class FileManagerScreen extends StatefulWidget {
   final String rootPath;
@@ -323,6 +325,15 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
     }
   }
 
+  void _openConfigEditor(String filePath) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => ConfigEditorScreen(
+        rootPath: _rootPath,
+        initialFilePath: filePath,
+      ),
+    ));
+  }
+
   void _showProperties(FileSystemEntity entity) {
     final stat = entity.statSync();
     final isDir = entity is Directory;
@@ -429,6 +440,19 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
     }
   }
 
+  bool _isConfigFile(String path) {
+    final ext = p.extension(path).toLowerCase();
+    return [
+      '.yml',
+      '.yaml',
+      '.properties',
+      '.json',
+      '.toml',
+      '.conf',
+      '.cfg',
+    ].contains(ext);
+  }
+
   List<String> _pathSegments() {
     final rel = p.relative(_currentPath, from: _rootPath);
     if (rel == '.') return [p.basename(_rootPath)];
@@ -447,13 +471,20 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
 
     final items = <PopupMenuEntry<String>>[];
     if (target != null) {
+      final ext = p.extension(target.path).toLowerCase();
       items.addAll([
+        if (ext == '.jar' || ext == '.zip')
+          PopupMenuItem(value: 'open', child: _menuItem(Icons.folder_open, '打开')),
         PopupMenuItem(value: 'copy', child: _menuItem(Icons.copy, '复制')),
         PopupMenuItem(value: 'cut', child: _menuItem(Icons.cut, '剪切')),
         PopupMenuItem(value: 'delete',
             child: _menuItem(Icons.delete, '删除', color: Colors.red)),
         PopupMenuItem(
             value: 'rename', child: _menuItem(Icons.edit, '重命名')),
+        if (target is! Directory && _isConfigFile(target.path))
+          PopupMenuItem(
+              value: 'editConfig',
+              child: _menuItem(Icons.text_snippet, '编辑')),
         const PopupMenuDivider(),
         PopupMenuItem(
             value: 'properties',
@@ -486,6 +517,13 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
       if (value == null) return;
       if (target != null) {
         switch (value) {
+          case 'open':
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ArchiveViewerScreen(filePath: target.path),
+              ),
+            );
           case 'copy':
             _handleCopy(target);
           case 'cut':
@@ -494,6 +532,8 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
             _handleDelete([target.path]);
           case 'rename':
             _handleRename(target.path);
+          case 'editConfig':
+            _openConfigEditor(target.path);
           case 'properties':
             _showProperties(target);
         }
@@ -801,6 +841,21 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
             _toggleSelection(entity.path);
           } else if (isDir) {
             _navigateTo(entity.path);
+          } else {
+            final ext = p.extension(entity.path).toLowerCase();
+            if (ext == '.jar' || ext == '.zip') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ArchiveViewerScreen(filePath: entity.path),
+                ),
+              );
+            }
+          }
+        },
+        onDoubleTap: () {
+          if (!_selectionMode && !isDir && _isConfigFile(entity.path)) {
+            _openConfigEditor(entity.path);
           }
         },
         onLongPress: () => _onItemLongPress(entity),

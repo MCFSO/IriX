@@ -62,6 +62,9 @@ dependencies:
   # FFI for Rust backup
   ffi: ^2.1.0
 
+  # Archive (ZIP/JAR) handling
+  archive: ^4.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

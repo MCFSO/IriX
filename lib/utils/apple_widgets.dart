@@ -1,14 +1,8 @@
 // Apple 风格 UI 组件
 // 提供符合 Apple Designing Fluid Interfaces 原则的响应式控件
 // 包括：即时反馈按钮、半透明材质、弹性卡片等
-//
-// 所有动画均受全局设置 animationsEnabled 控制 (见 AppState)；
-// 关闭动画时，按下/悬停的过渡即时完成，无弹簧/淡入效果。
 
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-
-import '../state/app_state.dart';
 
 /// Apple 风格响应式按钮
 ///
@@ -36,7 +30,6 @@ class _AppleButtonState extends State<AppleButton>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
-  bool _animationsEnabled = true;
 
   @override
   void initState() {
@@ -45,7 +38,6 @@ class _AppleButtonState extends State<AppleButton>
       duration: const Duration(milliseconds: 100),
       vsync: this,
     );
-    // 弹簧动画：damping 1.0（无弹跳），response 0.1s
     _scaleAnimation = Tween<double>(begin: 1.0, end: 0.97).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeOut),
     );
@@ -58,32 +50,22 @@ class _AppleButtonState extends State<AppleButton>
   }
 
   void _onTapDown(TapDownDetails details) {
-    if (widget.onPressed != null && _animationsEnabled) {
+    if (widget.onPressed != null) {
       _controller.forward();
     }
   }
 
   void _onTapUp(TapUpDetails details) {
-    if (_animationsEnabled) {
-      _controller.reverse();
-    }
+    _controller.reverse();
     widget.onPressed?.call();
   }
 
   void _onTapCancel() {
-    if (_animationsEnabled) {
-      _controller.reverse();
-    }
+    _controller.reverse();
   }
 
   @override
   Widget build(BuildContext context) {
-    final previous = _animationsEnabled;
-    _animationsEnabled =
-        context.select<AppState, bool>((s) => s.animationsEnabled);
-    if (_animationsEnabled == false && previous == true) {
-      _controller.reset();
-    }
     return GestureDetector(
       onTapDown: _onTapDown,
       onTapUp: _onTapUp,
@@ -133,7 +115,6 @@ class _AppleCardState extends State<AppleCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _elevationAnimation;
-  bool _animationsEnabled = true;
 
   @override
   void initState() {
@@ -154,7 +135,6 @@ class _AppleCardState extends State<AppleCard>
   }
 
   void _onHover(bool hovering) {
-    if (!_animationsEnabled) return;
     if (hovering) {
       _controller.forward();
     } else {
@@ -164,12 +144,6 @@ class _AppleCardState extends State<AppleCard>
 
   @override
   Widget build(BuildContext context) {
-    final previous = _animationsEnabled;
-    _animationsEnabled =
-        context.select<AppState, bool>((s) => s.animationsEnabled);
-    if (_animationsEnabled == false && previous == true) {
-      _controller.reset();
-    }
     return AnimatedBuilder(
       animation: _elevationAnimation,
       builder: (context, _) {
@@ -179,7 +153,6 @@ class _AppleCardState extends State<AppleCard>
           child: Card(
             margin: widget.margin ?? const EdgeInsets.all(8),
             elevation: _elevationAnimation.value,
-            // 半透明背景
             color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.85),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
@@ -217,17 +190,12 @@ class AppleSwitch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final animationsEnabled =
-        context.select<AppState, bool>((s) => s.animationsEnabled);
     return AnimatedContainer(
-      duration: animationsEnabled
-          ? const Duration(milliseconds: 200)
-          : Duration.zero,
+      duration: const Duration(milliseconds: 200),
       curve: Curves.easeOut,
       child: Switch(
         value: value,
         onChanged: onChanged,
-        // Apple 风格：开启时使用主色，关闭时使用灰色
         activeThumbColor: theme.colorScheme.primary,
         inactiveThumbColor: Colors.grey[400],
       ),
@@ -323,19 +291,15 @@ class AppleProgressIndicator extends StatelessWidget {
   }
 }
 
-/// 页面跳转，遵守动画开关。关闭动画时过渡直接跳过。
+/// 页面跳转，始终使用动画过渡。
 Future<T?> pushPage<T>(BuildContext context, WidgetBuilder builder) {
-  final animationsEnabled = context.read<AppState>().animationsEnabled;
-  final duration =
-      animationsEnabled ? const Duration(milliseconds: 300) : Duration.zero;
   return Navigator.push<T>(
     context,
     PageRouteBuilder<T>(
       pageBuilder: (_, _, _) => builder(context),
-      transitionDuration: duration,
-      reverseTransitionDuration: duration,
+      transitionDuration: const Duration(milliseconds: 300),
+      reverseTransitionDuration: const Duration(milliseconds: 300),
       transitionsBuilder: (_, animation, _, child) {
-        if (!animationsEnabled) return child;
         return SlideTransition(
           position: Tween<Offset>(
             begin: const Offset(1.0, 0.0),
@@ -351,16 +315,13 @@ Future<T?> pushPage<T>(BuildContext context, WidgetBuilder builder) {
   );
 }
 
-/// 弹出对话框，遵守动画开关。关闭动画时无过渡。
+/// 弹出对话框，始终使用淡入过渡。
 Future<T?> showAppDialog<T>(BuildContext context, WidgetBuilder builder) {
-  final animationsEnabled = context.read<AppState>().animationsEnabled;
   return showGeneralDialog<T>(
     context: context,
     pageBuilder: (_, _, _) => builder(context),
-    transitionDuration:
-        animationsEnabled ? const Duration(milliseconds: 150) : Duration.zero,
+    transitionDuration: const Duration(milliseconds: 150),
     transitionBuilder: (_, animation, _, child) {
-      if (!animationsEnabled) return child;
       return FadeTransition(opacity: animation, child: child);
     },
   );

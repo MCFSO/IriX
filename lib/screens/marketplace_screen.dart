@@ -133,10 +133,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     _search();
   }
 
-  static const _deprecatedLoaders = {
-    'liteloader',
-    "risugami's modloader",
-  };
+  static const _essentialLoaders = {'fabric', 'forge', 'quilt', 'neoforge'};
 
   Future<void> _loadTags() async {
     try {
@@ -145,7 +142,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       if (mounted) {
         setState(() {
           _loaders =
-              loaders.where((l) => !_deprecatedLoaders.contains(l.name)).toList();
+              loaders.where((l) => _essentialLoaders.contains(l.name)).toList();
           _gameVersions = versions.where((v) => v.major).toList();
         });
       }
@@ -373,7 +370,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         children: [
           _buildTypeFilterChip(),
           _buildSortChip(),
-          _buildLoaderChip(),
+          if (_source != MarketplaceSource.hangar) _buildLoaderChip(),
           _buildGameVersionChip(),
         ],
       ),
@@ -425,7 +422,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   Widget _buildLoaderChip() {
     return PopupMenuButton<String?>(
       child: _filterChip(
-        _loaderFilter == null ? '加载器' : '加载器: $_loaderFilter',
+        _loaderFilter == null ? '核心' : '核心: $_loaderFilter',
         active: _loaderFilter != null,
       ),
       onSelected: (value) {

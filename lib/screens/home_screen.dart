@@ -208,10 +208,9 @@ class _StatusChip extends StatelessWidget {
   }
 }
 
-/// 设置对话框 — 调节下载线程数与动画效果开关。
+/// 设置对话框 — 调节下载线程数。
 ///
-/// 下载线程数控制多线程分片断点续传下载的并发数 (1-32)；
-/// 动画效果开关控制界面弹簧/过渡动画是否启用。
+/// 下载线程数控制多线程分片断点续传下载的并发数 (1-32)。
 /// 修改即时生效并持久化 (SharedPreferences)。
 class _SettingsDialog extends StatefulWidget {
   const _SettingsDialog();
@@ -222,7 +221,6 @@ class _SettingsDialog extends StatefulWidget {
 
 class _SettingsDialogState extends State<_SettingsDialog> {
   late double _threads;
-  late bool _animations;
   bool _loading = true;
 
   @override
@@ -230,7 +228,6 @@ class _SettingsDialogState extends State<_SettingsDialog> {
     super.initState();
     final state = context.read<AppState>();
     _threads = state.downloadThreads.toDouble();
-    _animations = state.animationsEnabled;
     _loading = false;
   }
 
@@ -265,18 +262,6 @@ class _SettingsDialogState extends State<_SettingsDialog> {
           Text(
             '多线程分片断点续传；服务端不支持 Range 时自动回退单线程。',
             style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 16),
-          // 动画效果开关
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('动画效果'),
-            subtitle: const Text('关闭后界面将不使用弹簧/过渡动画'),
-            value: _animations,
-            onChanged: (v) {
-              setState(() => _animations = v);
-              context.read<AppState>().setAnimationsEnabled(v);
-            },
           ),
         ],
       ),

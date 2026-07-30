@@ -45,12 +45,6 @@ class AppState extends ChangeNotifier {
   /// 下载线程数 (只读视图)。
   int get downloadThreads => _downloadThreads;
 
-  /// 动画效果是否启用，控制 Apple 风格组件的弹簧/过渡动画。
-  bool _animationsEnabled = true;
-
-  /// 动画效果是否启用 (只读视图)。
-  bool get animationsEnabled => _animationsEnabled;
-
   /// 设置当前选中的实例，变更后通知监听者。
   set selected(ServerInstance? value) {
     if (_selected == value) return;
@@ -81,7 +75,6 @@ class AppState extends ChangeNotifier {
   Future<void> init() async {
     _instances = await _store.loadInstances();
     _downloadThreads = await DownloadSettings.getThreads();
-    _animationsEnabled = await DownloadSettings.getAnimationsEnabled();
     notifyListeners();
   }
 
@@ -99,15 +92,7 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 设置动画效果开关并持久化。
-  Future<void> setAnimationsEnabled(bool enabled) async {
-    if (_animationsEnabled == enabled) return;
-    _animationsEnabled = enabled;
-    await DownloadSettings.setAnimationsEnabled(enabled);
-    notifyListeners();
-  }
-
-  /// 创建一个通过“导入目录”方式的实例。
+  /// 创建一个通过"导入目录"方式的实例。
   ///
   /// [coreFilePath] 留空，[coreType]/[coreVersion] 为 null。
   Future<void> createImportedInstance({
@@ -126,7 +111,7 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 创建一个通过“选择本地核心文件”方式的实例。
+  /// 创建一个通过"选择本地核心文件"方式的实例。
   Future<void> createFromCoreFile({
     required String coreFilePath,
     required String rootPath,
@@ -148,7 +133,7 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 创建一个通过“下载核心”方式的实例。
+  /// 创建一个通过"下载核心"方式的实例。
   Future<void> createDownloadedInstance({
     required ServerCore core,
     required CoreVersionInfo versionInfo,
@@ -177,7 +162,6 @@ class AppState extends ChangeNotifier {
     final instance = _instanceById(id);
     final manager = _managers.remove(id);
     if (manager != null) {
-      // 先强制终止正在运行的进程，避免产生孤儿进程。
       await manager.forceStop();
       manager.dispose();
     }
@@ -186,16 +170,13 @@ class AppState extends ChangeNotifier {
     if (_selected?.id == id) {
       _selected = null;
     }
-    // 可选：删除服务器根目录下的所有文件。
     if (deleteFiles && instance != null && instance.rootPath.isNotEmpty) {
       try {
         final dir = Directory(instance.rootPath);
         if (await dir.exists()) {
           await dir.delete(recursive: true);
         }
-      } catch (_) {
-        // 删除文件失败不影响实例记录的移除，忽略错误。
-      }
+      } catch (_) {}
     }
     notifyListeners();
   }
@@ -236,8 +217,6 @@ class AppState extends ChangeNotifier {
       final instance = _instanceById(id);
       if (instance == null) return;
       if (instance.status == InstanceStatus.restarting) {
-        // 重启期间进程退出是预期行为，不翻转状态也不释放管理器；
-        // restartInstance 会在新进程启动后重新挂载监听。
         return;
       }
       instance.status = InstanceStatus.stopped;
@@ -271,7 +250,6 @@ class AppState extends ChangeNotifier {
     try {
       await manager.start();
     } catch (e) {
-      // 启动失败：重置状态为已关闭，移除并释放管理器。
       instance.status = InstanceStatus.stopped;
       _managers.remove(id);
       manager.dispose();
@@ -288,7 +266,7 @@ class AppState extends ChangeNotifier {
   /// 优雅停止指定实例：向进程标准输入写入 `stop`。
   ///
   /// 不在此处变更状态；进程退出后由 [_watchExit] 统一处理为已关闭。
-  /// 实例保持活跃状态以供 UI 展示“强制停止”按钮。
+  /// 实例保持活跃状态以供 UI 展示"强制停止"按钮。
   Future<void> stopInstance(String id) async {
     final manager = _managers[id];
     if (manager == null) return;
@@ -321,7 +299,6 @@ class AppState extends ChangeNotifier {
     try {
       await manager.restart();
     } catch (e) {
-      // 重启失败：重置状态为已关闭，移除并释放管理器。
       instance.status = InstanceStatus.stopped;
       _managers.remove(id);
       manager.dispose();
@@ -329,7 +306,6 @@ class AppState extends ChangeNotifier {
       rethrow;
     }
 
-    // restart 内部 start() 已创建新的 onExit Completer，需重新挂载监听。
     _managers[id] = manager;
     _watchExit(id, manager);
 

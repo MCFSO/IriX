@@ -3,6 +3,7 @@
 // 并提供统一的读取/写入接口。YAML 使用 yaml 包解析与序列化，
 // Properties 使用简单的 key=value 格式处理。
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
@@ -10,7 +11,7 @@ import 'package:yaml/yaml.dart';
 import 'package:yaml_writer/yaml_writer.dart';
 
 /// 配置文件类型。
-enum ConfigFileType { yaml, properties }
+enum ConfigFileType { yaml, properties, json, toml }
 
 /// 配置文件信息。
 class ConfigFileInfo {
@@ -89,10 +90,26 @@ class ConfigService {
         ));
         break;
       case '.properties':
+      case '.conf':
+      case '.cfg':
         files.add(ConfigFileInfo(
           path: file.path,
           name: p.basename(file.path),
           type: ConfigFileType.properties,
+        ));
+        break;
+      case '.json':
+        files.add(ConfigFileInfo(
+          path: file.path,
+          name: p.basename(file.path),
+          type: ConfigFileType.json,
+        ));
+        break;
+      case '.toml':
+        files.add(ConfigFileInfo(
+          path: file.path,
+          name: p.basename(file.path),
+          type: ConfigFileType.toml,
         ));
         break;
     }
@@ -109,7 +126,10 @@ class ConfigService {
     final content = file.readAsStringSync();
     final ext = p.extension(path).toLowerCase();
 
-    if (ext == '.properties') {
+    if (ext == '.json') {
+      return _parseJson(content);
+    }
+    if (ext == '.properties' || ext == '.conf' || ext == '.cfg') {
       return _parseProperties(content);
     }
     return _parseYaml(content);
@@ -127,7 +147,9 @@ class ConfigService {
   void writeConfig(String path, Map<String, dynamic> data) {
     final ext = p.extension(path).toLowerCase();
     String content;
-    if (ext == '.properties') {
+    if (ext == '.json') {
+      content = _serializeJson(data);
+    } else if (ext == '.properties' || ext == '.conf' || ext == '.cfg') {
       content = _serializeProperties(data);
     } else {
       content = _serializeYaml(data);
@@ -138,6 +160,16 @@ class ConfigService {
   /// 将原始文本写回配置文件。
   void writeRaw(String path, String content) {
     File(path).writeAsStringSync(content);
+  }
+
+  /// 解析 JSON 文本为 Map。
+  Map<String, dynamic> _parseJson(String content) {
+    if (content.trim().isEmpty) return {};
+    final decoded = jsonDecode(content);
+    if (decoded is Map) {
+      return Map<String, dynamic>.from(decoded);
+    }
+    return {};
   }
 
   /// 解析 YAML 文本为 Map。
@@ -160,6 +192,12 @@ class ConfigService {
       return node.map(_yamlToDart).toList();
     }
     return node;
+  }
+
+  /// 序列化 Map 为 JSON 文本（带缩进）。
+  String _serializeJson(Map<String, dynamic> data) {
+    const encoder = JsonEncoder.withIndent('  ');
+    return encoder.convert(data);
   }
 
   /// 序列化 Map 为 YAML 文本。

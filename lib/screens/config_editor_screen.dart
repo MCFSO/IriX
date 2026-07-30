@@ -16,10 +16,13 @@ import '../utils/code_highlight.dart';
 ///
 /// 接收实例根目录路径，扫描其中的配置文件并以图形表单或文本形式编辑。
 class ConfigEditorScreen extends StatefulWidget {
-  const ConfigEditorScreen({super.key, required this.rootPath});
+  const ConfigEditorScreen({super.key, required this.rootPath, this.initialFilePath});
 
   /// 实例根目录路径。
   final String rootPath;
+
+  /// 要初始打开的文件路径（可选）。
+  final String? initialFilePath;
 
   @override
   State<ConfigEditorScreen> createState() => _ConfigEditorScreenState();
@@ -53,28 +56,47 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
   /// 是否有未保存的修改。
   bool _dirty = false;
 
+  final ScrollController _gutterScrollController = ScrollController();
+
+  /// 文本编辑器的撤销栈。
+  final List<String> _undoStack = [];
+
+  /// 切换文件/模式前记录的上一个文本内容，用于撤销。
+  String _previousText = '';
+
+  /// 防止撤销操作本身再次入栈。
+  bool _undoing = false;
+
   @override
   void initState() {
     super.initState();
     _loadFiles();
+    _previousText = _textController.text;
   }
 
   @override
   void dispose() {
     _textController.dispose();
     _searchController.dispose();
+    _gutterScrollController.dispose();
     super.dispose();
   }
 
   /// 扫描配置文件列表。
   void _loadFiles() {
+    final initialPath = widget.initialFilePath;
     setState(() {
       _files = _service.scanConfigFiles(widget.rootPath);
       _selectedIndex = 0;
       _dirty = false;
     });
     if (_files.isNotEmpty) {
-      _loadFile(0);
+      int idx = 0;
+      if (initialPath != null) {
+        idx = _files.indexWhere((f) => f.path == initialPath);
+        if (idx < 0) idx = 0;
+      }
+      _loadFile(idx);
     } else {
       setState(() {
         _configData = {};
@@ -96,7 +118,10 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
         _textController.text = raw;
         _textMode = false;
         _dirty = false;
+        _undoStack.clear();
+        _previousText = raw;
       });
+      _resetGutterScroll();
     } catch (e) {
       // 解析失败时回退到文本模式。
       final raw = _service.readRaw(file.path);
@@ -107,7 +132,10 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
         _textController.text = raw;
         _textMode = true;
         _dirty = false;
+        _undoStack.clear();
+        _previousText = raw;
       });
+      _resetGutterScroll();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('解析失败，已切换到文本模式：$e')),
@@ -143,6 +171,40 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
 
   /// 标记数据已修改。
   void _markDirty() {
+    setState(() => _dirty = true);
+  }
+
+  void _resetGutterScroll() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_gutterScrollController.hasClients) {
+        _gutterScrollController.jumpTo(0);
+      }
+    });
+  }
+
+  /// 文本编辑器内容变更回调，同时记录撤销栈。
+  void _onTextChanged(String newText) {
+    if (_undoing) {
+      _undoing = false;
+      _markDirty();
+      return;
+    }
+    if (_previousText != newText) {
+      _undoStack.add(_previousText);
+      _previousText = newText;
+      _markDirty();
+    }
+  }
+
+  /// 撤销上一次文本变更。
+  void _undo() {
+    if (_undoStack.isEmpty) return;
+    _undoing = true;
+    final oldText = _undoStack.removeLast();
+    _textController.text = oldText;
+    _textController.selection = TextSelection.collapsed(offset: oldText.length);
+    _previousText = oldText;
+    _undoStack.removeWhere((_) => false);
     setState(() => _dirty = true);
   }
 
@@ -332,11 +394,20 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
                         onPressed: (index) {
                           setState(() => _textMode = index == 1);
                           if (_textMode) {
-                            // 切换到文本模式时，同步表单数据到文本
                             _textController.text =
                                 _service.readRaw(_files[_selectedIndex].path);
+                            _undoStack.clear();
+                            _previousText = _textController.text;
+                            _resetGutterScroll();
                           }
                         },
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.undo, size: 20),
+                        tooltip: '撤销',
+                        onPressed:
+                            _textMode && _undoStack.isNotEmpty ? _undo : null,
                       ),
                       const SizedBox(width: 8),
                       FilledButton.icon(
@@ -392,21 +463,73 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
 
   /// 文本编辑模式。
   Widget _buildTextEditor() {
+    final text = _textController.text;
+    final lineCount = '\n'.allMatches(text).length + 1;
+    const lineH = 19.5;
+
     return Padding(
       padding: const EdgeInsets.all(8),
-      child: TextField(
-        controller: _textController,
-        maxLines: null,
-        expands: true,
-        style: const TextStyle(
-          fontFamily: 'monospace',
-          fontSize: 13,
-        ),
-        decoration: const InputDecoration(
-          border: InputBorder.none,
-          contentPadding: EdgeInsets.all(8),
-        ),
-        onChanged: (_) => _markDirty(),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: SizedBox(
+              width: 48,
+              child: Container(
+                color: const Color(0xFF1E1E1E),
+                child: ListView.builder(
+                  controller: _gutterScrollController,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: lineCount,
+                  itemExtent: lineH,
+                  itemBuilder: (context, index) {
+                    return Container(
+                      alignment: Alignment.centerRight,
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Text(
+                        '${index + 1}',
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 13,
+                          color: Color(0xFF6A737D),
+                          height: 1.5,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (notification) {
+                if (_gutterScrollController.hasClients) {
+                  _gutterScrollController.jumpTo(
+                    notification.metrics.pixels,
+                  );
+                }
+                return false;
+              },
+              child: TextField(
+                controller: _textController,
+                maxLines: null,
+                expands: true,
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 13,
+                  height: 1.5,
+                ),
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.all(8),
+                ),
+                onChanged: _onTextChanged,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
