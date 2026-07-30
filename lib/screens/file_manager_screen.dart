@@ -460,7 +460,7 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
     return [rootName, ...rel.replaceAll('\\', '/').split('/')];
   }
 
-  void _showContextMenu(BuildContext context, Offset position,
+  Future<void> _showContextMenu(BuildContext context, Offset position,
       {FileSystemEntity? target}) {
     final overlay =
         Overlay.of(context).context.findRenderObject() as RenderBox;
@@ -506,48 +506,47 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
       ]);
     }
 
-    showMenu<String>(
+    final value = await showMenu<String>(
       context: context,
       position: RelativeRect.fromRect(
         Rect.fromLTWH(position.dx, position.dy, 1, 1),
         overlayRect,
       ),
       items: items,
-    ).then((value) {
-      if (value == null || !mounted) return;
-      if (target != null) {
-        switch (value) {
-          case 'open':
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ArchiveViewerScreen(filePath: target.path),
-              ),
-            );
-          case 'copy':
-            _handleCopy(target);
-          case 'cut':
-            _handleCut(target);
-          case 'delete':
-            _handleDelete([target.path]);
-          case 'rename':
-            _handleRename(target.path);
-          case 'editConfig':
-            _openConfigEditor(target.path);
-          case 'properties':
-            _showProperties(target);
-        }
-      } else {
-        switch (value) {
-          case 'paste':
-            _handlePaste();
-          case 'newFolder':
-            _handleNewFolder();
-          case 'refresh':
-            _refresh();
-        }
+    );
+    if (value == null || !mounted) return;
+    if (target != null) {
+      switch (value) {
+        case 'open':
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ArchiveViewerScreen(filePath: target.path),
+            ),
+          );
+        case 'copy':
+          _handleCopy(target);
+        case 'cut':
+          _handleCut(target);
+        case 'delete':
+          _handleDelete([target.path]);
+        case 'rename':
+          _handleRename(target.path);
+        case 'editConfig':
+          _openConfigEditor(target.path);
+        case 'properties':
+          _showProperties(target);
       }
-    });
+    } else {
+      switch (value) {
+        case 'paste':
+          _handlePaste();
+        case 'newFolder':
+          _handleNewFolder();
+        case 'refresh':
+          _refresh();
+      }
+    }
   }
 
   Widget _menuItem(IconData icon, String label, {Color? color}) {
