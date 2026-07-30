@@ -100,11 +100,23 @@ jobs:
           Copy-Item windows/runner/xmc_downloader.dll build/windows/x64/runner/Release/ -Force
           Copy-Item windows/runner/xmc_file_ops.dll build/windows/x64/runner/Release/ -Force
 
-      - name: Upload Windows artifact
+      - name: Install Fastforge
+        run: dart pub global activate fastforge
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Package EXE
+        run: fastforge package --platform windows --targets exe
+
+      - name: Package MSIX
+        run: fastforge package --platform windows --targets msix
+
+      - name: Upload Windows artifacts
         uses: actions/upload-artifact@v5
         with:
-          name: windows-build
-          path: build/windows/x64/runner/Release/
+          name: windows-packages
+          path: dist/
           retention-days: 30
 
   build-linux:
@@ -155,11 +167,23 @@ jobs:
       - name: Build Linux
         run: flutter build linux --release
 
-      - name: Upload Linux artifact
+      - name: Install Fastforge
+        run: dart pub global activate fastforge
+
+      - name: Package AppImage
+        run: fastforge package --platform linux --targets appimage
+
+      - name: Package DEB
+        run: fastforge package --platform linux --targets deb
+
+      - name: Package RPM
+        run: fastforge package --platform linux --targets rpm
+
+      - name: Upload Linux artifacts
         uses: actions/upload-artifact@v5
         with:
-          name: linux-build
-          path: build/linux/x64/release/bundle/
+          name: linux-packages
+          path: dist/
           retention-days: 30
 
   build-macos:
@@ -222,9 +246,15 @@ jobs:
       - name: Build macOS
         run: flutter build macos --release
 
-      - name: Upload macOS artifact
+      - name: Install Fastforge
+        run: dart pub global activate fastforge
+
+      - name: Package DMG
+        run: fastforge package --platform macos --targets dmg
+
+      - name: Upload macOS artifacts
         uses: actions/upload-artifact@v5
         with:
-          name: macos-build
-          path: build/macos/Build/Products/Release/xmcserverlancher.app
+          name: macos-packages
+          path: dist/
           retention-days: 30
