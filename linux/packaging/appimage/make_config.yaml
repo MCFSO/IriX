@@ -1,0 +1,10 @@
+display_name: X Minecraft Server Launcher
+icon: macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_512.png
+generic_name: Minecraft Server Manager
+keywords:
+  - minecraft
+  - server
+  - launcher
+categories:
+  - Utility
+startup_notify: true

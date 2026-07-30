@@ -1,0 +1,13 @@
+display_name: X Minecraft Server Launcher
+summary: A Flutter application for managing Minecraft servers.
+group: Applications/System
+vendor: MCFSO
+license: MIT
+url: https://github.com/MCFSO/xmcserverlancher
+generic_name: Minecraft Server Manager
+keywords:
+  - minecraft
+  - server
+  - launcher
+categories:
+  - Utility
