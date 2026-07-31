@@ -249,6 +249,78 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
     );
   }
 
+  // ---------- 数据库管理 ----------
+
+  Future<void> _showCreateDatabaseDialog() async {
+    final creds = await showAppDialog<
+        ({String database, String username, String password})>(
+      context,
+      (ctx) => _CreateDatabaseDialog(
+        type: _connection.type,
+      ),
+    );
+    if (creds == null || !mounted) return;
+    try {
+      await _service.createDatabaseWithUser(
+        _connection,
+        database: creds.database,
+        username: creds.username,
+        password: creds.password,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已创建数据库 ${creds.database}')),
+      );
+      _loadDatabases();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('创建失败: $e')));
+    }
+  }
+
+  Future<void> _confirmDropDatabase(String database) async {
+    final confirmed = await showAppDialog<bool>(
+      context,
+      (ctx) => AlertDialog(
+        title: const Text('删除数据库'),
+        content: Text('确定要删除数据库 $database 吗？\n此操作不可恢复！'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await _service.dropDatabase(_connection, database);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('已删除数据库 $database')));
+      if (_selectedDb == database) {
+        _selectedDb = null;
+        _level = 1;
+      }
+      _loadDatabases();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('删除失败: $e')));
+    }
+  }
+
   // ---------- Redis 操作 ----------
 
   void _onRedisSearchChanged(String text) {
@@ -454,27 +526,62 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
 
   Widget _buildDatabaseList() {
     final theme = Theme.of(context);
-    if (_databases.isEmpty) {
-      return const Center(child: Text('未找到数据库'));
-    }
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      itemCount: _databases.length,
-      itemBuilder: (context, index) {
-        final db = _databases[index];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+          child: Row(
+            children: [
+              Text('数据库', style: theme.textTheme.titleMedium),
+              const Spacer(),
+              FilledButton.tonalIcon(
+                onPressed: _showCreateDatabaseDialog,
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('新建数据库'),
+              ),
+            ],
           ),
-          child: ListTile(
-            leading: Icon(Icons.dns, color: theme.colorScheme.primary),
-            title: Text(db),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _selectDatabase(db),
-          ),
-        );
-      },
+        ),
+        Expanded(
+          child: _databases.isEmpty
+              ? const Center(child: Text('未找到数据库'))
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  itemCount: _databases.length,
+                  itemBuilder: (context, index) {
+                    final db = _databases[index];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: ListTile(
+                        leading: Icon(
+                          Icons.dns,
+                          color: theme.colorScheme.primary,
+                        ),
+                        title: Text(db),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              tooltip: '删除',
+                              icon: const Icon(Icons.delete_outline),
+                              onPressed: () => _confirmDropDatabase(db),
+                            ),
+                            const Icon(Icons.chevron_right),
+                          ],
+                        ),
+                        onTap: () => _selectDatabase(db),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 
@@ -1159,6 +1266,216 @@ class _RedisAddKeyDialogState extends State<_RedisAddKeyDialog> {
                 )
               : const Text('保存'),
         ),
+      ],
+    );
+  }
+}
+
+/// 新建数据库对话框。
+///
+/// 输入数据库名，凭据支持两种模式：
+/// - 自动生成：随机生成该库专用用户名与强密码（可点击"重新生成"）
+/// - 自定义：由用户填写用户名与密码
+/// 确认后返回 (database, username, password)，由调用方执行建库。
+class _CreateDatabaseDialog extends StatefulWidget {
+  final DbType type;
+
+  const _CreateDatabaseDialog({required this.type});
+
+  @override
+  State<_CreateDatabaseDialog> createState() => _CreateDatabaseDialogState();
+}
+
+class _CreateDatabaseDialogState extends State<_CreateDatabaseDialog> {
+  final _databaseController = TextEditingController();
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
+
+  /// 凭据模式：true 自动生成，false 自定义。
+  bool _autoGenerate = true;
+
+  String _generatedUsername = '';
+  String _generatedPassword = '';
+
+  String? _databaseError;
+
+  @override
+  void initState() {
+    super.initState();
+    _generate();
+  }
+
+  @override
+  void dispose() {
+    _databaseController.dispose();
+    _usernameController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  void _generate() {
+    final name = _databaseController.text.trim();
+    final creds = RemoteDatabaseService.generateCredentials(
+      name.isEmpty ? 'db' : name,
+    );
+    setState(() {
+      _generatedUsername = creds.username;
+      _generatedPassword = creds.password;
+    });
+  }
+
+  /// 只读字段（自动生成的凭据，支持复制）。
+  Widget _readOnlyField(String label, String value, bool monospace) {
+    return InputDecorator(
+      decoration: InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      ),
+      child: SelectableText(
+        value,
+        style: TextStyle(
+          fontSize: 14,
+          fontFamily: monospace ? 'monospace' : null,
+        ),
+      ),
+    );
+  }
+
+  void _submit() {
+    final database = _databaseController.text.trim();
+    if (database.isEmpty) {
+      setState(() => _databaseError = '请输入数据库名称');
+      return;
+    }
+    final username =
+        _autoGenerate ? _generatedUsername : _usernameController.text.trim();
+    final password =
+        _autoGenerate ? _generatedPassword : _passwordController.text;
+    if (username.isEmpty) {
+      setState(() => _databaseError = '请输入用户名');
+      return;
+    }
+    if (password.isEmpty) {
+      setState(() => _databaseError = '请输入密码');
+      return;
+    }
+    Navigator.of(context).pop((
+      database: database,
+      username: username,
+      password: password,
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AlertDialog(
+      title: const Text('新建数据库'),
+      content: SizedBox(
+        width: 420,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: _databaseController,
+                autofocus: true,
+                onChanged: (_) {
+                  if (_autoGenerate) _generate();
+                  setState(() => _databaseError = null);
+                },
+                decoration: InputDecoration(
+                  labelText: '数据库名称',
+                  hintText: widget.type == DbType.postgres
+                      ? '小写字母/数字/下划线'
+                      : '例如 minecraft',
+                  border: const OutlineInputBorder(),
+                  isDense: true,
+                  errorText: _databaseError,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text('数据库专用账号', style: theme.textTheme.titleSmall),
+              const SizedBox(height: 8),
+              SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(
+                    value: true,
+                    icon: Icon(Icons.auto_awesome, size: 18),
+                    label: Text('自动生成'),
+                  ),
+                  ButtonSegment(
+                    value: false,
+                    icon: Icon(Icons.edit_outlined, size: 18),
+                    label: Text('自定义'),
+                  ),
+                ],
+                selected: {_autoGenerate},
+                onSelectionChanged: (selection) {
+                  setState(() {
+                    _autoGenerate = selection.first;
+                    if (_autoGenerate) _generate();
+                  });
+                },
+              ),
+              const SizedBox(height: 12),
+              if (_autoGenerate) ...[
+                _readOnlyField('用户名', _generatedUsername, false),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _readOnlyField('密码', _generatedPassword, true),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      tooltip: '重新生成',
+                      icon: const Icon(Icons.refresh),
+                      onPressed: _generate,
+                    ),
+                  ],
+                ),
+              ] else ...[
+                TextField(
+                  controller: _usernameController,
+                  decoration: const InputDecoration(
+                    labelText: '用户名',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _passwordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: '密码',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
+              Text(
+                '将创建独立数据库并授予该账号全部权限',
+                style: TextStyle(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('创建')),
       ],
     );
   }

@@ -11,6 +11,8 @@
 //       redis 包 4.x 无 RedisClient，使用 RedisConnection().connect(host, port)
 //       返回 Command，认证通过 AUTH 命令完成，keys/del 通过 send_object 发送。
 
+import 'dart:math';
+
 import 'package:mysql_dart/mysql_client.dart' as mysql;
 import 'package:postgres/postgres.dart' as pg;
 import 'package:redis/redis.dart';
@@ -395,6 +397,113 @@ class RemoteDatabaseService {
     }
   }
 
+  // === 数据库管理 ===
+
+  /// 生成随机数据库专用账号：用户名含库名前缀 + 4 位随机，密码 16 位强字符。
+  static ({String username, String password}) generateCredentials(
+    String databaseName,
+  ) {
+    final rand = Random.secure();
+    const letterDigits = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    const strong = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        'abcdefghijklmnopqrstuvwxyz0123456789!@#%^&*-_';
+
+    final base = databaseName
+        .replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_')
+        .toLowerCase();
+    final safeBase = base.isEmpty ? 'db' : base.substring(0, base.length > 12 ? 12 : base.length);
+
+    String randomSuffix(int n) => String.fromCharCodes(
+          List.generate(
+            n,
+            (_) => letterDigits.codeUnitAt(rand.nextInt(letterDigits.length)),
+          ),
+        );
+
+    final username = 'user_${safeBase}_${randomSuffix(4)}';
+    final password = String.fromCharCodes(
+      List.generate(
+        16,
+        (_) => strong.codeUnitAt(rand.nextInt(strong.length)),
+      ),
+    );
+    return (username: username, password: password);
+  }
+
+  /// 新建数据库并创建该库专用账号：CREATE DATABASE + CREATE USER + GRANT。
+  ///
+  /// MySQL/MariaDB 账号允许任意主机登录（'%'）；PostgreSQL 授予库级全部权限。
+  /// 任一步失败会抛出异常（部分语句可能已执行，需人工检查）。
+  Future<void> createDatabaseWithUser(
+    DbConnectionInfo info, {
+    required String database,
+    required String username,
+    required String password,
+  }) async {
+    switch (info.type) {
+      case DbType.mysql:
+      case DbType.mariadb:
+        final conn = await _connectMysql(info);
+        try {
+          final dbName = _escMysqlIdent(database);
+          final user = _escMysqlIdent(username);
+          final pwd = _escMysqlStr(password);
+          await conn.execute(
+            'CREATE DATABASE `$dbName` '
+            'CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci',
+          );
+          await conn.execute(
+            "CREATE USER '$user'@'%' IDENTIFIED BY '$pwd'",
+          );
+          await conn.execute(
+            "GRANT ALL PRIVILEGES ON `$dbName`.* TO '$user'@'%'",
+          );
+          await conn.execute('FLUSH PRIVILEGES');
+        } finally {
+          await conn.close();
+        }
+      case DbType.postgres:
+        final conn = await _connectPostgres(info);
+        try {
+          final dbName = _escPgIdent(database);
+          final user = _escPgIdent(username);
+          final pwd = _escPgStr(password);
+          await conn.execute('CREATE DATABASE "$dbName"');
+          await conn.execute('CREATE USER "$user" WITH PASSWORD \'$pwd\'');
+          await conn.execute(
+            'GRANT ALL PRIVILEGES ON DATABASE "$dbName" TO "$user"',
+          );
+        } finally {
+          await conn.close();
+        }
+      case DbType.redis:
+        throw UnsupportedError('Redis 不支持创建数据库');
+    }
+  }
+
+  /// 删除数据库（DROP DATABASE）。Redis 不支持。
+  Future<void> dropDatabase(DbConnectionInfo info, String database) async {
+    switch (info.type) {
+      case DbType.mysql:
+      case DbType.mariadb:
+        final conn = await _connectMysql(info);
+        try {
+          await conn.execute('DROP DATABASE `${_escMysqlIdent(database)}`');
+        } finally {
+          await conn.close();
+        }
+      case DbType.postgres:
+        final conn = await _connectPostgres(info);
+        try {
+          await conn.execute('DROP DATABASE "${_escPgIdent(database)}"');
+        } finally {
+          await conn.close();
+        }
+      case DbType.redis:
+        throw UnsupportedError('Redis 不支持删除数据库');
+    }
+  }
+
   // === 内部工具 ===
 
   /// 空字符串密码/用户名归一化为 null
@@ -405,9 +514,16 @@ class RemoteDatabaseService {
   static String _escMysqlIdent(String ident) =>
       ident.replaceAll('`', '``');
 
+  /// MySQL 字符串字面量转义（反斜杠与单引号）
+  static String _escMysqlStr(String s) =>
+      s.replaceAll('\\', '\\\\').replaceAll("'", "''");
+
   /// PostgreSQL 标识符转义（双引号内的双引号翻倍）
   static String _escPgIdent(String ident) =>
       ident.replaceAll('"', '""');
+
+  /// PostgreSQL 字符串字面量转义（单引号翻倍）
+  static String _escPgStr(String s) => s.replaceAll("'", "''");
 
   static Future<mysql.MySQLConnection> _connectMysql(
     DbConnectionInfo info, {
