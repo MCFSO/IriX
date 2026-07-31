@@ -101,7 +101,7 @@ fastforge config --platform macos --format dmg
 fastforge config --platform linux --format appimage
 ```
 
-各平台打包配置位于对应 `packaging/` 目录下。
+各平台打包配置位于对应 `dist` 目录下。
 
 ## 许可
 
