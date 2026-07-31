@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "xmcserverlauncher" "\0"
+            VALUE "CompanyName", "org.mcfso" "\0"
+            VALUE "FileDescription", "IriX" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "xmcserverlauncher" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "xmcserverlauncher.exe" "\0"
-            VALUE "ProductName", "xmcserverlauncher" "\0"
+            VALUE "InternalName", "IriX" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 org.mcfso. All rights reserved." "\0"
+            VALUE "OriginalFilename", "IriX.exe" "\0"
+            VALUE "ProductName", "IriX" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

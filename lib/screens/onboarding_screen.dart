@@ -85,7 +85,7 @@ class OnboardingScreen extends StatelessWidget {
     }
     return Scaffold(
       appBar: AppBar(
-        title: const Text('XMCServerLauncher'),
+        title: const Text('IriX'),
         centerTitle: true,
       ),
       body: _buildBody(context),

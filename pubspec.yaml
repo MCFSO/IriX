@@ -1,4 +1,4 @@
-name: xmcserverlauncher
+name: irix
 description: "A Flutter application for managing Minecraft servers."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -121,7 +121,7 @@ flutter:
 msix_config:
   display_name: X Minecraft Server Launcher
   publisher_display_name: MCFSO
-  identity_name: xmcfs.launcher
+  identity_name: org.mcfso.lrix
   msix_version: 1.0.0.0
   logo_path: windows/runner/resources/app_icon.ico
   capabilities: internetClient

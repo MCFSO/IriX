@@ -1,4 +1,4 @@
-// XMCServerLauncher 应用入口文件
+// IriX 应用入口文件
 // 提供应用根组件、主题配置与全局状态容器（MultiProvider）。
 // 启动时初始化 AppState（加载持久化实例列表），主页为 HomeScreen。
 
@@ -36,7 +36,7 @@ class MyApp extends StatelessWidget {
         ),
       ],
       child: MaterialApp(
-        title: 'XMCServerLauncher',
+        title: 'IriX',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(

@@ -80,7 +80,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return CustomScrollView(
           slivers: [
             SliverAppBar(
-              title: const Text('XMCServerLauncher'),
+              title: const Text('IriX'),
               floating: true,
               actions: [
                 IconButton(

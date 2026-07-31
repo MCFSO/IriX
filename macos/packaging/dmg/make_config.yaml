@@ -13,4 +13,4 @@ contents:
   - x: 192
     y: 128
     type: file
-    path: xmcserverlauncher.app
+    path: lrix.app
