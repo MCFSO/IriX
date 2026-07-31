@@ -1315,6 +1315,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "xmc_logger"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "libc",
+]
+
+[[package]]
 name = "xz2"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"

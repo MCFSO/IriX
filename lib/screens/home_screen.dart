@@ -8,6 +8,7 @@ import '../models/server_instance.dart';
 import '../services/download_settings.dart';
 import '../state/app_state.dart';
 import '../utils/apple_widgets.dart';
+import 'database_screen.dart';
 import 'instance_detail_screen.dart';
 import 'marketplace_screen.dart';
 import 'onboarding_screen.dart';
@@ -46,6 +47,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 selectedIcon: Icon(Icons.store),
                 label: Text('市场'),
               ),
+              NavigationRailDestination(
+                icon: Icon(Icons.dns_outlined),
+                selectedIcon: Icon(Icons.dns),
+                label: Text('数据库'),
+              ),
             ],
           ),
           const VerticalDivider(thickness: 1, width: 1),
@@ -64,6 +70,8 @@ class _HomeScreenState extends State<HomeScreen> {
         return _buildInstancesPage();
       case 1:
         return const MarketplaceScreen();
+      case 2:
+        return const DatabaseScreen();
       default:
         return _buildInstancesPage();
     }

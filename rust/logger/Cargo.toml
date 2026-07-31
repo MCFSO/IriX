@@ -1,0 +1,11 @@
+[package]
+name = "xmc_logger"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+libc = "0.2"
+chrono = "0.4"

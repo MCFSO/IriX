@@ -19,9 +19,11 @@ echo Copying DLLs to Flutter app...
 copy /Y target\release\xmc_backup.dll ..\windows\runner\
 copy /Y target\release\xmc_downloader.dll ..\windows\runner\
 copy /Y target\release\xmc_file_ops.dll ..\windows\runner\
+copy /Y target\release\xmc_logger.dll ..\windows\runner\
 copy /Y target\release\xmc_backup.dll ..\
 copy /Y target\release\xmc_downloader.dll ..\
 copy /Y target\release\xmc_file_ops.dll ..\
+copy /Y target\release\xmc_logger.dll ..\
 
 echo Done! DLLs copied to windows\runner\
 pause

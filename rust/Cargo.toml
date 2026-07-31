@@ -1,5 +1,5 @@
 [workspace]
-members = ["backup", "downloader", "file_ops"]
+members = ["backup", "downloader", "file_ops", "logger"]
 resolver = "2"
 
 [profile.release]

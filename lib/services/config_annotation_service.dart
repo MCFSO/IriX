@@ -1,14 +1,11 @@
 // 配置注释导入服务
 // 支持 CSV 导入中文注释，覆盖/扩充硬编码的 config_descriptions.dart
-// 导入后持久化为 JSON 文件 (config_annotations.json)，启动时加载
-
-import 'dart:convert';
-import 'dart:io';
+// 导入后持久化为 SQLite (config_annotations 表)，启动时加载
 
 import 'package:csv/csv.dart';
-import 'package:path_provider/path_provider.dart';
 
 import '../data/config_descriptions.dart';
+import '../services/database_manager.dart';
 
 /// 配置注释导入服务 (单例)
 ///
@@ -30,13 +27,7 @@ class ConfigAnnotationService {
   Future<void> init() async {
     if (_initialized) return;
     try {
-      final dir = await getApplicationDocumentsDirectory();
-      final file = File('${dir.path}/config_annotations.json');
-      if (await file.exists()) {
-        final json = await file.readAsString();
-        final map = jsonDecode(json) as Map<String, dynamic>;
-        _imported = map.map((k, v) => MapEntry(k, v.toString()));
-      }
+      _imported = await DatabaseManager.instance.getAllAnnotations();
     } catch (_) {
       // 加载失败时使用空 map，不影响硬编码注释
     }
@@ -67,19 +58,10 @@ class ConfigAnnotationService {
       // 跳过表头
       if (key.toLowerCase() == 'key') continue;
       _imported[key] = desc;
+      await DatabaseManager.instance.insertAnnotation(key, desc);
       count++;
     }
 
-    if (count > 0) {
-      await _persist();
-    }
     return count;
-  }
-
-  /// 持久化到 JSON 文件
-  Future<void> _persist() async {
-    final dir = await getApplicationDocumentsDirectory();
-    final file = File('${dir.path}/config_annotations.json');
-    await file.writeAsString(jsonEncode(_imported));
   }
 }

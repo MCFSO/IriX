@@ -12,6 +12,7 @@ import '../data/server_cores.dart';
 import '../models/server_instance.dart';
 import '../services/download_settings.dart';
 import '../services/instance_store.dart';
+import '../services/log_persistence.dart';
 import '../services/server_process.dart';
 import '../utils/naming.dart';
 
@@ -224,6 +225,7 @@ class AppState extends ChangeNotifier {
         _managers.remove(id);
         captured.dispose();
       }
+      LogPersistence.instance.stopWatching(id);
       notifyListeners();
     }));
   }
@@ -257,6 +259,7 @@ class AppState extends ChangeNotifier {
       rethrow;
     }
 
+    LogPersistence.instance.startWatching(id, manager.logs);
     _watchExit(id, manager);
 
     instance.status = InstanceStatus.running;
@@ -322,6 +325,7 @@ class AppState extends ChangeNotifier {
   /// 释放所有管理器资源。
   @override
   void dispose() {
+    LogPersistence.instance.dispose();
     for (final manager in _managers.values) {
       manager.dispose();
     }
