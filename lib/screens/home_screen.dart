@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/server_instance.dart';
+import '../services/db_page_settings.dart';
 import '../services/download_settings.dart';
 import '../state/app_state.dart';
 import '../utils/apple_widgets.dart';
@@ -229,6 +230,7 @@ class _SettingsDialog extends StatefulWidget {
 
 class _SettingsDialogState extends State<_SettingsDialog> {
   late double _threads;
+  late double _pageSize;
   bool _loading = true;
 
   @override
@@ -236,6 +238,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
     super.initState();
     final state = context.read<AppState>();
     _threads = state.downloadThreads.toDouble();
+    _pageSize = DbPageSettings.pageSize.toDouble();
     _loading = false;
   }
 
@@ -269,6 +272,27 @@ class _SettingsDialogState extends State<_SettingsDialog> {
           const SizedBox(height: 4),
           Text(
             '多线程分片断点续传；服务端不支持 Range 时自动回退单线程。',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 16),
+          // 数据库表格每页行数
+          Text(
+            '数据库每页行数: ${_pageSize.round()}',
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          const SizedBox(height: 4),
+          Slider(
+            value: _pageSize,
+            min: DbPageSettings.minPageSize.toDouble(),
+            max: DbPageSettings.maxPageSize.toDouble(),
+            divisions: DbPageSettings.maxPageSize - DbPageSettings.minPageSize,
+            label: '${_pageSize.round()}',
+            onChanged: (v) => setState(() => _pageSize = v),
+            onChangeEnd: (v) => DbPageSettings.setPageSize(v.round()),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '浏览数据库表数据时每页显示的行数。',
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],

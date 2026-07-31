@@ -233,23 +233,25 @@ class RemoteDatabaseService {
         return const [];
     }
   }
-
   // === 数据查询 ===
 
-  /// 查询表中前 [limit] 行数据（默认 100）。返回 [{column: value, ...}, ...]。
+  /// 查询表中第 [offset] 行起的 [limit] 行数据（默认 100 行，offset 默认 0）。
+  /// 返回 [{column: value, ...}, ...]。
   Future<List<Map<String, dynamic>>> queryTable(
     DbConnectionInfo info,
     String database,
     String table, {
     int limit = 100,
+    int offset = 0,
   }) async {
     switch (info.type) {
       case DbType.mysql:
       case DbType.mariadb:
         final conn = await _connectMysql(info, database: database);
         try {
-          final sql = 'SELECT * FROM `${_escMysqlIdent(table)}` LIMIT ?';
-          final results = await conn.execute(sql, [limit]);
+          final sql = 'SELECT * FROM `${_escMysqlIdent(table)}` '
+              'LIMIT ? OFFSET ?';
+          final results = await conn.execute(sql, [limit, offset]);
           return [
             for (final row in results.rows)
               Map<String, dynamic>.from(row.assoc()),
@@ -261,12 +263,48 @@ class RemoteDatabaseService {
         final conn = await _connectPostgres(info, database: database);
         try {
           final result = await conn.execute(
-            'SELECT * FROM "${_escPgIdent(table)}" LIMIT @limit',
-            parameters: {'limit': limit},
+            'SELECT * FROM "${_escPgIdent(table)}" '
+            'LIMIT @limit OFFSET @offset',
+            parameters: {'limit': limit, 'offset': offset},
           );
           return [
-            for (final row in result) Map<String, dynamic>.from(row.toColumnMap()),
+            for (final row in result)
+              Map<String, dynamic>.from(row.toColumnMap()),
           ];
+        } finally {
+          await conn.close();
+        }
+      case DbType.redis:
+        throw UnsupportedError('Redis 不支持表查询');
+    }
+  }
+
+  /// 统计表中的总行数（用于分页）。
+  Future<int> countRows(
+    DbConnectionInfo info,
+    String database,
+    String table,
+  ) async {
+    switch (info.type) {
+      case DbType.mysql:
+      case DbType.mariadb:
+        final conn = await _connectMysql(info, database: database);
+        try {
+          final results = await conn
+              .execute('SELECT COUNT(*) AS c FROM `${_escMysqlIdent(table)}`');
+          if (results.rows.isEmpty) return 0;
+          return int.tryParse(results.rows.first.colAt(0) ?? '0') ?? 0;
+        } finally {
+          await conn.close();
+        }
+      case DbType.postgres:
+        final conn = await _connectPostgres(info, database: database);
+        try {
+          final result = await conn
+              .execute('SELECT COUNT(*) AS c FROM "${_escPgIdent(table)}"');
+          if (result.isEmpty) return 0;
+          final v = result.first.toColumnMap().values.first;
+          return v is int ? v : int.tryParse(v.toString()) ?? 0;
         } finally {
           await conn.close();
         }
@@ -504,6 +542,212 @@ class RemoteDatabaseService {
     }
   }
 
+  // === 行级数据编辑 ===
+
+  /// 获取表的主键列名列表（无主键返回空列表）。
+  Future<List<String>> getPrimaryKeys(
+    DbConnectionInfo info,
+    String database,
+    String table,
+  ) async {
+    switch (info.type) {
+      case DbType.mysql:
+      case DbType.mariadb:
+        final conn = await _connectMysql(info, database: database);
+        try {
+          final sql =
+              "SELECT kcu.column_name FROM information_schema.table_constraints tc "
+              "JOIN information_schema.key_column_usage kcu "
+              "  ON tc.constraint_name = kcu.constraint_name "
+              " AND tc.table_schema = kcu.table_schema "
+              "WHERE tc.constraint_type = 'PRIMARY KEY' "
+              "  AND tc.table_schema = DATABASE() "
+              "  AND tc.table_name = '${_escMysqlStr(table)}' "
+              "ORDER BY kcu.ordinal_position";
+          final results = await conn.execute(sql);
+          return [
+            for (final row in results.rows)
+              (row.colAt(0) ?? '').toString(),
+          ];
+        } finally {
+          await conn.close();
+        }
+      case DbType.postgres:
+        final conn = await _connectPostgres(info, database: database);
+        try {
+          final sql =
+              "SELECT kcu.column_name FROM information_schema.table_constraints tc "
+              "JOIN information_schema.key_column_usage kcu "
+              "  ON tc.constraint_name = kcu.constraint_name "
+              " AND tc.table_schema = kcu.table_schema "
+              "WHERE tc.constraint_type = 'PRIMARY KEY' "
+              "  AND tc.table_schema = 'public' "
+              "  AND tc.table_name = '${_escPgStr(table)}' "
+              "ORDER BY kcu.ordinal_position";
+          final result = await conn.execute(sql);
+          return [
+            for (final row in result)
+              (row.toColumnMap().values.firstOrNull ?? '').toString(),
+          ];
+        } finally {
+          await conn.close();
+        }
+      case DbType.redis:
+        return const [];
+    }
+  }
+
+  /// 更新一行数据：UPDATE 以主键定位（无主键则用整行旧值匹配）。
+  ///
+  /// [newValues] 仅包含被修改的列；空字符串视为 NULL。
+  /// 返回受影响行数。
+  Future<int> updateRow(
+    DbConnectionInfo info,
+    String database,
+    String table, {
+    required Map<String, dynamic> newValues,
+    required Map<String, dynamic> whereRow,
+  }) async {
+    switch (info.type) {
+      case DbType.mysql:
+      case DbType.mariadb:
+        final conn = await _connectMysql(info, database: database);
+        try {
+          final pks = await getPrimaryKeys(info, database, table);
+          final whereCols =
+              pks.isNotEmpty ? pks : whereRow.keys.where((k) => k != 'rowKey').toList();
+          final setClause = newValues.entries
+              .map((e) => '`${_escMysqlIdent(e.key)}` = ${_mysqlValue(e.value)}')
+              .join(', ');
+          final whereClause = whereCols
+              .map((k) => '`${_escMysqlIdent(k)}` = ${_mysqlValue(whereRow[k])}')
+              .join(' AND ');
+          if (whereClause.isEmpty) {
+            throw StateError('无法定位数据行（表为空 WHERE）');
+          }
+          final results = await conn
+              .execute('UPDATE `${_escMysqlIdent(table)}` SET $setClause WHERE $whereClause');
+          return results.affectedRows.toInt();
+        } finally {
+          await conn.close();
+        }
+      case DbType.postgres:
+        final conn = await _connectPostgres(info, database: database);
+        try {
+          final pks = await getPrimaryKeys(info, database, table);
+          final whereCols =
+              pks.isNotEmpty ? pks : whereRow.keys.where((k) => k != 'rowKey').toList();
+          final setClause = newValues.entries
+              .map((e) => '"${_escPgIdent(e.key)}" = ${_pgValue(e.value)}')
+              .join(', ');
+          final whereClause = whereCols
+              .map((k) => '"${_escPgIdent(k)}" = ${_pgValue(whereRow[k])}')
+              .join(' AND ');
+          if (whereClause.isEmpty) {
+            throw StateError('无法定位数据行（表为空 WHERE）');
+          }
+          final result = await conn.execute(
+            'UPDATE "${_escPgIdent(table)}" SET $setClause WHERE $whereClause',
+          );
+          return result.affectedRows;
+        } finally {
+          await conn.close();
+        }
+      case DbType.redis:
+        throw UnsupportedError('Redis 不支持表编辑');
+    }
+  }
+
+  /// 插入一行：INSERT 全部列。空字符串视为 NULL。
+  Future<void> insertRow(
+    DbConnectionInfo info,
+    String database,
+    String table,
+    Map<String, dynamic> values,
+  ) async {
+    switch (info.type) {
+      case DbType.mysql:
+      case DbType.mariadb:
+        final conn = await _connectMysql(info, database: database);
+        try {
+          final cols = values.keys.map(_escMysqlIdent).toList();
+          final vals = values.values.map(_mysqlValue).toList();
+          await conn.execute(
+            'INSERT INTO `${_escMysqlIdent(table)}` '
+            '(${cols.map((c) => '`$c`').join(', ')}) VALUES (${vals.join(', ')})',
+          );
+        } finally {
+          await conn.close();
+        }
+      case DbType.postgres:
+        final conn = await _connectPostgres(info, database: database);
+        try {
+          final cols = values.keys.map(_escPgIdent).toList();
+          final vals = values.values.map(_pgValue).toList();
+          await conn.execute(
+            'INSERT INTO "${_escPgIdent(table)}" '
+            '(${cols.map((c) => '"$c"').join(', ')}) VALUES (${vals.join(', ')})',
+          );
+        } finally {
+          await conn.close();
+        }
+      case DbType.redis:
+        throw UnsupportedError('Redis 不支持表编辑');
+    }
+  }
+
+  /// 删除一行：以主键定位（无主键则用整行旧值匹配）。返回受影响行数。
+  Future<int> deleteRow(
+    DbConnectionInfo info,
+    String database,
+    String table,
+    Map<String, dynamic> whereRow,
+  ) async {
+    switch (info.type) {
+      case DbType.mysql:
+      case DbType.mariadb:
+        final conn = await _connectMysql(info, database: database);
+        try {
+          final pks = await getPrimaryKeys(info, database, table);
+          final whereCols =
+              pks.isNotEmpty ? pks : whereRow.keys.where((k) => k != 'rowKey').toList();
+          final whereClause = whereCols
+              .map((k) => '`${_escMysqlIdent(k)}` = ${_mysqlValue(whereRow[k])}')
+              .join(' AND ');
+          if (whereClause.isEmpty) {
+            throw StateError('无法定位数据行（表为空 WHERE）');
+          }
+          final results = await conn.execute(
+            'DELETE FROM `${_escMysqlIdent(table)}` WHERE $whereClause',
+          );
+          return results.affectedRows.toInt();
+        } finally {
+          await conn.close();
+        }
+      case DbType.postgres:
+        final conn = await _connectPostgres(info, database: database);
+        try {
+          final pks = await getPrimaryKeys(info, database, table);
+          final whereCols =
+              pks.isNotEmpty ? pks : whereRow.keys.where((k) => k != 'rowKey').toList();
+          final whereClause = whereCols
+              .map((k) => '"${_escPgIdent(k)}" = ${_pgValue(whereRow[k])}')
+              .join(' AND ');
+          if (whereClause.isEmpty) {
+            throw StateError('无法定位数据行（表为空 WHERE）');
+          }
+          final result = await conn.execute(
+            'DELETE FROM "${_escPgIdent(table)}" WHERE $whereClause',
+          );
+          return result.affectedRows;
+        } finally {
+          await conn.close();
+        }
+      case DbType.redis:
+        throw UnsupportedError('Redis 不支持表编辑');
+    }
+  }
+
   // === 内部工具 ===
 
   /// 空字符串密码/用户名归一化为 null
@@ -524,6 +768,22 @@ class RemoteDatabaseService {
 
   /// PostgreSQL 字符串字面量转义（单引号翻倍）
   static String _escPgStr(String s) => s.replaceAll("'", "''");
+
+  /// MySQL 值序列化：null → NULL，空字符串 → NULL，其余转义为字符串字面量
+  static String _mysqlValue(Object? v) {
+    if (v == null) return 'NULL';
+    final s = v.toString();
+    if (s.isEmpty) return 'NULL';
+    return "'${_escMysqlStr(s)}'";
+  }
+
+  /// PostgreSQL 值序列化：null → NULL，空字符串 → NULL，其余转义为字符串字面量
+  static String _pgValue(Object? v) {
+    if (v == null) return 'NULL';
+    final s = v.toString();
+    if (s.isEmpty) return 'NULL';
+    return "'${_escPgStr(s)}'";
+  }
 
   static Future<mysql.MySQLConnection> _connectMysql(
     DbConnectionInfo info, {

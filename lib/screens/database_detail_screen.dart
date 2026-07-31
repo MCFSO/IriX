@@ -5,6 +5,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../services/db_page_settings.dart';
 import '../services/remote_db_service.dart';
 import '../utils/apple_widgets.dart';
 
@@ -30,6 +31,12 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
   List<String> _tables = [];
   List<Map<String, dynamic>> _rows = [];
   List<String> _columns = [];
+
+  // 数据浏览分页（第 3 层）
+  int _page = 1;
+  int _pageSize = DbPageSettings.defaultPageSize;
+  int _totalRows = 0;
+
   bool _loading = false;
   String? _error;
 
@@ -118,16 +125,22 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
       _error = null;
     });
     try {
+      _pageSize = DbPageSettings.pageSize;
+      final total = await _service.countRows(_connection, db, table);
+      final maxPage = total == 0 ? 1 : ((total - 1) ~/ _pageSize) + 1;
+      if (_page > maxPage) _page = maxPage;
       final rows = await _service.queryTable(
         _connection,
         db,
         table,
-        limit: 100,
+        limit: _pageSize,
+        offset: (_page - 1) * _pageSize,
       );
       if (!mounted) return;
       setState(() {
         _rows = rows;
         _columns = rows.isNotEmpty ? rows.first.keys.toList() : [];
+        _totalRows = total;
         _loading = false;
       });
     } catch (e) {
@@ -139,6 +152,15 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
         _loading = false;
       });
     }
+  }
+
+  void _goToPage(int page) {
+    if (page < 1) return;
+    final maxPage = _totalRows == 0 ? 1 : ((_totalRows - 1) ~/ _pageSize) + 1;
+    if (page > maxPage) return;
+    if (page == _page) return;
+    setState(() => _page = page);
+    _loadRows();
   }
 
   Future<void> _loadRedisKeys() async {
@@ -200,6 +222,8 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
     setState(() {
       _level = 3;
       _selectedTable = table;
+      _page = 1;
+      _totalRows = 0;
     });
     _loadRows();
   }
@@ -624,47 +648,170 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
   }
 
   Widget _buildDataBrowse() {
+    final theme = Theme.of(context);
+    final maxPage = _totalRows == 0 ? 1 : ((_totalRows - 1) ~/ _pageSize) + 1;
     return Column(
       children: [
-        _buildLevelHeader(title: '表: ${_selectedTable ?? ''}'),
-        if (_rows.length >= 100)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: Card(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: Row(
+            children: [
+              TextButton.icon(
+                onPressed: _goBack,
+                icon: const Icon(Icons.arrow_back, size: 18),
+                label: const Text('返回'),
               ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.info_outline,
-                      size: 16,
-                      color: Colors.orange[300],
-                    ),
-                    const SizedBox(width: 8),
-                    const Expanded(
-                      child: Text(
-                        '表数据较多，仅显示前 100 行',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ],
+              Expanded(
+                child: Text(
+                  '表: ${_selectedTable ?? ''}',
+                  style: theme.textTheme.titleMedium,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-            ),
+              FilledButton.tonalIcon(
+                onPressed: _showAddRowDialog,
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('添加行'),
+              ),
+            ],
           ),
+        ),
         Expanded(
           child: _rows.isEmpty
-              ? const Center(child: Text('该表没有数据'))
-              : _ResultTable(rows: _rows, columns: _columns),
+              ? Center(
+                  child: Text(_totalRows == 0 ? '该表没有数据' : '当前页无数据'),
+                )
+              : _EditableTable(
+                  rows: _rows,
+                  columns: _columns,
+                  onCellEdited: _onCellEdited,
+                  onDeleteRow: (row) => _confirmDeleteRow(row),
+                ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                tooltip: '上一页',
+                onPressed: _page > 1 ? () => _goToPage(_page - 1) : null,
+                icon: const Icon(Icons.chevron_left),
+              ),
+              Text(
+                '第 $_page / $maxPage 页 · 共 $_totalRows 行 · 每页 $_pageSize 行',
+                style: theme.textTheme.bodySmall,
+              ),
+              IconButton(
+                tooltip: '下一页',
+                onPressed: _page < maxPage ? () => _goToPage(_page + 1) : null,
+                icon: const Icon(Icons.chevron_right),
+              ),
+            ],
+          ),
         ),
       ],
     );
+  }
+
+  // ---------- 行级编辑 ----------
+
+  Future<void> _onCellEdited(
+    Map<String, dynamic> row,
+    String column,
+    String newValue,
+  ) async {
+    final db = _selectedDb;
+    final table = _selectedTable;
+    if (db == null || table == null) return;
+    try {
+      final affected = await _service.updateRow(
+        _connection,
+        db,
+        table,
+        newValues: {column: newValue},
+        whereRow: row,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            affected > 0 ? '已保存' : '未找到匹配行，数据未修改',
+          ),
+          duration: const Duration(seconds: 1),
+        ),
+      );
+      if (affected > 0) _loadRows();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('保存失败: $e')));
+    }
+  }
+
+  Future<void> _showAddRowDialog() async {
+    final values = await showAppDialog<Map<String, dynamic>>(
+      context,
+      (ctx) => _AddRowDialog(columns: _columns),
+    );
+    if (values == null || !mounted) return;
+    final db = _selectedDb;
+    final table = _selectedTable;
+    if (db == null || table == null) return;
+    try {
+      await _service.insertRow(_connection, db, table, values);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('已添加行')));
+      _loadRows();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('添加失败: $e')));
+    }
+  }
+
+  Future<void> _confirmDeleteRow(Map<String, dynamic> row) async {
+    final confirmed = await showAppDialog<bool>(
+      context,
+      (ctx) => AlertDialog(
+        title: const Text('删除行'),
+        content: const Text('确定要删除这一行吗？此操作不可恢复！'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final db = _selectedDb;
+    final table = _selectedTable;
+    if (db == null || table == null) return;
+    try {
+      final affected = await _service.deleteRow(_connection, db, table, row);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('已删除 $affected 行')));
+      _loadRows();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('删除失败: $e')));
+    }
   }
 
   /// 层级标题栏：返回按钮 + 当前层级标题。
@@ -781,18 +928,74 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
 }
 
 /// 通用数据表（可双向滚动），供数据浏览与 SQL 结果共用。
-class _ResultTable extends StatelessWidget {
+/// 可编辑数据表格：点击单元格进入编辑，回车/失焦保存；行尾可删除。
+class _EditableTable extends StatefulWidget {
   final List<Map<String, dynamic>> rows;
   final List<String>? columns;
+  final void Function(Map<String, dynamic> row, String column, String newValue)
+      onCellEdited;
+  final void Function(Map<String, dynamic> row) onDeleteRow;
 
-  const _ResultTable({required this.rows, this.columns});
+  const _EditableTable({
+    required this.rows,
+    this.columns,
+    required this.onCellEdited,
+    required this.onDeleteRow,
+  });
+
+  @override
+  State<_EditableTable> createState() => _EditableTableState();
+}
+
+class _EditableTableState extends State<_EditableTable> {
+  /// 当前正在编辑的单元格：(行索引, 列名)。
+  (int, String)? _editing;
+
+  /// 编辑中的输入控制器（仅编辑时创建）。
+  TextEditingController? _controller;
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  void _startEdit(int rowIndex, String column, Object? value) {
+    setState(() {
+      _editing = (rowIndex, column);
+      _controller?.dispose();
+      _controller = TextEditingController(
+        text: value == null ? '' : value.toString(),
+      );
+    });
+  }
+
+  void _finishEdit(bool commit) {
+    final editing = _editing;
+    final controller = _controller;
+    if (editing == null || controller == null) return;
+    final (rowIndex, column) = editing;
+    final oldValue = widget.rows[rowIndex][column];
+    final newText = controller.text;
+    setState(() {
+      _editing = null;
+      _controller = null;
+    });
+    final isNull = oldValue == null;
+    final changed = isNull
+        ? newText.isNotEmpty
+        : newText != oldValue.toString();
+    if (commit && changed) {
+      widget.onCellEdited(widget.rows[rowIndex], column, newText);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (rows.isEmpty) {
+    if (widget.rows.isEmpty) {
       return const Center(child: Text('无数据'));
     }
-    final cols = columns ?? rows.first.keys.toList();
+    final cols = widget.columns ?? widget.rows.first.keys.toList();
     final theme = Theme.of(context);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -814,11 +1017,194 @@ class _ResultTable extends StatelessWidget {
                   ),
                 ),
               ),
+            DataColumn(
+              label: Text(
+                '',
+                style: TextStyle(
+                  color: theme.colorScheme.error,
+                ),
+              ),
+            ),
           ],
           rows: [
-            for (final row in rows.take(100))
+            for (var i = 0; i < widget.rows.length && i < 100; i++)
+              _buildRow(cols, i, widget.rows[i], theme),
+          ],
+        ),
+      ),
+    );
+  }
+
+  DataRow _buildRow(List<String> cols, int rowIndex, Map<String, dynamic> row,
+      ThemeData theme) {
+    return DataRow(
+      cells: [
+        for (final c in cols)
+          DataCell(
+            _editing == (rowIndex, c) ? _buildEditor(c) : _buildCell(row[c]),
+            onTap: () => _startEdit(rowIndex, c, row[c]),
+          ),
+        DataCell(
+          IconButton(
+            tooltip: '删除行',
+            icon: Icon(Icons.delete_outline, color: theme.colorScheme.error),
+            onPressed: () => widget.onDeleteRow(row),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEditor(String column) {
+    return TextField(
+      controller: _controller,
+      autofocus: true,
+      style: const TextStyle(fontSize: 13),
+      decoration: const InputDecoration(
+        isDense: true,
+        contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        border: OutlineInputBorder(),
+      ),
+      onSubmitted: (_) => _finishEdit(true),
+      onTapOutside: (_) => _finishEdit(true),
+    );
+  }
+
+  Widget _buildCell(Object? value) {
+    if (value == null) {
+      return const Text(
+        'NULL',
+        style: TextStyle(
+          color: Colors.grey,
+          fontStyle: FontStyle.italic,
+          fontSize: 13,
+        ),
+      );
+    }
+    var text = value.toString();
+    if (text.length > 60) {
+      text = '${text.substring(0, 60)}…';
+    }
+    return Text(
+      text,
+      style: const TextStyle(fontSize: 13),
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+}
+
+/// 添加行对话框：为每列输入值（留空表示 NULL）。
+class _AddRowDialog extends StatefulWidget {
+  final List<String> columns;
+
+  const _AddRowDialog({required this.columns});
+
+  @override
+  State<_AddRowDialog> createState() => _AddRowDialogState();
+}
+
+class _AddRowDialogState extends State<_AddRowDialog> {
+  final Map<String, TextEditingController> _controllers = {};
+
+  @override
+  void initState() {
+    super.initState();
+    for (final c in widget.columns) {
+      _controllers[c] = TextEditingController();
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final c in _controllers.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  void _submit() {
+    Navigator.of(context).pop({
+      for (final entry in _controllers.entries)
+        entry.key: entry.value.text.trim(),
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('添加行'),
+      content: SizedBox(
+        width: 420,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final c in widget.columns) ...[
+                TextField(
+                  controller: _controllers[c],
+                  decoration: InputDecoration(
+                    labelText: c,
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('添加')),
+      ],
+    );
+  }
+}
+
+/// 只读数据表格（SQL 执行结果显示）。
+class _SqlResultTable extends StatelessWidget {
+  final List<Map<String, dynamic>> rows;
+
+  const _SqlResultTable({required this.rows});
+
+  @override
+  Widget build(BuildContext context) {
+    if (rows.isEmpty) {
+      return const Center(child: Text('无数据'));
+    }
+    final cols = rows.first.keys.toList();
+    final theme = Theme.of(context);
+    return SingleChildScrollView(
+      scrollDirection: Axis.vertical,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          headingRowColor: WidgetStatePropertyAll(
+            theme.colorScheme.surfaceContainerHighest,
+          ),
+          columns: [
+            for (final c in cols)
+              DataColumn(
+                label: Text(
+                  c,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+          ],
+          rows: [
+            for (final row in rows)
               DataRow(
-                cells: [for (final c in cols) DataCell(_buildCell(row[c]))],
+                cells: [
+                  for (final c in cols) DataCell(_buildCell(row[c])),
+                ],
               ),
           ],
         ),
@@ -1035,7 +1421,7 @@ class _SqlDialogState extends State<_SqlDialog> {
       );
     }
     if (_resultRows.isNotEmpty) {
-      return _ResultTable(rows: _resultRows);
+      return _SqlResultTable(rows: _resultRows);
     }
     if (_isQueryStatement(_lastSql!)) {
       return const Center(child: Text('查询返回 0 行'));
