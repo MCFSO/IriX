@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:ffi/ffi.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../services/logger_ffi.dart';
@@ -16,19 +17,28 @@ class LogPersistence {
   final Map<String, StreamSubscription<String>> _subscriptions = {};
   bool _initialized = false;
 
+  /// Rust 日志库是否可用；库加载失败（如未构建 DLL）时降级为不写日志。
+  bool _loggerAvailable = false;
+
   Future<void> init() async {
     if (_initialized) return;
-    final appDir = await getApplicationDocumentsDirectory();
-    final logDir = '${appDir.path}/logs';
-    final logger = LoggerNative.init();
-    final nativeLogDir = logDir.toNativeUtf8();
-    logger.logInit(nativeLogDir);
-    calloc.free(nativeLogDir);
     _initialized = true;
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final logDir = '${appDir.path}/logs';
+      final logger = LoggerNative.init();
+      final nativeLogDir = logDir.toNativeUtf8();
+      logger.logInit(nativeLogDir);
+      calloc.free(nativeLogDir);
+      _loggerAvailable = true;
+    } catch (e) {
+      debugPrint('Logger unavailable, logs will not be persisted: $e');
+    }
   }
 
   void startWatching(String instanceId, Stream<String> logStream) {
     if (_subscriptions.containsKey(instanceId)) return;
+    if (!_loggerAvailable) return;
     final logger = LoggerNative.init();
 
     _subscriptions[instanceId] = logStream.listen((line) {
@@ -49,7 +59,13 @@ class LogPersistence {
       sub.cancel();
     }
     _subscriptions.clear();
-    LoggerNative.init().logShutdown();
+    if (_loggerAvailable) {
+      try {
+        LoggerNative.init().logShutdown();
+      } catch (e) {
+        debugPrint('Failed to shutdown logger: $e');
+      }
+    }
   }
 
   static Future<String?> readLogs(String instanceId, {int? tail}) async {
@@ -65,8 +81,12 @@ class LogPersistence {
   }
 
   static Future<void> deleteLogs(String instanceId) async {
-    final nativeId = instanceId.toNativeUtf8();
-    LoggerNative.init().logDelete(nativeId);
-    calloc.free(nativeId);
+    try {
+      final nativeId = instanceId.toNativeUtf8();
+      LoggerNative.init().logDelete(nativeId);
+      calloc.free(nativeId);
+    } catch (e) {
+      debugPrint('Failed to delete logs: $e');
+    }
   }
 }

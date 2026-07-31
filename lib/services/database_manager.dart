@@ -20,18 +20,28 @@ class DatabaseManager {
 
   Database? _db;
 
+  /// 应用数据目录（数据库文件与旧 JSON 迁移源所在目录）。
+  String? _dataDir;
+
   Future<Database> get _database async {
     if (_db != null) return _db!;
     throw StateError('Database not initialized. Call init() first.');
   }
 
-  Future<void> init() async {
+  Future<void> init({String? dbPath, String? dataDir}) async {
     sqfliteFfiInit();
-    final dir = await getApplicationDocumentsDirectory();
-    final dbPath = p.join(dir.path, _dbName);
+    String baseDir;
+    if (dataDir != null) {
+      baseDir = dataDir;
+    } else {
+      final dir = await getApplicationDocumentsDirectory();
+      baseDir = dir.path;
+    }
+    _dataDir = baseDir;
+    final path = dbPath ?? p.join(baseDir, _dbName);
 
     _db = await databaseFactoryFfi.openDatabase(
-      dbPath,
+      path,
       options: OpenDatabaseOptions(
         version: _dbVersion,
         onCreate: _onCreate,
@@ -379,10 +389,10 @@ class DatabaseManager {
 
   Future<void> migrateFromJsonIfNeeded() async {
     try {
-      final dir = await getApplicationDocumentsDirectory();
+      final baseDir = _dataDir ?? (await getApplicationDocumentsDirectory()).path;
       final db = await _database;
 
-      final instancesFile = File(p.join(dir.path, 'instances.json'));
+      final instancesFile = File(p.join(baseDir, 'instances.json'));
       if (await instancesFile.exists()) {
         final count = _firstIntValue(
           await db.rawQuery('SELECT COUNT(*) AS c FROM servers'),
@@ -452,7 +462,7 @@ class DatabaseManager {
       }
 
       final annotationsFile = File(
-        p.join(dir.path, 'config_annotations.json'),
+        p.join(baseDir, 'config_annotations.json'),
       );
       if (await annotationsFile.exists()) {
         final count = _firstIntValue(
