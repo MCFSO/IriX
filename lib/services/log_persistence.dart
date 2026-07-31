@@ -2,7 +2,6 @@
 // 通过 Rust logger crate 异步写入日志文件
 
 import 'dart:async';
-import 'dart:ffi';
 import 'dart:io';
 
 import 'package:ffi/ffi.dart';

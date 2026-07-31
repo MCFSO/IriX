@@ -5,7 +5,6 @@
 
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
 import '../services/database_manager.dart';
@@ -91,7 +90,8 @@ class TrashStore {
 
   Future<void> restoreItem(String rootPath, String id) async {
     final items = await DatabaseManager.instance.getTrashItems(rootPath);
-    final itemRow = items.where((e) => e['id'] as String? == id).firstOrNull;
+    final itemRow =
+        items.where((e) => (e['id'] as String?) == id).firstOrNull;
     if (itemRow == null) return;
 
     final item = TrashItem.fromDbRow(itemRow);
@@ -110,7 +110,8 @@ class TrashStore {
 
   Future<void> permanentlyDelete(String rootPath, String id) async {
     final items = await DatabaseManager.instance.getTrashItems(rootPath);
-    final itemRow = items.where((e) => e['id'] as String? == id).firstOrNull;
+    final itemRow =
+        items.where((e) => (e['id'] as String?) == id).firstOrNull;
     if (itemRow == null) return;
 
     final item = TrashItem.fromDbRow(itemRow);

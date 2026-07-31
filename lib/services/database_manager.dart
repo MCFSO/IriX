@@ -30,15 +30,16 @@ class DatabaseManager {
     final dir = await getApplicationDocumentsDirectory();
     final dbPath = p.join(dir.path, _dbName);
 
-    _db = await openDatabase(
+    _db = await databaseFactoryFfi.openDatabase(
       dbPath,
-      version: _dbVersion,
-      onCreate: _onCreate,
-      onUpgrade: _onUpgrade,
-      onConfigure: (db) async {
-        await db.execute('PRAGMA foreign_keys = ON');
-      },
-      factory: databaseFactoryFfi,
+      options: OpenDatabaseOptions(
+        version: _dbVersion,
+        onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
+        onConfigure: (db) async {
+          await db.execute('PRAGMA foreign_keys = ON');
+        },
+      ),
     );
 
     await migrateFromJsonIfNeeded();

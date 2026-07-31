@@ -62,7 +62,7 @@ class DbConnectionInfo {
   String? databaseName;
   final DateTime createdAt;
 
-  const DbConnectionInfo({
+  DbConnectionInfo({
     required this.id,
     required this.name,
     required this.type,
@@ -296,7 +296,7 @@ class RemoteDatabaseService {
         final conn = await _connectMysql(info, database: database);
         try {
           final results = await conn.execute(sql);
-          final affected = results.affectedRows;
+          final affected = results.affectedRows.toInt();
           if (!isQuery) {
             return (
               rows: [
@@ -433,7 +433,7 @@ class RemoteDatabaseService {
       pg.Endpoint(
         host: info.host,
         port: info.port,
-        database: database ?? info.databaseName,
+        database: database ?? info.databaseName ?? 'postgres',
         username: info.username ?? 'postgres',
         password: info.password,
       ),

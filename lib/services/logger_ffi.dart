@@ -89,11 +89,9 @@ class LoggerNative {
           dir = parent;
         }
       }
-      if (lib == null) {
-        lib = DynamicLibrary.open(libName);
-      }
+      lib ??= DynamicLibrary.open(libName);
     }
-    _instance = LoggerNative._(lib!);
+    _instance = LoggerNative._(lib);
     return _instance!;
   }
 
