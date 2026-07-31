@@ -420,6 +420,8 @@ class RemoteDatabaseService {
       password: info.password ?? '',
       databaseName: database ?? info.databaseName,
       secure: false,
+      // MySQL 8+ 默认 caching_sha2_password，非 TLS 连接需允许获取服务器公钥
+      allowPublicKeyRetrieval: true,
     );
     await conn.connect();
     return conn;
