@@ -5,7 +5,7 @@ Minecraft 服务器管理工具。Flutter 构建 UI，Rust 提供高性能底层
 ## 功能
 
 - **服务器实例管理** —— 创建、导入、配置多个 Minecraft 服务端实例，一键启停
-- **核心下载** —— 从 Modrinth / Hangar / MSL 镜像获取 Paper、Purpur、Folia 等服务端核心
+- **核心下载** —— 从镜像获取 Paper、Purpur、Folia 等服务端核心
 - **插件 & Mod 市场** —— 浏览和安装 Modrinth / Hangar 上的一键汉化资源，支持关键词搜索与版本筛选
 - **配置文件编辑器** —— 内置 YAML 语法高亮、行号、撤销/重做、注释说明
 - **文件管理器** —— 文件树的复制、粘贴、移动、重命名，含回收站（7 天自动清理）
