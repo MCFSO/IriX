@@ -25,7 +25,7 @@ class HangarApiService {
 
   static const String _baseUrl = 'https://hangar.papermc.io/api/v1';
   static const String _userAgent =
-      'IriX/1.0.0 (https://github.com/mcfso/xmcserverlancher)';
+      'IriX/1.0.0 (https://github.com/MCFSO/IriX)';
 
   final http.Client _client;
 

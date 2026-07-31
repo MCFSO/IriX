@@ -226,5 +226,5 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: macos-build
-          path: build/macos/Build/Products/Release/xmcserverlauncher.app
+          path: build/macos/Build/Products/Release/lrix.app
           retention-days: 30

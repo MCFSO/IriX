@@ -68,11 +68,11 @@ pub extern "C" fn download_file(
         }
     };
     let ua = if user_agent.is_null() {
-        "xmcserverlancher/1.0.0"
+        "IriX/1.0.0 (https://github.com/MCFSO/IriX)"
     } else {
         match unsafe { CStr::from_ptr(user_agent) }.to_str() {
             Ok(s) => s,
-            Err(_) => "xmcserverlancher/1.0.0",
+            Err(_) => "IriX/1.0.0 (https://github.com/MCFSO/IriX)",
         }
     };
 
@@ -197,11 +197,11 @@ pub extern "C" fn download_file_multipart(
         }
     };
     let ua = if user_agent.is_null() {
-        "xmcserverlancher/1.0.0"
+        "IriX/1.0.0 (https://github.com/MCFSO/IriX)"
     } else {
         match unsafe { CStr::from_ptr(user_agent) }.to_str() {
             Ok(s) => s,
-            Err(_) => "xmcserverlancher/1.0.0",
+            Err(_) => "IriX/1.0.0 (https://github.com/MCFSO/IriX)",
         }
     };
     let thread_count = threads.clamp(1, 32) as usize;

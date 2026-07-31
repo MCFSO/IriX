@@ -211,10 +211,10 @@ jobs:
 
       - name: Copy Rust dylib to app bundle
         run: |
-          mkdir -p build/macos/Build/Products/Release/xmcserverlauncher.app/Contents/Frameworks
-          cp macos/libxmc_backup.dylib build/macos/Build/Products/Release/xmcserverlauncher.app/Contents/Frameworks/
-          cp macos/libxmc_downloader.dylib build/macos/Build/Products/Release/xmcserverlauncher.app/Contents/Frameworks/
-          cp macos/libxmc_file_ops.dylib build/macos/Build/Products/Release/xmcserverlauncher.app/Contents/Frameworks/
+          mkdir -p build/macos/Build/Products/Release/lrix.app/Contents/Frameworks
+          cp macos/libxmc_backup.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
+          cp macos/libxmc_downloader.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
+          cp macos/libxmc_file_ops.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
 
       - name: Install Fastforge
         run: dart pub global activate fastforge

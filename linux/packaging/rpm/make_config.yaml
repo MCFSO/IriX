@@ -3,7 +3,7 @@ summary: A Flutter application for managing Minecraft servers.
 group: Applications/System
 vendor: MCFSO
 license: MIT
-url: https://github.com/MCFSO/xmcserverlancher
+url: https://github.com/MCFSO/IriX
 icon: macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_512.png
 generic_name: Minecraft Server Manager
 keywords:

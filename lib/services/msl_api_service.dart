@@ -8,7 +8,7 @@ class MslApiService {
   const MslApiService._();
   static const instance = MslApiService._();
 
-  String get _ua => 'IriX/1.0.0 (https://github.com/mcfso/xmcserverlancher)';
+  String get _ua => 'IriX/1.0.0 (https://github.com/MCFSO/IriX)';
 
   Future<Map<String, dynamic>> _get(String path) async {
     final res = await http.get(
