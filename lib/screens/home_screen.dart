@@ -1,6 +1,8 @@
 // 实例列表主页 + 左侧导航栏
 // 左侧 NavigationRail 切换"实例列表"和"市场"
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -46,7 +48,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// 若设置中启用了 MCP 则启动本地服务器。
+  /// 测试环境下跳过（避免挂起 SQLite 定时器导致测试失败）。
   Future<void> _startMcpServer() async {
+    if (Platform.environment['FLUTTER_TEST'] == 'true') return;
     try {
       await McpServer.instance.startIfEnabled();
     } catch (e) {
