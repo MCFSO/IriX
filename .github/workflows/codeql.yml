@@ -49,8 +49,9 @@ jobs:
           build-mode: none
         - language: rust
           build-mode: none
-        - language: swift
-          build-mode: autobuild
+        # Swift 已移除：macos/ 目录为 Flutter 生成的 runner 样板代码，
+        # autobuild 需要 Flutter 工具链才能构建，无法自动分析。
+        # 如需扫描 Swift，请设置 build-mode: manual 并补充构建步骤。
         # CodeQL supports the following values keywords for 'language': 'actions', 'c-cpp', 'csharp', 'go', 'java-kotlin', 'javascript-typescript', 'python', 'ruby', 'rust', 'swift'
         # Use `c-cpp` to analyze code written in C, C++ or both
         # Use 'java-kotlin' to analyze code written in Java, Kotlin or both
