@@ -158,6 +158,13 @@ jobs:
       - name: Build Linux
         run: flutter build linux --release
 
+      - name: Copy Rust so to bundle
+        run: |
+          mkdir -p build/linux/x64/release/bundle/lib
+          cp linux/libxmc_backup.so build/linux/x64/release/bundle/lib/
+          cp linux/libxmc_downloader.so build/linux/x64/release/bundle/lib/
+          cp linux/libxmc_file_ops.so build/linux/x64/release/bundle/lib/
+
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v5
         with:
@@ -224,6 +231,13 @@ jobs:
 
       - name: Build macOS
         run: flutter build macos --release
+
+      - name: Copy Rust dylib to app bundle
+        run: |
+          mkdir -p build/macos/Build/Products/Release/lrix.app/Contents/Frameworks
+          cp macos/libxmc_backup.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
+          cp macos/libxmc_downloader.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
+          cp macos/libxmc_file_ops.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v5
