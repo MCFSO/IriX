@@ -18,7 +18,6 @@ import '../services/frp_provider.dart';
 import '../services/frpc_manager.dart';
 import '../services/hayfrp_provider.dart';
 import '../services/ofrp_service.dart';
-import '../services/oauth_callback_server.dart';
 import '../services/openfrp_provider.dart';
 import '../services/sakurafrp_provider.dart';
 import '../state/app_state.dart';
@@ -781,11 +780,10 @@ class _TypeTag extends StatelessWidget {
   }
 }
 
-/// OpenFrp 登录对话框。
+/// OpenFrp 登录对话框：Remote Login 远程安全登录（ofapi.md 推荐方案）。
 ///
-/// 网页授权登录（OAuth 网页传参）：本地起回调服务器，
-/// 拉起浏览器到 Natayark ID 授权页，登录授权后自动带回凭据。
-/// 面板已不提供 Authorization 复制，故仅保留网页授权方式。
+/// 流程：生成 Curve25519 密钥对 → 请求授权 → 浏览器打开授权页 →
+/// 每 5 秒轮询授权结果（最长 5 分钟）→ 解密得到 Authorization。
 class _OpenFrpLoginDialog extends StatefulWidget {
   const _OpenFrpLoginDialog();
 
@@ -794,37 +792,57 @@ class _OpenFrpLoginDialog extends StatefulWidget {
 }
 
 class _OpenFrpLoginDialogState extends State<_OpenFrpLoginDialog> {
-  final OAuthCallbackServer _callback = OAuthCallbackServer();
-
   bool _loading = false;
+  bool _cancelled = false;
   String? _error;
 
   @override
   void dispose() {
-    _callback.stop();
+    _cancelled = true;
     super.dispose();
   }
 
-  Future<void> _webLogin() async {
+  Future<void> _start() async {
     setState(() {
       _loading = true;
+      _cancelled = false;
       _error = null;
     });
+    final api = OfrpService.instance;
     try {
-      await _callback.start();
-      final url = OfrpService.buildOAuthAuthorizeUrl(_callback.port);
+      // 1. 生成 Curve25519 密钥对并请求授权。
+      final keys = await api.generateRemoteLoginKeys();
+      final request = await api.requestRemoteLogin(keys.publicKey);
+
+      // 2. 拉起浏览器打开授权页。
       final launched = await launchUrl(
-        Uri.parse(url),
+        Uri.parse(request.authorizationUrl),
         mode: LaunchMode.externalApplication,
       );
       if (!launched) {
         throw Exception('无法打开浏览器，请重试');
       }
-      final code = await _callback.waitForCode();
-      if (code == null || code.isEmpty) {
-        throw Exception('等待网页授权超时或已取消');
+
+      // 3. 轮询授权结果（每 5 秒，最长 5 分钟）。
+      final deadline = DateTime.now().add(const Duration(minutes: 5));
+      String? auth;
+      while (!_cancelled && DateTime.now().isBefore(deadline)) {
+        try {
+          final poll = await api.pollRemoteLogin(request.requestUuid);
+          auth = await OfrpService.decryptAuthorization(
+            poll.authorizationData,
+            keys.keyPair,
+          );
+          break;
+        } catch (_) {
+          // 尚未授权，继续轮询。
+        }
+        await Future.delayed(const Duration(seconds: 5));
       }
-      final auth = await OfrpService.instance.exchangeOAuthCode(code);
+      if (_cancelled) return;
+      if (auth == null || auth.isEmpty) {
+        throw Exception('授权超时，请重试');
+      }
       if (!mounted) return;
       Navigator.of(context).pop({'authorization': auth});
     } catch (e) {
@@ -833,13 +851,7 @@ class _OpenFrpLoginDialogState extends State<_OpenFrpLoginDialog> {
         _loading = false;
         _error = e.toString();
       });
-    } finally {
-      await _callback.stop();
     }
-  }
-
-  void _cancel() {
-    _callback.stop();
   }
 
   @override
@@ -855,8 +867,9 @@ class _OpenFrpLoginDialogState extends State<_OpenFrpLoginDialog> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                '点击下方按钮后将在浏览器中打开 Natayark ID 授权页：\n'
-                '登录/授权完成后会自动跳回 IriX，无需复制粘贴任何内容。',
+                '点击下方按钮后将在浏览器中打开 OpenFrp 授权页：\n'
+                '登录并在授权页确认后，IriX 会自动完成登录，无需复制任何内容。\n'
+                '轮询最长 5 分钟，超时或取消需重新发起。',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -892,12 +905,18 @@ class _OpenFrpLoginDialogState extends State<_OpenFrpLoginDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: _loading ? _cancel : () => Navigator.of(context).pop(),
-          child: const Text('取消'),
+          onPressed: () {
+            if (_loading) {
+              setState(() => _cancelled = true);
+            } else {
+              Navigator.of(context).pop();
+            }
+          },
+          child: Text(_loading ? '取消' : '关闭'),
         ),
         FilledButton(
-          onPressed: _loading ? null : _webLogin,
-          child: const Text('在浏览器中登录'),
+          onPressed: _loading ? null : _start,
+          child: const Text('在浏览器中授权'),
         ),
       ],
     );

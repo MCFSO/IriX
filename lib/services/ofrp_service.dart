@@ -1,16 +1,18 @@
 // OpenFrp 开放映射 API 服务
 //
 // 基于 OpenFrp OPENAPI（https://api.openfrp.net）实现：
-// 会话密钥登录（Authorization）、用户信息、隧道列表、节点列表、新建/删除隧道。
-// 登录方式采用官方推荐的「第三方客户端安全登录」：
-// 用户在 OpenFrp 面板复制 Authorization 后粘贴即可。
+// Remote Login 远程安全登录（ofapi.md 推荐给第三方）、
+// 用户信息、隧道列表、节点列表、新建/删除隧道。
 // 注意：任意接口响应头可能返回新的 Authorization，需要自动更新保存。
 //
 // 本项目使用 OpenFrp OPENAPI，按条款需在明显位置注明来源。
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart' as crypto;
+import 'package:cryptography/cryptography.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 
@@ -237,15 +239,6 @@ class OfrpService {
 
   // === API ===
 
-  /// 登录验证：携带 Authorization 请求用户信息，成功则保存认证。
-  Future<OfrpUserInfo> login(String auth) async {
-    final res = await _post('/frp/api/getUserInfo', {}, auth);
-    await _maybeUpdateAuth(res);
-    final json = _parse(res);
-    await setAuth(auth);
-    return OfrpUserInfo.fromJson(json['data'] as Map<String, dynamic>);
-  }
-
   /// 获取用户信息。
   Future<OfrpUserInfo> getUserInfo(String auth) async {
     final res = await _post('/frp/api/getUserInfo', {}, auth);
@@ -335,34 +328,138 @@ class OfrpService {
     return OfrpSoftwareInfo.fromJson(json['data'] as Map<String, dynamic>);
   }
 
-  // === OAuth 网页登录 ===
+  // === Remote Login 远程安全登录（ofapi.md 推荐方案） ===
+  //
+  // 流程：生成 Curve25519 密钥对 → requestLogin 提交公钥 →
+  // 浏览器打开授权页授权 → 每 5s 轮询 pollLogin →
+  // 解密 authorization_data 得到 Authorization。
+  // 密钥生成与加解密格式参考 ofapi.md 引用的 cloudflared/encrypt.go。
 
-  /// 生成网页授权登录地址（Natayark ID OAuth2）。
-  ///
-  /// [port] 为本地回调服务器端口，授权完成后浏览器会跳转到
-  /// `http://127.0.0.1:<port>/callback?code=xxx`。
-  static String buildOAuthAuthorizeUrl(int port) {
-    final redirect = Uri.encodeComponent('http://127.0.0.1:$port/callback');
-    return 'https://account.naids.com/oauth2/authorize'
-        '?response_type=code&redirect_uri=$redirect&client_id=openfrp';
+  /// 生成 Curve25519 密钥对，返回 (公钥, 私钥)。
+  Future<({String publicKey, SimpleKeyPair keyPair})>
+  generateRemoteLoginKeys() async {
+    final x25519 = X25519();
+    final keyPair = await x25519.newKeyPair();
+    final publicKey = await keyPair.extractPublicKey();
+    return (publicKey: base64Encode(publicKey.bytes), keyPair: keyPair);
   }
 
-  /// 用回调 code 换取 Authorization（读取响应头）。
-  Future<String> exchangeOAuthCode(String code) async {
+  /// 请求远程登录授权，返回 (授权 URL, 请求 UUID)。
+  Future<({String authorizationUrl, String requestUuid})> requestRemoteLogin(
+    String publicKey,
+  ) async {
     final res = await http
         .post(
-          Uri.parse('https://api.openfrp.net/oauth2/callback?code=$code'),
-          headers: {'User-Agent': _ua},
+          Uri.parse('https://access.openfrp.net/argoAccess/requestLogin'),
+          headers: {'Content-Type': 'application/json', 'User-Agent': _ua},
+          body: jsonEncode({'public_key': publicKey}),
         )
         .timeout(const Duration(seconds: 30));
     if (res.statusCode != 200) {
-      throw Exception('登录回调失败 HTTP ${res.statusCode}: ${_snippet(res.body)}');
+      throw Exception('请求授权失败 HTTP ${res.statusCode}: ${_snippet(res.body)}');
     }
-    final auth = res.headers['authorization'];
-    if (auth == null || auth.isEmpty) {
-      throw Exception('回调响应中未找到 Authorization，请重试');
+    final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    if (json['code'] != 200) {
+      throw Exception((json['msg'] ?? '请求授权失败').toString());
     }
-    return auth;
+    final data = json['data'] as Map<String, dynamic>;
+    final url = (data['authorization_url'] ?? '').toString();
+    final uuid = (data['request_uuid'] ?? '').toString();
+    if (url.isEmpty || uuid.isEmpty) {
+      throw Exception('请求授权失败：返回数据不完整');
+    }
+    return (authorizationUrl: url, requestUuid: uuid);
+  }
+
+  /// 轮询授权结果，成功返回 (服务端公钥, 加密的授权数据)。
+  ///
+  /// 用户尚未授权时抛异常，由调用方继续轮询。
+  Future<({String serverPublicKey, String authorizationData})> pollRemoteLogin(
+    String requestUuid,
+  ) async {
+    final res = await http
+        .post(
+          Uri.parse('https://access.openfrp.net/argoAccess/pollLogin'),
+          headers: {'Content-Type': 'application/json', 'User-Agent': _ua},
+          body: jsonEncode({'request_uuid': requestUuid}),
+        )
+        .timeout(const Duration(seconds: 30));
+    if (res.statusCode != 200) {
+      throw Exception('轮询授权失败 HTTP ${res.statusCode}');
+    }
+    final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    if (json['code'] != 200) {
+      throw Exception((json['msg'] ?? '尚未授权').toString());
+    }
+    final data = json['data'] as Map<String, dynamic>;
+    final authData = (data['authorization_data'] ?? '').toString();
+    if (authData.isEmpty) {
+      throw Exception('尚未授权');
+    }
+    final serverKey = res.headers['x-request-public-key'] ?? '';
+    return (serverPublicKey: serverKey, authorizationData: authData);
+  }
+
+  /// 解密 authorization_data 得到 Authorization 明文。
+  ///
+  /// 数据格式（cloudflared encrypt.go）：base64(临时公钥 32B || nonce 12B || 密文||tag)。
+  /// 共享密钥 = X25519(私钥, 临时公钥)，AES 密钥 = HKDF-SHA256(共享密钥)，
+  /// 密文用 AES-256-GCM 解密。兼容两种布局（tag 在尾部 / 无 tag）。
+  static Future<String> decryptAuthorization(
+    String authorizationData,
+    SimpleKeyPair keyPair,
+  ) async {
+    final raw = base64Decode(authorizationData);
+    if (raw.length < 44) {
+      throw Exception('授权数据格式错误');
+    }
+    final ephPub = raw.sublist(0, 32);
+    final nonce = raw.sublist(32, 44);
+    final rest = raw.sublist(44);
+
+    final x25519 = X25519();
+    final shared = await x25519.sharedSecretKey(
+      keyPair: keyPair,
+      remotePublicKey: SimplePublicKey(ephPub, type: KeyPairType.x25519),
+    );
+    final sharedBytes = await shared.extractBytes();
+    final aesKey = _hkdfSha256(sharedBytes, 32);
+
+    // 优先按 cloudflared 布局：尾部 16B 为 GCM tag。
+    String? plaintext;
+    for (final withTag in [true, false]) {
+      try {
+        final int ctLen;
+        final Mac mac;
+        if (withTag) {
+          ctLen = rest.length - 16;
+          mac = Mac(rest.sublist(ctLen));
+        } else {
+          ctLen = rest.length;
+          mac = Mac.empty;
+        }
+        if (ctLen <= 0) continue;
+        final box = await AesGcm.with256bits().decrypt(
+          SecretBox(rest.sublist(0, ctLen), nonce: nonce, mac: mac),
+          secretKey: SecretKey(aesKey),
+        );
+        plaintext = utf8.decode(box);
+        break;
+      } catch (_) {
+        // 尝试另一种布局。
+      }
+    }
+    if (plaintext == null || plaintext.isEmpty) {
+      throw Exception('授权数据解密失败');
+    }
+    return plaintext;
+  }
+
+  /// HKDF-SHA256（RFC 5869，salt 与 info 均为空，输出 [length] 字节）。
+  static Uint8List _hkdfSha256(List<int> ikm, int length) {
+    final prk = crypto.Hmac(crypto.sha256, const <int>[]).convert(ikm).bytes;
+    final t1 = crypto.Hmac(crypto.sha256, prk).convert(const [0x01]).bytes;
+    return Uint8List.fromList(t1.sublist(0, length));
   }
 
   static String _snippet(String body) {

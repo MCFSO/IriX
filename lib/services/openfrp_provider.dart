@@ -29,11 +29,13 @@ class OpenFrpProvider extends FrpProvider {
 
   @override
   Future<FrpAccountInfo> login(Map<String, String> credentials) async {
+    // Remote Login 流程在登录对话框中完成，这里拿到 Authorization 后验证并保存。
     final auth = credentials['authorization'];
     if (auth == null || auth.isEmpty) {
-      throw Exception('缺少 Authorization');
+      throw Exception('登录失败：未获取到 Authorization');
     }
-    final user = await _api.login(auth);
+    await _api.setAuth(auth);
+    final user = await _api.getUserInfo(auth);
     return _toAccount(user);
   }
 
