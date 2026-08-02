@@ -7,10 +7,12 @@ import 'package:provider/provider.dart';
 import '../models/server_instance.dart';
 import '../services/db_page_settings.dart';
 import '../services/download_settings.dart';
+import '../services/mcp_server.dart';
 import '../state/app_state.dart';
 import '../utils/apple_widgets.dart';
 import 'ai_screen.dart';
 import 'database_screen.dart';
+import 'frp_screen.dart';
 import 'instance_detail_screen.dart';
 import 'marketplace_screen.dart';
 import 'onboarding_screen.dart';
@@ -25,6 +27,67 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+
+  /// 是否已弹出 MCP 权限对话框（防止重复弹窗）。
+  bool _mcpDialogOpen = false;
+
+  @override
+  void initState() {
+    super.initState();
+    McpServer.instance.attachState(context.read<AppState>());
+    McpServer.instance.currentRequest.addListener(_onMcpRequest);
+    _startMcpServer();
+  }
+
+  @override
+  void dispose() {
+    McpServer.instance.currentRequest.removeListener(_onMcpRequest);
+    super.dispose();
+  }
+
+  /// 若设置中启用了 MCP 则启动本地服务器。
+  Future<void> _startMcpServer() async {
+    try {
+      await McpServer.instance.startIfEnabled();
+    } catch (e) {
+      debugPrint('MCP server start failed: $e');
+    }
+  }
+
+  /// 外部 AI 通过 MCP 申请敏感操作时弹出全局授权对话框。
+  void _onMcpRequest() {
+    final request = McpServer.instance.currentRequest.value;
+    if (request == null || _mcpDialogOpen) return;
+    _mcpDialogOpen = true;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('AI 申请执行敏感操作'),
+        content: Text(
+          '来自 ${request.clientName}\n\n${request.tool.describe(request.args)}',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              request.resolve(false);
+              _mcpDialogOpen = false;
+              Navigator.of(ctx).pop();
+            },
+            child: const Text('拒绝'),
+          ),
+          FilledButton(
+            onPressed: () {
+              request.resolve(true);
+              _mcpDialogOpen = false;
+              Navigator.of(ctx).pop();
+            },
+            child: const Text('允许'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,6 +122,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 selectedIcon: Icon(Icons.smart_toy),
                 label: Text('AI'),
               ),
+              NavigationRailDestination(
+                icon: Icon(Icons.hub_outlined),
+                selectedIcon: Icon(Icons.hub),
+                label: Text('FRP'),
+              ),
             ],
           ),
           const VerticalDivider(thickness: 1, width: 1),
@@ -79,6 +147,8 @@ class _HomeScreenState extends State<HomeScreen> {
         return const DatabaseScreen();
       case 3:
         return const AiScreen();
+      case 4:
+        return const FrpScreen();
       default:
         return _buildInstancesPage();
     }

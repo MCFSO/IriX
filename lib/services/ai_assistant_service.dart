@@ -11,6 +11,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 
@@ -47,6 +48,12 @@ enum AiEventKind {
 
   /// 需要用户授权的敏感操作。
   permission,
+
+  /// 正在压缩对话历史。
+  compressing,
+
+  /// 对话历史压缩完成。
+  compressed,
 
   /// 发生错误。
   error,
@@ -121,6 +128,22 @@ class AiEvent {
       toolArgs = args,
       error = null;
 
+  const AiEvent.compressing()
+    : kind = AiEventKind.compressing,
+      text = null,
+      toolName = null,
+      toolSummary = null,
+      toolArgs = null,
+      error = null;
+
+  const AiEvent.compressed(String summary)
+    : kind = AiEventKind.compressed,
+      text = summary,
+      toolName = null,
+      toolSummary = null,
+      toolArgs = null,
+      error = null;
+
   const AiEvent.error(String message)
     : kind = AiEventKind.error,
       text = null,
@@ -172,6 +195,9 @@ class AiConversation {
   bool _running = false;
   bool _cancelled = false;
 
+  /// 当前正在使用的模型（本轮对话开始时读取）。
+  AiModelConfig? _model;
+
   /// 当前是否在运行一轮对话。
   bool get running => _running;
 
@@ -210,13 +236,22 @@ class AiConversation {
     if (_running) return;
     _running = true;
     _cancelled = false;
+
+    final model = await AiSettings.getActiveModel();
+    if (model == null) {
+      emit(const AiEvent.error('尚未添加 AI 模型，请先点击左上角添加模型'));
+      _running = false;
+      return;
+    }
+    _model = model;
+
     _messages.add({'role': 'user', 'content': userText});
     try {
       var iterations = 0;
       while (!_cancelled && iterations < 12) {
         iterations++;
         emit(const AiEvent.thinking());
-        final message = await service._chatCompletion(_messages);
+        final message = await service._chatCompletion(_messages, model);
         if (message == null) {
           emit(const AiEvent.error('模型无响应（choices 为空）'));
           break;
@@ -277,12 +312,53 @@ class AiConversation {
       }
       if (_cancelled) {
         emit(const AiEvent.text('已停止。'));
+      } else {
+        // 根据上下文窗口压缩过长的对话历史。
+        await _compressIfNeeded(emit);
       }
     } catch (e) {
       emit(AiEvent.error(e.toString()));
     } finally {
       _running = false;
     }
+  }
+
+  /// 估算当前对话历史的 token 用量。
+  int _estimateTokens() {
+    var total = 0;
+    for (final message in _messages) {
+      final content = message['content'];
+      if (content is String) {
+        total += AiAssistantService.estimateTokens(content);
+      }
+    }
+    return total;
+  }
+
+  /// 当历史估算用量超过上下文窗口的 60% 时，
+  /// 把较早的对话交给 AI 压缩为摘要，替换为一条 system 摘要消息。
+  Future<void> _compressIfNeeded(void Function(AiEvent event) emit) async {
+    final model = _model;
+    if (model == null || model.contextWindow <= 0) return;
+    if (_messages.length < 8) return;
+    if (_estimateTokens() < model.contextWindow * 0.6) return;
+
+    const keepCount = 4;
+    final toCompress = _messages.sublist(0, _messages.length - keepCount);
+    final rest = _messages.sublist(_messages.length - keepCount);
+
+    emit(const AiEvent.compressing());
+    final summary = await service._summarizeHistory(toCompress, model);
+    if (summary == null || summary.trim().isEmpty) return;
+
+    _messages
+      ..clear()
+      ..add({
+        'role': 'system',
+        'content': '以下是此前对话的压缩摘要，请基于摘要继续帮助用户：\n$summary',
+      })
+      ..addAll(rest);
+    emit(AiEvent.compressed(summary));
   }
 }
 
@@ -299,23 +375,10 @@ class AiAssistantService {
 
   Future<Map<String, dynamic>?> _chatCompletion(
     List<Map<String, dynamic>> messages,
+    AiModelConfig model,
   ) async {
-    final baseUrl = await AiSettings.getBaseUrl();
-    final apiKey = await AiSettings.getApiKey();
-    final model = await AiSettings.getModel();
-
-    var url = baseUrl.trim();
-    if (url.isEmpty) throw Exception('未配置 AI 服务地址');
-    if (!url.endsWith('/chat/completions')) {
-      url = '${url.replaceAll(RegExp(r'/+$'), '')}/chat/completions';
-    }
-
-    final headers = {
-      'Content-Type': 'application/json',
-      if (apiKey.isNotEmpty) 'Authorization': 'Bearer $apiKey',
-    };
     final body = jsonEncode({
-      'model': model,
+      'model': model.name,
       'messages': messages,
       'tools': [
         for (final t in tools)
@@ -332,7 +395,11 @@ class AiAssistantService {
     });
 
     final res = await http
-        .post(Uri.parse(url), headers: headers, body: body)
+        .post(
+          Uri.parse(_endpoint(model.baseUrl)),
+          headers: _headers(model.apiKey),
+          body: body,
+        )
         .timeout(const Duration(seconds: 120));
     if (res.statusCode != 200) {
       throw Exception('API ${res.statusCode}: ${_snippet(res.body)}');
@@ -344,6 +411,86 @@ class AiAssistantService {
       (choices.first as Map)['message'] as Map,
     );
     return message;
+  }
+
+  /// 调用模型把一段对话历史压缩为摘要。失败返回 null。
+  Future<String?> _summarizeHistory(
+    List<Map<String, dynamic>> history,
+    AiModelConfig model,
+  ) async {
+    final dump = history
+        .map((m) {
+          final role = m['role']?.toString() ?? '?';
+          final content = m['content']?.toString() ?? '';
+          return '[$role] $content';
+        })
+        .join('\n');
+
+    final body = jsonEncode({
+      'model': model.name,
+      'messages': [
+        {
+          'role': 'system',
+          'content':
+              '你是对话摘要压缩器。请将用户提供的对话记录压缩为简洁的中文摘要，'
+              '保留关键事实：服务器实例名称、错误信息、已执行的操作与结论。'
+              '不要添加原文没有的内容，只输出摘要本身。',
+        },
+        {'role': 'user', 'content': dump},
+      ],
+      'max_tokens': (model.contextWindow ~/ 8).clamp(256, 2048),
+    });
+
+    try {
+      final res = await http
+          .post(
+            Uri.parse(_endpoint(model.baseUrl)),
+            headers: _headers(model.apiKey),
+            body: body,
+          )
+          .timeout(const Duration(seconds: 120));
+      if (res.statusCode != 200) return null;
+      final json =
+          jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      final choices = json['choices'] as List?;
+      if (choices == null || choices.isEmpty) return null;
+      final content = (choices.first as Map)['message']?['content']
+          ?.toString()
+          .trim();
+      return (content == null || content.isEmpty) ? null : content;
+    } catch (e) {
+      debugPrint('History compression failed: $e');
+      return null;
+    }
+  }
+
+  /// 拼接 Chat Completions 端点地址。
+  static String _endpoint(String baseUrl) {
+    final url = baseUrl.trim();
+    if (url.isEmpty) throw Exception('未配置 AI 服务地址');
+    if (url.endsWith('/chat/completions')) return url;
+    return '${url.replaceAll(RegExp(r'/+$'), '')}/chat/completions';
+  }
+
+  static Map<String, String> _headers(String apiKey) => {
+    'Content-Type': 'application/json',
+    if (apiKey.trim().isNotEmpty) 'Authorization': 'Bearer ${apiKey.trim()}',
+  };
+
+  /// 粗略估算文本 token 数：CJK 每字约 1 token，其余按 4 字符 1 token。
+  static int estimateTokens(String text) {
+    var cjk = 0;
+    var other = 0;
+    for (final rune in text.runes) {
+      if ((rune >= 0x4E00 && rune <= 0x9FFF) ||
+          (rune >= 0x3400 && rune <= 0x4DBF) ||
+          (rune >= 0x20000 && rune <= 0x2A6DF)) {
+        cjk++;
+      } else {
+        other++;
+      }
+    }
+    return cjk + (other / 4).ceil();
   }
 
   Future<String> _safeHandle(AiTool tool, AppState state, Map args) async {

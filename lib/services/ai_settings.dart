@@ -1,81 +1,232 @@
 // AI 助手设置 - 全局持久化
-// 使用 SQLite (settings 表) 存储 OpenAI 兼容 API 的连接配置
+// 使用 SQLite (settings 表) 存储模型列表（可多个，含上下文窗口）与 MCP 配置。
+// 旧版单模型配置（ai_base_url / ai_api_key / ai_model）会在首次读取时自动迁移。
+
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
 import '../services/database_manager.dart';
 
+/// 一个 AI 模型配置。
+class AiModelConfig {
+  final String id;
+  String name;
+  String baseUrl;
+  String apiKey;
+
+  /// 上下文窗口大小（token 数），用于决定何时压缩对话历史。
+  int contextWindow;
+
+  AiModelConfig({
+    required this.id,
+    required this.name,
+    required this.baseUrl,
+    required this.apiKey,
+    required this.contextWindow,
+  });
+
+  /// 创建新模型（自动生成 id）。
+  factory AiModelConfig.create({
+    required String name,
+    required String baseUrl,
+    required String apiKey,
+    required int contextWindow,
+  }) => AiModelConfig(
+    id: DateTime.now().microsecondsSinceEpoch.toRadixString(36),
+    name: name,
+    baseUrl: baseUrl,
+    apiKey: apiKey,
+    contextWindow: contextWindow,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'baseUrl': baseUrl,
+    'apiKey': apiKey,
+    'contextWindow': contextWindow,
+  };
+
+  factory AiModelConfig.fromJson(Map<String, dynamic> json) => AiModelConfig(
+    id: json['id'] as String,
+    name: json['name'] as String,
+    baseUrl: json['baseUrl'] as String,
+    apiKey: (json['apiKey'] as String?) ?? '',
+    contextWindow: ((json['contextWindow'] as num?)?.toInt()) ?? 8192,
+  );
+}
+
 /// AI 助手设置服务。
-///
-/// 持久化 OpenAI 兼容 API 的服务地址、密钥与模型名称，
-/// 支持 DeepSeek / OpenAI / Kimi / 本地 Ollama 等兼容接口。
 class AiSettings {
-  static const _keyBaseUrl = 'ai_base_url';
-  static const _keyApiKey = 'ai_api_key';
-  static const _keyModel = 'ai_model';
+  static const _keyModels = 'ai_models';
+  static const _keyActiveModelId = 'ai_active_model';
 
-  /// 默认服务地址。
-  static const String defaultBaseUrl = 'https://api.openai.com/v1';
+  // 旧版单模型配置键（迁移用）。
+  static const _legacyBaseUrl = 'ai_base_url';
+  static const _legacyApiKey = 'ai_api_key';
+  static const _legacyModel = 'ai_model';
 
-  /// 默认模型名称。
-  static const String defaultModel = 'gpt-4o-mini';
+  /// 默认上下文窗口（token）。
+  static const int defaultContextWindow = 8192;
 
-  /// 获取服务地址，未设置时返回 [defaultBaseUrl]。
-  static Future<String> getBaseUrl() async {
+  // === 模型管理 ===
+
+  /// 读取全部已保存模型；无新格式数据时尝试迁移旧版单模型配置。
+  static Future<List<AiModelConfig>> getModels() async {
     try {
-      return await DatabaseManager.instance.getSetting(_keyBaseUrl) ??
-          defaultBaseUrl;
+      final raw = await DatabaseManager.instance.getSetting(_keyModels);
+      if (raw != null && raw.trim().isNotEmpty) {
+        final list = jsonDecode(raw) as List<dynamic>;
+        return [
+          for (final e in list)
+            AiModelConfig.fromJson(e as Map<String, dynamic>),
+        ];
+      }
+      return await _migrateLegacy();
     } catch (e) {
-      debugPrint('Failed to get AI base url: $e');
-      return defaultBaseUrl;
+      debugPrint('Failed to get AI models: $e');
+      return [];
     }
   }
 
-  /// 设置服务地址（空值清除）。
-  static Future<void> setBaseUrl(String value) async {
+  static Future<List<AiModelConfig>> _migrateLegacy() async {
+    final baseUrl = await DatabaseManager.instance.getSetting(_legacyBaseUrl);
+    final model = await DatabaseManager.instance.getSetting(_legacyModel);
+    if (baseUrl == null ||
+        baseUrl.trim().isEmpty ||
+        model == null ||
+        model.trim().isEmpty) {
+      return [];
+    }
+    final apiKey =
+        await DatabaseManager.instance.getSetting(_legacyApiKey) ?? '';
+    final config = AiModelConfig.create(
+      name: model.trim(),
+      baseUrl: baseUrl.trim(),
+      apiKey: apiKey,
+      contextWindow: defaultContextWindow,
+    );
+    await _saveModels([config]);
+    await DatabaseManager.instance.setSetting(_keyActiveModelId, config.id);
+    await DatabaseManager.instance.setSetting(_legacyBaseUrl, '');
+    await DatabaseManager.instance.setSetting(_legacyModel, '');
+    await DatabaseManager.instance.setSetting(_legacyApiKey, '');
+    return [config];
+  }
+
+  static Future<void> _saveModels(List<AiModelConfig> models) async {
+    await DatabaseManager.instance.setSetting(
+      _keyModels,
+      jsonEncode([for (final m in models) m.toJson()]),
+    );
+  }
+
+  /// 当前使用的模型；未指定时取第一个。
+  static Future<AiModelConfig?> getActiveModel() async {
+    final models = await getModels();
+    if (models.isEmpty) return null;
+    final activeId = await DatabaseManager.instance.getSetting(
+      _keyActiveModelId,
+    );
+    for (final m in models) {
+      if (m.id == activeId) return m;
+    }
+    return models.first;
+  }
+
+  /// 设置当前使用的模型。
+  static Future<void> setActiveModel(String id) async {
     try {
-      await DatabaseManager.instance.setSetting(_keyBaseUrl, value.trim());
+      await DatabaseManager.instance.setSetting(_keyActiveModelId, id);
     } catch (e) {
-      debugPrint('Failed to set AI base url: $e');
+      debugPrint('Failed to set active model: $e');
     }
   }
 
-  /// 获取 API 密钥（可能为空）。
-  static Future<String> getApiKey() async {
-    try {
-      return (await DatabaseManager.instance.getSetting(_keyApiKey)) ?? '';
-    } catch (e) {
-      debugPrint('Failed to get AI api key: $e');
-      return '';
+  /// 添加新模型并设为当前使用。
+  static Future<void> addModel(AiModelConfig model) async {
+    final models = await getModels();
+    models.add(model);
+    await _saveModels(models);
+    await setActiveModel(model.id);
+  }
+
+  /// 更新已保存的模型配置。
+  static Future<void> updateModel(AiModelConfig model) async {
+    final models = await getModels();
+    final index = models.indexWhere((m) => m.id == model.id);
+    if (index < 0) return;
+    models[index] = model;
+    await _saveModels(models);
+  }
+
+  /// 删除模型；删除当前使用时自动切换到剩余第一个。
+  static Future<void> removeModel(String id) async {
+    final models = (await getModels()).where((m) => m.id != id).toList();
+    await _saveModels(models);
+    final activeId = await DatabaseManager.instance.getSetting(
+      _keyActiveModelId,
+    );
+    if (activeId == id) {
+      await DatabaseManager.instance.setSetting(
+        _keyActiveModelId,
+        models.isEmpty ? '' : models.first.id,
+      );
     }
   }
 
-  /// 设置 API 密钥（空值清除）。
-  static Future<void> setApiKey(String value) async {
+  // === 本地 MCP 服务器 ===
+
+  static const _keyMcpEnabled = 'ai_mcp_enabled';
+  static const _keyMcpPort = 'ai_mcp_port';
+
+  /// 默认 MCP 端口。
+  static const int defaultMcpPort = 39273;
+
+  /// 获取 MCP 服务器是否启用。
+  static Future<bool> getMcpEnabled() async {
     try {
-      await DatabaseManager.instance.setSetting(_keyApiKey, value.trim());
+      return await DatabaseManager.instance.getIntSetting(_keyMcpEnabled) == 1;
     } catch (e) {
-      debugPrint('Failed to set AI api key: $e');
+      debugPrint('Failed to get MCP enabled: $e');
+      return false;
     }
   }
 
-  /// 获取模型名称，未设置时返回 [defaultModel]。
-  static Future<String> getModel() async {
+  /// 设置 MCP 服务器开关。
+  static Future<void> setMcpEnabled(bool enabled) async {
     try {
-      return await DatabaseManager.instance.getSetting(_keyModel) ??
-          defaultModel;
+      await DatabaseManager.instance.setIntSetting(
+        _keyMcpEnabled,
+        enabled ? 1 : 0,
+      );
     } catch (e) {
-      debugPrint('Failed to get AI model: $e');
-      return defaultModel;
+      debugPrint('Failed to set MCP enabled: $e');
     }
   }
 
-  /// 设置模型名称（空值清除）。
-  static Future<void> setModel(String value) async {
+  /// 获取 MCP 端口，未设置时返回 [defaultMcpPort]。
+  static Future<int> getMcpPort() async {
     try {
-      await DatabaseManager.instance.setSetting(_keyModel, value.trim());
+      final v = await DatabaseManager.instance.getIntSetting(_keyMcpPort);
+      if (v == null) return defaultMcpPort;
+      return v.clamp(1024, 65535);
     } catch (e) {
-      debugPrint('Failed to set AI model: $e');
+      debugPrint('Failed to get MCP port: $e');
+      return defaultMcpPort;
+    }
+  }
+
+  /// 设置 MCP 端口，自动 clamp 到 1024-65535。
+  static Future<void> setMcpPort(int port) async {
+    try {
+      await DatabaseManager.instance.setIntSetting(
+        _keyMcpPort,
+        port.clamp(1024, 65535),
+      );
+    } catch (e) {
+      debugPrint('Failed to set MCP port: $e');
     }
   }
 }
