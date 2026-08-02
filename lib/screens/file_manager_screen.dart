@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
 import '../services/trash_store.dart';
+import '../utils/apple_widgets.dart';
 import 'archive_viewer_screen.dart';
 import 'text_editor_dialog.dart';
+import 'trash_view.dart';
 
 class FileManagerScreen extends StatefulWidget {
   final String rootPath;
@@ -67,7 +69,10 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
       int cmp;
       switch (_sortBy) {
         case _SortColumn.name:
-          cmp = p.basename(a.path).toLowerCase().compareTo(p.basename(b.path).toLowerCase());
+          cmp = p
+              .basename(a.path)
+              .toLowerCase()
+              .compareTo(p.basename(b.path).toLowerCase());
           break;
         case _SortColumn.size:
           final aSize = a is File ? a.lengthSync() : 0;
@@ -142,9 +147,7 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('确认删除'),
-        content: Text(
-          '确定删除 ${pathList.length} 个项目？\n文件将移至回收站，7天后自动删除',
-        ),
+        content: Text('确定删除 ${pathList.length} 个项目？\n文件将移至回收站，7天后自动删除'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -165,7 +168,8 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
     int count = 0;
     for (final filePath in pathList) {
       try {
-        final entity = FileSystemEntity.typeSync(filePath) ==
+        final entity =
+            FileSystemEntity.typeSync(filePath) ==
                 FileSystemEntityType.directory
             ? Directory(filePath)
             : File(filePath);
@@ -177,9 +181,9 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
     if (!mounted) return;
     _exitSelectionMode();
     _refresh();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('已删除 $count 个文件')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('已删除 $count 个文件')));
   }
 
   Future<void> _handleRename(String oldPath) async {
@@ -221,9 +225,9 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('重命名失败: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('重命名失败: $e')));
     }
     if (!mounted) return;
     _refresh();
@@ -260,9 +264,9 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
       await Directory(p.join(_currentPath, name)).create();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('创建文件夹失败: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('创建文件夹失败: $e')));
     }
     if (!mounted) return;
     _refresh();
@@ -307,9 +311,9 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
       showTextEditor(context, filePath);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('创建文件失败: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('创建文件失败: $e')));
     }
   }
 
@@ -353,9 +357,9 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('操作失败: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('操作失败: $e')));
     }
   }
 
@@ -507,12 +511,34 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
   bool _isBinaryFile(String path) {
     final ext = p.extension(path).toLowerCase();
     return const {
-      '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.webp',
-      '.db', '.sqlite', '.dat', '.bin',
-      '.class', '.nbt', '.mca', '.mcr',
-      '.gz', '.tar', '.rar', '.7z',
-      '.mp3', '.wav', '.ogg', '.mp4', '.avi',
-      '.dll', '.so', '.dylib', '.exe',
+      '.png',
+      '.jpg',
+      '.jpeg',
+      '.gif',
+      '.bmp',
+      '.ico',
+      '.webp',
+      '.db',
+      '.sqlite',
+      '.dat',
+      '.bin',
+      '.class',
+      '.nbt',
+      '.mca',
+      '.mcr',
+      '.gz',
+      '.tar',
+      '.rar',
+      '.7z',
+      '.mp3',
+      '.wav',
+      '.ogg',
+      '.mp4',
+      '.avi',
+      '.dll',
+      '.so',
+      '.dylib',
+      '.exe',
     }.contains(ext);
   }
 
@@ -523,10 +549,11 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
     return [rootName, ...rel.replaceAll('\\', '/').split('/')];
   }
 
-  Future<void> _showContextMenu(Offset position,
-      {FileSystemEntity? target}) async {
-    final overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox;
+  Future<void> _showContextMenu(
+    Offset position, {
+    FileSystemEntity? target,
+  }) async {
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
     final overlayRect = Rect.fromPoints(
       overlay.localToGlobal(Offset.zero),
       overlay.localToGlobal(overlay.size.bottomRight(Offset.zero)),
@@ -537,21 +564,27 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
       final ext = p.extension(target.path).toLowerCase();
       items.addAll([
         if (ext == '.jar' || ext == '.zip')
-          PopupMenuItem(value: 'open', child: _menuItem(Icons.folder_open, '打开')),
+          PopupMenuItem(
+            value: 'open',
+            child: _menuItem(Icons.folder_open, '打开'),
+          ),
         PopupMenuItem(value: 'copy', child: _menuItem(Icons.copy, '复制')),
         PopupMenuItem(value: 'cut', child: _menuItem(Icons.cut, '剪切')),
-        PopupMenuItem(value: 'delete',
-            child: _menuItem(Icons.delete, '删除', color: Colors.red)),
         PopupMenuItem(
-            value: 'rename', child: _menuItem(Icons.edit, '重命名')),
+          value: 'delete',
+          child: _menuItem(Icons.delete, '删除', color: Colors.red),
+        ),
+        PopupMenuItem(value: 'rename', child: _menuItem(Icons.edit, '重命名')),
         if (target is! Directory && !_isBinaryFile(target.path))
           PopupMenuItem(
-              value: 'editConfig',
-              child: _menuItem(Icons.text_snippet, '编辑')),
+            value: 'editConfig',
+            child: _menuItem(Icons.text_snippet, '编辑'),
+          ),
         const PopupMenuDivider(),
         PopupMenuItem(
-            value: 'properties',
-            child: _menuItem(Icons.info_outline, '属性')),
+          value: 'properties',
+          child: _menuItem(Icons.info_outline, '属性'),
+        ),
       ]);
     } else {
       items.addAll([
@@ -561,14 +594,15 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
           child: _menuItem(Icons.paste, '粘贴'),
         ),
         PopupMenuItem(
-            value: 'newFolder',
-            child: _menuItem(Icons.create_new_folder, '新建文件夹')),
+          value: 'newFolder',
+          child: _menuItem(Icons.create_new_folder, '新建文件夹'),
+        ),
         PopupMenuItem(
-            value: 'newFile',
-            child: _menuItem(Icons.note_add, '新建文件')),
+          value: 'newFile',
+          child: _menuItem(Icons.note_add, '新建文件'),
+        ),
         const PopupMenuDivider(),
-        PopupMenuItem(
-            value: 'refresh', child: _menuItem(Icons.refresh, '刷新')),
+        PopupMenuItem(value: 'refresh', child: _menuItem(Icons.refresh, '刷新')),
       ]);
     }
 
@@ -646,7 +680,9 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -674,12 +710,13 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
                     child: Text(
                       segments[i],
                       style: TextStyle(
-                        fontWeight: isLast ? FontWeight.bold : FontWeight.normal,
+                        fontWeight: isLast
+                            ? FontWeight.bold
+                            : FontWeight.normal,
                         color: isLast
                             ? Theme.of(context).colorScheme.primary
                             : Theme.of(context).colorScheme.onSurface,
-                        decoration:
-                            isLast ? null : TextDecoration.underline,
+                        decoration: isLast ? null : TextDecoration.underline,
                       ),
                     ),
                   ),
@@ -720,7 +757,8 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
               onPressed: selectedCount == 1
                   ? () {
                       final path = _selectedPaths.first;
-                      final entity = FileSystemEntity.typeSync(path) ==
+                      final entity =
+                          FileSystemEntity.typeSync(path) ==
                               FileSystemEntityType.directory
                           ? Directory(path)
                           : File(path);
@@ -734,7 +772,8 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
               onPressed: selectedCount == 1
                   ? () {
                       final path = _selectedPaths.first;
-                      final entity = FileSystemEntity.typeSync(path) ==
+                      final entity =
+                          FileSystemEntity.typeSync(path) ==
                               FileSystemEntityType.directory
                           ? Directory(path)
                           : File(path);
@@ -745,8 +784,9 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
             IconButton(
               icon: const Icon(Icons.delete, color: Colors.red),
               tooltip: '删除',
-              onPressed:
-                  selectedCount > 0 ? () => _handleDelete(_selectedPaths) : null,
+              onPressed: selectedCount > 0
+                  ? () => _handleDelete(_selectedPaths)
+                  : null,
             ),
             const SizedBox(width: 8),
             const VerticalDivider(),
@@ -772,7 +812,8 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
             onPressed: selectedCount == 1
                 ? () {
                     final path = _selectedPaths.first;
-                    final entity = FileSystemEntity.typeSync(path) ==
+                    final entity =
+                        FileSystemEntity.typeSync(path) ==
                             FileSystemEntityType.directory
                         ? Directory(path)
                         : File(path);
@@ -781,6 +822,12 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
                 : null,
           ),
           const Spacer(),
+          IconButton(
+            icon: const Icon(Icons.delete_outline),
+            tooltip: '回收站',
+            onPressed: () =>
+                pushPage(context, (_) => TrashView(rootPath: _rootPath)),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: '刷新',
@@ -794,10 +841,7 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
   Widget _buildSplitView() {
     return Row(
       children: [
-        SizedBox(
-          width: 200,
-          child: _buildDirectoryTree(),
-        ),
+        SizedBox(width: 200, child: _buildDirectoryTree()),
         const VerticalDivider(width: 1),
         Expanded(child: _buildFileList()),
       ],
@@ -853,18 +897,9 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
       child: Row(
         children: [
           const SizedBox(width: 40),
-          Expanded(
-            flex: 3,
-            child: _sortHeader('名称', _SortColumn.name),
-          ),
-          Expanded(
-            flex: 1,
-            child: _sortHeader('大小', _SortColumn.size),
-          ),
-          Expanded(
-            flex: 2,
-            child: _sortHeader('修改时间', _SortColumn.date),
-          ),
+          Expanded(flex: 3, child: _sortHeader('名称', _SortColumn.name)),
+          Expanded(flex: 1, child: _sortHeader('大小', _SortColumn.size)),
+          Expanded(flex: 2, child: _sortHeader('修改时间', _SortColumn.date)),
         ],
       ),
     );
@@ -1014,25 +1049,16 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
       ),
       child: Row(
         children: [
-          Text(
-            '${_entries.length} 个项目',
-            style: const TextStyle(fontSize: 12),
-          ),
+          Text('${_entries.length} 个项目', style: const TextStyle(fontSize: 12)),
           if (_selectionMode) ...[
             const SizedBox(width: 16),
             Text(
               '已选择 ${_selectedPaths.length} 项',
-              style: TextStyle(
-                fontSize: 12,
-                color: theme.colorScheme.primary,
-              ),
+              style: TextStyle(fontSize: 12, color: theme.colorScheme.primary),
             ),
           ],
           const Spacer(),
-          Text(
-            clipText,
-            style: const TextStyle(fontSize: 12),
-          ),
+          Text(clipText, style: const TextStyle(fontSize: 12)),
         ],
       ),
     );
@@ -1085,10 +1111,7 @@ class _DirectoryTreeState extends State<_DirectoryTree> {
     try {
       final dir = Directory(path);
       if (!dir.existsSync()) return [];
-      return dir
-          .listSync(recursive: false)
-          .whereType<Directory>()
-          .toList();
+      return dir.listSync(recursive: false).whereType<Directory>().toList();
     } catch (_) {
       return [];
     }
@@ -1098,9 +1121,7 @@ class _DirectoryTreeState extends State<_DirectoryTree> {
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      children: [
-        _buildTreeNode(widget.rootPath, 0),
-      ],
+      children: [_buildTreeNode(widget.rootPath, 0)],
     );
   }
 
@@ -1160,7 +1181,9 @@ class _DirectoryTreeState extends State<_DirectoryTree> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 13,
-                      fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: isCurrent
+                          ? FontWeight.bold
+                          : FontWeight.normal,
                     ),
                   ),
                 ),

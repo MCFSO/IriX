@@ -1,6 +1,7 @@
 // 回收站界面（统一视图）
-// 汇总所有实例的回收站条目，按实例分组展示，支持恢复、永久删除与清空。
-// 数据层使用 SQLite trash_items 表（见 services/trash_store.dart）。
+// 默认汇总所有实例的回收站条目，按实例分组展示；
+// 传入 rootPath 时仅展示该实例的回收站条目。
+// 支持恢复、永久删除与清空。数据层使用 SQLite trash_items 表。
 
 import 'dart:io';
 
@@ -10,7 +11,10 @@ import 'package:path/path.dart' as p;
 import '../services/trash_store.dart';
 
 class TrashView extends StatefulWidget {
-  const TrashView({super.key});
+  /// 仅查看指定实例（根目录）的回收站；为 null 时查看全部实例。
+  final String? rootPath;
+
+  const TrashView({super.key, this.rootPath});
 
   @override
   State<TrashView> createState() => _TrashViewState();
@@ -30,7 +34,13 @@ class _TrashViewState extends State<TrashView> {
   }
 
   Future<void> _refresh() async {
-    final groups = await _store.getAllTrashItems();
+    final Map<String, List<TrashItem>> groups;
+    final scope = widget.rootPath;
+    if (scope != null) {
+      groups = {scope: await _store.getTrashItems(scope)};
+    } else {
+      groups = await _store.getAllTrashItems();
+    }
     for (final items in groups.values) {
       items.sort((a, b) => b.deletedAt.compareTo(a.deletedAt));
     }
@@ -89,7 +99,11 @@ class _TrashViewState extends State<TrashView> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('清空回收站'),
-        content: const Text('确定要永久删除所有实例回收站中的文件吗？此操作不可撤销。'),
+        content: Text(
+          widget.rootPath == null
+              ? '确定要永久删除所有实例回收站中的文件吗？此操作不可撤销。'
+              : '确定要永久删除该实例回收站中的所有文件吗？此操作不可撤销。',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -104,7 +118,12 @@ class _TrashViewState extends State<TrashView> {
     );
     if (confirmed != true) return;
     try {
-      await _store.emptyAllTrash();
+      final scope = widget.rootPath;
+      if (scope != null) {
+        await _store.emptyTrash(scope);
+      } else {
+        await _store.emptyAllTrash();
+      }
       await _refresh();
       if (!mounted) return;
       ScaffoldMessenger.of(

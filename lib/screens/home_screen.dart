@@ -13,7 +13,6 @@ import 'database_screen.dart';
 import 'instance_detail_screen.dart';
 import 'marketplace_screen.dart';
 import 'onboarding_screen.dart';
-import 'trash_view.dart';
 
 /// 主页 — 左侧 NavigationRail + 右侧内容区。
 class HomeScreen extends StatefulWidget {
@@ -54,11 +53,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 selectedIcon: Icon(Icons.dns),
                 label: Text('数据库'),
               ),
-              NavigationRailDestination(
-                icon: Icon(Icons.delete_outline),
-                selectedIcon: Icon(Icons.delete),
-                label: Text('回收站'),
-              ),
             ],
           ),
           const VerticalDivider(thickness: 1, width: 1),
@@ -77,8 +71,6 @@ class _HomeScreenState extends State<HomeScreen> {
         return const MarketplaceScreen();
       case 2:
         return const DatabaseScreen();
-      case 3:
-        return const TrashView();
       default:
         return _buildInstancesPage();
     }
