@@ -130,6 +130,10 @@ jobs:
 
       - name: Copy Rust so to build output
         run: |
+          mkdir -p build/linux/x64/release/bundle/lib
+          cp linux/libxmc_backup.so build/linux/x64/release/bundle/lib/
+          cp linux/libxmc_downloader.so build/linux/x64/release/bundle/lib/
+          cp linux/libxmc_file_ops.so build/linux/x64/release/bundle/lib/
           cp linux/libxmc_backup.so build/linux/x64/release/bundle/
           cp linux/libxmc_downloader.so build/linux/x64/release/bundle/
           cp linux/libxmc_file_ops.so build/linux/x64/release/bundle/
