@@ -1,0 +1,69 @@
+name: 安全漏洞报告
+description: 报告安全问题（请勿在公开 Issue 中披露细节）
+title: "[Security] "
+labels: [security]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 重要提示
+
+        **请勿在公开 Issue 中粘贴敏感信息（凭据、令牌、数据库密码等）。**
+
+        推荐通过 GitHub **私有安全披露** 提交：仓库页面 → `Security` → `Report a vulnerability`。
+        详见 [SECURITY.md](../../SECURITY.md)。
+
+        如果你仍选择使用本表单，请只提供**模糊化**的描述，细节留在私有通道沟通。
+  - type: input
+    id: version
+    attributes:
+      label: 影响版本
+      description: 确认存在问题的版本（可填写 main 分支的最新提交号）
+    validations:
+      required: true
+  - type: dropdown
+    id: type
+    attributes:
+      label: 漏洞类型
+      options:
+        - 敏感信息泄露
+        - 任意文件读写 / 路径穿越
+        - 权限绕过（AI/MCP/FRP 授权）
+        - 远程代码执行
+        - 本地提权
+        - 拒绝服务
+        - 供应链 / 依赖漏洞
+        - 其他
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: 漏洞描述（模糊化）
+      description: 不包含具体凭据的概述，例如涉及哪个模块、通过什么路径触发
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: 复现步骤（模糊化）
+      description: 描述触发条件与影响范围，具体细节可留待私有通道
+  - type: dropdown
+    id: impact
+    attributes:
+      label: 影响范围
+      options:
+        - 仅本机用户数据
+        - 本地网络
+        - 远程可触达（公网）
+        - 不确定
+    validations:
+      required: true
+  - type: dropdown
+    id: disclosure
+    attributes:
+      label: 是否可以公开披露
+      options:
+        - 可以，修复发布 30 天后公开
+        - 可以，但需要提前协商
+        - 不可以

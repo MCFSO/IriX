@@ -18,6 +18,7 @@ import '../services/frp_provider.dart';
 import '../services/frpc_manager.dart';
 import '../services/hayfrp_provider.dart';
 import '../services/ofrp_service.dart';
+import '../services/oauth_callback_server.dart';
 import '../services/openfrp_provider.dart';
 import '../services/sakurafrp_provider.dart';
 import '../state/app_state.dart';
@@ -1039,7 +1040,10 @@ class _CustomLoginDialogState extends State<_CustomLoginDialog> {
   }
 }
 
-/// ChmlFrp 登录对话框：用户名/邮箱 + 密码。
+/// ChmlFrp 登录对话框：SSO 网页授权登录。
+///
+/// 浏览器打开 cf-v2.uapis.cn/sso/authorize 登录授权后，
+/// 自动跳回本地回调（#access_token=...），无需复制粘贴。
 /// 不提供注册功能，通过链接跳转到官网注册页。
 class _ChmlFrpLoginDialog extends StatefulWidget {
   const _ChmlFrpLoginDialog();
@@ -1049,42 +1053,62 @@ class _ChmlFrpLoginDialog extends StatefulWidget {
 }
 
 class _ChmlFrpLoginDialogState extends State<_ChmlFrpLoginDialog> {
-  final _usernameController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final OAuthCallbackServer _callback = OAuthCallbackServer();
   bool _loading = false;
+  bool _cancelled = false;
   String? _error;
 
   @override
   void dispose() {
-    _usernameController.dispose();
-    _passwordController.dispose();
+    _cancelled = true;
+    _callback.stop();
     super.dispose();
   }
 
-  Future<void> _login() async {
-    final username = _usernameController.text.trim();
-    final password = _passwordController.text;
-    if (username.isEmpty || password.isEmpty) {
-      setState(() => _error = '请输入用户名和密码');
-      return;
-    }
+  Future<void> _start() async {
     setState(() {
       _loading = true;
+      _cancelled = false;
       _error = null;
     });
     try {
-      await ChmlFrpProvider().login({
-        'username': username,
-        'password': password,
-      });
+      await _callback.start();
+      final returnUrl = Uri.encodeComponent(
+        'http://127.0.0.1:${_callback.port}/callback',
+      );
+      final authorizeUrl =
+          '$chmlFrpApiBase/sso/authorize?return_url=$returnUrl';
+      final launched = await launchUrl(
+        Uri.parse(authorizeUrl),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched) {
+        throw Exception('无法打开浏览器，请重试');
+      }
+      final params = await _callback.waitForParams();
+      if (_cancelled) return;
+      if (params == null) {
+        throw Exception('等待网页授权超时或已取消');
+      }
+      final accessToken = params['access_token'];
+      if (accessToken == null || accessToken.isEmpty) {
+        throw Exception('授权回调中未获取到 access_token，请重试');
+      }
       if (!mounted) return;
-      Navigator.of(context).pop({'username': username, 'password': password});
+      Navigator.of(context).pop({
+        'access_token': accessToken,
+        'refresh_token': params['refresh_token'] ?? '',
+        'expires_at': params['expires_at'] ?? '',
+        'expires_in': params['expires_in'] ?? '',
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
         _error = e.toString();
       });
+    } finally {
+      await _callback.stop();
     }
   }
 
@@ -1104,38 +1128,22 @@ class _ChmlFrpLoginDialogState extends State<_ChmlFrpLoginDialog> {
     return AlertDialog(
       title: const Text('登录 ChmlFrp'),
       content: SizedBox(
-        width: 420,
+        width: 460,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              TextField(
-                controller: _usernameController,
-                autofocus: true,
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
-                decoration: InputDecoration(
-                  labelText: '用户名或邮箱',
-                  border: const OutlineInputBorder(),
-                  isDense: true,
-                  errorText: _error,
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _passwordController,
-                obscureText: true,
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
-                onSubmitted: (_) => _login(),
-                decoration: const InputDecoration(
-                  labelText: '密码',
-                  border: OutlineInputBorder(),
-                  isDense: true,
+              Text(
+                '点击下方按钮后将在浏览器中打开 ChmlFrp 授权页：\n'
+                '登录并授权后会自动跳回 IriX，无需复制粘贴任何内容。',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 8),
               TextButton(
-                onPressed: _openRegister,
+                onPressed: _loading ? null : _openRegister,
                 child: const Text('还没有账号？去注册'),
               ),
               Text(
@@ -1144,24 +1152,50 @@ class _ChmlFrpLoginDialogState extends State<_ChmlFrpLoginDialog> {
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
+              if (_error != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  _error!,
+                  style: TextStyle(
+                    color: theme.colorScheme.error,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+              if (_loading) ...[
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    const SizedBox(width: 8),
+                    Text('等待浏览器授权…', style: theme.textTheme.bodySmall),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
       ),
       actions: [
         TextButton(
-          onPressed: _loading ? null : () => Navigator.of(context).pop(),
-          child: const Text('取消'),
+          onPressed: () {
+            if (_loading) {
+              setState(() => _cancelled = true);
+              _callback.stop();
+            } else {
+              Navigator.of(context).pop();
+            }
+          },
+          child: Text(_loading ? '取消' : '关闭'),
         ),
         FilledButton(
-          onPressed: _loading ? null : _login,
-          child: _loading
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('登录'),
+          onPressed: _loading ? null : _start,
+          child: const Text('在浏览器中授权'),
         ),
       ],
     );

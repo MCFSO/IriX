@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 安全漏洞报告
+    url: https://github.com/MCFSO/IriX/security
+    about: 通过 GitHub 私有安全披露提交漏洞，请勿在公开 Issue 中泄露细节。

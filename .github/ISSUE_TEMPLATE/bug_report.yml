@@ -1,0 +1,63 @@
+name: Bug 报告
+description: 报告应用中的缺陷或异常行为
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢你帮助我们改进 IriX！请尽量完整填写以下信息。
+  - type: input
+    id: version
+    attributes:
+      label: 应用版本
+      description: 设置 → 关于 中可见，或填写构建版本号
+      placeholder: 例如 1.0.0+1
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 操作系统
+      options:
+        - Windows
+        - Linux
+        - macOS
+        - 其他
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述
+      description: 发生了什么？预期行为是什么？
+      placeholder: 清晰、简洁地描述问题
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: 复现步骤
+      description: 如何稳定地复现该问题？
+      placeholder: |
+        1. 打开「XX」页面
+        2. 点击「XX」按钮
+        3. 出现错误
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / 错误信息
+      description: 相关日志、报错堆栈或控制台输出（请勿包含任何密码、令牌等敏感凭据）
+      render: shell
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: 截图
+      description: 可选，拖拽图片到此处
+  - type: textarea
+    id: extra
+    attributes:
+      label: 附加信息
+      description: 其他你认为有帮助的信息（环境、网络、第三方服务等）

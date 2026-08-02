@@ -1,0 +1,49 @@
+name: 功能建议
+description: 提出新功能或改进想法
+title: "[Feature] "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢你的建议！请说明你想解决什么问题，而不是只描述功能本身。
+  - type: textarea
+    id: problem
+    attributes:
+      label: 要解决的问题
+      description: 当前使用中遇到了什么不便或缺失？
+      placeholder: 例如：无法在同一个地方查看所有实例的磁盘占用
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: 期望的行为
+      description: 你希望它如何工作？
+      placeholder: 例如：新增一个「存储」页面，按实例展示磁盘占用与清理入口
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 替代方案
+      description: 你尝试过的其他方式或想法（可选）
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: 关联模块
+      description: 该功能涉及哪些模块？（可多选）
+      options:
+        - label: 实例管理
+        - label: 文件管理 / 回收站
+        - label: 备份
+        - label: 数据库管理
+        - label: FRP 端口映射
+        - label: AI 助手 / MCP
+        - label: 市场 / 插件
+        - label: 其他
+  - type: textarea
+    id: extra
+    attributes:
+      label: 附加信息
+      description: 参考截图、相关链接等（可选）
