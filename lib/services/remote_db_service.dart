@@ -28,28 +28,28 @@ enum DbType {
 
   /// 显示名称
   String get label => switch (this) {
-        DbType.mysql => 'MySQL',
-        DbType.mariadb => 'MariaDB',
-        DbType.postgres => 'PostgreSQL',
-        DbType.redis => 'Redis',
-      };
+    DbType.mysql => 'MySQL',
+    DbType.mariadb => 'MariaDB',
+    DbType.postgres => 'PostgreSQL',
+    DbType.redis => 'Redis',
+  };
 
   /// 从字符串解析（表内存储值），未知值回退到 MySQL
   static DbType fromString(String s) => switch (s) {
-        'mysql' => DbType.mysql,
-        'mariadb' => DbType.mariadb,
-        'postgres' => DbType.postgres,
-        'redis' => DbType.redis,
-        _ => DbType.mysql,
-      };
+    'mysql' => DbType.mysql,
+    'mariadb' => DbType.mariadb,
+    'postgres' => DbType.postgres,
+    'redis' => DbType.redis,
+    _ => DbType.mysql,
+  };
 
   /// 默认端口
   int get defaultPort => switch (this) {
-        DbType.mysql => 3306,
-        DbType.mariadb => 3306,
-        DbType.postgres => 5432,
-        DbType.redis => 6379,
-      };
+    DbType.mysql => 3306,
+    DbType.mariadb => 3306,
+    DbType.postgres => 5432,
+    DbType.redis => 6379,
+  };
 }
 
 /// 一条远程数据库连接配置
@@ -87,25 +87,34 @@ class DbConnectionInfo {
       username: row['username'] as String?,
       password: row['password'] as String?,
       databaseName: row['database_name'] as String?,
-      createdAt: DateTime.tryParse(
-            (row['created_at'] as String?) ?? '',
-          ) ??
+      createdAt:
+          DateTime.tryParse((row['created_at'] as String?) ?? '') ??
           DateTime.now(),
     );
   }
 
   /// 转换为 snake_case 表行
   Map<String, dynamic> toDbRow() => {
-        'id': id,
-        'name': name,
-        'type': type.name,
-        'host': host,
-        'port': port,
-        'username': username,
-        'password': password,
-        'database_name': databaseName,
-        'created_at': createdAt.toIso8601String(),
-      };
+    'id': id,
+    'name': name,
+    'type': type.name,
+    'host': host,
+    'port': port,
+    'username': username,
+    'password': password,
+    'database_name': databaseName,
+    'created_at': createdAt.toIso8601String(),
+  };
+}
+
+/// 一条数据库用户信息
+class DbUserInfo {
+  final String username;
+
+  /// 登录主机（MySQL/MariaDB 才有，如 '%' / 'localhost'）。
+  final String? host;
+
+  const DbUserInfo({required this.username, this.host});
 }
 
 /// 远程数据库操作服务（单例）
@@ -199,10 +208,7 @@ class RemoteDatabaseService {
   }
 
   /// 获取指定数据库中的表列表。Redis 不支持，返回空列表（UI 层判断）。
-  Future<List<String>> getTables(
-    DbConnectionInfo info,
-    String database,
-  ) async {
+  Future<List<String>> getTables(DbConnectionInfo info, String database) async {
     switch (info.type) {
       case DbType.mysql:
       case DbType.mariadb:
@@ -249,7 +255,8 @@ class RemoteDatabaseService {
       case DbType.mariadb:
         final conn = await _connectMysql(info, database: database);
         try {
-          final sql = 'SELECT * FROM `${_escMysqlIdent(table)}` '
+          final sql =
+              'SELECT * FROM `${_escMysqlIdent(table)}` '
               'LIMIT ? OFFSET ?';
           final results = await conn.execute(sql, [limit, offset]);
           return [
@@ -290,8 +297,9 @@ class RemoteDatabaseService {
       case DbType.mariadb:
         final conn = await _connectMysql(info, database: database);
         try {
-          final results = await conn
-              .execute('SELECT COUNT(*) AS c FROM `${_escMysqlIdent(table)}`');
+          final results = await conn.execute(
+            'SELECT COUNT(*) AS c FROM `${_escMysqlIdent(table)}`',
+          );
           if (results.rows.isEmpty) return 0;
           return int.tryParse(results.rows.first.colAt(0) ?? '0') ?? 0;
         } finally {
@@ -300,8 +308,9 @@ class RemoteDatabaseService {
       case DbType.postgres:
         final conn = await _connectPostgres(info, database: database);
         try {
-          final result = await conn
-              .execute('SELECT COUNT(*) AS c FROM "${_escPgIdent(table)}"');
+          final result = await conn.execute(
+            'SELECT COUNT(*) AS c FROM "${_escPgIdent(table)}"',
+          );
           if (result.isEmpty) return 0;
           final v = result.first.toColumnMap().values.first;
           return v is int ? v : int.tryParse(v.toString()) ?? 0;
@@ -323,7 +332,8 @@ class RemoteDatabaseService {
       throw UnsupportedError('Redis 不支持 SQL，请使用 Redis 专用操作');
     }
     final trimmed = sql.trimLeft().toUpperCase();
-    final isQuery = trimmed.startsWith('SELECT') ||
+    final isQuery =
+        trimmed.startsWith('SELECT') ||
         trimmed.startsWith('SHOW') ||
         trimmed.startsWith('WITH') ||
         trimmed.startsWith('DESC') ||
@@ -412,11 +422,7 @@ class RemoteDatabaseService {
   }
 
   /// 设置指定键的值。
-  Future<void> redisSet(
-    DbConnectionInfo info,
-    String key,
-    String value,
-  ) async {
+  Future<void> redisSet(DbConnectionInfo info, String key, String value) async {
     final cmd = await _redisConnect(info);
     try {
       await cmd.set(key, value);
@@ -443,27 +449,27 @@ class RemoteDatabaseService {
   ) {
     final rand = Random.secure();
     const letterDigits = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    const strong = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    const strong =
+        'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
         'abcdefghijklmnopqrstuvwxyz0123456789!@#%^&*-_';
 
     final base = databaseName
         .replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_')
         .toLowerCase();
-    final safeBase = base.isEmpty ? 'db' : base.substring(0, base.length > 12 ? 12 : base.length);
+    final safeBase = base.isEmpty
+        ? 'db'
+        : base.substring(0, base.length > 12 ? 12 : base.length);
 
     String randomSuffix(int n) => String.fromCharCodes(
-          List.generate(
-            n,
-            (_) => letterDigits.codeUnitAt(rand.nextInt(letterDigits.length)),
-          ),
-        );
+      List.generate(
+        n,
+        (_) => letterDigits.codeUnitAt(rand.nextInt(letterDigits.length)),
+      ),
+    );
 
     final username = 'user_${safeBase}_${randomSuffix(4)}';
     final password = String.fromCharCodes(
-      List.generate(
-        16,
-        (_) => strong.codeUnitAt(rand.nextInt(strong.length)),
-      ),
+      List.generate(16, (_) => strong.codeUnitAt(rand.nextInt(strong.length))),
     );
     return (username: username, password: password);
   }
@@ -490,9 +496,7 @@ class RemoteDatabaseService {
             'CREATE DATABASE `$dbName` '
             'CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci',
           );
-          await conn.execute(
-            "CREATE USER '$user'@'%' IDENTIFIED BY '$pwd'",
-          );
+          await conn.execute("CREATE USER '$user'@'%' IDENTIFIED BY '$pwd'");
           await conn.execute(
             "GRANT ALL PRIVILEGES ON `$dbName`.* TO '$user'@'%'",
           );
@@ -542,6 +546,117 @@ class RemoteDatabaseService {
     }
   }
 
+  // === 用户管理 ===
+
+  /// 获取数据库用户列表（仅关系型）。Redis 不支持，返回空列表。
+  Future<List<DbUserInfo>> getUsers(DbConnectionInfo info) async {
+    switch (info.type) {
+      case DbType.mysql:
+      case DbType.mariadb:
+        final conn = await _connectMysql(info);
+        try {
+          final results = await conn.execute(
+            'SELECT User, Host FROM mysql.user ORDER BY User',
+          );
+          return [
+            for (final row in results.rows)
+              DbUserInfo(
+                username: (row.colAt(0) ?? '').toString(),
+                host: (row.colAt(1) ?? '').toString(),
+              ),
+          ];
+        } finally {
+          await conn.close();
+        }
+      case DbType.postgres:
+        final conn = await _connectPostgres(info);
+        try {
+          final result = await conn.execute(
+            'SELECT usename FROM pg_user ORDER BY usename',
+          );
+          return [
+            for (final row in result)
+              DbUserInfo(
+                username: (row.toColumnMap().values.firstOrNull ?? '')
+                    .toString(),
+              ),
+          ];
+        } finally {
+          await conn.close();
+        }
+      case DbType.redis:
+        return const [];
+    }
+  }
+
+  /// 新建数据库用户。
+  ///
+  /// MySQL/MariaDB 可指定登录主机（默认 '%' 允许任意主机）。
+  /// PostgreSQL 直接创建可登录角色。
+  Future<void> createUser(
+    DbConnectionInfo info, {
+    required String username,
+    required String password,
+    String host = '%',
+  }) async {
+    switch (info.type) {
+      case DbType.mysql:
+      case DbType.mariadb:
+        final conn = await _connectMysql(info);
+        try {
+          final user = _escMysqlIdent(username);
+          final pwd = _escMysqlStr(password);
+          final h = _escMysqlStr(host);
+          await conn.execute("CREATE USER '$user'@'$h' IDENTIFIED BY '$pwd'");
+          await conn.execute('FLUSH PRIVILEGES');
+        } finally {
+          await conn.close();
+        }
+      case DbType.postgres:
+        final conn = await _connectPostgres(info);
+        try {
+          final user = _escPgIdent(username);
+          final pwd = _escPgStr(password);
+          await conn.execute('CREATE USER "$user" WITH PASSWORD \'$pwd\'');
+        } finally {
+          await conn.close();
+        }
+      case DbType.redis:
+        throw UnsupportedError('Redis 不支持用户管理');
+    }
+  }
+
+  /// 删除数据库用户。MySQL/MariaDB 需指定登录主机（默认 '%'）。
+  Future<void> dropUser(
+    DbConnectionInfo info, {
+    required String username,
+    String? host,
+  }) async {
+    switch (info.type) {
+      case DbType.mysql:
+      case DbType.mariadb:
+        final conn = await _connectMysql(info);
+        try {
+          final user = _escMysqlIdent(username);
+          final h = _escMysqlStr(host ?? '%');
+          await conn.execute("DROP USER '$user'@'$h'");
+          await conn.execute('FLUSH PRIVILEGES');
+        } finally {
+          await conn.close();
+        }
+      case DbType.postgres:
+        final conn = await _connectPostgres(info);
+        try {
+          final user = _escPgIdent(username);
+          await conn.execute('DROP USER "$user"');
+        } finally {
+          await conn.close();
+        }
+      case DbType.redis:
+        throw UnsupportedError('Redis 不支持用户管理');
+    }
+  }
+
   // === 行级数据编辑 ===
 
   /// 获取表的主键列名列表（无主键返回空列表）。
@@ -566,8 +681,7 @@ class RemoteDatabaseService {
               "ORDER BY kcu.ordinal_position";
           final results = await conn.execute(sql);
           return [
-            for (final row in results.rows)
-              (row.colAt(0) ?? '').toString(),
+            for (final row in results.rows) (row.colAt(0) ?? '').toString(),
           ];
         } finally {
           await conn.close();
@@ -614,19 +728,25 @@ class RemoteDatabaseService {
         final conn = await _connectMysql(info, database: database);
         try {
           final pks = await getPrimaryKeys(info, database, table);
-          final whereCols =
-              pks.isNotEmpty ? pks : whereRow.keys.where((k) => k != 'rowKey').toList();
+          final whereCols = pks.isNotEmpty
+              ? pks
+              : whereRow.keys.where((k) => k != 'rowKey').toList();
           final setClause = newValues.entries
-              .map((e) => '`${_escMysqlIdent(e.key)}` = ${_mysqlValue(e.value)}')
+              .map(
+                (e) => '`${_escMysqlIdent(e.key)}` = ${_mysqlValue(e.value)}',
+              )
               .join(', ');
           final whereClause = whereCols
-              .map((k) => '`${_escMysqlIdent(k)}` = ${_mysqlValue(whereRow[k])}')
+              .map(
+                (k) => '`${_escMysqlIdent(k)}` = ${_mysqlValue(whereRow[k])}',
+              )
               .join(' AND ');
           if (whereClause.isEmpty) {
             throw StateError('无法定位数据行（表为空 WHERE）');
           }
-          final results = await conn
-              .execute('UPDATE `${_escMysqlIdent(table)}` SET $setClause WHERE $whereClause');
+          final results = await conn.execute(
+            'UPDATE `${_escMysqlIdent(table)}` SET $setClause WHERE $whereClause',
+          );
           return results.affectedRows.toInt();
         } finally {
           await conn.close();
@@ -635,8 +755,9 @@ class RemoteDatabaseService {
         final conn = await _connectPostgres(info, database: database);
         try {
           final pks = await getPrimaryKeys(info, database, table);
-          final whereCols =
-              pks.isNotEmpty ? pks : whereRow.keys.where((k) => k != 'rowKey').toList();
+          final whereCols = pks.isNotEmpty
+              ? pks
+              : whereRow.keys.where((k) => k != 'rowKey').toList();
           final setClause = newValues.entries
               .map((e) => '"${_escPgIdent(e.key)}" = ${_pgValue(e.value)}')
               .join(', ');
@@ -709,10 +830,13 @@ class RemoteDatabaseService {
         final conn = await _connectMysql(info, database: database);
         try {
           final pks = await getPrimaryKeys(info, database, table);
-          final whereCols =
-              pks.isNotEmpty ? pks : whereRow.keys.where((k) => k != 'rowKey').toList();
+          final whereCols = pks.isNotEmpty
+              ? pks
+              : whereRow.keys.where((k) => k != 'rowKey').toList();
           final whereClause = whereCols
-              .map((k) => '`${_escMysqlIdent(k)}` = ${_mysqlValue(whereRow[k])}')
+              .map(
+                (k) => '`${_escMysqlIdent(k)}` = ${_mysqlValue(whereRow[k])}',
+              )
               .join(' AND ');
           if (whereClause.isEmpty) {
             throw StateError('无法定位数据行（表为空 WHERE）');
@@ -728,8 +852,9 @@ class RemoteDatabaseService {
         final conn = await _connectPostgres(info, database: database);
         try {
           final pks = await getPrimaryKeys(info, database, table);
-          final whereCols =
-              pks.isNotEmpty ? pks : whereRow.keys.where((k) => k != 'rowKey').toList();
+          final whereCols = pks.isNotEmpty
+              ? pks
+              : whereRow.keys.where((k) => k != 'rowKey').toList();
           final whereClause = whereCols
               .map((k) => '"${_escPgIdent(k)}" = ${_pgValue(whereRow[k])}')
               .join(' AND ');
@@ -751,20 +876,17 @@ class RemoteDatabaseService {
   // === 内部工具 ===
 
   /// 空字符串密码/用户名归一化为 null
-  static String? _nonEmpty(String? v) =>
-      (v == null || v.isEmpty) ? null : v;
+  static String? _nonEmpty(String? v) => (v == null || v.isEmpty) ? null : v;
 
   /// MySQL 标识符转义（反引号内的反引号翻倍）
-  static String _escMysqlIdent(String ident) =>
-      ident.replaceAll('`', '``');
+  static String _escMysqlIdent(String ident) => ident.replaceAll('`', '``');
 
   /// MySQL 字符串字面量转义（反斜杠与单引号）
   static String _escMysqlStr(String s) =>
       s.replaceAll('\\', '\\\\').replaceAll("'", "''");
 
   /// PostgreSQL 标识符转义（双引号内的双引号翻倍）
-  static String _escPgIdent(String ident) =>
-      ident.replaceAll('"', '""');
+  static String _escPgIdent(String ident) => ident.replaceAll('"', '""');
 
   /// PostgreSQL 字符串字面量转义（单引号翻倍）
   static String _escPgStr(String s) => s.replaceAll("'", "''");

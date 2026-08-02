@@ -48,11 +48,17 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
 
   bool get _isRedis => _connection.type == DbType.redis;
 
+  // 用户管理（仅关系型数据库）
+  List<DbUserInfo> _users = [];
+  bool _usersLoading = true;
+  String? _usersError;
+
   @override
   void initState() {
     super.initState();
     _connection = widget.connection;
     _loadInitial();
+    _loadUsers();
   }
 
   @override
@@ -276,13 +282,10 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
   // ---------- 数据库管理 ----------
 
   Future<void> _showCreateDatabaseDialog() async {
-    final creds = await showAppDialog<
-        ({String database, String username, String password})>(
-      context,
-      (ctx) => _CreateDatabaseDialog(
-        type: _connection.type,
-      ),
-    );
+    final creds =
+        await showAppDialog<
+          ({String database, String username, String password})
+        >(context, (ctx) => _CreateDatabaseDialog(type: _connection.type));
     if (creds == null || !mounted) return;
     try {
       await _service.createDatabaseWithUser(
@@ -292,9 +295,9 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
         password: creds.password,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已创建数据库 ${creds.database}')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('已创建数据库 ${creds.database}')));
       _loadDatabases();
     } catch (e) {
       if (!mounted) return;
@@ -401,6 +404,98 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
     }
   }
 
+  // ---------- 用户管理 ----------
+
+  Future<void> _loadUsers() async {
+    setState(() {
+      _usersLoading = true;
+      _usersError = null;
+    });
+    try {
+      final users = await _service.getUsers(_connection);
+      if (!mounted) return;
+      setState(() {
+        _users = users;
+        _usersLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _usersError = e.toString();
+        _usersLoading = false;
+      });
+    }
+  }
+
+  Future<void> _showCreateUserDialog() async {
+    final creds =
+        await showAppDialog<({String username, String password, String host})>(
+          context,
+          (ctx) => _CreateUserDialog(connection: _connection),
+        );
+    if (creds == null || !mounted) return;
+    try {
+      await _service.createUser(
+        _connection,
+        username: creds.username,
+        password: creds.password,
+        host: creds.host,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('已创建用户 ${creds.username}')));
+      _loadUsers();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('创建失败: $e')));
+    }
+  }
+
+  Future<void> _confirmDropUser(DbUserInfo user) async {
+    final hostText = user.host == null ? '' : '@${user.host}';
+    final confirmed = await showAppDialog<bool>(
+      context,
+      (ctx) => AlertDialog(
+        title: const Text('删除用户'),
+        content: Text('确定要删除用户 ${user.username}$hostText 吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await _service.dropUser(
+        _connection,
+        username: user.username,
+        host: user.host,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('已删除用户 ${user.username}')));
+      _loadUsers();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('删除失败: $e')));
+    }
+  }
+
   // ---------- 构建 ----------
 
   @override
@@ -409,7 +504,18 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
       appBar: AppBar(title: Text('${_connection.name} - 数据库')),
       body: Column(
         children: [
-          _buildInfoCard(),
+          // 顶部：连接信息（左）与用户管理（右）对半分布
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: _buildInfoCard()),
+                const SizedBox(width: 8),
+                Expanded(child: _buildUserCard()),
+              ],
+            ),
+          ),
           const SizedBox(height: 8),
           Expanded(
             child: _isRedis ? _buildRedisView() : _buildRelationalView(),
@@ -422,65 +528,62 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
   /// 顶部连接信息卡。
   Widget _buildInfoCard() {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Card(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    _typeIcon(_connection.type),
-                    size: 20,
-                    color: theme.colorScheme.primary,
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  _typeIcon(_connection.type),
+                  size: 20,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Text('连接信息', style: theme.textTheme.titleMedium),
+                const Spacer(),
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: Colors.green,
+                    shape: BoxShape.circle,
                   ),
+                ),
+                const SizedBox(width: 6),
+                const Text(
+                  '已连接',
+                  style: TextStyle(color: Colors.green, fontSize: 12),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _infoRow('类型', _connection.type.label),
+            _infoRow('地址', '${_connection.host}:${_connection.port}'),
+            _infoRow('用户', _connection.username ?? '-'),
+            _infoRow('数据库', _connection.databaseName ?? '无'),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                TextButton.icon(
+                  onPressed: _testConnection,
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: const Text('测试连接'),
+                ),
+                if (!_isRedis) ...[
                   const SizedBox(width: 8),
-                  Text('连接信息', style: theme.textTheme.titleMedium),
-                  const Spacer(),
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Colors.green,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  const Text(
-                    '已连接',
-                    style: TextStyle(color: Colors.green, fontSize: 12),
+                  FilledButton.tonalIcon(
+                    onPressed: _showSqlDialog,
+                    icon: const Icon(Icons.terminal, size: 18),
+                    label: const Text('执行 SQL'),
                   ),
                 ],
-              ),
-              const SizedBox(height: 12),
-              _infoRow('类型', _connection.type.label),
-              _infoRow('地址', '${_connection.host}:${_connection.port}'),
-              _infoRow('用户', _connection.username ?? '-'),
-              _infoRow('数据库', _connection.databaseName ?? '无'),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  TextButton.icon(
-                    onPressed: _testConnection,
-                    icon: const Icon(Icons.refresh, size: 18),
-                    label: const Text('测试连接'),
-                  ),
-                  if (!_isRedis) ...[
-                    const SizedBox(width: 8),
-                    FilledButton.tonalIcon(
-                      onPressed: _showSqlDialog,
-                      icon: const Icon(Icons.terminal, size: 18),
-                      label: const Text('执行 SQL'),
-                    ),
-                  ],
-                ],
-              ),
-            ],
-          ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -501,6 +604,142 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
           ),
           Expanded(child: Text(value, style: const TextStyle(fontSize: 13))),
         ],
+      ),
+    );
+  }
+
+  /// 顶部用户管理卡（与连接信息卡左右对半）。
+  Widget _buildUserCard() {
+    final theme = Theme.of(context);
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.manage_accounts,
+                  size: 20,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Text('用户管理', style: theme.textTheme.titleMedium),
+                const Spacer(),
+                if (!_isRedis)
+                  FilledButton.tonalIcon(
+                    onPressed: _showCreateUserDialog,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('新建用户'),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _buildUserList(theme),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 用户管理卡内容：加载中 / 错误 / 空态 / 用户列表。
+  Widget _buildUserList(ThemeData theme) {
+    if (_isRedis) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Center(
+          child: Text(
+            'Redis 不支持用户管理',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      );
+    }
+    if (_usersLoading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+    if (_usersError != null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _usersError!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            TextButton(onPressed: _loadUsers, child: const Text('重试')),
+          ],
+        ),
+      );
+    }
+    if (_users.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Center(
+          child: Text(
+            '暂无用户',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      );
+    }
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: 180),
+      child: ListView.builder(
+        shrinkWrap: true,
+        itemCount: _users.length,
+        itemBuilder: (context, index) {
+          final user = _users[index];
+          return ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            visualDensity: VisualDensity.compact,
+            leading: Icon(
+              Icons.person_outline,
+              size: 20,
+              color: theme.colorScheme.primary,
+            ),
+            title: Text(
+              user.username,
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: user.host == null
+                ? null
+                : Text(
+                    '@${user.host}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+            trailing: IconButton(
+              tooltip: '删除',
+              icon: const Icon(Icons.delete_outline, size: 20),
+              onPressed: () => _confirmDropUser(user),
+            ),
+          );
+        },
       ),
     );
   }
@@ -678,9 +917,7 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
         ),
         Expanded(
           child: _rows.isEmpty
-              ? Center(
-                  child: Text(_totalRows == 0 ? '该表没有数据' : '当前页无数据'),
-                )
+              ? Center(child: Text(_totalRows == 0 ? '该表没有数据' : '当前页无数据'))
               : _EditableTable(
                   rows: _rows,
                   columns: _columns,
@@ -735,9 +972,7 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            affected > 0 ? '已保存' : '未找到匹配行，数据未修改',
-          ),
+          content: Text(affected > 0 ? '已保存' : '未找到匹配行，数据未修改'),
           duration: const Duration(seconds: 1),
         ),
       );
@@ -933,7 +1168,7 @@ class _EditableTable extends StatefulWidget {
   final List<Map<String, dynamic>> rows;
   final List<String>? columns;
   final void Function(Map<String, dynamic> row, String column, String newValue)
-      onCellEdited;
+  onCellEdited;
   final void Function(Map<String, dynamic> row) onDeleteRow;
 
   const _EditableTable({
@@ -1018,12 +1253,7 @@ class _EditableTableState extends State<_EditableTable> {
                 ),
               ),
             DataColumn(
-              label: Text(
-                '',
-                style: TextStyle(
-                  color: theme.colorScheme.error,
-                ),
-              ),
+              label: Text('', style: TextStyle(color: theme.colorScheme.error)),
             ),
           ],
           rows: [
@@ -1035,8 +1265,12 @@ class _EditableTableState extends State<_EditableTable> {
     );
   }
 
-  DataRow _buildRow(List<String> cols, int rowIndex, Map<String, dynamic> row,
-      ThemeData theme) {
+  DataRow _buildRow(
+    List<String> cols,
+    int rowIndex,
+    Map<String, dynamic> row,
+    ThemeData theme,
+  ) {
     return DataRow(
       cells: [
         for (final c in cols)
@@ -1202,9 +1436,7 @@ class _SqlResultTable extends StatelessWidget {
           rows: [
             for (final row in rows)
               DataRow(
-                cells: [
-                  for (final c in cols) DataCell(_buildCell(row[c])),
-                ],
+                cells: [for (final c in cols) DataCell(_buildCell(row[c]))],
               ),
           ],
         ),
@@ -1657,6 +1889,129 @@ class _RedisAddKeyDialogState extends State<_RedisAddKeyDialog> {
   }
 }
 
+/// 新建用户对话框。
+///
+/// 输入用户名与密码；MySQL/MariaDB 额外可指定登录主机（默认 '%'）。
+/// 确认后返回 (username, password, host)。
+class _CreateUserDialog extends StatefulWidget {
+  final DbConnectionInfo connection;
+
+  const _CreateUserDialog({required this.connection});
+
+  @override
+  State<_CreateUserDialog> createState() => _CreateUserDialogState();
+}
+
+class _CreateUserDialogState extends State<_CreateUserDialog> {
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _hostController = TextEditingController(text: '%');
+
+  String? _error;
+
+  bool get _isMysql =>
+      widget.connection.type == DbType.mysql ||
+      widget.connection.type == DbType.mariadb;
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _passwordController.dispose();
+    _hostController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final username = _usernameController.text.trim();
+    final password = _passwordController.text;
+    final host = _isMysql ? _hostController.text.trim() : '%';
+    if (username.isEmpty) {
+      setState(() => _error = '请输入用户名');
+      return;
+    }
+    if (password.isEmpty) {
+      setState(() => _error = '请输入密码');
+      return;
+    }
+    if (host.isEmpty) {
+      setState(() => _error = '请输入登录主机');
+      return;
+    }
+    Navigator.of(
+      context,
+    ).pop((username: username, password: password, host: host));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AlertDialog(
+      title: const Text('新建用户'),
+      content: SizedBox(
+        width: 420,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: _usernameController,
+                autofocus: true,
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                decoration: const InputDecoration(
+                  labelText: '用户名',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _passwordController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: '密码',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+              if (_isMysql) ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _hostController,
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                  decoration: const InputDecoration(
+                    labelText: '登录主机',
+                    hintText: '例如 % 或 localhost',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+              ],
+              if (_error != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  _error!,
+                  style: TextStyle(
+                    color: theme.colorScheme.error,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('创建')),
+      ],
+    );
+  }
+}
+
 /// 新建数据库对话框。
 ///
 /// 输入数据库名，凭据支持两种模式：
@@ -1717,7 +2072,10 @@ class _CreateDatabaseDialogState extends State<_CreateDatabaseDialog> {
         labelText: label,
         border: const OutlineInputBorder(),
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
       ),
       child: SelectableText(
         value,
@@ -1735,10 +2093,12 @@ class _CreateDatabaseDialogState extends State<_CreateDatabaseDialog> {
       setState(() => _databaseError = '请输入数据库名称');
       return;
     }
-    final username =
-        _autoGenerate ? _generatedUsername : _usernameController.text.trim();
-    final password =
-        _autoGenerate ? _generatedPassword : _passwordController.text;
+    final username = _autoGenerate
+        ? _generatedUsername
+        : _usernameController.text.trim();
+    final password = _autoGenerate
+        ? _generatedPassword
+        : _passwordController.text;
     if (username.isEmpty) {
       setState(() => _databaseError = '请输入用户名');
       return;
@@ -1747,11 +2107,9 @@ class _CreateDatabaseDialogState extends State<_CreateDatabaseDialog> {
       setState(() => _databaseError = '请输入密码');
       return;
     }
-    Navigator.of(context).pop((
-      database: database,
-      username: username,
-      password: password,
-    ));
+    Navigator.of(
+      context,
+    ).pop((database: database, username: username, password: password));
   }
 
   @override
