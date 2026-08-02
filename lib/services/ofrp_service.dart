@@ -343,7 +343,7 @@ class OfrpService {
   /// `http://127.0.0.1:<port>/callback?code=xxx`。
   static String buildOAuthAuthorizeUrl(int port) {
     final redirect = Uri.encodeComponent('http://127.0.0.1:$port/callback');
-    return 'https://account.naids.com/api/api/oauth2/authorize'
+    return 'https://account.naids.com/oauth2/authorize'
         '?response_type=code&redirect_uri=$redirect&client_id=openfrp';
   }
 
