@@ -18,6 +18,7 @@ import '../services/frp_provider.dart';
 import '../services/frpc_manager.dart';
 import '../services/hayfrp_provider.dart';
 import '../services/ofrp_service.dart';
+import '../services/oauth_callback_server.dart';
 import '../services/openfrp_provider.dart';
 import '../services/sakurafrp_provider.dart';
 import '../state/app_state.dart';
@@ -780,7 +781,11 @@ class _TypeTag extends StatelessWidget {
   }
 }
 
-/// OpenFrp 登录对话框：粘贴面板中的 Authorization。
+/// OpenFrp 登录对话框。
+///
+/// 网页授权登录（OAuth 网页传参）：本地起回调服务器，
+/// 拉起浏览器到 Natayark ID 授权页，登录授权后自动带回凭据。
+/// 面板已不提供 Authorization 复制，故仅保留网页授权方式。
 class _OpenFrpLoginDialog extends StatefulWidget {
   const _OpenFrpLoginDialog();
 
@@ -789,28 +794,37 @@ class _OpenFrpLoginDialog extends StatefulWidget {
 }
 
 class _OpenFrpLoginDialogState extends State<_OpenFrpLoginDialog> {
-  final _authController = TextEditingController();
+  final OAuthCallbackServer _callback = OAuthCallbackServer();
+
   bool _loading = false;
   String? _error;
 
   @override
   void dispose() {
-    _authController.dispose();
+    _callback.stop();
     super.dispose();
   }
 
-  Future<void> _login() async {
-    final auth = _authController.text.trim();
-    if (auth.isEmpty) {
-      setState(() => _error = '请输入 Authorization');
-      return;
-    }
+  Future<void> _webLogin() async {
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      await OpenFrpProvider().login({'authorization': auth});
+      await _callback.start();
+      final url = OfrpService.buildOAuthAuthorizeUrl(_callback.port);
+      final launched = await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched) {
+        throw Exception('无法打开浏览器，请重试');
+      }
+      final code = await _callback.waitForCode();
+      if (code == null || code.isEmpty) {
+        throw Exception('等待网页授权超时或已取消');
+      }
+      final auth = await OfrpService.instance.exchangeOAuthCode(code);
       if (!mounted) return;
       Navigator.of(context).pop({'authorization': auth});
     } catch (e) {
@@ -819,7 +833,13 @@ class _OpenFrpLoginDialogState extends State<_OpenFrpLoginDialog> {
         _loading = false;
         _error = e.toString();
       });
+    } finally {
+      await _callback.stop();
     }
+  }
+
+  void _cancel() {
+    _callback.stop();
   }
 
   @override
@@ -834,45 +854,50 @@ class _OpenFrpLoginDialogState extends State<_OpenFrpLoginDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              TextField(
-                controller: _authController,
-                maxLines: 3,
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-                decoration: InputDecoration(
-                  labelText: 'Authorization',
-                  hintText: 'OPENFRPeyJ…',
-                  border: const OutlineInputBorder(),
-                  isDense: true,
-                  errorText: _error,
-                ),
-              ),
-              const SizedBox(height: 12),
               Text(
-                '获取方式：打开 OpenFrp 控制台 → 个人中心 → '
-                '「第三方客户端安全登录」→ 复制 Authorization 粘贴到此处。\n'
-                'Authorization 最长有效期 30 天，失效后需重新登录。',
+                '点击下方按钮后将在浏览器中打开 Natayark ID 授权页：\n'
+                '登录/授权完成后会自动跳回 IriX，无需复制粘贴任何内容。',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _error!,
+                  style: TextStyle(
+                    color: theme.colorScheme.error,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+              if (_loading) ...[
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    const SizedBox(width: 8),
+                    Text('等待浏览器授权…', style: theme.textTheme.bodySmall),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
       ),
       actions: [
         TextButton(
-          onPressed: _loading ? null : () => Navigator.of(context).pop(),
+          onPressed: _loading ? _cancel : () => Navigator.of(context).pop(),
           child: const Text('取消'),
         ),
         FilledButton(
-          onPressed: _loading ? null : _login,
-          child: _loading
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('登录'),
+          onPressed: _loading ? null : _webLogin,
+          child: const Text('在浏览器中登录'),
         ),
       ],
     );

@@ -335,6 +335,36 @@ class OfrpService {
     return OfrpSoftwareInfo.fromJson(json['data'] as Map<String, dynamic>);
   }
 
+  // === OAuth 网页登录 ===
+
+  /// 生成网页授权登录地址（Natayark ID OAuth2）。
+  ///
+  /// [port] 为本地回调服务器端口，授权完成后浏览器会跳转到
+  /// `http://127.0.0.1:<port>/callback?code=xxx`。
+  static String buildOAuthAuthorizeUrl(int port) {
+    final redirect = Uri.encodeComponent('http://127.0.0.1:$port/callback');
+    return 'https://account.naids.com/api/api/oauth2/authorize'
+        '?response_type=code&redirect_uri=$redirect&client_id=openfrp';
+  }
+
+  /// 用回调 code 换取 Authorization（读取响应头）。
+  Future<String> exchangeOAuthCode(String code) async {
+    final res = await http
+        .post(
+          Uri.parse('https://api.openfrp.net/oauth2/callback?code=$code'),
+          headers: {'User-Agent': _ua},
+        )
+        .timeout(const Duration(seconds: 30));
+    if (res.statusCode != 200) {
+      throw Exception('登录回调失败 HTTP ${res.statusCode}: ${_snippet(res.body)}');
+    }
+    final auth = res.headers['authorization'];
+    if (auth == null || auth.isEmpty) {
+      throw Exception('回调响应中未找到 Authorization，请重试');
+    }
+    return auth;
+  }
+
   static String _snippet(String body) {
     final trimmed = body.trim();
     return trimmed.length > 200 ? '${trimmed.substring(0, 200)}…' : trimmed;
