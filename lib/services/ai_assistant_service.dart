@@ -1,0 +1,598 @@
+// AI 助手服务
+// 基于 OpenAI 兼容 API（DeepSeek / OpenAI / Kimi / Ollama 等）的 agent 服务。
+//
+// 提供一组工具（读日志、查文件、启停实例、发送命令等）供模型调用：
+// - 只读工具（读日志/读文件/列表）直接执行，无需确认；
+// - 敏感工具（执行命令、启停实例）必须等待用户通过 resolvePermission 授权，
+//   用户拒绝时返回"用户拒绝了该操作"给模型。
+// 每次对话为一次 agent 循环：消息 → 模型 → 工具调用 → 结果回填 → 直至模型给出最终回答。
+
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:http/http.dart' as http;
+import 'package:path/path.dart' as p;
+
+import '../models/server_instance.dart';
+import '../services/ai_settings.dart';
+import '../services/log_persistence.dart';
+import '../state/app_state.dart';
+
+/// 工具权限级别。
+enum AiToolPermission {
+  /// 只读，直接执行。
+  read,
+
+  /// 敏感操作，需要用户授权。
+  elevated,
+}
+
+/// 对话过程中的事件类型。
+enum AiEventKind {
+  /// 用户消息（UI 自行构造）。
+  user,
+
+  /// 模型思考中（等待 API 响应）。
+  thinking,
+
+  /// 模型的文本回答。
+  text,
+
+  /// 模型请求调用工具。
+  toolCall,
+
+  /// 工具执行完成的结果。
+  toolResult,
+
+  /// 需要用户授权的敏感操作。
+  permission,
+
+  /// 发生错误。
+  error,
+}
+
+/// 对话过程中的一条事件。
+class AiEvent {
+  final AiEventKind kind;
+  final String? text;
+  final String? toolName;
+  final String? toolSummary;
+  final Map<String, dynamic>? toolArgs;
+  final String? error;
+
+  const AiEvent({
+    required this.kind,
+    this.text,
+    this.toolName,
+    this.toolSummary,
+    this.toolArgs,
+    this.error,
+  });
+
+  const AiEvent.user(String message)
+    : kind = AiEventKind.user,
+      text = message,
+      toolName = null,
+      toolSummary = null,
+      toolArgs = null,
+      error = null;
+
+  const AiEvent.thinking()
+    : kind = AiEventKind.thinking,
+      text = null,
+      toolName = null,
+      toolSummary = null,
+      toolArgs = null,
+      error = null;
+
+  const AiEvent.text(String message)
+    : kind = AiEventKind.text,
+      text = message,
+      toolName = null,
+      toolSummary = null,
+      toolArgs = null,
+      error = null;
+
+  const AiEvent.toolCall(String name, Map<String, dynamic> args, String summary)
+    : kind = AiEventKind.toolCall,
+      text = null,
+      toolName = name,
+      toolSummary = summary,
+      toolArgs = args,
+      error = null;
+
+  const AiEvent.toolResult(String name, String summary)
+    : kind = AiEventKind.toolResult,
+      text = null,
+      toolName = name,
+      toolSummary = summary,
+      toolArgs = null,
+      error = null;
+
+  const AiEvent.permission(
+    String name,
+    Map<String, dynamic> args,
+    String summary,
+  ) : kind = AiEventKind.permission,
+      text = null,
+      toolName = name,
+      toolSummary = summary,
+      toolArgs = args,
+      error = null;
+
+  const AiEvent.error(String message)
+    : kind = AiEventKind.error,
+      text = null,
+      toolName = null,
+      toolSummary = null,
+      toolArgs = null,
+      error = message;
+}
+
+/// 一个可被模型调用的工具。
+class AiTool {
+  final String name;
+  final String description;
+
+  /// JSON Schema 形式的参数定义。
+  final Map<String, dynamic> parameters;
+  final AiToolPermission permission;
+
+  /// 生成面向用户的中文描述（用于权限卡片与对话展示）。
+  final String Function(Map<String, dynamic> args) describe;
+  final Future<String> Function(AppState state, Map<String, dynamic> args)
+  handler;
+
+  const AiTool({
+    required this.name,
+    required this.description,
+    required this.parameters,
+    required this.permission,
+    required this.describe,
+    required this.handler,
+  });
+}
+
+/// 一次 AI 对话会话。
+///
+/// 持有独立的对话历史与授权状态；同一应用可有多个会话
+/// （导航栏 AI 页与实例详情页侧栏互不干扰）。
+class AiConversation {
+  AiConversation(this.service);
+
+  final AiAssistantService service;
+
+  /// 对话历史（OpenAI messages 格式）。
+  final List<Map<String, dynamic>> _messages = [];
+
+  /// 待用户授权的 completer；为 null 表示当前无待授权操作。
+  Completer<bool>? _permissionCompleter;
+
+  bool _running = false;
+  bool _cancelled = false;
+
+  /// 当前是否在运行一轮对话。
+  bool get running => _running;
+
+  /// 是否有待用户授权的敏感操作。
+  bool get hasPendingPermission => _permissionCompleter != null;
+
+  /// 清空对话历史。
+  void resetConversation() {
+    _messages.clear();
+    _cancelled = false;
+  }
+
+  /// 停止当前对话（待授权的操作视为拒绝）。
+  void cancel() {
+    _cancelled = true;
+    _permissionCompleter?.complete(false);
+    _permissionCompleter = null;
+  }
+
+  /// 用户对敏感操作授权：true 允许，false 拒绝。
+  void resolvePermission(bool allowed) {
+    _permissionCompleter?.complete(allowed);
+    _permissionCompleter = null;
+  }
+
+  /// 运行一轮对话：用户消息 → agent 循环 → 最终回答。
+  ///
+  /// [emit] 在每产生一个事件时回调（UI 刷新用）。
+  /// 敏感工具调用会先发出 [AiEventKind.permission] 事件并挂起，
+  /// 等待 [resolvePermission] 后才继续。
+  Future<void> runTurn(
+    AppState state,
+    String userText, {
+    required void Function(AiEvent event) emit,
+  }) async {
+    if (_running) return;
+    _running = true;
+    _cancelled = false;
+    _messages.add({'role': 'user', 'content': userText});
+    try {
+      var iterations = 0;
+      while (!_cancelled && iterations < 12) {
+        iterations++;
+        emit(const AiEvent.thinking());
+        final message = await service._chatCompletion(_messages);
+        if (message == null) {
+          emit(const AiEvent.error('模型无响应（choices 为空）'));
+          break;
+        }
+        // 保留完整 assistant 消息（含 tool_calls）作为上下文。
+        _messages.add(message);
+
+        final content = message['content'] as String?;
+        if (content != null && content.trim().isNotEmpty) {
+          emit(AiEvent.text(content));
+        }
+
+        final toolCalls = message['tool_calls'] as List?;
+        if (toolCalls == null || toolCalls.isEmpty) break;
+
+        for (final tc in toolCalls) {
+          if (_cancelled) break;
+          final fn =
+              (tc as Map<String, dynamic>)['function'] as Map<String, dynamic>;
+          final name = fn['name'] as String? ?? '?';
+          final args = AiAssistantService.parseArgs(fn['arguments']);
+          final tool = service.tools.where((t) => t.name == name).firstOrNull;
+
+          if (tool == null) {
+            _messages.add({
+              'role': 'tool',
+              'tool_call_id': tc['id'],
+              'content': '未知工具: $name',
+            });
+            emit(AiEvent.toolResult(name, '未知工具，已忽略'));
+            continue;
+          }
+
+          emit(AiEvent.toolCall(name, args, tool.describe(args)));
+
+          String result;
+          if (tool.permission == AiToolPermission.elevated) {
+            _permissionCompleter = Completer<bool>();
+            emit(AiEvent.permission(name, args, tool.describe(args)));
+            final allowed = await _permissionCompleter!.future;
+            _permissionCompleter = null;
+            if (_cancelled || !allowed) {
+              result = '用户拒绝了该操作: ${tool.describe(args)}';
+            } else {
+              result = await service._safeHandle(tool, state, args);
+            }
+          } else {
+            result = await service._safeHandle(tool, state, args);
+          }
+
+          _messages.add({
+            'role': 'tool',
+            'tool_call_id': tc['id'],
+            'content': result,
+          });
+          emit(AiEvent.toolResult(name, result));
+        }
+      }
+      if (_cancelled) {
+        emit(const AiEvent.text('已停止。'));
+      }
+    } catch (e) {
+      emit(AiEvent.error(e.toString()));
+    } finally {
+      _running = false;
+    }
+  }
+}
+
+/// AI 助手服务（单例）。
+class AiAssistantService {
+  static final AiAssistantService instance = AiAssistantService._();
+  AiAssistantService._();
+
+  /// 全部可用工具。
+  final List<AiTool> tools = _buildTools();
+
+  /// 创建新的独立会话。
+  AiConversation createConversation() => AiConversation(this);
+
+  Future<Map<String, dynamic>?> _chatCompletion(
+    List<Map<String, dynamic>> messages,
+  ) async {
+    final baseUrl = await AiSettings.getBaseUrl();
+    final apiKey = await AiSettings.getApiKey();
+    final model = await AiSettings.getModel();
+
+    var url = baseUrl.trim();
+    if (url.isEmpty) throw Exception('未配置 AI 服务地址');
+    if (!url.endsWith('/chat/completions')) {
+      url = '${url.replaceAll(RegExp(r'/+$'), '')}/chat/completions';
+    }
+
+    final headers = {
+      'Content-Type': 'application/json',
+      if (apiKey.isNotEmpty) 'Authorization': 'Bearer $apiKey',
+    };
+    final body = jsonEncode({
+      'model': model,
+      'messages': messages,
+      'tools': [
+        for (final t in tools)
+          {
+            'type': 'function',
+            'function': {
+              'name': t.name,
+              'description': t.description,
+              'parameters': t.parameters,
+            },
+          },
+      ],
+      'tool_choice': 'auto',
+    });
+
+    final res = await http
+        .post(Uri.parse(url), headers: headers, body: body)
+        .timeout(const Duration(seconds: 120));
+    if (res.statusCode != 200) {
+      throw Exception('API ${res.statusCode}: ${_snippet(res.body)}');
+    }
+    final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    final choices = json['choices'] as List?;
+    if (choices == null || choices.isEmpty) return null;
+    final message = Map<String, dynamic>.from(
+      (choices.first as Map)['message'] as Map,
+    );
+    return message;
+  }
+
+  Future<String> _safeHandle(AiTool tool, AppState state, Map args) async {
+    try {
+      final result = await tool.handler(state, Map<String, dynamic>.from(args));
+      return _truncate(result, 8000);
+    } catch (e) {
+      return '工具执行失败: $e';
+    }
+  }
+
+  static Map<String, dynamic> parseArgs(Object? raw) {
+    if (raw is! String || raw.trim().isEmpty) return {};
+    try {
+      final decoded = jsonDecode(raw);
+      return decoded is Map<String, dynamic> ? decoded : {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static String _snippet(String body) {
+    final trimmed = body.trim();
+    return trimmed.length > 300 ? '${trimmed.substring(0, 300)}…' : trimmed;
+  }
+
+  static String _truncate(String text, int maxChars) {
+    if (text.length <= maxChars) return text;
+    return '${text.substring(0, maxChars)}\n…(已截断 ${text.length - maxChars} 字符)';
+  }
+
+  // === 工具实现 ===
+
+  /// 将相对路径解析到实例根目录内，越界时抛异常。
+  static String _resolvePath(ServerInstance instance, String relative) {
+    final root = p.normalize(p.absolute(instance.rootPath));
+    final target = p.normalize(p.join(root, relative));
+    if (!target.startsWith(root)) {
+      throw Exception('路径越界，不允许访问根目录之外: $relative');
+    }
+    return target;
+  }
+
+  static List<AiTool> _buildTools() => [
+    AiTool(
+      name: 'list_instances',
+      description: '列出所有服务器实例：ID、名称、运行状态与根目录路径',
+      parameters: {'type': 'object', 'properties': {}, 'required': []},
+      permission: AiToolPermission.read,
+      describe: (_) => '查看实例列表',
+      handler: (state, _) async {
+        final lines = [
+          for (final i in state.instances)
+            '${i.id} | ${i.name} | ${i.status.label} | 根目录: ${i.rootPath}',
+        ];
+        if (lines.isEmpty) return '没有已创建的实例';
+        return lines.join('\n');
+      },
+    ),
+    AiTool(
+      name: 'read_logs',
+      description: '读取指定实例的服务器日志，默认最近 200 行（tail 参数可指定行数）',
+      parameters: {
+        'type': 'object',
+        'properties': {
+          'instance_id': {'type': 'string', 'description': '实例 ID'},
+          'tail': {'type': 'integer', 'description': '读取最近 N 行，默认 200'},
+        },
+        'required': ['instance_id'],
+      },
+      permission: AiToolPermission.read,
+      describe: (a) => '读取日志 · ${a['instance_id']} · 最近 ${a['tail'] ?? 200} 行',
+      handler: (state, a) async {
+        final id = a['instance_id'].toString();
+        final tail = (a['tail'] as num?)?.toInt() ?? 200;
+        final log = await LogPersistence.readLogs(id, tail: tail);
+        if (log == null) return '该实例没有日志文件';
+        return '最近 $tail 行日志（共 ${log.length} 字符）:\n$log';
+      },
+    ),
+    AiTool(
+      name: 'search_logs',
+      description: '在指定实例的日志中搜索匹配关键词或正则表达式的行（大小写不敏感）',
+      parameters: {
+        'type': 'object',
+        'properties': {
+          'instance_id': {'type': 'string', 'description': '实例 ID'},
+          'pattern': {'type': 'string', 'description': '关键词或正则表达式'},
+          'tail': {'type': 'integer', 'description': '在最近 N 行内搜索，默认 500'},
+        },
+        'required': ['instance_id', 'pattern'],
+      },
+      permission: AiToolPermission.read,
+      describe: (a) => '搜索日志 · ${a['instance_id']} · 关键词 "${a['pattern']}"',
+      handler: (state, a) async {
+        final id = a['instance_id'].toString();
+        final pattern = a['pattern'].toString();
+        final tail = (a['tail'] as num?)?.toInt() ?? 500;
+        final log = await LogPersistence.readLogs(id, tail: tail);
+        if (log == null) return '该实例没有日志文件';
+        final regex = RegExp(pattern, caseSensitive: false);
+        final matches = <String>[];
+        var lineNo = 0;
+        for (final line in log.split('\n')) {
+          lineNo++;
+          if (regex.hasMatch(line)) {
+            matches.add('[$lineNo] $line');
+            if (matches.length >= 60) break;
+          }
+        }
+        if (matches.isEmpty) return '未找到匹配 "$pattern" 的行';
+        return '匹配 ${matches.length} 行（可能截断）:\n${matches.join('\n')}';
+      },
+    ),
+    AiTool(
+      name: 'list_files',
+      description: '列出实例根目录（或指定子目录）中的文件与文件夹',
+      parameters: {
+        'type': 'object',
+        'properties': {
+          'instance_id': {'type': 'string', 'description': '实例 ID'},
+          'path': {'type': 'string', 'description': '相对根目录的子目录路径，默认 "" 表示根目录'},
+        },
+        'required': ['instance_id'],
+      },
+      permission: AiToolPermission.read,
+      describe: (a) => '查看文件 · ${a['instance_id']} · 目录 "${a['path'] ?? ''}"',
+      handler: (state, a) async {
+        final id = a['instance_id'].toString();
+        final instance = state.instances.where((i) => i.id == id).firstOrNull;
+        if (instance == null) return '实例不存在';
+        final dir = Directory(
+          _resolvePath(instance, a['path']?.toString() ?? ''),
+        );
+        if (!await dir.exists()) return '目录不存在: ${dir.path}';
+        final entries = dir.listSync(recursive: false)
+          ..sort((x, y) {
+            final xd = x is Directory;
+            final yd = y is Directory;
+            if (xd != yd) return xd ? -1 : 1;
+            return p
+                .basename(x.path)
+                .toLowerCase()
+                .compareTo(p.basename(y.path).toLowerCase());
+          });
+        final lines = [
+          for (final e in entries.take(200))
+            '${e is Directory ? '[目录]' : '[文件]'} ${p.basename(e.path)}',
+        ];
+        if (lines.isEmpty) return '目录为空: ${dir.path}';
+        if (entries.length > 200) {
+          lines.add('…(共 ${entries.length} 项，仅显示前 200)');
+        }
+        lines.insert(0, '目录: ${dir.path}');
+        return lines.join('\n');
+      },
+    ),
+    AiTool(
+      name: 'read_file',
+      description: '读取实例目录内的文本文件内容（超过 60KB 只返回开头部分）',
+      parameters: {
+        'type': 'object',
+        'properties': {
+          'instance_id': {'type': 'string', 'description': '实例 ID'},
+          'path': {
+            'type': 'string',
+            'description': '相对根目录的文件路径，例如 logs/latest.log',
+          },
+        },
+        'required': ['instance_id', 'path'],
+      },
+      permission: AiToolPermission.read,
+      describe: (a) => '读取文件 · ${a['instance_id']} · "${a['path']}"',
+      handler: (state, a) async {
+        final id = a['instance_id'].toString();
+        final instance = state.instances.where((i) => i.id == id).firstOrNull;
+        if (instance == null) return '实例不存在';
+        final file = File(_resolvePath(instance, a['path'].toString()));
+        if (!await file.exists()) return '文件不存在: ${file.path}';
+        final length = await file.length();
+        if (length > 60 * 1024) {
+          return '文件过大（$length 字节），仅读取开头部分:\n'
+              '${await file.openRead(0, 60 * 1024).transform(utf8.decoder).join()}';
+        }
+        return await file.readAsString();
+      },
+    ),
+    AiTool(
+      name: 'send_server_command',
+      description: '向运行中的服务器控制台发送命令（如 op、whitelist、say、give 等）',
+      parameters: {
+        'type': 'object',
+        'properties': {
+          'instance_id': {'type': 'string', 'description': '实例 ID'},
+          'command': {'type': 'string', 'description': '要执行的命令内容'},
+        },
+        'required': ['instance_id', 'command'],
+      },
+      permission: AiToolPermission.elevated,
+      describe: (a) => '发送命令 · ${a['instance_id']} · "${a['command']}"',
+      handler: (state, a) async {
+        final id = a['instance_id'].toString();
+        final command = a['command'].toString();
+        final instance = state.instances.where((i) => i.id == id).firstOrNull;
+        if (instance == null) return '实例不存在';
+        if (!instance.status.isActive) return '实例未运行，无法发送命令';
+        state.sendCommand(id, command);
+        return '命令已发送到 ${instance.name}: $command';
+      },
+    ),
+    AiTool(
+      name: 'start_instance',
+      description: '启动指定服务器实例',
+      parameters: {
+        'type': 'object',
+        'properties': {
+          'instance_id': {'type': 'string', 'description': '实例 ID'},
+        },
+        'required': ['instance_id'],
+      },
+      permission: AiToolPermission.elevated,
+      describe: (a) => '启动实例 · ${a['instance_id']}',
+      handler: (state, a) async {
+        final id = a['instance_id'].toString();
+        final instance = state.instances.where((i) => i.id == id).firstOrNull;
+        if (instance == null) return '实例不存在';
+        await state.startInstance(id);
+        return '实例已启动: ${instance.name}';
+      },
+    ),
+    AiTool(
+      name: 'stop_instance',
+      description: '优雅停止指定服务器实例（向控制台发送 stop）',
+      parameters: {
+        'type': 'object',
+        'properties': {
+          'instance_id': {'type': 'string', 'description': '实例 ID'},
+        },
+        'required': ['instance_id'],
+      },
+      permission: AiToolPermission.elevated,
+      describe: (a) => '停止实例 · ${a['instance_id']}',
+      handler: (state, a) async {
+        final id = a['instance_id'].toString();
+        final instance = state.instances.where((i) => i.id == id).firstOrNull;
+        if (instance == null) return '实例不存在';
+        await state.stopInstance(id);
+        return '已向 ${instance.name} 发送停止命令';
+      },
+    ),
+  ];
+}

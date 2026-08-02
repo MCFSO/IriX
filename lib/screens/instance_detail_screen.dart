@@ -10,11 +10,13 @@ import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
 import '../models/server_instance.dart';
+import '../services/ai_assistant_service.dart';
 import '../services/backup_ffi.dart';
 import '../services/backup_settings.dart';
 import '../services/background_tasks.dart';
 import '../state/app_state.dart';
 import '../utils/apple_widgets.dart';
+import 'ai_screen.dart';
 import 'config_editor_screen.dart';
 import 'file_manager_screen.dart';
 import 'plugins_tab.dart';
@@ -62,9 +64,18 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
   /// 后台文件任务管理器。
   final BackgroundTaskManager _taskManager = BackgroundTaskManager();
 
+  /// 右侧 AI 侧栏是否展开。
+  bool _showAi = false;
+
+  /// AI 侧栏的会话状态（页面打开期间保持，收起再展开不丢失）。
+  late final AiChatController _aiController;
+
   @override
   void initState() {
     super.initState();
+    _aiController = AiChatController(
+      conversation: AiAssistantService.instance.createConversation(),
+    );
     _subscribeLogs();
     context.read<AppState>().addListener(_onAppStateChanged);
   }
@@ -83,6 +94,7 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
   @override
   void dispose() {
     context.read<AppState>().removeListener(_onAppStateChanged);
+    _aiController.dispose();
     _logSub?.cancel();
     _scrollController.dispose();
     _commandController.dispose();
@@ -129,8 +141,7 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
     if (instance == null) return;
     final status = instance.status;
 
-    if (status == InstanceStatus.starting ||
-        status == InstanceStatus.stopped) {
+    if (status == InstanceStatus.starting || status == InstanceStatus.stopped) {
       _stopClicked = false;
     }
 
@@ -159,9 +170,9 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
       await context.read<AppState>().startInstance(widget.instanceId);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('启动失败：$e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('启动失败：$e')));
     }
   }
 
@@ -171,9 +182,9 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
       await context.read<AppState>().restartInstance(widget.instanceId);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('重启失败：$e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('重启失败：$e')));
     }
   }
 
@@ -195,6 +206,15 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: Text(instance.name),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.smart_toy_outlined),
+              isSelected: _showAi,
+              tooltip: _showAi ? '关闭 AI 助手' : '打开 AI 助手',
+              onPressed: () => setState(() => _showAi = !_showAi),
+            ),
+            const SizedBox(width: 4),
+          ],
           bottom: const TabBar(
             tabs: [
               Tab(icon: Icon(Icons.dashboard), text: '总览'),
@@ -206,51 +226,58 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
             ],
           ),
         ),
-        body: TabBarView(
+        body: Row(
           children: [
-            // Tab 1: 总览 — 日志控制台 + 生命周期控制
-            Selector<AppState, InstanceStatus>(
-              selector: (_, s) => s.instances
-                  .firstWhere(
-                    (e) => e.id == widget.instanceId,
-                    orElse: () => instance,
-                  )
-                  .status,
-              builder: (context, status, _) {
-                return Row(
-                  children: [
-                    // 左侧：日志 + 命令输入
-                    Expanded(
-                      flex: 3,
-                      child: _buildLogPanel(),
-                    ),
-                    const VerticalDivider(width: 1),
-                    // 右侧：生命周期控制
-                    Expanded(
-                      flex: 1,
-                      child: _buildControlPanel(status),
-                    ),
-                  ],
-                );
-              },
+            Expanded(
+              child: TabBarView(
+                children: [
+                  // Tab 1: 总览 — 日志控制台 + 生命周期控制
+                  Selector<AppState, InstanceStatus>(
+                    selector: (_, s) => s.instances
+                        .firstWhere(
+                          (e) => e.id == widget.instanceId,
+                          orElse: () => instance,
+                        )
+                        .status,
+                    builder: (context, status, _) {
+                      return Row(
+                        children: [
+                          // 左侧：日志 + 命令输入
+                          Expanded(flex: 3, child: _buildLogPanel()),
+                          const VerticalDivider(width: 1),
+                          // 右侧：生命周期控制
+                          Expanded(flex: 1, child: _buildControlPanel(status)),
+                        ],
+                      );
+                    },
+                  ),
+                  // Tab 2: 配置 — 配置文件编辑器
+                  ConfigEditorScreen(rootPath: instance.rootPath),
+                  // Tab 3: 插件/Mod — 卡片网格
+                  PluginsTab(rootPath: instance.rootPath),
+                  // Tab 4: 文件管理
+                  FileManagerScreen(rootPath: instance.rootPath),
+                  // Tab 5: 备份 — 文件选择与压缩
+                  _BackupTab(
+                    rootPath: instance.rootPath,
+                    instanceId: widget.instanceId,
+                  ),
+                  // Tab 6: 设置 — 实例名称 + 启动命令
+                  _SettingsTab(instanceId: widget.instanceId),
+                ],
+              ),
             ),
-            // Tab 2: 配置 — 配置文件编辑器
-            ConfigEditorScreen(rootPath: instance.rootPath),
-            // Tab 3: 插件/Mod — 卡片网格
-            PluginsTab(rootPath: instance.rootPath),
-            // Tab 4: 文件管理
-            FileManagerScreen(
-              rootPath: instance.rootPath,
-            ),
-            // Tab 5: 备份 — 文件选择与压缩
-            _BackupTab(
-              rootPath: instance.rootPath,
-              instanceId: widget.instanceId,
-            ),
-            // Tab 6: 设置 — 实例名称 + 启动命令
-            _SettingsTab(
-              instanceId: widget.instanceId,
-            ),
+            // 右侧 AI 助手侧栏（可手动收起）
+            if (_showAi) ...[
+              const VerticalDivider(width: 1),
+              SizedBox(
+                width: 380,
+                child: AiChatPanel(
+                  controller: _aiController,
+                  onClose: () => setState(() => _showAi = false),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -296,7 +323,8 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
                     border: const OutlineInputBorder(),
                     isDense: true,
                     // 半透明背景
-                    fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                    fillColor: theme.colorScheme.surfaceContainerHighest
+                        .withValues(alpha: 0.5),
                     filled: true,
                   ),
                   onSubmitted: (_) => _sendCommand(),
@@ -329,18 +357,14 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
           const SizedBox(height: 16),
           // 启动按钮：仅在「已关闭」可用
           FilledButton.icon(
-            onPressed: isStopped
-                ? _startInstance
-                : null,
+            onPressed: isStopped ? _startInstance : null,
             icon: const Icon(Icons.play_arrow),
             label: const Text('启动'),
           ),
           const SizedBox(height: 12),
           // 重启按钮：仅在「启动中」可用
           FilledButton.tonalIcon(
-            onPressed: isActive
-                ? _restartInstance
-                : null,
+            onPressed: isActive ? _restartInstance : null,
             icon: const Icon(Icons.refresh),
             label: const Text('重启'),
           ),
@@ -350,8 +374,7 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
             FilledButton.icon(
               onPressed: isActive
                   ? () {
-                      context.read<AppState>()
-                          .stopInstance(widget.instanceId);
+                      context.read<AppState>().stopInstance(widget.instanceId);
                       setState(() => _stopClicked = true);
                     }
                   : null,
@@ -365,8 +388,8 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
                 foregroundColor: theme.colorScheme.onError,
               ),
               // 在关闭流程期间及已关闭后均可点击，以备随时强制终止。
-              onPressed: () => context.read<AppState>()
-                  .forceStopInstance(widget.instanceId),
+              onPressed: () =>
+                  context.read<AppState>().forceStopInstance(widget.instanceId),
               icon: const Icon(Icons.dangerous),
               label: const Text('强制停止'),
             ),
@@ -380,10 +403,7 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
                 children: [
                   Text('当前状态', style: theme.textTheme.labelSmall),
                   const SizedBox(height: 4),
-                  Text(
-                    status.label,
-                    style: theme.textTheme.bodyLarge,
-                  ),
+                  Text(status.label, style: theme.textTheme.bodyLarge),
                 ],
               ),
             ),
@@ -474,15 +494,24 @@ class _BackupTabState extends State<_BackupTab> {
   /// 弹出进度对话框，调用 FFI 压缩函数，支持取消。
   Future<void> _startBackup() async {
     if (_selectedIndices.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请至少选择一个文件或文件夹')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请至少选择一个文件或文件夹')));
       return;
     }
 
-    final selectedNames = _selectedIndices.map((i) => p.basename(_files[i].path)).toList();
-    final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
-    final outputPath = p.join(p.dirname(widget.rootPath), '${p.basename(widget.rootPath)}_backup_$timestamp.zip');
+    final selectedNames = _selectedIndices
+        .map((i) => p.basename(_files[i].path))
+        .toList();
+    final timestamp = DateTime.now()
+        .toIso8601String()
+        .replaceAll(':', '-')
+        .split('.')
+        .first;
+    final outputPath = p.join(
+      p.dirname(widget.rootPath),
+      '${p.basename(widget.rootPath)}_backup_$timestamp.zip',
+    );
 
     setState(() {
       _backupInProgress = true;
@@ -492,8 +521,7 @@ class _BackupTabState extends State<_BackupTab> {
     // 尝试调用 Rust FFI (在后台 isolate 执行，不阻塞 UI)
     try {
       final backupService = BackupService.instance;
-      final compressionLevel =
-          await BackupSettings.getLevel(widget.instanceId);
+      final compressionLevel = await BackupSettings.getLevel(widget.instanceId);
 
       final result = await backupService.backup(
         widget.rootPath,
@@ -513,26 +541,26 @@ class _BackupTabState extends State<_BackupTab> {
       if (!mounted) return;
 
       if (result.isSuccess) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('备份已保存到 $outputPath')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('备份已保存到 $outputPath')));
       } else if (result.isCancelled) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('备份已取消')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('备份已取消')));
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(
-                  '备份失败: ${result.error ?? '错误码 ${result.code}'}')),
+            content: Text('备份失败: ${result.error ?? '错误码 ${result.code}'}'),
+          ),
         );
       }
     } catch (e) {
       // isolate 启动失败等异常
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('备份失败: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('备份失败: $e')));
       }
     } finally {
       if (mounted) {
@@ -592,7 +620,9 @@ class _BackupTabState extends State<_BackupTab> {
                     return CheckboxListTile(
                       value: isSelected,
                       onChanged: (_) => _toggleSelection(index),
-                      secondary: Icon(isDir ? Icons.folder : Icons.insert_drive_file),
+                      secondary: Icon(
+                        isDir ? Icons.folder : Icons.insert_drive_file,
+                      ),
                       title: Text(name),
                       subtitle: Text(isDir ? '文件夹' : '文件'),
                     );
@@ -634,10 +664,7 @@ class _BackupTabState extends State<_BackupTab> {
                 style: const TextStyle(fontSize: 16),
               ),
               const SizedBox(height: 24),
-              OutlinedButton(
-                onPressed: _cancelBackup,
-                child: const Text('取消'),
-              ),
+              OutlinedButton(onPressed: _cancelBackup, child: const Text('取消')),
             ],
           ),
         ),
@@ -666,7 +693,9 @@ class _StartCommandCardState extends State<_StartCommandCard> {
   @override
   void initState() {
     super.initState();
-    final instance = context.read<AppState>().instances
+    final instance = context
+        .read<AppState>()
+        .instances
         .where((e) => e.id == widget.instanceId)
         .firstOrNull;
     _controller = TextEditingController(text: instance?.startCommand ?? '');
@@ -693,7 +722,8 @@ class _StartCommandCardState extends State<_StartCommandCard> {
 
   /// 拖动滑块时，更新启动命令中的 -Xmx 值。
   void _onMemoryChanged(double gb) {
-    final xmxArg = '-Xmx${gb == gb.truncateToDouble() ? gb.toInt().toString() : gb.toStringAsFixed(1)}G';
+    final xmxArg =
+        '-Xmx${gb == gb.truncateToDouble() ? gb.toInt().toString() : gb.toStringAsFixed(1)}G';
     final text = _controller.text;
     String newText;
     if (_xmxRegex.hasMatch(text)) {
@@ -715,9 +745,9 @@ class _StartCommandCardState extends State<_StartCommandCard> {
     if (cmd.isEmpty) return;
     context.read<AppState>().updateStartCommand(widget.instanceId, cmd);
     setState(() => _dirty = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('启动命令已更新')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('启动命令已更新')));
   }
 
   @override
@@ -743,21 +773,24 @@ class _StartCommandCardState extends State<_StartCommandCard> {
                     children: [
                       Row(
                         children: [
-          const Text('最大内存', style: TextStyle(fontWeight: FontWeight.w500)),
-          const Spacer(),
-          Text(
-            hasXmx
-                ? (displayGb == displayGb.truncateToDouble()
-                    ? '${displayGb.toInt()} GB'
-                    : '${displayGb.toStringAsFixed(1)} GB')
-                : '未设置',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: hasXmx
-                  ? Theme.of(context).colorScheme.primary
-                  : Colors.grey,
-            ),
-          ),
+                          const Text(
+                            '最大内存',
+                            style: TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                          const Spacer(),
+                          Text(
+                            hasXmx
+                                ? (displayGb == displayGb.truncateToDouble()
+                                      ? '${displayGb.toInt()} GB'
+                                      : '${displayGb.toStringAsFixed(1)} GB')
+                                : '未设置',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: hasXmx
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Colors.grey,
+                            ),
+                          ),
                         ],
                       ),
                       Slider(
@@ -839,9 +872,9 @@ class _SettingsTab extends StatelessWidget {
     if (result == null || !result.confirmed) return;
     if (!context.mounted) return;
     await context.read<AppState>().removeInstance(
-          instanceId,
-          deleteFiles: result.deleteFiles,
-        );
+      instanceId,
+      deleteFiles: result.deleteFiles,
+    );
     if (!context.mounted) return;
     Navigator.of(context).pop();
   }
@@ -873,7 +906,10 @@ class _SettingsTab extends StatelessWidget {
 
 /// 删除确认结果。
 class _DeleteConfirmation {
-  const _DeleteConfirmation({required this.confirmed, required this.deleteFiles});
+  const _DeleteConfirmation({
+    required this.confirmed,
+    required this.deleteFiles,
+  });
 
   final bool confirmed;
   final bool deleteFiles;
@@ -954,7 +990,9 @@ class _InstanceNameCardState extends State<_InstanceNameCard> {
   @override
   void initState() {
     super.initState();
-    final instance = context.read<AppState>().instances
+    final instance = context
+        .read<AppState>()
+        .instances
         .where((e) => e.id == widget.instanceId)
         .firstOrNull;
     _controller = TextEditingController(text: instance?.name ?? '');
@@ -971,9 +1009,9 @@ class _InstanceNameCardState extends State<_InstanceNameCard> {
     if (name.isEmpty) return;
     context.read<AppState>().renameInstance(widget.instanceId, name);
     setState(() => _dirty = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('实例名称已更新')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('实例名称已更新')));
   }
 
   @override
@@ -1100,10 +1138,7 @@ class _CompressionSettingsCardState extends State<_CompressionSettingsCard> {
             const SizedBox(height: 4),
             Text(
               '级别越低压缩越快但文件更大，级别越高压缩比越好但更慢。0=不压缩(仅存储)，6=标准，9=最佳压缩比。',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
             ),
           ],
         ),
@@ -1126,7 +1161,10 @@ class _EulaCard extends StatefulWidget {
 }
 
 class _EulaCardState extends State<_EulaCard> {
-  static final _eulaRegex = RegExp(r'^\s*eula\s*=\s*(true|false)\s*$', caseSensitive: false);
+  static final _eulaRegex = RegExp(
+    r'^\s*eula\s*=\s*(true|false)\s*$',
+    caseSensitive: false,
+  );
 
   bool _accepted = false;
   bool _fileExists = true;
@@ -1140,7 +1178,9 @@ class _EulaCardState extends State<_EulaCard> {
 
   /// 获取当前实例的 eula.txt 路径。
   String _eulaPath() {
-    final instance = context.read<AppState>().instances
+    final instance = context
+        .read<AppState>()
+        .instances
         .where((e) => e.id == widget.instanceId)
         .firstOrNull;
     return p.join(instance?.rootPath ?? '', 'eula.txt');
@@ -1194,7 +1234,8 @@ class _EulaCardState extends State<_EulaCard> {
       if (!replaced) lines.add('eula=$value');
       content = lines.join('\n');
     } else {
-      content = '#By changing the setting below to TRUE you are indicating your agreement to our EULA (https://account.mojang.com/documents/minecraft_eula).\neula=$value';
+      content =
+          '#By changing the setting below to TRUE you are indicating your agreement to our EULA (https://account.mojang.com/documents/minecraft_eula).\neula=$value';
     }
     try {
       file.writeAsStringSync(content);
@@ -1209,9 +1250,9 @@ class _EulaCardState extends State<_EulaCard> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('写入 eula.txt 失败: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('写入 eula.txt 失败: $e')));
     }
   }
 
@@ -1261,11 +1302,7 @@ class _EulaCardState extends State<_EulaCard> {
               value: _accepted,
               onChanged: (v) => _setEula(v),
               title: const Text('同意 Mojang EULA'),
-              subtitle: Text(
-                _accepted
-                    ? '已同意，服务器可正常启动'
-                    : '未同意，服务器启动后将自动退出',
-              ),
+              subtitle: Text(_accepted ? '已同意，服务器可正常启动' : '未同意，服务器启动后将自动退出'),
               contentPadding: EdgeInsets.zero,
             ),
             const SizedBox(height: 4),

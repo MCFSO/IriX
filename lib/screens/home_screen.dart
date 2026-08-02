@@ -9,6 +9,7 @@ import '../services/db_page_settings.dart';
 import '../services/download_settings.dart';
 import '../state/app_state.dart';
 import '../utils/apple_widgets.dart';
+import 'ai_screen.dart';
 import 'database_screen.dart';
 import 'instance_detail_screen.dart';
 import 'marketplace_screen.dart';
@@ -53,6 +54,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 selectedIcon: Icon(Icons.dns),
                 label: Text('数据库'),
               ),
+              NavigationRailDestination(
+                icon: Icon(Icons.smart_toy_outlined),
+                selectedIcon: Icon(Icons.smart_toy),
+                label: Text('AI'),
+              ),
             ],
           ),
           const VerticalDivider(thickness: 1, width: 1),
@@ -71,6 +77,8 @@ class _HomeScreenState extends State<HomeScreen> {
         return const MarketplaceScreen();
       case 2:
         return const DatabaseScreen();
+      case 3:
+        return const AiScreen();
       default:
         return _buildInstancesPage();
     }
