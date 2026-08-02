@@ -23,33 +23,33 @@ class TrashItem {
   });
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'originalPath': originalPath,
-        'trashPath': trashPath,
-        'deletedAt': deletedAt.toIso8601String(),
-      };
+    'id': id,
+    'originalPath': originalPath,
+    'trashPath': trashPath,
+    'deletedAt': deletedAt.toIso8601String(),
+  };
 
   factory TrashItem.fromJson(Map<String, dynamic> map) => TrashItem(
-        id: map['id'] as String,
-        originalPath: map['originalPath'] as String,
-        trashPath: map['trashPath'] as String,
-        deletedAt: DateTime.parse(map['deletedAt'] as String),
-      );
+    id: map['id'] as String,
+    originalPath: map['originalPath'] as String,
+    trashPath: map['trashPath'] as String,
+    deletedAt: DateTime.parse(map['deletedAt'] as String),
+  );
 
   static TrashItem fromDbRow(Map<String, dynamic> row) => TrashItem(
-        id: row['id'] as String,
-        originalPath: row['original_path'] as String,
-        trashPath: row['trash_path'] as String,
-        deletedAt: DateTime.parse(row['deleted_at'] as String),
-      );
+    id: row['id'] as String,
+    originalPath: row['original_path'] as String,
+    trashPath: row['trash_path'] as String,
+    deletedAt: DateTime.parse(row['deleted_at'] as String),
+  );
 
   Map<String, dynamic> toDbRow(String rootPath) => {
-        'id': id,
-        'root_path': rootPath,
-        'original_path': originalPath,
-        'trash_path': trashPath,
-        'deleted_at': deletedAt.toIso8601String(),
-      };
+    'id': id,
+    'root_path': rootPath,
+    'original_path': originalPath,
+    'trash_path': trashPath,
+    'deleted_at': deletedAt.toIso8601String(),
+  };
 }
 
 class TrashStore {
@@ -63,10 +63,7 @@ class TrashStore {
     return '${now.toRadixString(36)}-$suffix';
   }
 
-  Future<void> moveToTrash(
-    String rootPath,
-    FileSystemEntity entity,
-  ) async {
+  Future<void> moveToTrash(String rootPath, FileSystemEntity entity) async {
     final trashDir = _trashDir(rootPath);
     final dir = Directory(trashDir);
     if (!await dir.exists()) {
@@ -90,8 +87,7 @@ class TrashStore {
 
   Future<void> restoreItem(String rootPath, String id) async {
     final items = await DatabaseManager.instance.getTrashItems(rootPath);
-    final itemRow =
-        items.where((e) => (e['id'] as String?) == id).firstOrNull;
+    final itemRow = items.where((e) => (e['id'] as String?) == id).firstOrNull;
     if (itemRow == null) return;
 
     final item = TrashItem.fromDbRow(itemRow);
@@ -110,8 +106,7 @@ class TrashStore {
 
   Future<void> permanentlyDelete(String rootPath, String id) async {
     final items = await DatabaseManager.instance.getTrashItems(rootPath);
-    final itemRow =
-        items.where((e) => (e['id'] as String?) == id).firstOrNull;
+    final itemRow = items.where((e) => (e['id'] as String?) == id).firstOrNull;
     if (itemRow == null) return;
 
     final item = TrashItem.fromDbRow(itemRow);
@@ -130,6 +125,35 @@ class TrashStore {
   Future<List<TrashItem>> getTrashItems(String rootPath) async {
     final rows = await DatabaseManager.instance.getTrashItems(rootPath);
     return rows.map(TrashItem.fromDbRow).toList();
+  }
+
+  /// 获取所有实例的回收站条目，按实例根目录分组。
+  Future<Map<String, List<TrashItem>>> getAllTrashItems() async {
+    final rows = await DatabaseManager.instance.getAllTrashItems();
+    final groups = <String, List<TrashItem>>{};
+    for (final row in rows) {
+      final rootPath = row['root_path'] as String;
+      groups.putIfAbsent(rootPath, () => []).add(TrashItem.fromDbRow(row));
+    }
+    return groups;
+  }
+
+  /// 清空所有实例的回收站。
+  Future<void> emptyAllTrash() async {
+    final groups = await getAllTrashItems();
+    for (final items in groups.values) {
+      for (final item in items) {
+        final entry = FileSystemEntity.typeSync(item.trashPath);
+        if (entry == FileSystemEntityType.notFound) continue;
+        final target = entry == FileSystemEntityType.directory
+            ? Directory(item.trashPath)
+            : File(item.trashPath);
+        try {
+          await target.delete(recursive: true);
+        } catch (_) {}
+      }
+    }
+    await DatabaseManager.instance.purgeAllTrashItems();
   }
 
   Future<void> emptyTrash(String rootPath) async {

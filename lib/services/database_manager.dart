@@ -78,9 +78,7 @@ class DatabaseManager {
         deleted_at TEXT NOT NULL
       )
     ''');
-    batch.execute(
-      'CREATE INDEX idx_trash_root_path ON trash_items(root_path)',
-    );
+    batch.execute('CREATE INDEX idx_trash_root_path ON trash_items(root_path)');
     batch.execute('''
       CREATE TABLE config_annotations (
         key TEXT PRIMARY KEY,
@@ -160,12 +158,7 @@ class DatabaseManager {
   Future<void> updateServer(String id, Map<String, dynamic> data) async {
     try {
       final db = await _database;
-      await db.update(
-        'servers',
-        data,
-        where: 'id = ?',
-        whereArgs: [id],
-      );
+      await db.update('servers', data, where: 'id = ?', whereArgs: [id]);
     } catch (e) {
       debugPrint('Failed to update server: $e');
     }
@@ -174,11 +167,7 @@ class DatabaseManager {
   Future<void> deleteServer(String id) async {
     try {
       final db = await _database;
-      await db.delete(
-        'servers',
-        where: 'id = ?',
-        whereArgs: [id],
-      );
+      await db.delete('servers', where: 'id = ?', whereArgs: [id]);
     } catch (e) {
       debugPrint('Failed to delete server: $e');
     }
@@ -200,6 +189,17 @@ class DatabaseManager {
     }
   }
 
+  /// 获取所有实例的回收站条目。
+  Future<List<Map<String, dynamic>>> getAllTrashItems() async {
+    try {
+      final db = await _database;
+      return await db.query('trash_items', orderBy: 'deleted_at DESC');
+    } catch (e) {
+      debugPrint('Failed to get all trash items: $e');
+      return [];
+    }
+  }
+
   Future<void> insertTrashItem(Map<String, dynamic> item) async {
     try {
       final db = await _database;
@@ -216,11 +216,7 @@ class DatabaseManager {
   Future<void> deleteTrashItem(String id) async {
     try {
       final db = await _database;
-      await db.delete(
-        'trash_items',
-        where: 'id = ?',
-        whereArgs: [id],
-      );
+      await db.delete('trash_items', where: 'id = ?', whereArgs: [id]);
     } catch (e) {
       debugPrint('Failed to delete trash item: $e');
     }
@@ -236,6 +232,16 @@ class DatabaseManager {
       );
     } catch (e) {
       debugPrint('Failed to delete all trash items: $e');
+    }
+  }
+
+  /// 清空所有实例的回收站元数据。
+  Future<void> purgeAllTrashItems() async {
+    try {
+      final db = await _database;
+      await db.delete('trash_items');
+    } catch (e) {
+      debugPrint('Failed to purge all trash items: $e');
     }
   }
 
@@ -257,11 +263,10 @@ class DatabaseManager {
   Future<void> insertAnnotation(String key, String value) async {
     try {
       final db = await _database;
-      await db.insert(
-        'config_annotations',
-        {'key': key, 'value': value},
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await db.insert('config_annotations', {
+        'key': key,
+        'value': value,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     } catch (e) {
       debugPrint('Failed to insert annotation: $e');
     }
@@ -320,12 +325,7 @@ class DatabaseManager {
   Future<void> updateDbConnection(String id, Map<String, dynamic> data) async {
     try {
       final db = await _database;
-      await db.update(
-        'db_connections',
-        data,
-        where: 'id = ?',
-        whereArgs: [id],
-      );
+      await db.update('db_connections', data, where: 'id = ?', whereArgs: [id]);
     } catch (e) {
       debugPrint('Failed to update db connection $id: $e');
     }
@@ -334,11 +334,7 @@ class DatabaseManager {
   Future<void> deleteDbConnection(String id) async {
     try {
       final db = await _database;
-      await db.delete(
-        'db_connections',
-        where: 'id = ?',
-        whereArgs: [id],
-      );
+      await db.delete('db_connections', where: 'id = ?', whereArgs: [id]);
     } catch (e) {
       debugPrint('Failed to delete db connection $id: $e');
     }
@@ -365,11 +361,10 @@ class DatabaseManager {
   Future<void> setSetting(String key, String value) async {
     try {
       final db = await _database;
-      await db.insert(
-        'settings',
-        {'key': key, 'value': value},
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await db.insert('settings', {
+        'key': key,
+        'value': value,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     } catch (e) {
       debugPrint('Failed to set setting $key: $e');
     }
@@ -389,7 +384,8 @@ class DatabaseManager {
 
   Future<void> migrateFromJsonIfNeeded() async {
     try {
-      final baseDir = _dataDir ?? (await getApplicationDocumentsDirectory()).path;
+      final baseDir =
+          _dataDir ?? (await getApplicationDocumentsDirectory()).path;
       final db = await _database;
 
       final instancesFile = File(p.join(baseDir, 'instances.json'));
@@ -417,9 +413,7 @@ class DatabaseManager {
               }, conflictAlgorithm: ConflictAlgorithm.replace);
             }
             await batch.commit(noResult: true);
-            debugPrint(
-              'Migrated ${list.length} instances from instances.json',
-            );
+            debugPrint('Migrated ${list.length} instances from instances.json');
           }
         }
       }
@@ -453,17 +447,13 @@ class DatabaseManager {
                 }, conflictAlgorithm: ConflictAlgorithm.replace);
               }
               await batch.commit(noResult: true);
-              debugPrint(
-                'Migrated ${list.length} trash items for $rootPath',
-              );
+              debugPrint('Migrated ${list.length} trash items for $rootPath');
             }
           }
         }
       }
 
-      final annotationsFile = File(
-        p.join(baseDir, 'config_annotations.json'),
-      );
+      final annotationsFile = File(p.join(baseDir, 'config_annotations.json'));
       if (await annotationsFile.exists()) {
         final count = _firstIntValue(
           await db.rawQuery('SELECT COUNT(*) AS c FROM config_annotations'),

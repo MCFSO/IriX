@@ -1,204 +1,86 @@
-// 回收站界面
-// 展示已删除文件的列表，支持恢复和永久删除操作。
-// 数据层使用本地 xmc_trash/trash_meta.json 持久化。
+// 回收站界面（统一视图）
+// 汇总所有实例的回收站条目，按实例分组展示，支持恢复、永久删除与清空。
+// 数据层使用 SQLite trash_items 表（见 services/trash_store.dart）。
 
-import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
-import 'package:uuid/uuid.dart';
 
-class TrashEntry {
-  final String id;
-  final String originalPath;
-  final String fileName;
-  final int size;
-  final DateTime deletedAt;
-
-  const TrashEntry({
-    required this.id,
-    required this.originalPath,
-    required this.fileName,
-    required this.size,
-    required this.deletedAt,
-  });
-
-  factory TrashEntry.create({
-    required String originalPath,
-    required String fileName,
-    required int size,
-  }) {
-    return TrashEntry(
-      id: const Uuid().v4(),
-      originalPath: originalPath,
-      fileName: fileName,
-      size: size,
-      deletedAt: DateTime.now(),
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'originalPath': originalPath,
-        'fileName': fileName,
-        'size': size,
-        'deletedAt': deletedAt.toIso8601String(),
-      };
-
-  factory TrashEntry.fromJson(Map<String, dynamic> json) => TrashEntry(
-        id: json['id'] as String,
-        originalPath: json['originalPath'] as String,
-        fileName: json['fileName'] as String,
-        size: json['size'] as int,
-        deletedAt: DateTime.parse(json['deletedAt'] as String),
-      );
-
-  int get remainingDays {
-    final deadline = deletedAt.add(const Duration(days: 7));
-    final diff = deadline.difference(DateTime.now());
-    return max(0, diff.inDays);
-  }
-
-  bool get isExpired => remainingDays <= 0;
-}
-
-class TrashStore {
-  final String rootPath;
-
-  const TrashStore({required this.rootPath});
-
-  String get trashDir => p.join(rootPath, 'xmc_trash');
-  String get metaPath => p.join(trashDir, 'trash_meta.json');
-
-  Future<List<TrashEntry>> listEntries() async {
-    try {
-      final file = File(metaPath);
-      if (!await file.exists()) return [];
-      final content = await file.readAsString();
-      if (content.trim().isEmpty) return [];
-      final list = jsonDecode(content) as List<dynamic>;
-      return list
-          .map((e) => TrashEntry.fromJson(e as Map<String, dynamic>))
-          .toList();
-    } catch (e) {
-      debugPrint('TrashStore listEntries error: $e');
-      return [];
-    }
-  }
-
-  Future<void> _saveEntries(List<TrashEntry> entries) async {
-    final dir = Directory(trashDir);
-    if (!await dir.exists()) {
-      await dir.create(recursive: true);
-    }
-    final encoded = jsonEncode(entries.map((e) => e.toJson()).toList());
-    await File(metaPath).writeAsString(encoded);
-  }
-
-  Future<void> addEntry(TrashEntry entry) async {
-    final entries = await listEntries();
-    entries.add(entry);
-    await _saveEntries(entries);
-  }
-
-  Future<void> removeEntry(String id) async {
-    final entries = await listEntries();
-    entries.removeWhere((e) => e.id == id);
-    await _saveEntries(entries);
-  }
-
-  Future<void> purgeAll() async {
-    await _saveEntries([]);
-  }
-
-  Future<void> autoClean() async {
-    final entries = await listEntries();
-    entries.removeWhere((e) => e.isExpired);
-    await _saveEntries(entries);
-  }
-}
+import '../services/trash_store.dart';
 
 class TrashView extends StatefulWidget {
-  final String rootPath;
-
-  const TrashView({super.key, required this.rootPath});
+  const TrashView({super.key});
 
   @override
   State<TrashView> createState() => _TrashViewState();
 }
 
 class _TrashViewState extends State<TrashView> {
-  late final TrashStore _store;
-  List<TrashEntry>? _entries;
+  final TrashStore _store = TrashStore();
+
+  /// 按实例根目录分组的回收站条目。
+  Map<String, List<TrashItem>>? _groups;
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _store = TrashStore(rootPath: widget.rootPath);
     _refresh();
   }
 
   Future<void> _refresh() async {
-    await _store.autoClean();
-    final entries = await _store.listEntries();
-    entries.sort((a, b) => b.deletedAt.compareTo(a.deletedAt));
+    final groups = await _store.getAllTrashItems();
+    for (final items in groups.values) {
+      items.sort((a, b) => b.deletedAt.compareTo(a.deletedAt));
+    }
+    final sortedKeys = groups.keys.toList()
+      ..sort((a, b) => _instanceLabel(a).compareTo(_instanceLabel(b)));
+    final sorted = <String, List<TrashItem>>{};
+    for (final key in sortedKeys) {
+      sorted[key] = groups[key]!;
+    }
     setState(() {
-      _entries = entries;
+      _groups = sorted;
       _loading = false;
     });
   }
 
-  Future<void> _restore(TrashEntry entry) async {
+  /// 实例显示名：根目录的目录名。
+  String _instanceLabel(String rootPath) {
+    final name = p.basename(p.normalize(rootPath));
+    return name.isEmpty ? rootPath : name;
+  }
+
+  Future<void> _restore(String rootPath, TrashItem item) async {
     try {
-      final trashFilePath = p.join(_store.trashDir, entry.fileName);
-      final trashFile = File(trashFilePath);
-      if (await trashFile.exists()) {
-        final originalDir = Directory(p.dirname(entry.originalPath));
-        if (!await originalDir.exists()) {
-          await originalDir.create(recursive: true);
-        }
-        await trashFile.copy(entry.originalPath);
-        await trashFile.delete();
-      }
-      await _store.removeEntry(entry.id);
+      await _store.restoreItem(rootPath, item.id);
       await _refresh();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('已恢复 "${entry.fileName}"')),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已恢复 "${p.basename(item.originalPath)}"')),
+      );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('恢复失败: $e')),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('恢复失败: $e')));
     }
   }
 
-  Future<void> _permanentlyDelete(TrashEntry entry) async {
+  Future<void> _permanentlyDelete(String rootPath, TrashItem item) async {
     try {
-      final trashFilePath = p.join(_store.trashDir, entry.fileName);
-      final trashFile = File(trashFilePath);
-      if (await trashFile.exists()) {
-        await trashFile.delete();
-      }
-      await _store.removeEntry(entry.id);
+      await _store.permanentlyDelete(rootPath, item.id);
       await _refresh();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('已永久删除 "${entry.fileName}"')),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已永久删除 "${p.basename(item.originalPath)}"')),
+      );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('删除失败: $e')),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('删除失败: $e')));
     }
   }
 
@@ -207,7 +89,7 @@ class _TrashViewState extends State<TrashView> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('清空回收站'),
-        content: const Text('确定要永久删除回收站中的所有文件吗？此操作不可撤销。'),
+        content: const Text('确定要永久删除所有实例回收站中的文件吗？此操作不可撤销。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -222,53 +104,44 @@ class _TrashViewState extends State<TrashView> {
     );
     if (confirmed != true) return;
     try {
-      final entries = await _store.listEntries();
-      for (final entry in entries) {
-        final trashFilePath = p.join(_store.trashDir, entry.fileName);
-        final trashFile = File(trashFilePath);
-        if (await trashFile.exists()) {
-          await trashFile.delete();
-        }
-      }
-      await _store.purgeAll();
+      await _store.emptyAllTrash();
       await _refresh();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('回收站已清空')),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('回收站已清空')));
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('清空失败: $e')),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('清空失败: $e')));
     }
   }
 
-  String _formatSize(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) {
-      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-    }
-    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
-  }
-
-  String _remainingLabel(int days) {
-    if (days <= 0) return '即将删除';
-    return '$days 天后永久删除';
+  String _formatDate(DateTime dt) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(dt.year, dt.month, dt.day);
+    final dayDiff = today.difference(day).inDays;
+    final hh = dt.hour.toString().padLeft(2, '0');
+    final mm = dt.minute.toString().padLeft(2, '0');
+    if (dayDiff == 0) return '今天 $hh:$mm';
+    if (dayDiff == 1) return '昨天 $hh:$mm';
+    return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-'
+        '${dt.day.toString().padLeft(2, '0')} $hh:$mm';
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final count =
+        _groups?.values.fold<int>(0, (sum, items) => sum + items.length) ?? 0;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('回收站'),
         actions: [
-          if (_entries != null && _entries!.isNotEmpty)
+          if (count > 0)
             TextButton.icon(
               onPressed: _purgeAll,
               icon: const Icon(Icons.delete_sweep, size: 20),
@@ -286,8 +159,9 @@ class _TrashViewState extends State<TrashView> {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
+    final groups = _groups ?? const {};
 
-    if (_entries == null || _entries!.isEmpty) {
+    if (groups.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -309,44 +183,61 @@ class _TrashViewState extends State<TrashView> {
       );
     }
 
-    return ListView.builder(
+    return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      itemCount: _entries!.length,
-      itemBuilder: (context, index) {
-        final entry = _entries![index];
-        return _TrashEntryCard(
-          entry: entry,
-          onRestore: () => _restore(entry),
-          onDelete: () => _permanentlyDelete(entry),
-          formatSize: _formatSize,
-          remainingLabel: _remainingLabel,
-        );
-      },
+      children: [
+        for (final entry in groups.entries) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+            child: Row(
+              children: [
+                Icon(Icons.storage, size: 18, color: theme.colorScheme.primary),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    '${_instanceLabel(entry.key)} · ${entry.value.length} 项',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          for (final item in entry.value)
+            _TrashEntryCard(
+              item: item,
+              onRestore: () => _restore(entry.key, item),
+              onDelete: () => _permanentlyDelete(entry.key, item),
+              formatDate: _formatDate,
+            ),
+        ],
+      ],
     );
   }
 }
 
 class _TrashEntryCard extends StatelessWidget {
   const _TrashEntryCard({
-    required this.entry,
+    required this.item,
     required this.onRestore,
     required this.onDelete,
-    required this.formatSize,
-    required this.remainingLabel,
+    required this.formatDate,
   });
 
-  final TrashEntry entry;
+  final TrashItem item;
   final VoidCallback onRestore;
   final VoidCallback onDelete;
-  final String Function(int) formatSize;
-  final String Function(int) remainingLabel;
+  final String Function(DateTime) formatDate;
+
+  bool get _isDirectory =>
+      FileSystemEntity.typeSync(item.trashPath) ==
+      FileSystemEntityType.directory;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final remaining = entry.remainingDays;
-    final isExpiring = remaining <= 1;
-
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -355,8 +246,8 @@ class _TrashEntryCard extends StatelessWidget {
         child: Row(
           children: [
             Icon(
-              Icons.delete_outline,
-              color: Colors.red.shade400,
+              _isDirectory ? Icons.folder_outlined : Icons.insert_drive_file,
+              color: _isDirectory ? Colors.amber.shade700 : Colors.red.shade400,
               size: 28,
             ),
             const SizedBox(width: 12),
@@ -365,7 +256,7 @@ class _TrashEntryCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    entry.fileName,
+                    p.basename(item.originalPath),
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -373,7 +264,7 @@ class _TrashEntryCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    entry.originalPath,
+                    item.originalPath,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.outline,
                     ),
@@ -381,36 +272,17 @@ class _TrashEntryCard extends StatelessWidget {
                     maxLines: 1,
                   ),
                   const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Text(
-                        formatSize(entry.size),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.outline,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        remainingLabel(remaining),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isExpiring
-                              ? Colors.red
-                              : theme.colorScheme.outline,
-                          fontWeight:
-                              isExpiring ? FontWeight.w600 : FontWeight.normal,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    '删除于 ${formatDate(item.deletedAt)}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.outline,
+                    ),
                   ),
                 ],
               ),
             ),
             PopupMenuButton<String>(
-              icon: Icon(
-                Icons.more_vert,
-                color: theme.colorScheme.outline,
-              ),
+              icon: Icon(Icons.more_vert, color: theme.colorScheme.outline),
               onSelected: (value) {
                 switch (value) {
                   case 'restore':

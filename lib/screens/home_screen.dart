@@ -13,6 +13,7 @@ import 'database_screen.dart';
 import 'instance_detail_screen.dart';
 import 'marketplace_screen.dart';
 import 'onboarding_screen.dart';
+import 'trash_view.dart';
 
 /// 主页 — 左侧 NavigationRail + 右侧内容区。
 class HomeScreen extends StatefulWidget {
@@ -53,13 +54,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 selectedIcon: Icon(Icons.dns),
                 label: Text('数据库'),
               ),
+              NavigationRailDestination(
+                icon: Icon(Icons.delete_outline),
+                selectedIcon: Icon(Icons.delete),
+                label: Text('回收站'),
+              ),
             ],
           ),
           const VerticalDivider(thickness: 1, width: 1),
           // 右侧内容区
-          Expanded(
-            child: _buildContent(),
-          ),
+          Expanded(child: _buildContent()),
         ],
       ),
     );
@@ -73,6 +77,8 @@ class _HomeScreenState extends State<HomeScreen> {
         return const MarketplaceScreen();
       case 2:
         return const DatabaseScreen();
+      case 3:
+        return const TrashView();
       default:
         return _buildInstancesPage();
     }
@@ -95,10 +101,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 IconButton(
                   icon: const Icon(Icons.add),
                   tooltip: '新建实例',
-                  onPressed: () => pushPage(
-                    context,
-                    (_) => const OnboardingScreen(),
-                  ),
+                  onPressed: () =>
+                      pushPage(context, (_) => const OnboardingScreen()),
                 ),
                 IconButton(
                   icon: const Icon(Icons.settings_outlined),
@@ -125,9 +129,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         state.selectInstance(instance.id);
                         pushPage(
                           context,
-                          (_) => InstanceDetailScreen(
-                            instanceId: instance.id,
-                          ),
+                          (_) => InstanceDetailScreen(instanceId: instance.id),
                         );
                       },
                     ),
@@ -171,10 +173,7 @@ class _InstanceCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      instance.name,
-                      style: theme.textTheme.titleMedium,
-                    ),
+                    Text(instance.name, style: theme.textTheme.titleMedium),
                     const SizedBox(height: 4),
                     _StatusChip(status: instance.status),
                   ],
@@ -209,10 +208,7 @@ class _StatusChip extends StatelessWidget {
         color: color.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Text(
-        status.label,
-        style: TextStyle(color: color, fontSize: 12),
-      ),
+      child: Text(status.label, style: TextStyle(color: color, fontSize: 12)),
     );
   }
 }
@@ -263,7 +259,8 @@ class _SettingsDialogState extends State<_SettingsDialog> {
             value: _threads,
             min: DownloadSettings.minThreads.toDouble(),
             max: DownloadSettings.maxThreads.toDouble(),
-            divisions: DownloadSettings.maxThreads - DownloadSettings.minThreads,
+            divisions:
+                DownloadSettings.maxThreads - DownloadSettings.minThreads,
             label: '${_threads.round()}',
             onChanged: (v) => setState(() => _threads = v),
             onChangeEnd: (v) =>
