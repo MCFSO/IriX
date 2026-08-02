@@ -8,6 +8,7 @@
 import '../services/chmlfrp_provider.dart';
 import '../services/custom_frp_provider.dart';
 import '../services/database_manager.dart';
+import '../services/hayfrp_provider.dart';
 import '../services/openfrp_provider.dart';
 import '../services/sakurafrp_provider.dart';
 
@@ -16,7 +17,8 @@ enum FrpProviderKind {
   openfrp('openfrp', 'OpenFrp'),
   custom('custom', '自建 frps'),
   chmlfrp('chmlfrp', 'ChmlFrp'),
-  sakurafrp('sakurafrp', 'SakuraFrp');
+  sakurafrp('sakurafrp', 'SakuraFrp'),
+  hayfrp('hayfrp', 'HayFrp');
 
   const FrpProviderKind(this.id, this.label);
 
@@ -173,6 +175,7 @@ class FrpProviderRegistry {
     FrpProviderKind.custom => CustomFrpProvider(),
     FrpProviderKind.chmlfrp => ChmlFrpProvider(),
     FrpProviderKind.sakurafrp => SakuraFrpProvider(),
+    FrpProviderKind.hayfrp => HayFrpProvider(),
   };
 
   /// 当前选中的提供商 id。

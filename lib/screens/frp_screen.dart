@@ -16,6 +16,7 @@ import '../services/chmlfrp_provider.dart';
 import '../services/custom_frp_provider.dart';
 import '../services/frp_provider.dart';
 import '../services/frpc_manager.dart';
+import '../services/hayfrp_provider.dart';
 import '../services/ofrp_service.dart';
 import '../services/openfrp_provider.dart';
 import '../services/sakurafrp_provider.dart';
@@ -110,6 +111,11 @@ class _FrpScreenState extends State<FrpScreen> {
         credentials = await showAppDialog<Map<String, String>>(
           context,
           (_) => const _SakuraFrpLoginDialog(),
+        );
+      case FrpProviderKind.hayfrp:
+        credentials = await showAppDialog<Map<String, String>>(
+          context,
+          (_) => const _HayFrpLoginDialog(),
         );
     }
     if (credentials == null || !mounted) return;
@@ -1188,6 +1194,120 @@ class _SakuraFrpLoginDialogState extends State<_SakuraFrpLoginDialog> {
               Text(
                 '获取方式：打开 SakuraFrp 控制台 → 账户信息 → 访问密钥，'
                 '点击复制后粘贴到此处。',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _loading ? null : () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: _loading ? null : _login,
+          child: _loading
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('登录'),
+        ),
+      ],
+    );
+  }
+}
+
+/// HayFrp 登录对话框：用户名/邮箱 + 密码。
+class _HayFrpLoginDialog extends StatefulWidget {
+  const _HayFrpLoginDialog();
+
+  @override
+  State<_HayFrpLoginDialog> createState() => _HayFrpLoginDialogState();
+}
+
+class _HayFrpLoginDialogState extends State<_HayFrpLoginDialog> {
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _login() async {
+    final username = _usernameController.text.trim();
+    final password = _passwordController.text;
+    if (username.isEmpty || password.isEmpty) {
+      setState(() => _error = '请输入用户名和密码');
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await HayFrpProvider().login({
+        'username': username,
+        'password': password,
+      });
+      if (!mounted) return;
+      Navigator.of(context).pop({'username': username, 'password': password});
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e.toString();
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AlertDialog(
+      title: const Text('登录 HayFrp'),
+      content: SizedBox(
+        width: 420,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: _usernameController,
+                autofocus: true,
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                decoration: InputDecoration(
+                  labelText: '用户名或邮箱',
+                  border: const OutlineInputBorder(),
+                  isDense: true,
+                  errorText: _error,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _passwordController,
+                obscureText: true,
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                onSubmitted: (_) => _login(),
+                decoration: const InputDecoration(
+                  labelText: '密码',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '登录获取的 Token 有效期 7 天，每次登录会使上次 Token 失效。',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
