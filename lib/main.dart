@@ -9,6 +9,7 @@ import 'screens/home_screen.dart';
 import 'services/config_annotation_service.dart';
 import 'services/database_manager.dart';
 import 'state/app_state.dart';
+import 'state/node_state.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +33,14 @@ class MyApp extends StatelessWidget {
           create: (_) {
             final state = AppState();
             // 异步加载持久化实例列表，加载后 notifyListeners 会刷新 UI。
+            state.init();
+            return state;
+          },
+        ),
+        ChangeNotifierProvider(
+          create: (_) {
+            final state = NodeState();
+            // 异步加载持久化节点列表；首次启动自动创建"本地"节点。
             state.init();
             return state;
           },

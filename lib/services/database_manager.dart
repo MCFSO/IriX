@@ -16,7 +16,7 @@ class DatabaseManager {
   DatabaseManager._();
 
   static const String _dbName = 'irix.db';
-  static const int _dbVersion = 2;
+  static const int _dbVersion = 3;
 
   Database? _db;
 
@@ -104,6 +104,16 @@ class DatabaseManager {
         created_at TEXT NOT NULL
       )
     ''');
+    batch.execute('''
+      CREATE TABLE nodes (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        address TEXT NOT NULL,
+        api_key TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )
+    ''');
     await batch.commit(noResult: true);
   }
 
@@ -119,6 +129,18 @@ class DatabaseManager {
           username TEXT,
           password TEXT,
           database_name TEXT,
+          created_at TEXT NOT NULL
+        )
+      ''');
+    }
+    if (oldVersion < 3) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS nodes (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL,
+          address TEXT NOT NULL,
+          api_key TEXT NOT NULL,
           created_at TEXT NOT NULL
         )
       ''');
@@ -337,6 +359,49 @@ class DatabaseManager {
       await db.delete('db_connections', where: 'id = ?', whereArgs: [id]);
     } catch (e) {
       debugPrint('Failed to delete db connection $id: $e');
+    }
+  }
+
+  // === nodes 表 ===
+
+  Future<List<Map<String, dynamic>>> getAllNodes() async {
+    try {
+      final db = await _database;
+      return await db.query('nodes', orderBy: 'created_at ASC');
+    } catch (e) {
+      debugPrint('Failed to get all nodes: $e');
+      return [];
+    }
+  }
+
+  Future<void> insertNode(Map<String, dynamic> node) async {
+    try {
+      final db = await _database;
+      await db.insert(
+        'nodes',
+        node,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    } catch (e) {
+      debugPrint('Failed to insert node: $e');
+    }
+  }
+
+  Future<void> updateNode(String id, Map<String, dynamic> data) async {
+    try {
+      final db = await _database;
+      await db.update('nodes', data, where: 'id = ?', whereArgs: [id]);
+    } catch (e) {
+      debugPrint('Failed to update node $id: $e');
+    }
+  }
+
+  Future<void> deleteNode(String id) async {
+    try {
+      final db = await _database;
+      await db.delete('nodes', where: 'id = ?', whereArgs: [id]);
+    } catch (e) {
+      debugPrint('Failed to delete node $id: $e');
     }
   }
 

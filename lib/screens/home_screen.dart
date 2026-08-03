@@ -17,6 +17,7 @@ import 'database_screen.dart';
 import 'frp_screen.dart';
 import 'instance_detail_screen.dart';
 import 'marketplace_screen.dart';
+import 'nodes_screen.dart';
 import 'onboarding_screen.dart';
 
 /// 主页 — 左侧 NavigationRail + 右侧内容区。
@@ -112,6 +113,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 label: Text('实例'),
               ),
               NavigationRailDestination(
+                icon: Icon(Icons.lan_outlined),
+                selectedIcon: Icon(Icons.lan),
+                label: Text('节点'),
+              ),
+              NavigationRailDestination(
                 icon: Icon(Icons.store_outlined),
                 selectedIcon: Icon(Icons.store),
                 label: Text('市场'),
@@ -146,12 +152,14 @@ class _HomeScreenState extends State<HomeScreen> {
       case 0:
         return _buildInstancesPage();
       case 1:
-        return const MarketplaceScreen();
+        return const NodesScreen();
       case 2:
-        return const DatabaseScreen();
+        return const MarketplaceScreen();
       case 3:
-        return const AiScreen();
+        return const DatabaseScreen();
       case 4:
+        return const AiScreen();
+      case 5:
         return const FrpScreen();
       default:
         return _buildInstancesPage();

@@ -49,3 +49,10 @@ rust/target/
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Go node daemon build artifacts
+node/irix-node
+node/irix-node.exe
+node/bin/
+node/data/
+
