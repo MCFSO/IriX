@@ -11,20 +11,20 @@ import 'package:irix/utils/docker_visibility.dart';
 void main() {
   group('客户端为 Windows', () {
     test('节点为 Windows（win32 / Windows_NT）时不显示', () {
-      expect(shouldShowDockerSettings(nodePlatform: 'win32'), isFalse);
-      expect(shouldShowDockerSettings(nodePlatform: 'Windows_NT'), isFalse);
-      expect(shouldShowDockerSettings(nodePlatform: 'windows'), isFalse);
+      expect(shouldShowDockerSettings(nodePlatform: 'win32', clientIsWindows: true), isFalse);
+      expect(shouldShowDockerSettings(nodePlatform: 'Windows_NT', clientIsWindows: true), isFalse);
+      expect(shouldShowDockerSettings(nodePlatform: 'windows', clientIsWindows: true), isFalse);
     });
 
     test('节点平台未知时不显示', () {
-      expect(shouldShowDockerSettings(nodePlatform: null), isFalse);
-      expect(shouldShowDockerSettings(nodePlatform: ''), isFalse);
+      expect(shouldShowDockerSettings(nodePlatform: null, clientIsWindows: true), isFalse);
+      expect(shouldShowDockerSettings(nodePlatform: '', clientIsWindows: true), isFalse);
     });
 
     test('节点为 Linux / macOS 等其他平台时显示', () {
-      expect(shouldShowDockerSettings(nodePlatform: 'linux'), isTrue);
-      expect(shouldShowDockerSettings(nodePlatform: 'darwin'), isTrue);
-      expect(shouldShowDockerSettings(nodePlatform: 'freebsd'), isTrue);
+      expect(shouldShowDockerSettings(nodePlatform: 'linux', clientIsWindows: true), isTrue);
+      expect(shouldShowDockerSettings(nodePlatform: 'darwin', clientIsWindows: true), isTrue);
+      expect(shouldShowDockerSettings(nodePlatform: 'freebsd', clientIsWindows: true), isTrue);
     });
   });
 
