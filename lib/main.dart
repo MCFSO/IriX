@@ -40,7 +40,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) {
             final state = NodeState();
-            // 异步加载持久化节点列表；首次启动自动创建"本地"节点。
+            // 异步加载持久化节点列表，加载后 notifyListeners 会刷新 UI。
             state.init();
             return state;
           },

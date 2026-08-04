@@ -1,9 +1,6 @@
 // 节点状态管理层
 // 汇总节点列表、当前选中节点与在线状态，作为 UI 与持久化层之间的桥梁。
 // 通过 ChangeNotifier 向 UI 暴露响应式状态。
-//
-// 首次启动时若不存在任何节点，自动创建一个名为"本地"的 Node 类型节点
-// （地址 http://127.0.0.1:12346，对应项目根目录 node/ 的 Go 守护进程）。
 
 import 'dart:math';
 
@@ -58,21 +55,12 @@ class NodeState extends ChangeNotifier {
     return 'n-${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}-$suffix';
   }
 
-  /// 初始化：加载持久化节点列表；为空时创建默认"本地"节点。
+  /// 初始化：加载持久化节点列表并选中第一个节点。
   Future<void> init() async {
     _nodes = await _store.loadNodes();
-    if (_nodes.isEmpty) {
-      final local = NodeInfo(
-        id: _generateId(),
-        name: '本地',
-        type: NodeType.node,
-        address: 'http://127.0.0.1:12346',
-        apiKey: '',
-      );
-      await _store.addNode(local);
-      _nodes.add(local);
+    if (_nodes.isNotEmpty && _selectedNodeId == null) {
+      _selectedNodeId = _nodes.first.id;
     }
-    _selectedNodeId ??= _nodes.first.id;
     notifyListeners();
   }
 

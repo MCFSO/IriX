@@ -1,5 +1,5 @@
 // 节点状态测试
-// 验证首次启动自动创建"本地"节点、添加/重命名/删除与持久化逻辑。
+// 验证初始化、添加/重命名/删除与持久化逻辑。
 
 import 'dart:io';
 
@@ -28,16 +28,13 @@ void main() {
     }
   });
 
-  test('首次启动自动创建默认"本地"节点', () async {
+  test('首次启动节点列表为空，不创建默认节点', () async {
     final state = NodeState();
     await state.init();
 
-    expect(state.nodes.length, 1);
-    final local = state.nodes.first;
-    expect(local.name, '本地');
-    expect(local.type, NodeType.node);
-    expect(local.address, 'http://127.0.0.1:12346');
-    expect(state.selectedNodeId, local.id);
+    expect(state.nodes.length, 0);
+    expect(state.selectedNode, isNull);
+    expect(state.selectedNodeId, isNull);
   });
 
   test('添加节点后持久化并可重命名、删除', () async {
@@ -50,14 +47,14 @@ void main() {
       address: 'http://192.168.1.5:23333',
       apiKey: 'test-key',
     );
-    expect(state.nodes.length, 2);
+    expect(state.nodes.length, 1);
     expect(added.type, NodeType.mcsm);
     expect(state.selectedNodeId, added.id);
 
     // 重载状态验证持久化
     final state2 = NodeState();
     await state2.init();
-    expect(state2.nodes.length, 2);
+    expect(state2.nodes.length, 1);
     final found = state2.nodes.firstWhere((n) => n.id == added.id);
     expect(found.address, 'http://192.168.1.5:23333');
     expect(found.apiKey, 'test-key');
@@ -67,7 +64,7 @@ void main() {
     expect(renamed.name, '新名字');
 
     await state2.removeNode(added.id);
-    expect(state2.nodes.length, 1);
-    expect(state2.selectedNodeId, state2.nodes.first.id);
+    expect(state2.nodes.length, 0);
+    expect(state2.selectedNode, isNull);
   });
 }
