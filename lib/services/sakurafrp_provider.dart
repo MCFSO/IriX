@@ -132,8 +132,9 @@ class SakuraFrpProvider extends FrpProvider {
   @override
   Future<List<FrpTunnel>> listTunnels() async {
     final res = await _send('GET', '/tunnels');
-    final list = _decode(res)['data'];
-    final rawList = list is List ? list : <dynamic>[];
+    // v4 接口直接返回隧道数组（无 data 包装）。
+    final decoded = jsonDecode(utf8.decode(res.bodyBytes));
+    final rawList = decoded is List ? decoded : <dynamic>[];
     final nodes = await _nodeMap();
     return [
       for (final e in rawList)
@@ -165,9 +166,9 @@ class SakuraFrpProvider extends FrpProvider {
 
   Future<Map<int, FrpNode>> _nodeMap() async {
     final res = await _send('GET', '/nodes');
-    final json = _decode(res);
-    final data = json['data'];
-    if (data is! Map) return {};
+    // v4 接口直接返回 节点id -> 节点信息 的 Map（无 data 包装）。
+    final decoded = jsonDecode(utf8.decode(res.bodyBytes));
+    final data = decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
     return {
       for (final entry in data.entries)
         if (entry.value is Map)
@@ -182,9 +183,8 @@ class SakuraFrpProvider extends FrpProvider {
   @override
   Future<List<FrpNode>> listNodes() async {
     final res = await _send('GET', '/nodes');
-    final json = _decode(res);
-    final data = json['data'];
-    if (data is! Map) return [];
+    final decoded = jsonDecode(utf8.decode(res.bodyBytes));
+    final data = decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
     final nodes = <FrpNode>[];
     for (final entry in data.entries) {
       if (entry.value is! Map) continue;
