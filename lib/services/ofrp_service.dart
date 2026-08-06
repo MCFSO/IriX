@@ -229,7 +229,7 @@ class OfrpService {
   /// 解析统一响应结构 {flag, msg, data}，失败抛异常。
   Map<String, dynamic> _parse(http.Response res) {
     final body = utf8.decode(res.bodyBytes);
-    if (body.isEmpty) {
+    if (body.trim().isEmpty) {
       throw Exception('服务器返回空响应');
     }
     final json = jsonDecode(body) as Map<String, dynamic>;
@@ -334,7 +334,7 @@ class OfrpService {
       throw Exception('HTTP ${res.statusCode}');
     }
     final body = utf8.decode(res.bodyBytes);
-    if (body.isEmpty) {
+    if (body.trim().isEmpty) {
       throw Exception('获取软件信息失败：服务器返回空响应');
     }
     final json = jsonDecode(body) as Map<String, dynamic>;
@@ -378,7 +378,7 @@ class OfrpService {
       throw Exception('请求授权失败 HTTP ${res.statusCode}: ${_snippet(res.body)}');
     }
     final body = utf8.decode(res.bodyBytes);
-    if (body.isEmpty) {
+    if (body.trim().isEmpty) {
       throw Exception('请求授权失败：服务器返回空响应');
     }
     final json = jsonDecode(body) as Map<String, dynamic>;
@@ -416,7 +416,7 @@ class OfrpService {
       throw Exception('轮询授权失败 HTTP ${res.statusCode}');
     }
     final body = utf8.decode(res.bodyBytes);
-    if (body.isEmpty) {
+    if (body.trim().isEmpty) {
       throw Exception('轮询授权失败：服务器返回空响应');
     }
     final json = jsonDecode(body) as Map<String, dynamic>;

@@ -131,7 +131,7 @@ class ChmlFrpProvider extends FrpProvider {
 
   Map<String, dynamic> _parse(http.Response res) {
     final body = utf8.decode(res.bodyBytes);
-    if (body.isEmpty) {
+    if (body.trim().isEmpty) {
       throw Exception('服务器返回空响应');
     }
     final json = jsonDecode(body) as Map<String, dynamic>;
