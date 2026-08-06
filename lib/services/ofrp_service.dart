@@ -32,6 +32,9 @@ class OfrpUserInfo {
   final int traffic;
   final bool realname;
 
+  /// 用户密钥 token（frpc 简易启动 -u 参数使用）。
+  final String token;
+
   const OfrpUserInfo({
     required this.username,
     required this.email,
@@ -41,6 +44,7 @@ class OfrpUserInfo {
     required this.used,
     required this.traffic,
     required this.realname,
+    required this.token,
   });
 
   factory OfrpUserInfo.fromJson(Map<String, dynamic> json) => OfrpUserInfo(
@@ -52,6 +56,7 @@ class OfrpUserInfo {
     used: (json['used'] as num?)?.toInt() ?? 0,
     traffic: (json['traffic'] as num?)?.toInt() ?? 0,
     realname: json['realname'] == true,
+    token: (json['token'] ?? '').toString(),
   );
 }
 

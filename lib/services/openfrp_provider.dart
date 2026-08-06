@@ -1,13 +1,26 @@
 // OpenFrp 提供商实现
 // 基于 OpenFrp OPENAPI（ofrp_service.dart），
 // 登录方式：面板「第三方客户端安全登录」复制的 Authorization。
+//
+// 注意：API 请求用 Authorization；frpc 简易启动（-u）必须用
+// getUserInfo 返回的用户密钥 token（32 位 hex），两者不同。
 
+import '../services/database_manager.dart';
 import '../services/frp_provider.dart';
 import '../services/frpc_manager.dart';
 import '../services/ofrp_service.dart';
 
 class OpenFrpProvider extends FrpProvider {
   final OfrpService _api = OfrpService.instance;
+
+  /// 用户密钥 token（frpc -u 用），登录时从 getUserInfo 保存。
+  static const _keyUserToken = 'ofrp_user_token';
+
+  Future<String?> _userToken() =>
+      DatabaseManager.instance.getSetting(_keyUserToken);
+
+  Future<void> _saveUserToken(String token) =>
+      DatabaseManager.instance.setSetting(_keyUserToken, token.trim());
 
   @override
   String get id => 'openfrp';
@@ -21,6 +34,7 @@ class OpenFrpProvider extends FrpProvider {
     if (auth == null || auth.isEmpty) return null;
     try {
       final user = await _api.getUserInfo(auth);
+      await _saveUserToken(user.token);
       return _toAccount(user);
     } catch (_) {
       return null;
@@ -36,6 +50,7 @@ class OpenFrpProvider extends FrpProvider {
     }
     await _api.setAuth(auth);
     final user = await _api.getUserInfo(auth);
+    await _saveUserToken(user.token);
     return _toAccount(user);
   }
 
@@ -122,7 +137,17 @@ class OpenFrpProvider extends FrpProvider {
     if (auth == null || auth.isEmpty) {
       throw Exception('未登录');
     }
-    await FrpcManager.instance.startOpenFrp(auth, tunnelId);
+    // 简易启动 -u 需要用户密钥 token，而不是 Authorization。
+    var token = await _userToken();
+    if (token == null || token.isEmpty) {
+      final user = await _api.getUserInfo(auth);
+      token = user.token;
+      await _saveUserToken(token);
+    }
+    if (token.isEmpty) {
+      throw Exception('未获取到用户密钥，请重新登录');
+    }
+    await FrpcManager.instance.startOpenFrp(token, tunnelId);
   }
 
   @override
