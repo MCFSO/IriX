@@ -1,6 +1,6 @@
 // frpc 本地进程管理器
 //
-// 负责下载 OpenFrp 官方 frpc（Windows amd64 zip），
+// 负责下载 OpenFrp 官方 frpc（按平台选择 Windows zip / Linux、macOS tar.gz），
 // 支持两种启动方式：
 // - 简易启动：`frpc -u <token> -p <隧道ID>`（OpenFrp 专属）；
 // - 配置启动：`frpc -c <config.toml>`（自建 frps 等通用场景）。
@@ -45,6 +45,54 @@ class FrpcManager extends ChangeNotifier {
   /// 运行中的隧道 key 列表。
   List<String> get runningKeys => _processes.keys.toList();
 
+  /// 当前平台对应的 frpc 下载文件名（如 frpc_windows_amd64.zip）。
+  ///
+  /// macOS 官方命名沿用了文档中的 drawin 拼写。
+  String get _downloadFileName {
+    final arch = _archName;
+    return switch (Platform.operatingSystem) {
+      'windows' => 'frpc_windows_$arch.zip',
+      'linux' => 'frpc_linux_$arch.tar.gz',
+      'macos' => 'frpc_drawin_$arch.tar.gz',
+      final os => throw Exception('不支持的平台: $os'),
+    };
+  }
+
+  /// 当前设备架构（amd64 / 386 / arm64 / arm）。
+  String get _archName {
+    if (Platform.isWindows) {
+      final arch = (Platform.environment['PROCESSOR_ARCHITECTURE'] ?? 'AMD64')
+          .toUpperCase();
+      return switch (arch) {
+        'AMD64' => 'amd64',
+        'X86' => '386',
+        'ARM64' => 'arm64',
+        'ARM' => 'arm',
+        _ => 'amd64',
+      };
+    }
+    try {
+      final out = (Process.runSync('uname', ['-m']).stdout as String)
+          .trim()
+          .toLowerCase();
+      if (out == 'x86_64' || out == 'amd64') return 'amd64';
+      if (out.startsWith('i3') ||
+          out.startsWith('i4') ||
+          out.startsWith('i5') ||
+          out.startsWith('i6')) {
+        return '386';
+      }
+      if (out == 'aarch64' || out == 'arm64') return 'arm64';
+      if (out.startsWith('arm')) return 'arm';
+    } catch (_) {
+      // 忽略，退回 amd64。
+    }
+    return 'amd64';
+  }
+
+  /// 解压后的可执行文件名（Windows 带 .exe 后缀）。
+  String get _binaryName => Platform.isWindows ? 'frpc.exe' : 'frpc';
+
   /// 确保 frpc 可执行文件存在，不存在时下载最新版并解压。
   Future<String> ensureFrpc() async {
     if (_frpcPath != null && File(_frpcPath!).existsSync()) {
@@ -52,7 +100,7 @@ class FrpcManager extends ChangeNotifier {
     }
     final appDir = await getApplicationDocumentsDirectory();
     final frpcDir = Directory(p.join(appDir.path, 'ofrp', 'frpc'));
-    final exe = File(p.join(frpcDir.path, 'frpc.exe'));
+    final exe = File(p.join(frpcDir.path, _binaryName));
     if (exe.existsSync()) {
       _frpcPath = exe.path;
       return exe.path;
@@ -67,7 +115,7 @@ class FrpcManager extends ChangeNotifier {
       }
       var ok = false;
       for (final source in info.sources) {
-        final url = '$source/${info.latestFull}/frpc_windows_amd64.zip';
+        final url = '$source/${info.latestFull}/$_downloadFileName';
         try {
           await _downloadAndExtract(url, frpcDir);
           ok = true;
@@ -77,12 +125,15 @@ class FrpcManager extends ChangeNotifier {
         }
       }
       if (!ok) throw Exception('frpc 下载失败，请检查网络后重试');
-      final frpcExe = _findFrpcExe(frpcDir);
-      if (frpcExe == null) {
+      final frpcBin = _findFrpcBinary(frpcDir);
+      if (frpcBin == null) {
         throw Exception('解压后未找到 frpc 可执行文件');
       }
-      if (frpcExe.path != exe.path) {
-        await frpcExe.rename(exe.path);
+      if (frpcBin.path != exe.path) {
+        await frpcBin.rename(exe.path);
+      }
+      if (!Platform.isWindows) {
+        await Process.run('chmod', ['+x', exe.path]);
       }
       _frpcPath = exe.path;
       return exe.path;
@@ -92,19 +143,7 @@ class FrpcManager extends ChangeNotifier {
     }
   }
 
-  /// 在解压目录中递归查找 frpc 可执行文件（新版命名为
-  /// frpc_windows_amd64.exe，旧版为 frpc.exe，均可能带版本目录前缀）。
-  File? _findFrpcExe(Directory dir) {
-    for (final entry in dir.listSync(recursive: true)) {
-      if (entry is! File) continue;
-      final name = p.basename(entry.path).toLowerCase();
-      if (name.startsWith('frpc') && name.endsWith('.exe')) {
-        return entry;
-      }
-    }
-    return null;
-  }
-
+  /// 下载并解压（zip 或 tar.gz 由 URL 扩展名决定）。
   Future<void> _downloadAndExtract(String url, Directory targetDir) async {
     final res = await http
         .get(Uri.parse(url))
@@ -116,13 +155,36 @@ class FrpcManager extends ChangeNotifier {
       targetDir.deleteSync(recursive: true);
     }
     targetDir.createSync(recursive: true);
-    final archive = ZipDecoder().decodeBytes(res.bodyBytes);
+    final archive = _decodeArchive(url, res.bodyBytes);
     for (final file in archive) {
       if (!file.isFile) continue;
       final outPath = p.join(targetDir.path, file.name);
       Directory(p.dirname(outPath)).createSync(recursive: true);
       File(outPath).writeAsBytesSync(file.content as List<int>);
     }
+  }
+
+  Archive _decodeArchive(String url, List<int> bytes) {
+    if (url.endsWith('.tar.gz') || url.endsWith('.tgz')) {
+      return TarDecoder().decodeBytes(GZipDecoder().decodeBytes(bytes));
+    }
+    return ZipDecoder().decodeBytes(bytes);
+  }
+
+  /// 在解压目录中递归查找 frpc 可执行文件（新版命名为
+  /// frpc_windows_amd64.exe / frpc_linux_amd64，旧版为 frpc.exe / frpc，
+  /// 均可能带版本目录前缀）。
+  File? _findFrpcBinary(Directory dir) {
+    final isWindows = Platform.isWindows;
+    for (final entry in dir.listSync(recursive: true)) {
+      if (entry is! File) continue;
+      final name = p.basename(entry.path).toLowerCase();
+      if (!name.startsWith('frpc')) continue;
+      if (isWindows && !name.endsWith('.exe')) continue;
+      if (!isWindows && name.endsWith('.exe')) continue;
+      return entry;
+    }
+    return null;
   }
 
   /// OpenFrp 简易启动：frpc -u token -p proxyId。
