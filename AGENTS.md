@@ -31,16 +31,16 @@ rust/
 ├── file_ops/              # 文件扫描、移动、回收站
 └── logger/                # 日志
 test/                      # Flutter 测试
-windows/ linux/ macos/     # 平台代码（rust/runner 目录存 FFI 动态库）
+windows/ linux/ macos/     # 平台代码（FFI 动态库：windows/runner/、linux/、macos/）
 dist/ build/               # 打包产物，勿修改
 ```
 
 ## 常用命令
 
 ```bash
-# Rust FFI 库编译（Windows 直接双击 build_rust.bat）
+# Rust FFI 库编译（Windows 直接双击 build_rust.bat；Linux/macOS 运行 ./build_rust.sh）
 cargo build --release --manifest-path rust/Cargo.toml
-# 产物复制到 windows/runner/（build_rust.bat 已处理）
+# 产物复制：Windows -> windows/runner/；Linux -> linux/；macOS -> macos/（脚本已处理）
 
 # Dart 依赖
 flutter pub get
@@ -52,11 +52,13 @@ flutter analyze
 
 # 发行构建
 flutter build windows --release
+flutter build linux --release   # 需先 ./build_rust.sh，CMake 会安装 .so 到 bundle/lib/
+flutter build macos --release   # 需先 ./build_rust.sh，Xcode 会复制并签名 dylib
 ```
 
 ## 关键约定
 
-- **修改 Rust 代码后**必须先重新编译并复制 DLL 到 `windows/runner/`，否则运行的是旧动态库
+- **修改 Rust 代码后**必须先重新编译并复制动态库到平台目录（Windows `windows/runner/`、Linux `linux/`、macOS `macos/`），否则运行的是旧动态库
 - Rust 导出函数通过 FFI 调用，Dart 侧封装在 `lib/services/*_ffi.dart`（如 `backup_ffi.dart`、`file_ops_ffi.dart`、`logger_ffi.dart`）
 - 状态管理统一走 `lib/state/`（Provider），不在 widget 内直接持有全局状态
 - 持久化数据用 SQLite（`instance_store.dart`、`node_store.dart`、`trash_store.dart` 等），轻量设置用 SharedPreferences

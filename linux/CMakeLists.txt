@@ -112,6 +112,22 @@ install(DIRECTORY "${NATIVE_ASSETS_DIR}"
    DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
    COMPONENT Runtime)
 
+# IriX Rust FFI 动态库（由 build_rust.sh 编译后放入 linux/）。
+# 未构建时跳过安装，运行期 FFI 加载会给出更明确的提示。
+set(XMC_RUST_LIBS
+  "${CMAKE_CURRENT_SOURCE_DIR}/libxmc_backup.so"
+  "${CMAKE_CURRENT_SOURCE_DIR}/libxmc_downloader.so"
+  "${CMAKE_CURRENT_SOURCE_DIR}/libxmc_file_ops.so"
+  "${CMAKE_CURRENT_SOURCE_DIR}/libxmc_logger.so"
+)
+foreach(rust_lib ${XMC_RUST_LIBS})
+  if(EXISTS "${rust_lib}")
+    install(FILES "${rust_lib}"
+      DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+      COMPONENT Runtime)
+  endif()
+endforeach(rust_lib)
+
 # Fully re-copy the assets directory on each build to avoid having stale files
 # from a previous install.
 set(FLUTTER_ASSET_DIR_NAME "flutter_assets")

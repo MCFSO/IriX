@@ -42,6 +42,10 @@ app.*.map.json
 # Rust build artifacts
 rust/target/
 
+# Rust FFI 动态库（由 build_rust.bat / build_rust.sh 生成）
+linux/libxmc_*.so
+macos/libxmc_*.dylib
+
 # Fastforge output
 /dist/
 
