@@ -341,7 +341,10 @@ class OfrpService {
     final x25519 = X25519();
     final keyPair = await x25519.newKeyPair();
     final publicKey = await keyPair.extractPublicKey();
-    return (publicKey: base64Encode(publicKey.bytes), keyPair: keyPair);
+    return (
+      publicKey: base64UrlEncode(publicKey.bytes),
+      keyPair: keyPair,
+    );
   }
 
   /// 请求远程登录授权，返回 (授权 URL, 请求 UUID)。
