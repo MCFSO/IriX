@@ -262,14 +262,27 @@ class HayFrpProvider extends FrpProvider {
   Future<void> startTunnel(String tunnelId) async {
     final token = await _token();
     if (token == null || token.isEmpty) throw Exception('未登录');
-    final json = await _proxyPost({
-      'type': 'config',
-      'format': 'toml',
-      'csrf': token,
-      'node': tunnelId,
-    });
-    final config =
-        json['config']?.toString() ?? (json['data']?.toString() ?? '');
+    // 注意：config 接口的隧道参数是 id（传 node=隧道ID 会返回空响应），
+    // 且响应为纯 TOML 文本（非 JSON 包装），因此不走 _proxyPost/_decode。
+    final res = await http
+        .post(
+          Uri.parse('$hayFrpApiBase/proxy'),
+          headers: {
+            'Content-Type': 'application/json;charset=UTF-8',
+            'waf': 'off',
+          },
+          body: jsonEncode({
+            'type': 'config',
+            'format': 'toml',
+            'csrf': token,
+            'id': tunnelId,
+          }),
+        )
+        .timeout(const Duration(seconds: 30));
+    if (res.statusCode != 200) {
+      throw Exception('HTTP ${res.statusCode}: ${_snippet(res.body)}');
+    }
+    final config = utf8.decode(res.bodyBytes);
     if (config.trim().isEmpty) throw Exception('获取隧道配置失败');
     await FrpcManager.instance.startWithConfig(config, 'hayfrp-$tunnelId');
   }
