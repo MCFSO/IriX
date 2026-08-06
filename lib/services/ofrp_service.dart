@@ -11,10 +11,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:crypto/crypto.dart' as crypto;
 import 'package:cryptography/cryptography.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
+import 'package:pinenacl/x25519.dart' as nacl;
 
 import '../services/database_manager.dart';
 
@@ -418,64 +418,40 @@ class OfrpService {
 
   /// 解密 authorization_data 得到 Authorization 明文。
   ///
-  /// 数据格式（cloudflared encrypt.go）：base64(临时公钥 32B || nonce 12B || 密文||tag)。
-  /// 共享密钥 = X25519(私钥, 临时公钥)，AES 密钥 = HKDF-SHA256(共享密钥)，
-  /// 密文用 AES-256-GCM 解密。兼容两种布局（tag 在尾部 / 无 tag）。
+  /// 服务端参考 cloudflared/token/encrypt.go 的 NaCl crypto_box 方案：
+  /// authorization_data = base64(nonce 24B || 密文 || Poly1305 tag 16B)，
+  /// 共享密钥 = X25519(客户端私钥, 服务端公钥)，服务端公钥来自
+  /// pollLogin 响应头 X-Request-Public-Key。
   static Future<String> decryptAuthorization(
     String authorizationData,
     SimpleKeyPair keyPair,
+    String serverPublicKey,
   ) async {
     final raw = base64Decode(authorizationData);
-    if (raw.length < 44) {
+    if (raw.length < 24 + 16) {
       throw Exception('授权数据格式错误');
     }
-    final ephPub = raw.sublist(0, 32);
-    final nonce = raw.sublist(32, 44);
-    final rest = raw.sublist(44);
-
-    final x25519 = X25519();
-    final shared = await x25519.sharedSecretKey(
-      keyPair: keyPair,
-      remotePublicKey: SimplePublicKey(ephPub, type: KeyPairType.x25519),
-    );
-    final sharedBytes = await shared.extractBytes();
-    final aesKey = _hkdfSha256(sharedBytes, 32);
-
-    // 优先按 cloudflared 布局：尾部 16B 为 GCM tag。
-    String? plaintext;
-    for (final withTag in [true, false]) {
-      try {
-        final int ctLen;
-        final Mac mac;
-        if (withTag) {
-          ctLen = rest.length - 16;
-          mac = Mac(rest.sublist(ctLen));
-        } else {
-          ctLen = rest.length;
-          mac = Mac.empty;
-        }
-        if (ctLen <= 0) continue;
-        final box = await AesGcm.with256bits().decrypt(
-          SecretBox(rest.sublist(0, ctLen), nonce: nonce, mac: mac),
-          secretKey: SecretKey(aesKey),
-        );
-        plaintext = utf8.decode(box);
-        break;
-      } catch (_) {
-        // 尝试另一种布局。
-      }
+    final serverPubBytes = base64Decode(serverPublicKey);
+    if (serverPubBytes.length != 32) {
+      throw Exception('服务端公钥格式错误');
     }
-    if (plaintext == null || plaintext.isEmpty) {
+    final clientPriv = await keyPair.extractPrivateKeyBytes();
+
+    final box = nacl.Box(
+      myPrivateKey: nacl.PrivateKey(Uint8List.fromList(clientPriv)),
+      theirPublicKey: nacl.PublicKey(serverPubBytes),
+    );
+    final plaintext = box.decrypt(
+      nacl.EncryptedMessage(
+        nonce: raw.sublist(0, 24),
+        cipherText: raw.sublist(24),
+      ),
+    );
+    final text = utf8.decode(plaintext);
+    if (text.isEmpty) {
       throw Exception('授权数据解密失败');
     }
-    return plaintext;
-  }
-
-  /// HKDF-SHA256（RFC 5869，salt 与 info 均为空，输出 [length] 字节）。
-  static Uint8List _hkdfSha256(List<int> ikm, int length) {
-    final prk = crypto.Hmac(crypto.sha256, const <int>[]).convert(ikm).bytes;
-    final t1 = crypto.Hmac(crypto.sha256, prk).convert(const [0x01]).bytes;
-    return Uint8List.fromList(t1.sublist(0, length));
+    return text;
   }
 
   static String _snippet(String body) {

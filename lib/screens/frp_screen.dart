@@ -837,6 +837,7 @@ class _OpenFrpLoginDialogState extends State<_OpenFrpLoginDialog> {
           auth = await OfrpService.decryptAuthorization(
             poll.authorizationData,
             keys.keyPair,
+            poll.serverPublicKey,
           );
           break;
         } on PendingAuthorizationException {

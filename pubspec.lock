@@ -448,6 +448,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "7.0.2"
+  pinenacl:
+    dependency: "direct main"
+    description:
+      path: "third_party/pinenacl"
+      relative: true
+    source: path
+    version: "0.6.0"
   platform:
     dependency: transitive
     description:
