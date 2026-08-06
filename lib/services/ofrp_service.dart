@@ -167,6 +167,14 @@ class OfrpSoftwareInfo {
       );
 }
 
+/// 远程登录尚未授权（轮询中的常见状态），调用方应继续轮询。
+class PendingAuthorizationException implements Exception {
+  const PendingAuthorizationException();
+
+  @override
+  String toString() => '尚未授权';
+}
+
 /// OpenFrp API 服务（单例）。
 class OfrpService {
   static final OfrpService instance = OfrpService._();
@@ -376,17 +384,22 @@ class OfrpService {
 
   /// 轮询授权结果，成功返回 (服务端公钥, 加密的授权数据)。
   ///
-  /// 用户尚未授权时抛异常，由调用方继续轮询。
+  /// 接口为 GET 请求（query 携带 request_uuid），用户尚未授权时返回
+  /// HTTP 204，抛 [PendingAuthorizationException]，由调用方继续轮询。
   Future<({String serverPublicKey, String authorizationData})> pollRemoteLogin(
     String requestUuid,
   ) async {
     final res = await http
-        .post(
-          Uri.parse('https://access.openfrp.net/argoAccess/pollLogin'),
-          headers: {'Content-Type': 'application/json', 'User-Agent': _ua},
-          body: jsonEncode({'request_uuid': requestUuid}),
+        .get(
+          Uri.parse(
+            'https://access.openfrp.net/argoAccess/pollLogin',
+          ).replace(queryParameters: {'request_uuid': requestUuid}),
+          headers: {'User-Agent': _ua},
         )
         .timeout(const Duration(seconds: 30));
+    if (res.statusCode == 204) {
+      throw const PendingAuthorizationException();
+    }
     if (res.statusCode != 200) {
       throw Exception('轮询授权失败 HTTP ${res.statusCode}');
     }
@@ -397,7 +410,7 @@ class OfrpService {
     final data = json['data'] as Map<String, dynamic>;
     final authData = (data['authorization_data'] ?? '').toString();
     if (authData.isEmpty) {
-      throw Exception('尚未授权');
+      throw const PendingAuthorizationException();
     }
     final serverKey = res.headers['x-request-public-key'] ?? '';
     return (serverPublicKey: serverKey, authorizationData: authData);

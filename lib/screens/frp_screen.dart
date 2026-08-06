@@ -796,6 +796,7 @@ class _OpenFrpLoginDialogState extends State<_OpenFrpLoginDialog> {
   bool _loading = false;
   bool _cancelled = false;
   String? _error;
+  String _status = '等待浏览器授权…';
 
   @override
   void dispose() {
@@ -808,6 +809,7 @@ class _OpenFrpLoginDialogState extends State<_OpenFrpLoginDialog> {
       _loading = true;
       _cancelled = false;
       _error = null;
+      _status = '正在请求授权…';
     });
     final api = OfrpService.instance;
     try {
@@ -827,22 +829,32 @@ class _OpenFrpLoginDialogState extends State<_OpenFrpLoginDialog> {
       // 3. 轮询授权结果（每 5 秒，最长 5 分钟）。
       final deadline = DateTime.now().add(const Duration(minutes: 5));
       String? auth;
+      Object? lastError;
       while (!_cancelled && DateTime.now().isBefore(deadline)) {
         try {
           final poll = await api.pollRemoteLogin(request.requestUuid);
+          if (mounted) setState(() => _status = '已授权，正在解密…');
           auth = await OfrpService.decryptAuthorization(
             poll.authorizationData,
             keys.keyPair,
           );
           break;
-        } catch (_) {
+        } on PendingAuthorizationException {
           // 尚未授权，继续轮询。
+          if (mounted) setState(() => _status = '等待浏览器授权…');
+        } catch (e) {
+          // 真实错误（网络/解密失败等），立即停止并展示。
+          lastError = e;
+          break;
         }
         await Future.delayed(const Duration(seconds: 5));
       }
-      if (_cancelled) return;
+      if (_cancelled) {
+        if (mounted) Navigator.of(context).pop();
+        return;
+      }
       if (auth == null || auth.isEmpty) {
-        throw Exception('授权超时，请重试');
+        throw Exception(lastError?.toString() ?? '授权超时，请重试');
       }
       if (!mounted) return;
       Navigator.of(context).pop({'authorization': auth});
@@ -851,6 +863,7 @@ class _OpenFrpLoginDialogState extends State<_OpenFrpLoginDialog> {
       setState(() {
         _loading = false;
         _error = e.toString();
+        _status = '';
       });
     }
   }
@@ -896,7 +909,10 @@ class _OpenFrpLoginDialogState extends State<_OpenFrpLoginDialog> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                     const SizedBox(width: 8),
-                    Text('等待浏览器授权…', style: theme.textTheme.bodySmall),
+                    Text(
+                      _status.isEmpty ? '等待浏览器授权…' : _status,
+                      style: theme.textTheme.bodySmall,
+                    ),
                   ],
                 ),
               ],
