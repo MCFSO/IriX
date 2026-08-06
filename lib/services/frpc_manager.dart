@@ -77,8 +77,12 @@ class FrpcManager extends ChangeNotifier {
         }
       }
       if (!ok) throw Exception('frpc 下载失败，请检查网络后重试');
-      if (!exe.existsSync()) {
-        throw Exception('解压后未找到 frpc.exe');
+      final frpcExe = _findFrpcExe(frpcDir);
+      if (frpcExe == null) {
+        throw Exception('解压后未找到 frpc 可执行文件');
+      }
+      if (frpcExe.path != exe.path) {
+        await frpcExe.rename(exe.path);
       }
       _frpcPath = exe.path;
       return exe.path;
@@ -86,6 +90,19 @@ class FrpcManager extends ChangeNotifier {
       _downloading = false;
       notifyListeners();
     }
+  }
+
+  /// 在解压目录中递归查找 frpc 可执行文件（新版命名为
+  /// frpc_windows_amd64.exe，旧版为 frpc.exe，均可能带版本目录前缀）。
+  File? _findFrpcExe(Directory dir) {
+    for (final entry in dir.listSync(recursive: true)) {
+      if (entry is! File) continue;
+      final name = p.basename(entry.path).toLowerCase();
+      if (name.startsWith('frpc') && name.endsWith('.exe')) {
+        return entry;
+      }
+    }
+    return null;
   }
 
   Future<void> _downloadAndExtract(String url, Directory targetDir) async {
