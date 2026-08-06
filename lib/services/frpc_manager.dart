@@ -20,11 +20,16 @@ import 'package:path_provider/path_provider.dart';
 import '../services/ofrp_service.dart';
 
 /// frpc 进程管理器（单例）。
+///
+/// 支持两种 frpc 变体（flavor）：
+/// - 'openfrp'：OpenFrp 官方 frpc（新版本，仅支持 TOML 配置，下载 zip/tar.gz）；
+/// - 'chmlfrp'：ChmlFrp 官方 frpc（0.51.x 分支，仅支持 INI 配置，直接下载可执行文件）。
 class FrpcManager extends ChangeNotifier {
   static final FrpcManager instance = FrpcManager._();
   FrpcManager._();
 
-  String? _frpcPath;
+  /// flavor -> frpc 可执行文件路径。
+  final Map<String, String> _frpcPaths = {};
   bool _downloading = false;
 
   /// 按隧道 key（如 'ofrp-123' / 'custom-my'）记录的运行进程。
@@ -93,54 +98,126 @@ class FrpcManager extends ChangeNotifier {
   /// 解压后的可执行文件名（Windows 带 .exe 后缀）。
   String get _binaryName => Platform.isWindows ? 'frpc.exe' : 'frpc';
 
-  /// 确保 frpc 可执行文件存在，不存在时下载最新版并解压。
-  Future<String> ensureFrpc() async {
-    if (_frpcPath != null && File(_frpcPath!).existsSync()) {
-      return _frpcPath!;
+  /// 确保指定 flavor 的 frpc 可执行文件存在，不存在时下载。
+  Future<String> ensureFrpc([String flavor = 'openfrp']) async {
+    final cached = _frpcPaths[flavor];
+    if (cached != null && File(cached).existsSync()) {
+      return cached;
     }
     final appDir = await getApplicationDocumentsDirectory();
-    final frpcDir = Directory(p.join(appDir.path, 'ofrp', 'frpc'));
+    final frpcDir = Directory(
+      p.join(appDir.path, 'ofrp', flavor == 'chmlfrp' ? 'frpc-chml' : 'frpc'),
+    );
     final exe = File(p.join(frpcDir.path, _binaryName));
     if (exe.existsSync()) {
-      _frpcPath = exe.path;
+      _frpcPaths[flavor] = exe.path;
       return exe.path;
     }
 
     _downloading = true;
     notifyListeners();
     try {
-      final info = await OfrpService.instance.getSoftwareInfo();
-      if (info.latestFull.isEmpty || info.sources.isEmpty) {
-        throw Exception('无法获取 frpc 下载信息');
+      if (flavor == 'chmlfrp') {
+        await _downloadChmlFrpc(frpcDir, exe);
+      } else {
+        await _downloadOpenFrpFrpc(frpcDir, exe);
       }
-      var ok = false;
-      for (final source in info.sources) {
-        final url = '$source/${info.latestFull}/$_downloadFileName';
-        try {
-          await _downloadAndExtract(url, frpcDir);
-          ok = true;
-          break;
-        } catch (e) {
-          debugPrint('frpc download failed ($source): $e');
-        }
-      }
-      if (!ok) throw Exception('frpc 下载失败，请检查网络后重试');
-      final frpcBin = _findFrpcBinary(frpcDir);
-      if (frpcBin == null) {
-        throw Exception('解压后未找到 frpc 可执行文件');
-      }
-      if (frpcBin.path != exe.path) {
-        await frpcBin.rename(exe.path);
-      }
-      if (!Platform.isWindows) {
-        await Process.run('chmod', ['+x', exe.path]);
-      }
-      _frpcPath = exe.path;
+      _frpcPaths[flavor] = exe.path;
       return exe.path;
     } finally {
       _downloading = false;
       notifyListeners();
     }
+  }
+
+  /// 下载 OpenFrp 官方 frpc（zip/tar.gz）。
+  Future<void> _downloadOpenFrpFrpc(Directory frpcDir, File exe) async {
+    final info = await OfrpService.instance.getSoftwareInfo();
+    if (info.latestFull.isEmpty || info.sources.isEmpty) {
+      throw Exception('无法获取 frpc 下载信息');
+    }
+    var ok = false;
+    for (final source in info.sources) {
+      final url = '$source/${info.latestFull}/$_downloadFileName';
+      try {
+        await _downloadAndExtract(url, frpcDir);
+        ok = true;
+        break;
+      } catch (e) {
+        debugPrint('frpc download failed ($source): $e');
+      }
+    }
+    if (!ok) throw Exception('frpc 下载失败，请检查网络后重试');
+    final frpcBin = _findFrpcBinary(frpcDir);
+    if (frpcBin == null) {
+      throw Exception('解压后未找到 frpc 可执行文件');
+    }
+    if (frpcBin.path != exe.path) {
+      await frpcBin.rename(exe.path);
+    }
+    if (!Platform.isWindows) {
+      await Process.run('chmod', ['+x', exe.path]);
+    }
+  }
+
+  /// 下载 ChmlFrp 官方 frpc（INI 兼容版本，直接下载可执行文件）。
+  Future<void> _downloadChmlFrpc(Directory frpcDir, File exe) async {
+    final infoUrl = 'https://cf-v1.uapis.cn/download/frpc/frpc_info.json';
+    final res = await http
+        .get(Uri.parse(infoUrl))
+        .timeout(const Duration(seconds: 30));
+    if (res.statusCode != 200) {
+      throw Exception('获取 ChmlFrp frpc 信息失败 HTTP ${res.statusCode}');
+    }
+    final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    final downloads = ((json['data'] ?? const {}) as Map)['downloads'];
+    if (downloads is! List) {
+      throw Exception('ChmlFrp frpc 信息格式错误');
+    }
+    final platform = _chmlPlatform();
+    Map<String, dynamic>? match;
+    for (final entry in downloads) {
+      if (entry is! Map) continue;
+      final os = (entry['os'] ?? '').toString();
+      final arch = (entry['arch'] ?? '').toString();
+      if (os == platform.$1 && arch == platform.$2) {
+        match = entry.cast<String, dynamic>();
+        break;
+      }
+    }
+    final link = match?['link']?.toString();
+    if (link == null || link.isEmpty) {
+      throw Exception('ChmlFrp 不支持当前平台 (${platform.$1}/${platform.$2})');
+    }
+    if (frpcDir.existsSync()) {
+      frpcDir.deleteSync(recursive: true);
+    }
+    frpcDir.createSync(recursive: true);
+    final bin = await http
+        .get(Uri.parse(link))
+        .timeout(const Duration(seconds: 120));
+    if (bin.statusCode != 200) {
+      throw Exception('下载 ChmlFrp frpc 失败 HTTP ${bin.statusCode}');
+    }
+    await exe.writeAsBytes(bin.bodyBytes);
+    if (!Platform.isWindows) {
+      await Process.run('chmod', ['+x', exe.path]);
+    }
+  }
+
+  /// ChmlFrp frpc_info.json 中的 (os, arch) 组合。
+  ({String $1, String $2}) _chmlPlatform() {
+    final arch = switch (_archName) {
+      'amd64' => 'x86_64',
+      '386' => 'x86',
+      'arm64' => 'aarch64',
+      'arm' => 'arm',
+      final a => a,
+    };
+    return (
+      $1: Platform.operatingSystem,
+      $2: arch,
+    );
   }
 
   /// 下载并解压（zip 或 tar.gz 由 URL 扩展名决定）。
@@ -189,7 +266,7 @@ class FrpcManager extends ChangeNotifier {
 
   /// OpenFrp 简易启动：frpc -u token -p proxyId。
   Future<void> startOpenFrp(String token, String proxyId) =>
-      _spawn('ofrp-$proxyId', (path) async {
+      _spawn('ofrp-$proxyId', 'openfrp', (path) async {
         return Process.start(path, [
           '-u',
           token,
@@ -198,15 +275,22 @@ class FrpcManager extends ChangeNotifier {
         ], workingDirectory: p.dirname(path));
       });
 
-  /// 通用配置启动：写入 TOML 配置后以 frpc -c 运行。
-  Future<void> startWithConfig(String configContent, String key) =>
-      _spawn(key, (path) async {
+  /// 通用配置启动：写入配置文件后以 frpc -c 运行。
+  ///
+  /// [flavor] 选择 frpc 变体：'openfrp'（TOML）/ 'chmlfrp'（INI）。
+  Future<void> startWithConfig(
+    String configContent,
+    String key, {
+    String flavor = 'openfrp',
+  }) =>
+      _spawn(key, flavor, (path) async {
         final appDir = await getApplicationDocumentsDirectory();
         final configDir = Directory(p.join(appDir.path, 'ofrp', 'configs'));
         if (!configDir.existsSync()) {
           configDir.createSync(recursive: true);
         }
-        final configFile = File(p.join(configDir.path, '$key.toml'));
+        final ext = flavor == 'chmlfrp' ? 'ini' : 'toml';
+        final configFile = File(p.join(configDir.path, '$key.$ext'));
         await configFile.writeAsString(configContent);
         return Process.start(path, [
           '-c',
@@ -216,10 +300,11 @@ class FrpcManager extends ChangeNotifier {
 
   Future<void> _spawn(
     String key,
+    String flavor,
     Future<Process> Function(String frpcPath) starter,
   ) async {
     if (_processes.containsKey(key)) return;
-    final path = await ensureFrpc();
+    final path = await ensureFrpc(flavor);
     if (_downloading) return;
     final process = await starter(path);
     _processes[key] = process;

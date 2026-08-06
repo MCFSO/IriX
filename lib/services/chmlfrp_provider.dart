@@ -286,7 +286,12 @@ class ChmlFrpProvider extends FrpProvider {
     );
     final config = (json['data'] ?? '').toString();
     if (config.trim().isEmpty) throw Exception('获取隧道配置失败');
-    await FrpcManager.instance.startWithConfig(config, 'chmlfrp-$tunnelId');
+    // ChmlFrp 服务端返回 frpc.ini（INI 格式），需用其官方 INI 版 frpc 启动。
+    await FrpcManager.instance.startWithConfig(
+      config,
+      'chmlfrp-$tunnelId',
+      flavor: 'chmlfrp',
+    );
   }
 
   @override

@@ -182,9 +182,27 @@ class CustomFrpProvider extends FrpProvider {
     bool encrypt = false,
     bool gzip = false,
   }) {
-    final parts = server.trim().split(':');
-    final host = parts.first.trim();
-    final port = parts.length > 1 ? parts[1].trim() : '7000';
+    final serverTrimmed = server.trim();
+    String host;
+    String port = '7000';
+    if (serverTrimmed.startsWith('[')) {
+      // IPv6 带端口：[::1]:7000
+      final end = serverTrimmed.indexOf(']');
+      if (end < 0) throw Exception('服务器地址格式错误');
+      host = serverTrimmed.substring(1, end);
+      if (end + 1 < serverTrimmed.length && serverTrimmed[end + 1] == ':') {
+        port = serverTrimmed.substring(end + 2);
+      }
+    } else {
+      final parts = serverTrimmed.split(':');
+      host = parts.first.trim();
+      if (parts.length == 2) {
+        port = parts[1].trim();
+      } else if (parts.length > 2) {
+        // 裸 IPv6 地址（无端口）
+        host = serverTrimmed;
+      }
+    }
 
     final buf = StringBuffer()
       ..writeln('serverAddr = "${_esc(host)}"')
