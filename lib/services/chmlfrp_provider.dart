@@ -130,7 +130,11 @@ class ChmlFrpProvider extends FrpProvider {
   }
 
   Map<String, dynamic> _parse(http.Response res) {
-    final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    final body = utf8.decode(res.bodyBytes);
+    if (body.isEmpty) {
+      throw Exception('服务器返回空响应');
+    }
+    final json = jsonDecode(body) as Map<String, dynamic>;
     if (json['code'] != 200 || json['state'] != 'success') {
       throw Exception((json['msg'] ?? '请求失败').toString());
     }

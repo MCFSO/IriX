@@ -57,8 +57,13 @@ class SakuraFrpProvider extends FrpProvider {
     return res;
   }
 
-  Map<String, dynamic> _decode(http.Response res) =>
-      jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+  Map<String, dynamic> _decode(http.Response res) {
+    final body = utf8.decode(res.bodyBytes);
+    if (body.isEmpty) {
+      throw Exception('服务器返回空响应');
+    }
+    return jsonDecode(body) as Map<String, dynamic>;
+  }
 
   String _errorMessage(http.Response res) {
     try {

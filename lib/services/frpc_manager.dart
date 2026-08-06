@@ -169,7 +169,11 @@ class FrpcManager extends ChangeNotifier {
     if (res.statusCode != 200) {
       throw Exception('获取 ChmlFrp frpc 信息失败 HTTP ${res.statusCode}');
     }
-    final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    final body = utf8.decode(res.bodyBytes);
+    if (body.isEmpty) {
+      throw Exception('获取 ChmlFrp frpc 信息失败：服务器返回空响应');
+    }
+    final json = jsonDecode(body) as Map<String, dynamic>;
     final downloads = ((json['data'] ?? const {}) as Map)['downloads'];
     if (downloads is! List) {
       throw Exception('ChmlFrp frpc 信息格式错误');

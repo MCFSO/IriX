@@ -66,7 +66,11 @@ class HayFrpProvider extends FrpProvider {
   }
 
   Map<String, dynamic> _decode(http.Response res) {
-    final decoded = jsonDecode(utf8.decode(res.bodyBytes));
+    final body = utf8.decode(res.bodyBytes);
+    if (body.isEmpty) {
+      throw Exception('服务器返回空响应');
+    }
+    final decoded = jsonDecode(body);
     if (decoded is! Map<String, dynamic>) {
       throw Exception('响应格式错误');
     }
