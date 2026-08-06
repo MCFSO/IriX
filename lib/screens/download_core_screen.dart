@@ -1,10 +1,11 @@
 // 下载核心界面
 // 多步骤向导：选择核心与版本 → 下载核心文件 → 编辑启动命令并创建实例。
-// 通过 [AppState] 创建下载型实例，使用 path_provider 构造实例根目录。
+// 通过 [AppState] 创建下载型实例，实例文件夹放在 APP 根目录的 instances/ 下。
+
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 
 import '../data/server_cores.dart';
@@ -191,9 +192,10 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
     }
 
     try {
-      final docsDir = await getApplicationDocumentsDirectory();
+      // 实例文件夹放在 APP 根目录（exe 所在目录）下的 instances/。
+      final appRoot = p.dirname(Platform.resolvedExecutable);
       final instanceRoot = p.join(
-        docsDir.path,
+        appRoot,
         'instances',
         '${_downloadSource.toLowerCase()}-${DateTime.now().millisecondsSinceEpoch.toRadixString(36)}',
       );
