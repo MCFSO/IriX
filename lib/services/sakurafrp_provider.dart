@@ -3,7 +3,7 @@
 // 基于 SakuraFrp API v4（https://api.natfrp.com/v4）：
 // - 认证：访问密钥（Access Token），Bearer 头；
 // - 隧道：列表 / 创建 / 删除（支持 tcp/udp/http/https，不接入子域绑定）；
-// - 启动：通过 /tunnel/config 获取 frpc 配置文件（ini/toml），由 frpc -c 运行。
+// - 启动：官方 frpc（nya.globalslb.net 下载）以 `frpc -f <访问密钥>:<隧道ID>` 运行。
 
 import 'dart:convert';
 
@@ -16,9 +16,6 @@ import '../services/frpc_manager.dart';
 /// SakuraFrp API 基础地址。
 const sakuraFrpApiBase = 'https://api.natfrp.com/v4';
 
-/// 请求配置的 frpc 版本（上游版本，配置兼容新版本 frpc）。
-const _frpcVersion = '0.59.0';
-
 class SakuraFrpProvider extends FrpProvider {
   static const _keyToken = 'sakurafrp_token';
 
@@ -27,6 +24,10 @@ class SakuraFrpProvider extends FrpProvider {
 
   @override
   String get label => 'SakuraFrp';
+
+  /// SakuraFrp 官方定制 frpc（0.51.0-sakura 系列，-f 参数启动）。
+  @override
+  String get frpcFlavor => 'sakurafrp';
 
   Future<String?> _token() => DatabaseManager.instance.getSetting(_keyToken);
 
@@ -225,14 +226,9 @@ class SakuraFrpProvider extends FrpProvider {
 
   @override
   Future<void> startTunnel(String tunnelId) async {
-    final res = await _send(
-      'POST',
-      '/tunnel/config',
-      body: {'query': tunnelId, 'frpc': _frpcVersion},
-    );
-    final config = utf8.decode(res.bodyBytes);
-    if (config.trim().isEmpty) throw Exception('获取隧道配置失败');
-    await FrpcManager.instance.startWithConfig(config, 'sakurafrp-$tunnelId');
+    final token = await _token();
+    if (token == null || token.isEmpty) throw Exception('未登录');
+    await FrpcManager.instance.startSakuraFrp(token, tunnelId);
   }
 
   @override

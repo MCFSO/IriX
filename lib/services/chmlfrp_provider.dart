@@ -32,6 +32,10 @@ class ChmlFrpProvider extends FrpProvider {
   @override
   String get label => 'ChmlFrp';
 
+  /// ChmlFrp 服务端返回 INI 配置，需用其官方 INI 版 frpc。
+  @override
+  String get frpcFlavor => 'chmlfrp';
+
   /// 不接入域名（二级域名）功能，仅 tcp / udp。
   @override
   bool get supportsWebTunnels => false;
@@ -294,7 +298,7 @@ class ChmlFrpProvider extends FrpProvider {
     await FrpcManager.instance.startWithConfig(
       config,
       'chmlfrp-$tunnelId',
-      flavor: 'chmlfrp',
+      flavor: frpcFlavor,
     );
   }
 

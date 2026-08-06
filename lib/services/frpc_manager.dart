@@ -21,9 +21,11 @@ import '../services/ofrp_service.dart';
 
 /// frpc 进程管理器（单例）。
 ///
-/// 支持两种 frpc 变体（flavor）：
+/// 每个提供商使用各自的 frpc 变体（flavor）：
 /// - 'openfrp'：OpenFrp 官方 frpc（新版本，仅支持 TOML 配置，下载 zip/tar.gz）；
-/// - 'chmlfrp'：ChmlFrp 官方 frpc（0.51.x 分支，仅支持 INI 配置，直接下载可执行文件）。
+/// - 'chmlfrp'：ChmlFrp 官方 frpc（0.51.x 分支，仅支持 INI 配置，直接下载可执行文件）；
+/// - 'sakurafrp'：SakuraFrp 官方 frpc（0.51.0-sakura 系列，-f 参数启动，直接下载可执行文件）；
+/// - 'standard'：fatedier 官方标准 frpc（HayFrp/自建 frps 等标准 frp 服务）。
 class FrpcManager extends ChangeNotifier {
   static final FrpcManager instance = FrpcManager._();
   FrpcManager._();
@@ -129,7 +131,12 @@ class FrpcManager extends ChangeNotifier {
     }
     final appDir = await getApplicationDocumentsDirectory();
     final frpcDir = Directory(
-      p.join(appDir.path, 'ofrp', flavor == 'chmlfrp' ? 'frpc-chml' : 'frpc'),
+      p.join(appDir.path, 'ofrp', switch (flavor) {
+        'chmlfrp' => 'frpc-chml',
+        'sakurafrp' => 'frpc-sakura',
+        'standard' => 'frpc-standard',
+        _ => 'frpc',
+      }),
     );
     final exe = File(p.join(frpcDir.path, _binaryName));
     if (exe.existsSync()) {
@@ -142,6 +149,10 @@ class FrpcManager extends ChangeNotifier {
     try {
       if (flavor == 'chmlfrp') {
         await _downloadChmlFrpc(frpcDir, exe);
+      } else if (flavor == 'sakurafrp') {
+        await _downloadSakuraFrpc(frpcDir, exe);
+      } else if (flavor == 'standard') {
+        await _downloadFatedierFrpc(frpcDir, exe);
       } else {
         await _downloadOpenFrpFrpc(frpcDir, exe);
       }
@@ -232,6 +243,72 @@ class FrpcManager extends ChangeNotifier {
     }
   }
 
+  /// SakuraFrp 官方 frpc 下载目录。
+  static const _sakuraFrpcBase = 'https://nya.globalslb.net/natfrp/client/frpc';
+
+  /// 下载 SakuraFrp 官方 frpc（0.51.0-sakura 系列，直接下载可执行文件）。
+  Future<void> _downloadSakuraFrpc(Directory frpcDir, File exe) async {
+    final version = await _latestSakuraVersion();
+    final fileName = _sakuraFileName();
+    final res = await http
+        .get(Uri.parse('$_sakuraFrpcBase/$version/$fileName'))
+        .timeout(const Duration(seconds: 120));
+    if (res.statusCode != 200) {
+      throw Exception('下载 SakuraFrp frpc 失败 HTTP ${res.statusCode}');
+    }
+    if (frpcDir.existsSync()) {
+      frpcDir.deleteSync(recursive: true);
+    }
+    frpcDir.createSync(recursive: true);
+    await exe.writeAsBytes(res.bodyBytes);
+    if (!Platform.isWindows) {
+      await Process.run('chmod', ['+x', exe.path]);
+    }
+  }
+
+  /// SakuraFrp frpc 文件名（如 frpc_windows_amd64.exe）。
+  String _sakuraFileName() {
+    final arch = switch (_archName) {
+      'arm' => 'armv7',
+      final a => a,
+    };
+    return switch (Platform.operatingSystem) {
+      'windows' => 'frpc_windows_$arch.exe',
+      'linux' => 'frpc_linux_$arch',
+      'macos' => 'frpc_darwin_$arch',
+      final os => throw Exception('不支持的平台: $os'),
+    };
+  }
+
+  /// 从索引页解析最新 SakuraFrp frpc 版本目录（如 0.51.0-sakura-14）。
+  Future<String> _latestSakuraVersion() async {
+    final res = await http
+        .get(Uri.parse('$_sakuraFrpcBase/'))
+        .timeout(const Duration(seconds: 30));
+    if (res.statusCode != 200) {
+      throw Exception('获取 SakuraFrp frpc 版本失败 HTTP ${res.statusCode}');
+    }
+    final html = utf8.decode(res.bodyBytes);
+    final versions = <List<int>>[];
+    final re = RegExp(r'href="(\d+\.\d+\.\d+-sakura-[\d.]+)/"');
+    for (final m in re.allMatches(html)) {
+      versions.add([
+        for (final s in m.group(1)!.split(RegExp(r'[\-.]')))
+          int.tryParse(s) ?? 0,
+      ]);
+    }
+    if (versions.isEmpty) throw Exception('未找到 SakuraFrp frpc 版本');
+    versions.sort((a, b) {
+      final len = a.length < b.length ? a.length : b.length;
+      for (var i = 0; i < len; i++) {
+        if (a[i] != b[i]) return a[i].compareTo(b[i]);
+      }
+      return a.length.compareTo(b.length);
+    });
+    final latest = versions.last;
+    return '${latest[0]}.${latest[1]}.${latest[2]}-sakura-${latest.sublist(3).join('.')}';
+  }
+
   /// ChmlFrp frpc_info.json 中的 (os, arch) 组合。
   ({String $1, String $2}) _chmlPlatform() {
     final arch = switch (_archName) {
@@ -245,6 +322,77 @@ class FrpcManager extends ChangeNotifier {
       $1: Platform.operatingSystem,
       $2: arch,
     );
+  }
+
+  /// GitHub 加速镜像（国内可达），依次尝试后回退直连。
+  static const List<String> _ghMirrors = ['https://ghfast.top', 'https://ghproxy.net', ''];
+
+  /// 下载 fatedier 官方 frpc（HayFrp/SakuraFrp/自建 frps 等标准 frp 服务共用）。
+  ///
+  /// 版本优先取自 HayFrp /version 接口的 ver_frpc（与标准 frp 服务端对齐），
+  /// 失败时回退内置默认版本。
+  Future<void> _downloadFatedierFrpc(Directory frpcDir, File exe) async {
+    final version = await _hayFrpFrpcVersion();
+    final fileName = _fatedierFileName(version);
+    final urls = [
+      for (final mirror in _ghMirrors)
+        if (mirror.isEmpty)
+          'https://github.com/fatedier/frp/releases/download/v$version/$fileName'
+        else
+          '$mirror/https://github.com/fatedier/frp/releases/download/v$version/$fileName',
+    ];
+    var ok = false;
+    // 镜像可能返回截断文件（解压时才会暴露），最多两轮逐源重试。
+    for (var pass = 0; pass < 2 && !ok; pass++) {
+      for (final url in urls) {
+        try {
+          await _downloadAndExtract(url, frpcDir);
+          ok = true;
+          break;
+        } catch (e) {
+          debugPrint('fatedier frpc download failed ($url): $e');
+        }
+      }
+    }
+    if (!ok) throw Exception('frpc 下载失败，请检查网络后重试');
+    final frpcBin = _findFrpcBinary(frpcDir);
+    if (frpcBin == null) {
+      throw Exception('解压后未找到 frpc 可执行文件');
+    }
+    if (frpcBin.path != exe.path) {
+      await frpcBin.rename(exe.path);
+    }
+    if (!Platform.isWindows) {
+      await Process.run('chmod', ['+x', exe.path]);
+    }
+  }
+
+  /// HayFrp 推荐的 frpc 版本（GET /version 的 ver_frpc，如 0.70.0）。
+  Future<String> _hayFrpFrpcVersion() async {
+    try {
+      final res = await http
+          .get(Uri.parse('https://api.hayfrp.1zyq1.com/version'))
+          .timeout(const Duration(seconds: 15));
+      if (res.statusCode == 200) {
+        final json = jsonDecode(utf8.decode(res.bodyBytes));
+        final v = ((json as Map)['ver_frpc'] ?? '').toString().trim();
+        if (RegExp(r'^\d+\.\d+\.\d+$').hasMatch(v)) return v;
+      }
+    } catch (_) {
+      // 忽略，回退默认版本。
+    }
+    return '0.70.0';
+  }
+
+  /// fatedier 官方发布包文件名（如 frp_0.70.0_windows_amd64.zip）。
+  String _fatedierFileName(String version) {
+    final arch = _archName;
+    return switch (Platform.operatingSystem) {
+      'windows' => 'frp_${version}_windows_$arch.zip',
+      'linux' => 'frp_${version}_linux_$arch.tar.gz',
+      'macos' => 'frp_${version}_darwin_$arch.tar.gz',
+      final os => throw Exception('不支持的平台: $os'),
+    };
   }
 
   /// 下载并解压（zip 或 tar.gz 由 URL 扩展名决定）。
@@ -302,9 +450,18 @@ class FrpcManager extends ChangeNotifier {
         ], workingDirectory: p.dirname(path));
       });
 
+  /// SakuraFrp 官方启动：frpc -f <访问密钥>:<隧道ID>。
+  Future<void> startSakuraFrp(String token, String tunnelId) =>
+      _spawn('sakurafrp-$tunnelId', 'sakurafrp', (path) async {
+        return Process.start(path, [
+          '-f',
+          '$token:$tunnelId',
+        ], workingDirectory: p.dirname(path));
+      });
+
   /// 通用配置启动：写入配置文件后以 frpc -c 运行。
   ///
-  /// [flavor] 选择 frpc 变体：'openfrp'（TOML）/ 'chmlfrp'（INI）。
+  /// [flavor] 选择 frpc 变体：'openfrp'（TOML）/ 'standard'（标准 TOML）/ 'chmlfrp'（INI）。
   Future<void> startWithConfig(
     String configContent,
     String key, {
@@ -319,8 +476,11 @@ class FrpcManager extends ChangeNotifier {
         final ext = flavor == 'chmlfrp' ? 'ini' : 'toml';
         final configFile = File(p.join(configDir.path, '$key.$ext'));
         await configFile.writeAsString(configContent);
+        // OpenFrp 官方 frpc 移除了 -c 短参数（直接退出），必须用 --config；
+        // 标准版与 ChmlFrp 版均支持 -c。
+        final flag = (flavor == 'chmlfrp' || flavor == 'standard') ? '-c' : '--config';
         return Process.start(path, [
-          '-c',
+          flag,
           configFile.path,
         ], workingDirectory: p.dirname(path));
       });

@@ -27,6 +27,10 @@ class HayFrpProvider extends FrpProvider {
   @override
   String get label => 'HayFrp';
 
+  /// HayFrp 为标准 frp 服务商，使用 fatedier 官方标准版 frpc。
+  @override
+  String get frpcFlavor => 'standard';
+
   Future<String?> _token() => DatabaseManager.instance.getSetting(_keyToken);
 
   Future<Map<String, dynamic>> _userPost(Map<String, dynamic> body) =>
@@ -284,7 +288,11 @@ class HayFrpProvider extends FrpProvider {
     }
     final config = utf8.decode(res.bodyBytes);
     if (config.trim().isEmpty) throw Exception('获取隧道配置失败');
-    await FrpcManager.instance.startWithConfig(config, 'hayfrp-$tunnelId');
+    await FrpcManager.instance.startWithConfig(
+      config,
+      'hayfrp-$tunnelId',
+      flavor: frpcFlavor,
+    );
   }
 
   @override

@@ -164,6 +164,14 @@ abstract class FrpProvider {
   /// 隧道在 FrpcManager 中的进程 key（如 'ofrp-123'）。
   String tunnelKey(String tunnelId);
 
+  /// 本提供商使用的 frpc 变体（每个供应商用自己的定制 frpc）。
+  ///
+  /// - 'openfrp'：OpenFrp 官方 fork（-u -p 或 --config 启动）；
+  /// - 'chmlfrp'：ChmlFrp 官方 INI 版（-c 启动）；
+  /// - 'sakurafrp'：SakuraFrp 官方版（-f 启动）；
+  /// - 'standard'：fatedier 官方标准版（-c 启动，HayFrp/自建 frps 等标准 frp 服务）。
+  String get frpcFlavor => 'openfrp';
+
   /// 是否支持 HTTP/HTTPS（域名绑定）隧道；不支持的提供商仅允许 tcp/udp。
   bool get supportsWebTunnels => true;
 }

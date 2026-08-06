@@ -23,6 +23,10 @@ class CustomFrpProvider extends FrpProvider {
   @override
   String get label => '自建 frps';
 
+  /// 自建 frps 为标准 frp 协议，使用 fatedier 官方标准版 frpc。
+  @override
+  String get frpcFlavor => 'standard';
+
   Future<String?> _server() => DatabaseManager.instance.getSetting(_keyServer);
 
   Future<String?> _token() => DatabaseManager.instance.getSetting(_keyToken);
@@ -154,7 +158,11 @@ class CustomFrpProvider extends FrpProvider {
       encrypt: tunnel['encrypt'] == true,
       gzip: tunnel['gzip'] == true,
     );
-    await FrpcManager.instance.startWithConfig(config, 'custom-$tunnelId');
+    await FrpcManager.instance.startWithConfig(
+      config,
+      'custom-$tunnelId',
+      flavor: frpcFlavor,
+    );
   }
 
   @override
