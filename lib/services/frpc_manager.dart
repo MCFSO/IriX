@@ -44,8 +44,31 @@ class FrpcManager extends ChangeNotifier {
   /// 指定隧道是否在运行。
   bool isRunning(String key) => _processes.containsKey(key);
 
-  /// 指定隧道的输出（最近 4000 字符）。
+  /// 指定隧道的输出（内存保留最近 [maxOutputChars] 字符）。
   String? outputFor(String key) => _outputs[key];
+
+  /// 清空指定隧道的内存日志（不影响已持久化的日志文件）。
+  void clearOutput(String key) {
+    if (!_outputs.containsKey(key)) return;
+    _outputs[key] = '';
+    notifyListeners();
+  }
+
+  /// 内存中保留的日志上限（约 200KB），超出后丢弃最旧内容。
+  static const int maxOutputChars = 200 * 1024;
+
+  /// 日志持久化目录（APP 根目录/logs）。
+  String? _logsDir;
+
+  Future<String> _ensureLogsDir() async {
+    if (_logsDir != null) return _logsDir!;
+    final appRoot = p.dirname(Platform.resolvedExecutable);
+    final dir = Directory(p.join(appRoot, 'logs'));
+    if (!dir.existsSync()) {
+      dir.createSync(recursive: true);
+    }
+    return _logsDir = dir.path;
+  }
 
   /// 运行中的隧道 key 列表。
   List<String> get runningKeys => _processes.keys.toList();
@@ -314,18 +337,40 @@ class FrpcManager extends ChangeNotifier {
     _processes[key] = process;
     _outputs[key] = '';
 
+    // 持久化日志：追加写入 APP 根目录/logs/frpc-<key>.log（跨会话保留）。
+    IOSink? logSink;
+    try {
+      final logsDir = await _ensureLogsDir();
+      logSink = File(p.join(logsDir, 'frpc-$key.log')).openWrite(
+        mode: FileMode.append,
+      );
+      logSink.writeln(
+        '===== ${DateTime.now().toIso8601String()} frpc 启动 (flavor: $flavor) =====',
+      );
+    } catch (e) {
+      debugPrint('frpc log file open failed: $e');
+    }
+
     void onOutput(String chunk) {
       _outputs[key] = (_outputs[key] ?? '') + chunk;
-      if (_outputs[key]!.length > 8000) {
-        _outputs[key] = _outputs[key]!.substring(_outputs[key]!.length - 8000);
+      if (_outputs[key]!.length > maxOutputChars) {
+        _outputs[key] = _outputs[key]!
+            .substring(_outputs[key]!.length - maxOutputChars);
       }
+      logSink?.write(chunk);
       notifyListeners();
     }
 
     process.stdout.transform(utf8.decoder).listen(onOutput);
     process.stderr.transform(utf8.decoder).listen(onOutput);
     unawaited(
-      process.exitCode.then((_) {
+      process.exitCode.then((code) async {
+        try {
+          logSink?.writeln(
+            '\n===== ${DateTime.now().toIso8601String()} frpc 退出 (code: $code) =====\n',
+          );
+          await logSink?.close();
+        } catch (_) {}
         _processes.remove(key);
         notifyListeners();
       }),

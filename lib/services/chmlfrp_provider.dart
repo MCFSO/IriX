@@ -307,6 +307,9 @@ class ChmlFrpProvider extends FrpProvider {
       FrpcManager.instance.isRunning('chmlfrp-$tunnelId');
 
   @override
+  String tunnelKey(String tunnelId) => 'chmlfrp-$tunnelId';
+
+  @override
   String? tunnelOutput(String tunnelId) =>
       FrpcManager.instance.outputFor('chmlfrp-$tunnelId');
 

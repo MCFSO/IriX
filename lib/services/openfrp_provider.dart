@@ -134,6 +134,9 @@ class OpenFrpProvider extends FrpProvider {
       FrpcManager.instance.isRunning('ofrp-$tunnelId');
 
   @override
+  String tunnelKey(String tunnelId) => 'ofrp-$tunnelId';
+
+  @override
   String? tunnelOutput(String tunnelId) =>
       FrpcManager.instance.outputFor('ofrp-$tunnelId');
 }

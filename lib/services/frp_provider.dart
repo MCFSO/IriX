@@ -161,6 +161,9 @@ abstract class FrpProvider {
   /// 隧道运行输出（最近一段）。
   String? tunnelOutput(String tunnelId);
 
+  /// 隧道在 FrpcManager 中的进程 key（如 'ofrp-123'）。
+  String tunnelKey(String tunnelId);
+
   /// 是否支持 HTTP/HTTPS（域名绑定）隧道；不支持的提供商仅允许 tcp/udp。
   bool get supportsWebTunnels => true;
 }

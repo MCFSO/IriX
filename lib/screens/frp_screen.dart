@@ -40,6 +40,18 @@ class _FrpScreenState extends State<FrpScreen> {
   bool _loading = true;
   String? _error;
 
+  /// 右侧日志面板当前选中的隧道 id（null 表示未选择）。
+  String? _selectedTunnelId;
+
+  /// 日志面板滚动控制器（自动滚到最新）。
+  final ScrollController _logScrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _logScrollController.dispose();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -235,6 +247,8 @@ class _FrpScreenState extends State<FrpScreen> {
         ).showSnackBar(SnackBar(content: Text('启动失败: $e')));
       }
     }
+    if (!mounted) return;
+    setState(() => _selectedTunnelId = tunnel.id);
   }
 
   @override
@@ -343,7 +357,19 @@ class _FrpScreenState extends State<FrpScreen> {
             ],
           ),
         ),
-        Expanded(child: _buildTunnelList(theme)),
+        // 左侧隧道列表 + 右侧日志面板
+        Expanded(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(flex: 5, child: _buildTunnelList(theme)),
+              SizedBox(
+                width: 320,
+                child: _buildLogPanel(theme),
+              ),
+            ],
+          ),
+        ),
         // OpenFrp OPENAPI 使用条款要求的来源注明（仅 OpenFrp 提供商）。
         if (_provider is OpenFrpProvider)
           Padding(
@@ -357,6 +383,78 @@ class _FrpScreenState extends State<FrpScreen> {
             ),
           ),
       ],
+    );
+  }
+
+  /// 右侧日志面板：显示选中隧道的完整日志（自动滚动到最新）。
+  Widget _buildLogPanel(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 8, 16, 8),
+      child: Card(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 8, 6),
+              child: Row(
+                children: [
+                  Icon(Icons.terminal, size: 18, color: theme.colorScheme.primary),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '日志',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: '清空内存日志',
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.clear_all, size: 18),
+                    onPressed: () => FrpcManager.instance.clearOutput(
+                      _provider.tunnelKey(_selectedTunnelId ?? ''),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: ListenableBuilder(
+                listenable: FrpcManager.instance,
+                builder: (context, _) {
+                  final key = _provider.tunnelKey(_selectedTunnelId ?? '');
+                  final output = FrpcManager.instance.outputFor(key);
+                  final text = output == null || output.isEmpty
+                      ? '暂无日志\n\n点击左侧隧道卡片可查看对应日志'
+                      : output;
+                  final controller = _logScrollController;
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (controller.hasClients) {
+                      controller.jumpTo(controller.position.maxScrollExtent);
+                    }
+                  });
+                  return SingleChildScrollView(
+                    controller: controller,
+                    padding: const EdgeInsets.all(12),
+                    child: SelectableText(
+                      text,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 11.5,
+                        height: 1.5,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -574,7 +672,7 @@ class _FrpScreenState extends State<FrpScreen> {
 
   Widget _buildTunnelCard(ThemeData theme, FrpTunnel tunnel) {
     final running = _provider.isTunnelRunning(tunnel.id);
-    final output = _provider.tunnelOutput(tunnel.id);
+    final selected = tunnel.id == _selectedTunnelId;
     final typeIcon = switch (tunnel.type) {
       'udp' => Icons.bolt,
       'http' => Icons.language,
@@ -590,8 +688,16 @@ class _FrpScreenState extends State<FrpScreen> {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: selected
+            ? BorderSide(color: theme.colorScheme.primary, width: 1.5)
+            : BorderSide.none,
+      ),
+      child: InkWell(
+        onTap: () => setState(() => _selectedTunnelId = tunnel.id),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -695,30 +801,8 @@ class _FrpScreenState extends State<FrpScreen> {
                 ],
               ),
             ],
-            if (running && output != null && output.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest.withValues(
-                    alpha: 0.5,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  output,
-                  style: const TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 11,
-                    height: 1.4,
-                  ),
-                  maxLines: 4,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
           ],
+        ),
         ),
       ),
     );

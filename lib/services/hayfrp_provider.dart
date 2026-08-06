@@ -286,6 +286,9 @@ class HayFrpProvider extends FrpProvider {
   String? tunnelOutput(String tunnelId) =>
       FrpcManager.instance.outputFor('hayfrp-$tunnelId');
 
+  @override
+  String tunnelKey(String tunnelId) => 'hayfrp-$tunnelId';
+
   static String _snippet(String body) {
     final trimmed = body.trim();
     return trimmed.length > 200 ? '${trimmed.substring(0, 200)}…' : trimmed;

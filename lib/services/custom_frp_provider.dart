@@ -169,6 +169,9 @@ class CustomFrpProvider extends FrpProvider {
   String? tunnelOutput(String tunnelId) =>
       FrpcManager.instance.outputFor('custom-$tunnelId');
 
+  @override
+  String tunnelKey(String tunnelId) => 'custom-$tunnelId';
+
   /// 生成 frpc TOML 配置。
   static String _buildToml({
     required String server,

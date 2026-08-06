@@ -247,6 +247,9 @@ class SakuraFrpProvider extends FrpProvider {
   String? tunnelOutput(String tunnelId) =>
       FrpcManager.instance.outputFor('sakurafrp-$tunnelId');
 
+  @override
+  String tunnelKey(String tunnelId) => 'sakurafrp-$tunnelId';
+
   static String _snippet(String body) {
     final trimmed = body.trim();
     return trimmed.length > 200 ? '${trimmed.substring(0, 200)}…' : trimmed;
