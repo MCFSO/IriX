@@ -221,12 +221,14 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
     try {
       final result = await _fetchPage(0, 20);
+      if (!mounted) return;
       setState(() {
         _hits = result.hits;
         _hasMore = result.hasMore;
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = e.toString();
         _isLoading = false;
@@ -240,12 +242,14 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
     try {
       final result = await _fetchPage(_hits.length, 20);
+      if (!mounted) return;
       setState(() {
         _hits.addAll(result.hits);
         _hasMore = result.hasMore && result.hits.isNotEmpty;
         _isLoadingMore = false;
       });
     } catch (_) {
+      if (!mounted) return;
       setState(() => _isLoadingMore = false);
     }
   }
