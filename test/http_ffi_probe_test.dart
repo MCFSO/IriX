@@ -1,7 +1,6 @@
 // 观察实验：Dart HttpServer 延迟响应期间，裸 Socket 客户端收到什么字节？
 // 排除 FFI 层，纯 dart:io。用于定位 Linux CI 上读超时不触发的问题。
 
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -9,11 +8,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   late HttpServer server;
-  late String baseUrl;
 
   setUpAll(() async {
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    baseUrl = 'http://127.0.0.1:${server.port}';
     server.listen((request) {
       final path = request.uri.path;
       if (path == '/slow') {
