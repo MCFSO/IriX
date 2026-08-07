@@ -216,8 +216,9 @@ class HttpFfiService {
       }
     });
 
+    Isolate? isolate;
     try {
-      await Isolate.spawn(
+      isolate = await Isolate.spawn(
         _httpRequestIsolate,
         _HttpFfiRequest(
           method: method,
@@ -229,7 +230,12 @@ class HttpFfiService {
           sendPort: responsePort.sendPort,
         ),
       );
-      return await completer.future;
+      // Dart 层硬超时兜底：Rust 侧 SO_RCVTIMEO 在个别平台/环境下可能失效，
+      // 这里保证调用方总能按预期超时返回，并尽力终止后台 isolate。
+      return await completer.future.timeout(timeout, onTimeout: () {
+        isolate?.kill(priority: Isolate.immediate);
+        throw HttpFfiException('请求超时: $timeout');
+      });
     } finally {
       await sub.cancel();
       responsePort.close();

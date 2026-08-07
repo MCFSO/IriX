@@ -241,8 +241,6 @@ fn do_request(
         "status": status,
         "headers": header_map,
         "body_b64": BASE64.encode(&buf),
-        "debug_timeout_secs": timeout_secs,
-        "debug_max_redirects": max_redirects,
     })
     .to_string())
 }
