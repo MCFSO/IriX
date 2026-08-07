@@ -53,11 +53,11 @@ jobs:
       - name: Analyze Dart code
         run: flutter analyze
 
-      - name: Run Dart tests
-        run: flutter test --coverage
-
       - name: Run Rust tests
         run: cd rust && cargo test --release
+
+      - name: Run Dart tests
+        run: flutter test --coverage
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v5
