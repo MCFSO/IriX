@@ -45,16 +45,34 @@ void _serverIsolate(SendPort sendPort) async {
   sendPort.send(server.port);
 }
 
+void _socketServerIsolate(SendPort sendPort) async {
+  final server = await ServerSocket.bind('127.0.0.1', 0);
+  server.listen((socket) {
+    socket.listen((_) {
+      Future.delayed(const Duration(seconds: 3), () {
+        socket.write('HTTP/1.1 200 OK\r\nContent-Length: 4\r\nConnection: close\r\n\r\nslow');
+        socket.close();
+      });
+    });
+  });
+  sendPort.send(server.port);
+}
+
 void main() {
-  late int serverPort;
+  late int httpServerPort;
+  late int socketServerPort;
 
   setUpAll(() async {
-    final rp = ReceivePort();
+    var rp = ReceivePort();
     await Isolate.spawn(_serverIsolate, rp.sendPort);
-    serverPort = await rp.first as int;
+    httpServerPort = await rp.first as int;
+
+    rp = ReceivePort();
+    await Isolate.spawn(_socketServerIsolate, rp.sendPort);
+    socketServerPort = await rp.first as int;
   });
 
-  String? syncCall(int timeoutSecs) {
+  String? syncCall(String url, int timeoutSecs) {
     final libName = Platform.isWindows
         ? 'xmc_http_client.dll'
         : 'libxmc_http_client.so';
@@ -81,7 +99,7 @@ void main() {
 
     final sw = Stopwatch()..start();
     final methodPtr = 'GET'.toNativeUtf8();
-    final urlPtr = 'http://127.0.0.1:$serverPort/slow'.toNativeUtf8();
+    final urlPtr = url.toNativeUtf8();
     final headersPtr = '{}'.toNativeUtf8();
 
     final resultPtr =
@@ -98,16 +116,16 @@ void main() {
     return raw;
   }
 
-  test('同步 FFI：timeout=1（期望 1 秒超时）与 timeout=0（默认 60s）对比', () {
-    final raw1 = syncCall(1);
-    final raw0 = syncCall(0);
+  test('同步 FFI 对比：HttpServer vs ServerSocket（timeout=1）', () {
+    final raw1 = syncCall('http://127.0.0.1:$httpServerPort/slow', 1);
+    final raw2 = syncCall('http://127.0.0.1:$socketServerPort/slow', 1);
     final decoded1 = jsonDecode(raw1!) as Map<String, dynamic>;
-    final decoded0 = jsonDecode(raw0!) as Map<String, dynamic>;
+    final decoded2 = jsonDecode(raw2!) as Map<String, dynamic>;
     // ignore: avoid_print
-    print('timeout=1 -> rust 收到 timeout_secs=${decoded1['debug_timeout_secs']} '
+    print('HttpServer: rust 收到 timeout_secs=${decoded1['debug_timeout_secs']} '
         'ok=${decoded1['ok']}');
     // ignore: avoid_print
-    print('timeout=0 -> rust 收到 timeout_secs=${decoded0['debug_timeout_secs']} '
-        'ok=${decoded0['ok']}');
+    print('ServerSocket: rust 收到 timeout_secs=${decoded2['debug_timeout_secs']} '
+        'ok=${decoded2['ok']}');
   });
 }
