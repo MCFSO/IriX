@@ -33,6 +33,20 @@ jobs:
         with:
           workspaces: rust
 
+      - name: Build Rust library
+        run: |
+          cd rust
+          cargo build --release
+
+      - name: Copy Rust so (for FFI tests)
+        run: |
+          mkdir -p linux
+          cp rust/target/release/libxmc_backup.so linux/
+          cp rust/target/release/libxmc_downloader.so linux/
+          cp rust/target/release/libxmc_file_ops.so linux/
+          cp rust/target/release/libxmc_logger.so linux/
+          cp rust/target/release/libxmc_http_client.so linux/
+
       - name: Get dependencies
         run: flutter pub get
 
@@ -83,6 +97,8 @@ jobs:
           Copy-Item rust/target/release/xmc_backup.dll windows/runner/ -Force
           Copy-Item rust/target/release/xmc_downloader.dll windows/runner/ -Force
           Copy-Item rust/target/release/xmc_file_ops.dll windows/runner/ -Force
+          Copy-Item rust/target/release/xmc_logger.dll windows/runner/ -Force
+          Copy-Item rust/target/release/xmc_http_client.dll windows/runner/ -Force
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -102,6 +118,8 @@ jobs:
           Copy-Item windows/runner/xmc_backup.dll build/windows/x64/runner/Release/ -Force
           Copy-Item windows/runner/xmc_downloader.dll build/windows/x64/runner/Release/ -Force
           Copy-Item windows/runner/xmc_file_ops.dll build/windows/x64/runner/Release/ -Force
+          Copy-Item windows/runner/xmc_logger.dll build/windows/x64/runner/Release/ -Force
+          Copy-Item windows/runner/xmc_http_client.dll build/windows/x64/runner/Release/ -Force
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v5
@@ -144,6 +162,8 @@ jobs:
           cp rust/target/release/libxmc_backup.so linux/
           cp rust/target/release/libxmc_downloader.so linux/
           cp rust/target/release/libxmc_file_ops.so linux/
+          cp rust/target/release/libxmc_logger.so linux/
+          cp rust/target/release/libxmc_http_client.so linux/
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -164,6 +184,8 @@ jobs:
           cp linux/libxmc_backup.so build/linux/x64/release/bundle/lib/
           cp linux/libxmc_downloader.so build/linux/x64/release/bundle/lib/
           cp linux/libxmc_file_ops.so build/linux/x64/release/bundle/lib/
+          cp linux/libxmc_logger.so build/linux/x64/release/bundle/lib/
+          cp linux/libxmc_http_client.so build/linux/x64/release/bundle/lib/
 
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v5
@@ -218,6 +240,14 @@ jobs:
             rust/target/x86_64-apple-darwin/release/libxmc_file_ops.dylib \
             rust/target/aarch64-apple-darwin/release/libxmc_file_ops.dylib \
             -output macos/libxmc_file_ops.dylib
+          lipo -create \
+            rust/target/x86_64-apple-darwin/release/libxmc_logger.dylib \
+            rust/target/aarch64-apple-darwin/release/libxmc_logger.dylib \
+            -output macos/libxmc_logger.dylib
+          lipo -create \
+            rust/target/x86_64-apple-darwin/release/libxmc_http_client.dylib \
+            rust/target/aarch64-apple-darwin/release/libxmc_http_client.dylib \
+            -output macos/libxmc_http_client.dylib
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -238,6 +268,8 @@ jobs:
           cp macos/libxmc_backup.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
           cp macos/libxmc_downloader.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
           cp macos/libxmc_file_ops.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
+          cp macos/libxmc_logger.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
+          cp macos/libxmc_http_client.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v5

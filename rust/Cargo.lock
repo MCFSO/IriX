@@ -1315,6 +1315,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "xmc_http_client"
+version = "0.1.0"
+dependencies = [
+ "base64",
+ "libc",
+ "serde_json",
+ "ureq",
+]
+
+[[package]]
 name = "xmc_logger"
 version = "0.1.0"
 dependencies = [
