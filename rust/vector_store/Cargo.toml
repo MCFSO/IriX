@@ -1,0 +1,15 @@
+[package]
+name = "xmc_vector_store"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+libc = "0.2"
+# SQLite（bundled 编译）用于向量存储；sqlite-vec 通过 auto_extension 注册 vec0 虚拟表。
+rusqlite = { version = "0.37", features = ["bundled"] }
+sqlite-vec = "0.1"
+serde_json = "1"
+zerocopy = "0.8"

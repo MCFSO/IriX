@@ -7,12 +7,16 @@
 // - 添加模型时可指定上下文窗口，对话按上下文窗口自动压缩历史；
 // - 敏感工具（执行命令、启停实例）弹出权限申请卡片，等待用户允许/拒绝。
 
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../services/ai_assistant_service.dart';
 import '../services/ai_settings.dart';
+import '../services/knowledge_service.dart';
 import '../services/mcp_server.dart';
 import '../state/app_state.dart';
 import '../utils/apple_widgets.dart';
@@ -614,16 +618,128 @@ class _ModelsDialogState extends State<_ModelsDialog> {
   bool _mcpEnabled = false;
   final _mcpPortController = TextEditingController();
 
+  /// 知识库文档列表与加载状态。
+  List<KnowledgeDocument> _knowledgeDocs = [];
+  bool _knowledgeLoading = false;
+  bool _importing = false;
+
   @override
   void initState() {
     super.initState();
     _load();
+    _loadKnowledge();
   }
 
   @override
   void dispose() {
     _mcpPortController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadKnowledge() async {
+    setState(() => _knowledgeLoading = true);
+    try {
+      final docs = await KnowledgeService.instance.listDocuments();
+      if (!mounted) return;
+      setState(() => _knowledgeDocs = docs);
+    } catch (e) {
+      debugPrint('Failed to load knowledge docs: $e');
+      if (mounted) {
+        setState(() => _knowledgeDocs = []);
+      }
+    } finally {
+      if (mounted) setState(() => _knowledgeLoading = false);
+    }
+  }
+
+  Future<void> _importKnowledge() async {
+    if (_importing) return;
+    final model = await AiSettings.getActiveModel();
+    if (model == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('请先添加 AI 模型，知识库导入需要调用 Embedding 接口')),
+        );
+      }
+      return;
+    }
+
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['txt', 'md'],
+      withData: false,
+    );
+    final path = result?.files.first.path;
+    if (path == null) return;
+
+    String content;
+    try {
+      content = await File(path).readAsString();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('读取文件失败: $e')));
+      }
+      return;
+    }
+
+    setState(() => _importing = true);
+    try {
+      await KnowledgeService.instance.importDocument(
+        model,
+        title: path.split(Platform.pathSeparator).last,
+        content: content,
+      );
+      await _loadKnowledge();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('知识库导入完成')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('导入失败: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _importing = false);
+    }
+  }
+
+  Future<void> _deleteKnowledge(KnowledgeDocument doc) async {
+    final confirmed = await showAppDialog<bool>(
+      context,
+      (ctx) => AlertDialog(
+        title: const Text('删除文档'),
+        content: Text('确定从知识库删除 "${doc.title}" 吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await KnowledgeService.instance.deleteDocument(doc.id);
+      await _loadKnowledge();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('删除失败: $e')));
+      }
+    }
   }
 
   Future<void> _load() async {
@@ -830,6 +946,106 @@ class _ModelsDialogState extends State<_ModelsDialog> {
                   ),
                 ),
               const Divider(height: 24),
+              // === 知识库（RAG）===
+              Row(
+                children: [
+                  Icon(
+                    Icons.menu_book_outlined,
+                    size: 20,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '知识库',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  FilledButton.tonalIcon(
+                    onPressed: _importing ? null : _importKnowledge,
+                    icon: _importing
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.upload_file, size: 18),
+                    label: Text(_importing ? '导入中…' : '导入文档'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (_knowledgeLoading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Center(
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                )
+              else if (_knowledgeDocs.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    '知识库为空。导入 .txt/.md 文档后，AI 对话时可检索知识库内容。\n'
+                    '（需在模型设置中配置 Embedding 模型，或留空使用同名模型）',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                )
+              else
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 160),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _knowledgeDocs.length,
+                    itemBuilder: (context, index) {
+                      final doc = _knowledgeDocs[index];
+                      return ListTile(
+                        dense: true,
+                        leading: Icon(
+                          Icons.description_outlined,
+                          size: 20,
+                          color: theme.colorScheme.primary,
+                        ),
+                        title: Text(
+                          doc.title,
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          '${doc.chunkCount} 个分块 · ${doc.createdAt}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.outline,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: IconButton(
+                          tooltip: '删除',
+                          visualDensity: VisualDensity.compact,
+                          icon: Icon(
+                            Icons.delete_outline,
+                            size: 18,
+                            color: theme.colorScheme.error,
+                          ),
+                          onPressed: () => _deleteKnowledge(doc),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              const Divider(height: 24),
               // === MCP 服务器 ===
               Row(
                 children: [
@@ -943,6 +1159,7 @@ class _ModelEditDialogState extends State<_ModelEditDialog> {
   final _baseUrlController = TextEditingController();
   final _apiKeyController = TextEditingController();
   final _contextController = TextEditingController();
+  final _embeddingController = TextEditingController();
 
   String? _nameError;
   String? _baseUrlError;
@@ -959,6 +1176,7 @@ class _ModelEditDialogState extends State<_ModelEditDialog> {
       _baseUrlController.text = model.baseUrl;
       _apiKeyController.text = model.apiKey;
       _contextController.text = '${model.contextWindow}';
+      _embeddingController.text = model.embeddingModel ?? '';
     } else {
       _contextController.text = '${AiSettings.defaultContextWindow}';
     }
@@ -970,6 +1188,7 @@ class _ModelEditDialogState extends State<_ModelEditDialog> {
     _baseUrlController.dispose();
     _apiKeyController.dispose();
     _contextController.dispose();
+    _embeddingController.dispose();
     super.dispose();
   }
 
@@ -996,6 +1215,9 @@ class _ModelEditDialogState extends State<_ModelEditDialog> {
       baseUrl: baseUrl,
       apiKey: _apiKeyController.text.trim(),
       contextWindow: contextWindow!,
+      embeddingModel: _embeddingController.text.trim().isEmpty
+          ? null
+          : _embeddingController.text.trim(),
     );
     Navigator.of(context).pop(model);
   }
@@ -1061,10 +1283,23 @@ class _ModelEditDialogState extends State<_ModelEditDialog> {
                   errorText: _contextError,
                 ),
               ),
+const SizedBox(height: 12),
+              TextField(
+                controller: _embeddingController,
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                decoration: const InputDecoration(
+                  labelText: 'Embedding 模型（可选，知识库用）',
+                  hintText: '如 text-embedding-3-small；留空则用模型本身',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
               const SizedBox(height: 12),
               Text(
                 '对话接近上下文窗口上限时，会自动将较早的对话交给 AI 压缩成摘要，'
-                '以节省 token 并保持长期对话连贯。',
+                '以节省 token 并保持长期对话连贯。\n'
+                '知识库（RAG）使用 Embedding 模型生成向量，'
+                '配置后即可在 AI 设置中导入 .txt/.md 文档。',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),

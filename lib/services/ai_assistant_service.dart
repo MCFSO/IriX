@@ -17,6 +17,7 @@ import 'package:path/path.dart' as p;
 import '../models/server_instance.dart';
 import '../services/ai_settings.dart';
 import '../services/http_ffi.dart';
+import '../services/knowledge_service.dart';
 import '../services/log_persistence.dart';
 import '../state/app_state.dart';
 
@@ -674,6 +675,42 @@ class AiAssistantService {
               '${await file.openRead(0, 60 * 1024).transform(utf8.decoder).join()}';
         }
         return await file.readAsString();
+      },
+    ),
+    AiTool(
+      name: 'search_knowledge',
+      description:
+          '在本地知识库（用户导入的文档）中检索与问题相关的内容，'
+          '返回最相似的文本片段。当你认为答案可能来自知识库时使用。',
+      parameters: {
+        'type': 'object',
+        'properties': {
+          'query': {'type': 'string', 'description': '检索关键词或问题'},
+          'top_k': {'type': 'integer', 'description': '返回片段数，默认 5'},
+        },
+        'required': ['query'],
+      },
+      permission: AiToolPermission.read,
+      describe: (a) => '知识库检索 · "${a['query']}"',
+      handler: (state, a) async {
+        final model = await AiSettings.getActiveModel();
+        if (model == null) return '尚未配置 AI 模型，无法获取 embedding';
+        final query = a['query'].toString();
+        final topK = (a['top_k'] as num?)?.toInt() ?? 5;
+        final hits = await KnowledgeService.instance.search(
+          model,
+          query,
+          topK: topK,
+        );
+        if (hits.isEmpty) return '知识库中没有相关内容（或知识库为空，可先在 AI 设置中导入文档）';
+        final lines = <String>[];
+        for (var i = 0; i < hits.length; i++) {
+          final h = hits[i];
+          lines.add(
+            '[$i] <${h.title}> 相似度 ${(1 - h.distance).toStringAsFixed(3)}:\n${h.text}',
+          );
+        }
+        return '知识库检索结果:\n${lines.join('\n\n')}';
       },
     ),
     AiTool(

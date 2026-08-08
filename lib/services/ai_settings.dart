@@ -18,12 +18,16 @@ class AiModelConfig {
   /// 上下文窗口大小（token 数），用于决定何时压缩对话历史。
   int contextWindow;
 
+  /// 知识库 embedding 模型名（可选）；为空时知识库回退使用 [name]。
+  String? embeddingModel;
+
   AiModelConfig({
     required this.id,
     required this.name,
     required this.baseUrl,
     required this.apiKey,
     required this.contextWindow,
+    this.embeddingModel,
   });
 
   /// 创建新模型（自动生成 id）。
@@ -32,12 +36,14 @@ class AiModelConfig {
     required String baseUrl,
     required String apiKey,
     required int contextWindow,
+    String? embeddingModel,
   }) => AiModelConfig(
     id: DateTime.now().microsecondsSinceEpoch.toRadixString(36),
     name: name,
     baseUrl: baseUrl,
     apiKey: apiKey,
     contextWindow: contextWindow,
+    embeddingModel: embeddingModel,
   );
 
   Map<String, dynamic> toJson() => {
@@ -46,6 +52,7 @@ class AiModelConfig {
     'baseUrl': baseUrl,
     'apiKey': apiKey,
     'contextWindow': contextWindow,
+    if (embeddingModel != null) 'embeddingModel': embeddingModel,
   };
 
   factory AiModelConfig.fromJson(Map<String, dynamic> json) => AiModelConfig(
@@ -54,6 +61,7 @@ class AiModelConfig {
     baseUrl: json['baseUrl'] as String,
     apiKey: (json['apiKey'] as String?) ?? '',
     contextWindow: ((json['contextWindow'] as num?)?.toInt()) ?? 8192,
+    embeddingModel: json['embeddingModel'] as String?,
   );
 }
 
