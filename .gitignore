@@ -43,6 +43,8 @@ app.*.map.json
 rust/target/
 
 # Rust FFI 动态库（由 build_rust.bat / build_rust.sh 生成）
+# 项目根目录的 DLL 只服务本地 FFI 测试，不入库；windows/runner/ 下仍跟踪
+/xmc_*.dll
 linux/libxmc_*.so
 macos/libxmc_*.dylib
 

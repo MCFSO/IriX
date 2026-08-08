@@ -6,29 +6,40 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:http/http.dart' as http;
 import 'package:irix/services/mcp_server.dart';
 import 'package:irix/state/app_state.dart';
 
 void main() {
   late McpServer server;
+  late HttpClient client;
 
   setUp(() async {
+    client = HttpClient();
     server = McpServer(AppState());
     await server.start(0);
   });
 
   tearDown(() async {
     await server.stop();
+    client.close(force: true);
   });
 
   Uri uri(String path) => Uri.parse('http://127.0.0.1:${server.port}$path');
 
-  Future<http.Response> post(Map<String, dynamic> body) => http.post(
-    uri('/mcp'),
-    headers: {'Content-Type': 'application/json'},
-    body: jsonEncode(body),
-  );
+  Future<TestHttpResponse> post(Map<String, dynamic> body) async {
+    final request =
+        await client.postUrl(uri('/mcp'))
+          ..headers.set('Content-Type', 'application/json')
+          ..add(utf8.encode(jsonEncode(body)));
+    final response = await request.close();
+    return TestHttpResponse.read(response);
+  }
+
+  Future<TestHttpResponse> get(Uri u) async {
+    final request = await client.getUrl(u);
+    final response = await request.close();
+    return TestHttpResponse.read(response);
+  }
 
   Future<Map<String, dynamic>> rpc(
     String method, [
@@ -41,7 +52,7 @@ void main() {
       'params': params ?? {},
     });
     expect(res.statusCode, 200, reason: res.body);
-    return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    return jsonDecode(res.body) as Map<String, dynamic>;
   }
 
   test('initialize 握手返回服务器信息与工具能力', () async {
@@ -157,9 +168,23 @@ void main() {
   });
 
   test('GET / 返回信息页', () async {
-    final res = await http.get(uri('/'));
+    final res = await get(uri('/'));
     expect(res.statusCode, 200);
     expect(res.body, contains('IriX MCP Server'));
     expect(res.body, contains('/mcp'));
   });
+}
+
+/// dart:io HttpClient 响应简化封装，替代 package:http Response。
+class TestHttpResponse {
+  TestHttpResponse(this.statusCode, this.body);
+
+  final int statusCode;
+  final String body;
+
+  static Future<TestHttpResponse> read(HttpClientResponse response) async {
+    final status = response.statusCode;
+    final body = await utf8.decodeStream(response);
+    return TestHttpResponse(status, body);
+  }
 }

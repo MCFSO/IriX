@@ -8,7 +8,7 @@ IriX（X Minecraft Server Launcher）—— Minecraft 服务器管理工具。Fl
 
 - **UI**: Flutter 3.x (Dart SDK >= 3.12), Provider 状态管理
 - **Rust**: workspace（backup / downloader / http_client / file_ops / logger / db_client / vector_store），release profile 开启 `opt-level = 3` + `lto`
-- **存储**: SQLite（sqflite_common_ffi）、SharedPreferences
+- **存储**: SQLite（sqflite_common_ffi，settings 表统一存设置）
 - **FFI**: `package:ffi` 调用 `xmc_backup.dll`、`xmc_downloader.dll`、`xmc_http_client.dll`、`xmc_file_ops.dll`、`xmc_logger.dll`、`xmc_db_client.dll`、`xmc_vector_store.dll`
 - **数据库**: 远程数据库（MySQL/MariaDB/PostgreSQL/Redis）连接与操作由 Rust 执行（`db_client` crate，mysql/postgres/redis 纯 Rust 驱动，无 OpenSSL）；本地持久化用 SQLite（sqflite_common_ffi，`DatabaseManager`）
 - **网络**: 全部 HTTP 请求由 Rust 处理（`http_client` crate 通用请求 + `downloader` crate 流式/分片下载，均为 ureq + rustls，无 OpenSSL）；Dart 侧不再使用 `package:http`（仅测试用例保留），本地回环 HTTP 服务（OAuth 回调、MCP 服务端）仍用 `dart:io HttpServer`
@@ -76,7 +76,7 @@ flutter test test/knowledge_ffi_test.dart
 - **所有 HTTP 请求统一走 Rust**：通用请求用 `lib/services/http_ffi.dart`（`HttpFfiService`，小/中响应），大文件下载用 `lib/services/downloader.dart`（`Downloader.downloadFile`，流式写盘）；新增 API 服务禁止使用 `package:http`，本地回环 HTTP 服务端（OAuth 回调、MCP）例外
 - **所有远程数据库操作统一走 Rust**：通过 `lib/services/db_client_ffi.dart`（`DbClientFfi`）调用 `xmc_db_client` 动态库的 `db_request` 入口（MySQL/MariaDB/PostgreSQL/Redis 连接测试、浏览、查询、管理）；禁止在 Dart 侧新增数据库客户端依赖；`remote_db_service.dart` 是唯一业务入口
 - 状态管理统一走 `lib/state/`（Provider），不在 widget 内直接持有全局状态
-- 持久化数据用 SQLite（`instance_store.dart`、`node_store.dart`、`trash_store.dart` 等），轻量设置用 SharedPreferences
+- 持久化数据统一用 SQLite（`instance_store.dart`、`node_store.dart`、`trash_store.dart`、`ai_settings.dart` 等，设置存 settings 表）；无 SharedPreferences
 - 新增页面放 `lib/screens/`，新增 API 服务放 `lib/services/`，命名遵循现有 `*_api_service.dart` / `*_provider.dart` 模式
 - 全局暗色主题，UI 组件参考 `lib/utils/apple_widgets.dart`
 - 勿编辑 `rust/target/`、`build/`、`dist/` 等生成目录

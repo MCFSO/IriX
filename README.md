@@ -25,7 +25,7 @@ AI作品轻喷
 |---|---|
 | UI | Flutter 3.x, Provider |
 | 网络 | ureq + rustls（Rust，Dart 侧禁用 package:http） |
-| 存储 | SQLite（sqflite_common_ffi）, SharedPreferences |
+| 存储 | SQLite（sqflite_common_ffi），无 SharedPreferences |
 | 压缩 | flate2 (zlib-ng) + crc32fast, rayon 并行 |
 | 文件操作 | walkdir, serde_json, Rust FFI |
 | 远程数据库 | Rust mysql / postgres / redis 驱动（db_client FFI） |
