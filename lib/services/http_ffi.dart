@@ -100,8 +100,8 @@ class _HttpFfiRequest {
 /// Rust 通用 HTTP 客户端 — FFI 封装
 ///
 /// 所有耗时的 FFI 调用都在后台 isolate 执行，UI 线程不会阻塞。
-/// 与现有 [ModrinthApiService] 等基于 package:http 的服务不冲突，
-/// 可作为后续迁移的底层替换（接口设计对齐 http.Response 常用字段）。
+/// 全项目 HTTP 请求均经由本服务（以及 [Downloader] 负责大文件流式下载），
+/// 接口设计对齐 http.Response 常用字段。
 class HttpFfiService {
   static HttpFfiService? _instance;
 

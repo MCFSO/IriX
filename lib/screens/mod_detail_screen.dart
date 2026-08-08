@@ -46,7 +46,6 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
 
   @override
   void dispose() {
-    _api.dispose();
     super.dispose();
   }
 

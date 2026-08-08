@@ -12,11 +12,11 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 
 import '../models/server_instance.dart';
 import '../services/ai_settings.dart';
+import '../services/http_ffi.dart';
 import '../services/log_persistence.dart';
 import '../state/app_state.dart';
 
@@ -394,13 +394,12 @@ class AiAssistantService {
       'tool_choice': 'auto',
     });
 
-    final res = await http
-        .post(
-          Uri.parse(_endpoint(model.baseUrl)),
-          headers: _headers(model.apiKey),
-          body: body,
-        )
-        .timeout(const Duration(seconds: 120));
+    final res = await HttpFfiService.instance.post(
+      _endpoint(model.baseUrl),
+      headers: _headers(model.apiKey),
+      body: body,
+      timeout: const Duration(seconds: 120),
+    );
     if (res.statusCode != 200) {
       throw Exception('API ${res.statusCode}: ${_snippet(res.body)}');
     }
@@ -442,13 +441,12 @@ class AiAssistantService {
     });
 
     try {
-      final res = await http
-          .post(
-            Uri.parse(_endpoint(model.baseUrl)),
-            headers: _headers(model.apiKey),
-            body: body,
-          )
-          .timeout(const Duration(seconds: 120));
+      final res = await HttpFfiService.instance.post(
+        _endpoint(model.baseUrl),
+        headers: _headers(model.apiKey),
+        body: body,
+        timeout: const Duration(seconds: 120),
+      );
       if (res.statusCode != 200) return null;
       final json =
           jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;

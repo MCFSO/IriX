@@ -1,9 +1,10 @@
 // Modrinth API v2 服务
 // 文档: https://docs.modrinth.com
+// HTTP 请求全部由 Rust (xmc_http_client.dll) 执行。
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 
 import '../models/modrinth.dart';
+import '../services/http_ffi.dart';
 
 /// Modrinth API 异常
 class ModrinthApiException implements Exception {
@@ -18,14 +19,9 @@ class ModrinthApiException implements Exception {
 
 /// Modrinth API 服务
 class ModrinthApiService {
-  ModrinthApiService({http.Client? client})
-      : _client = client ?? http.Client();
-
   static const String _baseUrl = 'https://api.modrinth.com/v2';
   static const String _userAgent =
       'IriX/1.0.0 (https://github.com/MCFSO/IriX)';
-
-  final http.Client _client;
 
   /// 搜索项目
   ///
@@ -139,13 +135,16 @@ class ModrinthApiService {
         .toList();
   }
 
-  /// 统一 GET 请求
+  /// 统一 GET 请求（由 Rust http_client 执行）。
   Future<dynamic> _get(Uri uri) async {
     try {
-      final response = await _client.get(uri, headers: <String, String>{
-        'User-Agent': _userAgent,
-        'Accept': 'application/json',
-      });
+      final response = await HttpFfiService.instance.get(
+        uri.toString(),
+        headers: <String, String>{
+          'User-Agent': _userAgent,
+          'Accept': 'application/json',
+        },
+      );
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw ModrinthApiException(
@@ -157,12 +156,8 @@ class ModrinthApiService {
       return jsonDecode(response.body);
     } on FormatException catch (e) {
       throw ModrinthApiException('JSON 解析失败: ${e.message}');
-    } on http.ClientException catch (e) {
+    } on HttpFfiException catch (e) {
       throw ModrinthApiException('网络错误: ${e.message}');
     }
-  }
-
-  void dispose() {
-    _client.close();
   }
 }

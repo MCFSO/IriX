@@ -41,7 +41,6 @@ class _HangarDetailScreenState extends State<HangarDetailScreen> {
 
   @override
   void dispose() {
-    _api.dispose();
     super.dispose();
   }
 

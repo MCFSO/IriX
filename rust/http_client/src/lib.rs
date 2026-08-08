@@ -24,8 +24,10 @@ thread_local! {
     static LAST_ERROR: RefCell<Option<CString>> = const { RefCell::new(None) };
 }
 
-/// 响应体大小上限 (16 MiB)，防止意外大响应耗尽内存。
-const MAX_BODY_BYTES: u64 = 16 * 1024 * 1024;
+/// 响应体大小上限 (256 MiB)。
+/// 迁移后所有 HTTP 请求都走 Rust，包括节点文件下载等大响应场景；
+/// 256 MiB 在内存可承受范围内，同时避免意外大响应耗尽内存。
+const MAX_BODY_BYTES: u64 = 256 * 1024 * 1024;
 
 const DEFAULT_USER_AGENT: &str = "IriX/1.0.0 (https://github.com/MCFSO/IriX)";
 

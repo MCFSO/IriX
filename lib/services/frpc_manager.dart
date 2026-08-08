@@ -13,10 +13,11 @@ import 'dart:io';
 
 import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../services/downloader.dart';
+import '../services/http_ffi.dart';
 import '../services/ofrp_service.dart';
 
 /// frpc 进程管理器（单例）。
@@ -196,10 +197,12 @@ class FrpcManager extends ChangeNotifier {
 
   /// 下载 ChmlFrp 官方 frpc（INI 兼容版本，直接下载可执行文件）。
   Future<void> _downloadChmlFrpc(Directory frpcDir, File exe) async {
+    final downloader = Downloader();
     final infoUrl = 'https://cf-v1.uapis.cn/download/frpc/frpc_info.json';
-    final res = await http
-        .get(Uri.parse(infoUrl))
-        .timeout(const Duration(seconds: 30));
+    final res = await HttpFfiService.instance.get(
+      infoUrl,
+      timeout: const Duration(seconds: 30),
+    );
     if (res.statusCode != 200) {
       throw Exception('获取 ChmlFrp frpc 信息失败 HTTP ${res.statusCode}');
     }
@@ -231,13 +234,7 @@ class FrpcManager extends ChangeNotifier {
       frpcDir.deleteSync(recursive: true);
     }
     frpcDir.createSync(recursive: true);
-    final bin = await http
-        .get(Uri.parse(link))
-        .timeout(const Duration(seconds: 120));
-    if (bin.statusCode != 200) {
-      throw Exception('下载 ChmlFrp frpc 失败 HTTP ${bin.statusCode}');
-    }
-    await exe.writeAsBytes(bin.bodyBytes);
+    await downloader.downloadFile(link, exe.path, (_) {});
     if (!Platform.isWindows) {
       await Process.run('chmod', ['+x', exe.path]);
     }
@@ -250,17 +247,12 @@ class FrpcManager extends ChangeNotifier {
   Future<void> _downloadSakuraFrpc(Directory frpcDir, File exe) async {
     final version = await _latestSakuraVersion();
     final fileName = _sakuraFileName();
-    final res = await http
-        .get(Uri.parse('$_sakuraFrpcBase/$version/$fileName'))
-        .timeout(const Duration(seconds: 120));
-    if (res.statusCode != 200) {
-      throw Exception('下载 SakuraFrp frpc 失败 HTTP ${res.statusCode}');
-    }
     if (frpcDir.existsSync()) {
       frpcDir.deleteSync(recursive: true);
     }
     frpcDir.createSync(recursive: true);
-    await exe.writeAsBytes(res.bodyBytes);
+    await Downloader()
+        .downloadFile('$_sakuraFrpcBase/$version/$fileName', exe.path, (_) {});
     if (!Platform.isWindows) {
       await Process.run('chmod', ['+x', exe.path]);
     }
@@ -282,9 +274,10 @@ class FrpcManager extends ChangeNotifier {
 
   /// 从索引页解析最新 SakuraFrp frpc 版本目录（如 0.51.0-sakura-14）。
   Future<String> _latestSakuraVersion() async {
-    final res = await http
-        .get(Uri.parse('$_sakuraFrpcBase/'))
-        .timeout(const Duration(seconds: 30));
+    final res = await HttpFfiService.instance.get(
+      '$_sakuraFrpcBase/',
+      timeout: const Duration(seconds: 30),
+    );
     if (res.statusCode != 200) {
       throw Exception('获取 SakuraFrp frpc 版本失败 HTTP ${res.statusCode}');
     }
@@ -370,9 +363,10 @@ class FrpcManager extends ChangeNotifier {
   /// HayFrp 推荐的 frpc 版本（GET /version 的 ver_frpc，如 0.70.0）。
   Future<String> _hayFrpFrpcVersion() async {
     try {
-      final res = await http
-          .get(Uri.parse('https://api.hayfrp.1zyq1.com/version'))
-          .timeout(const Duration(seconds: 15));
+      final res = await HttpFfiService.instance.get(
+        'https://api.hayfrp.1zyq1.com/version',
+        timeout: const Duration(seconds: 15),
+      );
       if (res.statusCode == 200) {
         final json = jsonDecode(utf8.decode(res.bodyBytes));
         final v = ((json as Map)['ver_frpc'] ?? '').toString().trim();
@@ -396,23 +390,27 @@ class FrpcManager extends ChangeNotifier {
   }
 
   /// 下载并解压（zip 或 tar.gz 由 URL 扩展名决定）。
+  ///
+  /// 二进制下载交给 Rust Downloader 流式写入临时文件（规避响应体内存上限），
+  /// 解压完成后删除临时文件。
   Future<void> _downloadAndExtract(String url, Directory targetDir) async {
-    final res = await http
-        .get(Uri.parse(url))
-        .timeout(const Duration(seconds: 120));
-    if (res.statusCode != 200) {
-      throw Exception('HTTP ${res.statusCode}');
-    }
-    if (targetDir.existsSync()) {
-      targetDir.deleteSync(recursive: true);
-    }
-    targetDir.createSync(recursive: true);
-    final archive = _decodeArchive(url, res.bodyBytes);
-    for (final file in archive) {
-      if (!file.isFile) continue;
-      final outPath = p.join(targetDir.path, file.name);
-      Directory(p.dirname(outPath)).createSync(recursive: true);
-      File(outPath).writeAsBytesSync(file.content as List<int>);
+    final tmpDir = await Directory.systemTemp.createTemp('irix-frpc-');
+    final archivePath = p.join(tmpDir.path, 'archive');
+    try {
+      await Downloader().downloadFile(url, archivePath, (_) {});
+      if (targetDir.existsSync()) {
+        targetDir.deleteSync(recursive: true);
+      }
+      targetDir.createSync(recursive: true);
+      final archive = _decodeArchive(url, File(archivePath).readAsBytesSync());
+      for (final file in archive) {
+        if (!file.isFile) continue;
+        final outPath = p.join(targetDir.path, file.name);
+        Directory(p.dirname(outPath)).createSync(recursive: true);
+        File(outPath).writeAsBytesSync(file.content as List<int>);
+      }
+    } finally {
+      tmpDir.deleteSync(recursive: true);
     }
   }
 

@@ -9,11 +9,10 @@
 
 import 'dart:convert';
 
-import 'package:http/http.dart' as http;
-
 import '../services/database_manager.dart';
 import '../services/frp_provider.dart';
 import '../services/frpc_manager.dart';
+import '../services/http_ffi.dart';
 
 /// HayFrp API 基础地址。
 const hayFrpApiBase = 'https://api.hayfrp.1zyq1.com';
@@ -43,16 +42,16 @@ class HayFrpProvider extends FrpProvider {
     String path,
     Map<String, dynamic> body,
   ) async {
-    final res = await http
+    final res = await HttpFfiService.instance
         .post(
-          Uri.parse('$hayFrpApiBase$path'),
+          '$hayFrpApiBase$path',
           headers: {
             'Content-Type': 'application/json;charset=UTF-8',
             'waf': 'off',
           },
           body: jsonEncode(body),
-        )
-        .timeout(const Duration(seconds: 30));
+          timeout: const Duration(seconds: 30),
+        );
     if (res.statusCode != 200) {
       throw Exception('HTTP ${res.statusCode}: ${_snippet(res.body)}');
     }
@@ -60,16 +59,18 @@ class HayFrpProvider extends FrpProvider {
   }
 
   Future<Map<String, dynamic>> _get(String path) async {
-    final res = await http
-        .get(Uri.parse('$hayFrpApiBase$path'), headers: {'waf': 'off'})
-        .timeout(const Duration(seconds: 30));
+    final res = await HttpFfiService.instance.get(
+      '$hayFrpApiBase$path',
+      headers: {'waf': 'off'},
+      timeout: const Duration(seconds: 30),
+    );
     if (res.statusCode != 200) {
       throw Exception('HTTP ${res.statusCode}');
     }
     return _decode(res);
   }
 
-  Map<String, dynamic> _decode(http.Response res) {
+  Map<String, dynamic> _decode(HttpFfiResponse res) {
     final body = utf8.decode(res.bodyBytes);
     if (body.trim().isEmpty) {
       throw Exception('服务器返回空响应');
@@ -268,9 +269,9 @@ class HayFrpProvider extends FrpProvider {
     if (token == null || token.isEmpty) throw Exception('未登录');
     // 注意：config 接口的隧道参数是 id（传 node=隧道ID 会返回空响应），
     // 且响应为纯 TOML 文本（非 JSON 包装），因此不走 _proxyPost/_decode。
-    final res = await http
+    final res = await HttpFfiService.instance
         .post(
-          Uri.parse('$hayFrpApiBase/proxy'),
+          '$hayFrpApiBase/proxy',
           headers: {
             'Content-Type': 'application/json;charset=UTF-8',
             'waf': 'off',
@@ -281,8 +282,8 @@ class HayFrpProvider extends FrpProvider {
             'csrf': token,
             'id': tunnelId,
           }),
-        )
-        .timeout(const Duration(seconds: 30));
+          timeout: const Duration(seconds: 30),
+        );
     if (res.statusCode != 200) {
       throw Exception('HTTP ${res.statusCode}: ${_snippet(res.body)}');
     }

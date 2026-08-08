@@ -10,11 +10,13 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
-import 'package:http/http.dart' as http;
+import 'package:path/path.dart' as p;
 
 import '../models/node.dart';
 import '../models/remote.dart';
+import '../services/http_ffi.dart';
 
 /// 节点 API 异常。
 class NodeApiException implements Exception {
@@ -111,27 +113,20 @@ class NodeApiClient {
     final headers = body != null ? _headers : const {
       'X-Requested-With': 'XMLHttpRequest',
     };
-    http.Response resp;
+    HttpFfiResponse resp;
     try {
-      resp = switch (method) {
-        'GET' => await http.get(uri, headers: headers).timeout(timeout),
-        'POST' => await http
-            .post(uri, headers: headers, body: jsonEncode(body))
-            .timeout(timeout),
-        'PUT' => await http
-            .put(uri, headers: headers, body: jsonEncode(body))
-            .timeout(timeout),
-        'DELETE' => await http
-            .delete(uri, headers: headers, body: jsonEncode(body))
-            .timeout(timeout),
-        _ => throw NodeApiException(0, '不支持的请求方法: $method'),
-      };
-    } on SocketException {
-      throw NodeApiException(0, '无法连接到节点 $baseUrl，请检查地址与网络');
-    } on HttpException {
-      throw NodeApiException(0, '无法连接到节点 $baseUrl，请检查地址与网络');
-    } on TimeoutException {
-      throw NodeApiException(0, '连接节点 $baseUrl 超时');
+      resp = await HttpFfiService.instance.request(
+        method: method,
+        url: uri.toString(),
+        headers: headers,
+        body: body == null ? null : utf8.encode(jsonEncode(body)),
+        timeout: timeout,
+      );
+    } on HttpFfiException catch (e) {
+      if (e.message.contains('超时')) {
+        throw NodeApiException(0, '连接节点 $baseUrl 超时');
+      }
+      throw NodeApiException(0, '无法连接到节点 $baseUrl，请检查地址与网络 (${e.message})');
     }
 
     if (resp.statusCode == 401 && retryOnce && apiKey.isEmpty) {
@@ -154,7 +149,7 @@ class NodeApiClient {
   }
 
   /// 解码响应体，兼容 UTF-8 与 GBK 等编码。
-  dynamic _decode(http.Response resp) {
+  dynamic _decode(HttpFfiResponse resp) {
     try {
       return jsonDecode(utf8.decode(resp.bodyBytes));
     } catch (_) {
@@ -531,7 +526,10 @@ class NodeApiClient {
 
   /// 直连下载文件字节流（GET /download/{password}/...）。
   Future<List<int>> directDownload(DownloadTicket ticket) async {
-    final resp = await http.get(Uri.parse(ticket.url)).timeout(timeout);
+    final resp = await HttpFfiService.instance.get(
+      ticket.url,
+      timeout: timeout,
+    );
     if (resp.statusCode >= 400) {
       throw NodeApiException(resp.statusCode, '下载失败（HTTP ${resp.statusCode}）');
     }
@@ -539,6 +537,9 @@ class NodeApiClient {
   }
 
   /// 直连上传文件（POST /upload/{password}，multipart 字段名 file）。
+  ///
+  /// multipart 请求体在 Dart 侧按 RFC 2046 手工构造，
+  /// 实际网络传输由 Rust http_client 负责。
   Future<void> directUpload({
     required UploadTicket ticket,
     required String localPath,
@@ -547,10 +548,25 @@ class NodeApiClient {
     if (!await file.exists()) {
       throw NodeApiException(0, '本地文件不存在: $localPath');
     }
-    final req = http.MultipartRequest('POST', Uri.parse(ticket.url))
-      ..files.add(await http.MultipartFile.fromPath('file', localPath));
-    final streamed = await req.send().timeout(timeout);
-    final resp = await http.Response.fromStream(streamed);
+    final boundary = 'IriX${DateTime.now().microsecondsSinceEpoch}';
+    final bytes = await file.readAsBytes();
+    final body = BytesBuilder()
+      ..add(
+        utf8.encode(
+          '--$boundary\r\n'
+          'Content-Disposition: form-data; name="file"; filename="${p.basename(localPath)}"\r\n'
+          'Content-Type: application/octet-stream\r\n'
+          '\r\n',
+        ),
+      )
+      ..add(bytes)
+      ..add(utf8.encode('\r\n--$boundary--\r\n'));
+    final resp = await HttpFfiService.instance.post(
+      ticket.url,
+      headers: {'Content-Type': 'multipart/form-data; boundary=$boundary'},
+      body: body.takeBytes(),
+      timeout: timeout,
+    );
     if (resp.statusCode >= 400) {
       throw NodeApiException(resp.statusCode, '上传失败（HTTP ${resp.statusCode}）');
     }

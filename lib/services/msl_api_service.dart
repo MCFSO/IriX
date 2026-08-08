@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:http/http.dart' as http;
+import '../services/http_ffi.dart';
 
 const _baseUrl = 'https://api.mslmc.cn/v4';
 
@@ -11,12 +11,12 @@ class MslApiService {
   String get _ua => 'IriX/1.0.0 (https://github.com/MCFSO/IriX)';
 
   Future<Map<String, dynamic>> _get(String path) async {
-    final res = await http.get(
-      Uri.parse('$_baseUrl$path'),
+    final res = await HttpFfiService.instance.get(
+      '$_baseUrl$path',
       headers: {'User-Agent': _ua},
     );
     if (res.statusCode != 200) {
-      throw Exception('MSL API $res.statusCode: ${res.body}');
+      throw Exception('MSL API ${res.statusCode}: ${res.body}');
     }
     final body = jsonDecode(res.body) as Map<String, dynamic>;
     if (body['code'] != 200) {
@@ -31,8 +31,8 @@ class MslApiService {
   }
 
   Future<List<String>> getMirrorsFlat() async {
-    final response = await http.get(
-      Uri.parse('$_baseUrl/mirrors?view=list'),
+    final response = await HttpFfiService.instance.get(
+      '$_baseUrl/mirrors?view=list',
       headers: {'User-Agent': _ua},
     );
     if (response.statusCode != 200) {

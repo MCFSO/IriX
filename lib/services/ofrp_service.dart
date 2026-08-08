@@ -12,11 +12,11 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
-import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:pinenacl/x25519.dart' as nacl;
 
 import '../services/database_manager.dart';
+import '../services/http_ffi.dart';
 
 const _apiBase = 'https://api.openfrp.net';
 const _ua = 'IriX/1.0.0 (https://github.com/MCFSO/IriX)';
@@ -213,18 +213,17 @@ class OfrpService {
     'Authorization': auth,
   };
 
-  Future<http.Response> _post(
+  Future<HttpFfiResponse> _post(
     String path,
     Map<String, dynamic> body,
     String auth,
   ) async {
-    final res = await http
-        .post(
-          Uri.parse('$_apiBase$path'),
-          headers: _headers(auth),
-          body: jsonEncode(body),
-        )
-        .timeout(const Duration(seconds: 30));
+    final res = await HttpFfiService.instance.post(
+      '$_apiBase$path',
+      headers: _headers(auth),
+      body: jsonEncode(body),
+      timeout: const Duration(seconds: 30),
+    );
     if (res.statusCode != 200) {
       throw Exception('HTTP ${res.statusCode}: ${_snippet(res.body)}');
     }
@@ -232,7 +231,7 @@ class OfrpService {
   }
 
   /// 解析统一响应结构 {flag, msg, data}，失败抛异常。
-  Map<String, dynamic> _parse(http.Response res) {
+  Map<String, dynamic> _parse(HttpFfiResponse res) {
     final body = utf8.decode(res.bodyBytes);
     if (body.trim().isEmpty) {
       throw Exception('服务器返回空响应');
@@ -245,7 +244,7 @@ class OfrpService {
   }
 
   /// 文档说明：任意接口响应头有概率返回新的 Authorization，需要自动更新。
-  Future<void> _maybeUpdateAuth(http.Response res) async {
+  Future<void> _maybeUpdateAuth(HttpFfiResponse res) async {
     final newAuth = res.headers['authorization'];
     if (newAuth == null || newAuth.isEmpty) return;
     final current = await getAuth();
@@ -329,12 +328,11 @@ class OfrpService {
 
   /// 获取 frpc 软件资源（下载源与最新版本）。
   Future<OfrpSoftwareInfo> getSoftwareInfo() async {
-    final res = await http
-        .get(
-          Uri.parse('$_apiBase/commonQuery/get?key=software'),
-          headers: {'User-Agent': _ua},
-        )
-        .timeout(const Duration(seconds: 30));
+    final res = await HttpFfiService.instance.get(
+      '$_apiBase/commonQuery/get?key=software',
+      headers: {'User-Agent': _ua},
+      timeout: const Duration(seconds: 30),
+    );
     if (res.statusCode != 200) {
       throw Exception('HTTP ${res.statusCode}');
     }
@@ -372,13 +370,13 @@ class OfrpService {
   Future<({String authorizationUrl, String requestUuid})> requestRemoteLogin(
     String publicKey,
   ) async {
-    final res = await http
+    final res = await HttpFfiService.instance
         .post(
-          Uri.parse('https://access.openfrp.net/argoAccess/requestLogin'),
+          'https://access.openfrp.net/argoAccess/requestLogin',
           headers: {'Content-Type': 'application/json', 'User-Agent': _ua},
           body: jsonEncode({'public_key': publicKey}),
-        )
-        .timeout(const Duration(seconds: 30));
+          timeout: const Duration(seconds: 30),
+        );
     if (res.statusCode != 200) {
       throw Exception('请求授权失败 HTTP ${res.statusCode}: ${_snippet(res.body)}');
     }
@@ -406,14 +404,11 @@ class OfrpService {
   Future<({String serverPublicKey, String authorizationData})> pollRemoteLogin(
     String requestUuid,
   ) async {
-    final res = await http
-        .get(
-          Uri.parse(
-            'https://access.openfrp.net/argoAccess/pollLogin',
-          ).replace(queryParameters: {'request_uuid': requestUuid}),
-          headers: {'User-Agent': _ua},
-        )
-        .timeout(const Duration(seconds: 30));
+    final res = await HttpFfiService.instance.get(
+      'https://access.openfrp.net/argoAccess/pollLogin?request_uuid=$requestUuid',
+      headers: {'User-Agent': _ua},
+      timeout: const Duration(seconds: 30),
+    );
     if (res.statusCode == 204) {
       throw const PendingAuthorizationException();
     }

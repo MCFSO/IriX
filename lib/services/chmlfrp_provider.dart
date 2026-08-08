@@ -9,11 +9,10 @@
 
 import 'dart:convert';
 
-import 'package:http/http.dart' as http;
-
 import '../services/database_manager.dart';
 import '../services/frp_provider.dart';
 import '../services/frpc_manager.dart';
+import '../services/http_ffi.dart';
 
 /// ChmlFrp 面板 API 基础地址。
 const chmlFrpApiBase = 'http://cf-v2.uapis.cn';
@@ -56,7 +55,7 @@ class ChmlFrpProvider extends FrpProvider {
   }
 
   /// 请求是否因登录态失效需要刷新。
-  bool _needsRefresh(http.Response res) {
+  bool _needsRefresh(HttpFfiResponse res) {
     if (res.statusCode == 401) return true;
     try {
       final json =
@@ -73,13 +72,13 @@ class ChmlFrpProvider extends FrpProvider {
     final refreshToken = await _refreshToken();
     if (refreshToken == null || refreshToken.isEmpty) return false;
     try {
-      final res = await http
+      final res = await HttpFfiService.instance
           .post(
-            Uri.parse('$chmlFrpApiBase/sso/refresh'),
+            '$chmlFrpApiBase/sso/refresh',
             headers: await _headers(),
             body: jsonEncode({'refresh_token': refreshToken}),
-          )
-          .timeout(const Duration(seconds: 30));
+            timeout: const Duration(seconds: 30),
+          );
       if (res.statusCode != 200) return false;
       final json =
           jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
@@ -113,27 +112,32 @@ class ChmlFrpProvider extends FrpProvider {
     return _parse(res);
   }
 
-  Future<http.Response> _send(
+  Future<HttpFfiResponse> _send(
     String method,
     String path, {
     Map<String, dynamic>? body,
   }) async {
-    final uri = Uri.parse('$chmlFrpApiBase$path');
+    final uri = '$chmlFrpApiBase$path';
     final headers = await _headers();
     final res = method == 'GET'
-        ? await http
-              .get(uri, headers: headers)
-              .timeout(const Duration(seconds: 30))
-        : await http
-              .post(uri, headers: headers, body: jsonEncode(body ?? {}))
-              .timeout(const Duration(seconds: 30));
+        ? await HttpFfiService.instance.get(
+            uri,
+            headers: headers,
+            timeout: const Duration(seconds: 30),
+          )
+        : await HttpFfiService.instance.post(
+            uri,
+            headers: headers,
+            body: jsonEncode(body ?? {}),
+            timeout: const Duration(seconds: 30),
+          );
     if (res.statusCode >= 500) {
       throw Exception('HTTP ${res.statusCode}: ${_snippet(res.body)}');
     }
     return res;
   }
 
-  Map<String, dynamic> _parse(http.Response res) {
+  Map<String, dynamic> _parse(HttpFfiResponse res) {
     final body = utf8.decode(res.bodyBytes);
     if (body.trim().isEmpty) {
       throw Exception('服务器返回空响应');

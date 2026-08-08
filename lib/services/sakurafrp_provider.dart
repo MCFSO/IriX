@@ -7,11 +7,10 @@
 
 import 'dart:convert';
 
-import 'package:http/http.dart' as http;
-
 import '../services/database_manager.dart';
 import '../services/frp_provider.dart';
 import '../services/frpc_manager.dart';
+import '../services/http_ffi.dart';
 
 /// SakuraFrp API 基础地址。
 const sakuraFrpApiBase = 'https://api.natfrp.com/v4';
@@ -31,7 +30,7 @@ class SakuraFrpProvider extends FrpProvider {
 
   Future<String?> _token() => DatabaseManager.instance.getSetting(_keyToken);
 
-  Future<http.Response> _send(
+  Future<HttpFfiResponse> _send(
     String method,
     String path, {
     Map<String, dynamic>? body,
@@ -40,25 +39,30 @@ class SakuraFrpProvider extends FrpProvider {
     if (token == null || token.isEmpty) {
       throw Exception('未登录');
     }
-    final uri = Uri.parse('$sakuraFrpApiBase$path');
+    final uri = '$sakuraFrpApiBase$path';
     final headers = {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer $token',
     };
     final res = method == 'GET'
-        ? await http
-              .get(uri, headers: headers)
-              .timeout(const Duration(seconds: 30))
-        : await http
-              .post(uri, headers: headers, body: jsonEncode(body ?? {}))
-              .timeout(const Duration(seconds: 30));
+        ? await HttpFfiService.instance.get(
+            uri,
+            headers: headers,
+            timeout: const Duration(seconds: 30),
+          )
+        : await HttpFfiService.instance.post(
+            uri,
+            headers: headers,
+            body: jsonEncode(body ?? {}),
+            timeout: const Duration(seconds: 30),
+          );
     if (res.statusCode >= 400) {
       throw Exception(_errorMessage(res));
     }
     return res;
   }
 
-  Map<String, dynamic> _decode(http.Response res) {
+  Map<String, dynamic> _decode(HttpFfiResponse res) {
     final body = utf8.decode(res.bodyBytes);
     if (body.trim().isEmpty) {
       throw Exception('服务器返回空响应');
@@ -66,7 +70,7 @@ class SakuraFrpProvider extends FrpProvider {
     return jsonDecode(body) as Map<String, dynamic>;
   }
 
-  String _errorMessage(http.Response res) {
+  String _errorMessage(HttpFfiResponse res) {
     try {
       final json = _decode(res);
       if (json['msg'] != null) return json['msg'].toString();

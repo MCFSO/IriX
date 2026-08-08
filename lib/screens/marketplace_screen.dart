@@ -116,8 +116,6 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     _searchController.dispose();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
-    _modrinthApi.dispose();
-    _hangarApi.dispose();
     super.dispose();
   }
 
