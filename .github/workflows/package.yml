@@ -39,6 +39,7 @@ jobs:
           Copy-Item rust/target/release/xmc_file_ops.dll windows/runner/ -Force
           Copy-Item rust/target/release/xmc_logger.dll windows/runner/ -Force
           Copy-Item rust/target/release/xmc_http_client.dll windows/runner/ -Force
+          Copy-Item rust/target/release/xmc_db_client.dll windows/runner/ -Force
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -60,6 +61,7 @@ jobs:
           Copy-Item windows/runner/xmc_file_ops.dll build/windows/x64/runner/Release/ -Force
           Copy-Item windows/runner/xmc_logger.dll build/windows/x64/runner/Release/ -Force
           Copy-Item windows/runner/xmc_http_client.dll build/windows/x64/runner/Release/ -Force
+          Copy-Item windows/runner/xmc_db_client.dll build/windows/x64/runner/Release/ -Force
 
       - name: Install Fastforge
         run: dart pub global activate fastforge
@@ -120,6 +122,7 @@ jobs:
           cp rust/target/release/libxmc_file_ops.so linux/
           cp rust/target/release/libxmc_logger.so linux/
           cp rust/target/release/libxmc_http_client.so linux/
+          cp rust/target/release/libxmc_db_client.so linux/
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -142,11 +145,13 @@ jobs:
           cp linux/libxmc_file_ops.so build/linux/x64/release/bundle/lib/
           cp linux/libxmc_logger.so build/linux/x64/release/bundle/lib/
           cp linux/libxmc_http_client.so build/linux/x64/release/bundle/lib/
+          cp linux/libxmc_db_client.so build/linux/x64/release/bundle/lib/
           cp linux/libxmc_backup.so build/linux/x64/release/bundle/
           cp linux/libxmc_downloader.so build/linux/x64/release/bundle/
           cp linux/libxmc_file_ops.so build/linux/x64/release/bundle/
           cp linux/libxmc_logger.so build/linux/x64/release/bundle/
           cp linux/libxmc_http_client.so build/linux/x64/release/bundle/
+          cp linux/libxmc_db_client.so build/linux/x64/release/bundle/
 
       - name: Install Fastforge
         run: dart pub global activate fastforge
@@ -220,6 +225,10 @@ jobs:
             rust/target/x86_64-apple-darwin/release/libxmc_http_client.dylib \
             rust/target/aarch64-apple-darwin/release/libxmc_http_client.dylib \
             -output macos/libxmc_http_client.dylib
+          lipo -create \
+            rust/target/x86_64-apple-darwin/release/libxmc_db_client.dylib \
+            rust/target/aarch64-apple-darwin/release/libxmc_db_client.dylib \
+            -output macos/libxmc_db_client.dylib
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -242,6 +251,7 @@ jobs:
           cp macos/libxmc_file_ops.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
           cp macos/libxmc_logger.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
           cp macos/libxmc_http_client.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
+          cp macos/libxmc_db_client.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
 
       - name: Install Fastforge
         run: dart pub global activate fastforge
