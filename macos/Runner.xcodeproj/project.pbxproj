@@ -318,7 +318,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# Copy Rust FFI dylibs built by build_rust.sh into the app bundle and (re)sign them.\nDST=\"$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/MacOS\"\nmkdir -p \"$DST\"\nSIGN=\"${EXPANDED_CODE_SIGN_IDENTITY:--}\"\nfor lib in libxmc_backup.dylib libxmc_downloader.dylib libxmc_file_ops.dylib libxmc_logger.dylib; do\n  SRC=\"$PROJECT_DIR/$lib\"\n  if [ -f \"$SRC\" ]; then\n    cp -f \"$SRC\" \"$DST/\"\n    codesign --force --sign \"$SIGN\" \"$DST/$lib\" >/dev/null 2>&1 || true\n  fi\ndone\n";
+			shellScript = "# Copy Rust FFI dylibs built by build_rust.sh into the app bundle and (re)sign them.\nDST=\"$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/MacOS\"\nmkdir -p \"$DST\"\nSIGN=\"${EXPANDED_CODE_SIGN_IDENTITY:--}\"\nfor lib in libxmc_backup.dylib libxmc_downloader.dylib libxmc_file_ops.dylib libxmc_logger.dylib libxmc_http_client.dylib libxmc_db_client.dylib; do\n  SRC=\"$PROJECT_DIR/$lib\"\n  if [ -f \"$SRC\" ]; then\n    cp -f \"$SRC\" \"$DST/\"\n    codesign --force --sign \"$SIGN\" \"$DST/$lib\" >/dev/null 2>&1 || true\n  fi\ndone\n";
 		};
 		3399D490228B24CF009A79C7 /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;

@@ -1,0 +1,22 @@
+[package]
+name = "xmc_db_client"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+libc = "0.2"
+# MySQL/MariaDB 客户端：纯 Rust，rustls 后端，无 OpenSSL。
+# minimal-rust 使 flate2 使用 rust 后端；rustls-tls-ring 提供 TLS 支持。
+mysql = { version = "28", default-features = false, features = ["minimal-rust", "rustls-tls-ring"] }
+# PostgreSQL 同步客户端（内部 tokio + 纯 Rust TLS 可选，本项目走 NoTls）。
+# with-chrono-0_4 提供 NaiveDate/NaiveTime/NaiveDateTime 解析用于值序列化。
+postgres = { version = "0.19", features = ["with-chrono-0_4"] }
+chrono = "0.4"
+# Redis 客户端（纯 Rust）。sync API：Client + get_connection。
+redis = "1.5"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"

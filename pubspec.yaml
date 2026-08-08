@@ -68,10 +68,7 @@ dependencies:
   # Archive (ZIP/JAR) handling
   archive: ^4.0.0
 
-  # Remote database clients (MySQL/MariaDB/PostgreSQL/Redis)
-  mysql_dart: ^3.0.0
-  postgres: ^3.0.0
-  redis: ^4.0.0
+  # Remote database clients are handled by Rust (xmc_db_client via FFI)
   url_launcher: ^6.3.2
   cryptography: ^2.9.0
   crypto: ^3.0.7
