@@ -29,7 +29,7 @@ AI作品轻喷
 | 压缩 | flate2 (zlib-ng) + crc32fast, rayon 并行 |
 | 文件操作 | walkdir, serde_json, Rust FFI |
 | 远程数据库 | Rust mysql / postgres / redis 驱动（db_client FFI） |
-| 知识库 | rusqlite + sqlite-vec（vector_store FFI），embedding 由 Dart 调 AI 模型 API 生成 |
+| 知识库 | rusqlite + sqlite-vec（vector_store FFI）；embedding 由 Rust HTTP 调 AI 模型 API 生成（Dart 侧组装请求） |
 
 ## 构建
 
