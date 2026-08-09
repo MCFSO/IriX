@@ -155,6 +155,7 @@ class DbClientFfi {
     String? username,
     String? password,
     String? database,
+    bool useSsl = false,
     required String op,
     Map<String, dynamic> args = const {},
     Duration timeout = const Duration(seconds: 120),
@@ -178,6 +179,7 @@ class DbClientFfi {
       'username': username,
       'password': password,
       'database': database,
+      'ssl': useSsl,
     });
 
     Isolate? isolate;

@@ -481,6 +481,7 @@ class _ConnectionDialogState extends State<_ConnectionDialog> {
   final _databaseController = TextEditingController();
 
   late DbType _type;
+  late bool _useSsl;
 
   String? _nameError;
   String? _hostError;
@@ -501,6 +502,7 @@ class _ConnectionDialogState extends State<_ConnectionDialog> {
     final existing = widget.existing;
     if (existing != null) {
       _type = existing.type;
+      _useSsl = existing.useSsl;
       _nameController.text = existing.name;
       _hostController.text = existing.host;
       _portController.text = '${existing.port}';
@@ -509,6 +511,7 @@ class _ConnectionDialogState extends State<_ConnectionDialog> {
       _databaseController.text = existing.databaseName ?? '';
     } else {
       _type = DbType.mysql;
+      _useSsl = false;
     }
   }
 
@@ -557,6 +560,7 @@ class _ConnectionDialogState extends State<_ConnectionDialog> {
       username: username.isEmpty ? null : username,
       password: password.isEmpty ? null : password,
       databaseName: database.isEmpty ? null : database,
+      useSsl: _useSsl,
       createdAt: existing?.createdAt ?? DateTime.now(),
     );
     await RemoteDatabaseService.instance.saveConnection(connection);
@@ -627,6 +631,16 @@ class _ConnectionDialogState extends State<_ConnectionDialog> {
               TextField(
                 controller: _databaseController,
                 decoration: const InputDecoration(labelText: '数据库名（可选）'),
+              ),
+              const SizedBox(height: 4),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('使用 SSL 连接'),
+                subtitle: const Text(
+                  '加密传输（MySQL/MariaDB/PostgreSQL/Redis，验证服务器证书）',
+                ),
+                value: _useSsl,
+                onChanged: (v) => setState(() => _useSsl = v),
               ),
             ],
           ),

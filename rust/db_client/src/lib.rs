@@ -53,6 +53,9 @@ struct ConnInfo {
     password: Option<String>,
     #[serde(default)]
     database: Option<String>,
+    /// 是否使用 TLS 加密连接（MySQL/PG/Redis 均支持，rustls，无 OpenSSL）。
+    #[serde(default)]
+    ssl: bool,
 }
 
 #[allow(dead_code)]
@@ -191,7 +194,7 @@ fn mysql_opts(conn: &ConnInfo, db_override: Option<&str>) -> mysql::Opts {
     let db = db_override
         .map(|s| s.to_string())
         .or_else(|| conn.database.clone());
-    mysql::OptsBuilder::new()
+    let mut builder = mysql::OptsBuilder::new()
         .ip_or_hostname(Some(conn.host.as_str()))
         .tcp_port(conn.port)
         .user(Some(conn.user_or("root").as_str()))
@@ -199,8 +202,12 @@ fn mysql_opts(conn: &ConnInfo, db_override: Option<&str>) -> mysql::Opts {
         .db_name(db.as_deref())
         .tcp_connect_timeout(Some(CONN_TIMEOUT))
         .read_timeout(Some(IO_TIMEOUT))
-        .write_timeout(Some(IO_TIMEOUT))
-        .into()
+        .write_timeout(Some(IO_TIMEOUT));
+    if conn.ssl {
+        // rustls 后端 + webpki-roots（Mozilla）校验证书，无 OpenSSL。
+        builder = builder.ssl_opts(Some(mysql::SslOpts::default()));
+    }
+    builder.into()
 }
 
 fn mysql_connect(conn: &ConnInfo, db_override: Option<&str>) -> Result<mysql::Conn, String> {
@@ -318,9 +325,17 @@ fn pg_config(conn: &ConnInfo, db_override: Option<&str>) -> postgres::Config {
 }
 
 fn pg_connect(conn: &ConnInfo, db_override: Option<&str>) -> Result<postgres::Client, String> {
-    pg_config(conn, db_override)
-        .connect(postgres::NoTls)
-        .map_err(|e| format!("PostgreSQL 连接失败: {e}"))
+    let cfg = pg_config(conn, db_override);
+    if conn.ssl {
+        // rustls 连接器，webpki-roots（Mozilla）校验证书，无 OpenSSL。
+        let tls = rustls_tokio_postgres::MakeRustlsConnect::new(
+            rustls_tokio_postgres::config_webpki_roots(),
+        );
+        cfg.connect(tls).map_err(|e| format!("PostgreSQL 连接失败: {e}"))
+    } else {
+        cfg.connect(postgres::NoTls)
+            .map_err(|e| format!("PostgreSQL 连接失败: {e}"))
+    }
 }
 
 /// PostgreSQL 列值 → JSON
@@ -379,8 +394,18 @@ fn pg_rows_to_json(rows: &[postgres::Row]) -> Result<Json, String> {
 // ======================== Redis ========================
 
 fn redis_connect(conn: &ConnInfo) -> Result<redis::Connection, String> {
-    let url = format!("redis://{}:{}", conn.host, conn.port);
-    let client = redis::Client::open(url.as_str()).map_err(|e| format!("Redis 地址无效: {e}"))?;
+    let scheme = if conn.ssl { "rediss" } else { "redis" };
+    let url = format!("{scheme}://{}:{}", conn.host, conn.port);
+    let client = if conn.ssl {
+        // rustls + 本地信任库验证证书，无 OpenSSL。
+        redis::Client::build_with_tls(
+            url.as_str(),
+            redis::TlsCertificates { client_tls: None, root_cert: None },
+        )
+        .map_err(|e| format!("Redis 地址无效: {e}"))?
+    } else {
+        redis::Client::open(url.as_str()).map_err(|e| format!("Redis 地址无效: {e}"))?
+    };
     let mut con = client
         .get_connection_with_timeout(CONN_TIMEOUT)
         .map_err(|e| format!("Redis 连接失败: {e}"))?;

@@ -57,6 +57,9 @@ class DbConnectionInfo {
   String? username;
   String? password;
   String? databaseName;
+
+  /// 是否使用 TLS 加密连接（MySQL/PG/Redis 均支持，Rust rustls 实现）。
+  bool useSsl;
   final DateTime createdAt;
 
   DbConnectionInfo({
@@ -68,6 +71,7 @@ class DbConnectionInfo {
     this.username,
     this.password,
     this.databaseName,
+    this.useSsl = false,
     required this.createdAt,
   });
 
@@ -82,6 +86,7 @@ class DbConnectionInfo {
       username: row['username'] as String?,
       password: row['password'] as String?,
       databaseName: row['database_name'] as String?,
+      useSsl: row['use_ssl'] == 1 || row['use_ssl'] == true,
       createdAt:
           DateTime.tryParse((row['created_at'] as String?) ?? '') ??
           DateTime.now(),
@@ -98,6 +103,7 @@ class DbConnectionInfo {
     'username': username,
     'password': password,
     'database_name': databaseName,
+    'use_ssl': useSsl ? 1 : 0,
     'created_at': createdAt.toIso8601String(),
   };
 }
@@ -152,6 +158,7 @@ class RemoteDatabaseService {
       username: info.username,
       password: info.password,
       database: info.databaseName,
+      useSsl: info.useSsl,
       op: op,
       args: args,
       timeout: timeout,

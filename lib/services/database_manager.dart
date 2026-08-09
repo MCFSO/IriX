@@ -16,7 +16,7 @@ class DatabaseManager {
   DatabaseManager._();
 
   static const String _dbName = 'irix.db';
-  static const int _dbVersion = 3;
+  static const int _dbVersion = 4;
 
   Database? _db;
 
@@ -101,6 +101,7 @@ class DatabaseManager {
         username TEXT,
         password TEXT,
         database_name TEXT,
+        use_ssl INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL
       )
     ''');
@@ -144,6 +145,16 @@ class DatabaseManager {
           created_at TEXT NOT NULL
         )
       ''');
+    }
+    if (oldVersion < 4) {
+      // 远程数据库连接增加 SSL 开关列。
+      final cols = await db.rawQuery('PRAGMA table_info(db_connections)');
+      final hasSsl = cols.any((c) => c['name'] == 'use_ssl');
+      if (!hasSsl) {
+        await db.execute(
+          'ALTER TABLE db_connections ADD COLUMN use_ssl INTEGER NOT NULL DEFAULT 0',
+        );
+      }
     }
   }
 

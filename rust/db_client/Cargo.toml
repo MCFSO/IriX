@@ -14,9 +14,12 @@ mysql = { version = "28", default-features = false, features = ["minimal-rust", 
 # PostgreSQL 同步客户端（内部 tokio + 纯 Rust TLS 可选，本项目走 NoTls）。
 # with-chrono-0_4 提供 NaiveDate/NaiveTime/NaiveDateTime 解析用于值序列化。
 postgres = { version = "0.19", features = ["with-chrono-0_4"] }
+# PostgreSQL 纯 rustls TLS 连接器（MakeTlsConnect 实现），webpki-roots 校验证书，无 OpenSSL。
+rustls-tokio-postgres = { version = "0.4", default-features = false, features = ["ring", "webpki-roots"] }
 chrono = "0.4"
 # Redis 客户端（纯 Rust）。sync API：Client + get_connection。
-redis = "1.5"
+# tls-rustls + tokio-rustls-comp 提供 TLS 连接（rediss://，本地信任库验证）。
+redis = { version = "1.5", features = ["tls-rustls", "tokio-rustls-comp"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 base64 = "0.22"
