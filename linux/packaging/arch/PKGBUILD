@@ -1,0 +1,79 @@
+# Maintainer:
+
+pkgname=irix
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="IriX (X Minecraft Server Launcher) - Minecraft 服务器管理工具。Flutter UI + Rust 高性能底层（压缩/下载/文件操作），支持实例管理、核心下载、插件市场、备份、内网穿透、节点管理与 AI 助手"
+arch=('x86_64')
+url="https://github.com/MCFSO/IriX"
+license=('MIT')
+depends=(
+  'glibc'
+  'gcc-libs'
+  'gtk3'
+  'zlib'
+  'libxkbcommon'
+  'libgl'
+  'nss'
+  'xdg-utils'
+)
+makedepends=(
+  'flutter'
+  'cargo'
+  'cmake'
+  'clang'
+  'ninja'
+  'pkgconf'
+)
+options=('!lto')
+source=("$pkgname::git+https://github.com/MCFSO/IriX.git#branch=main")
+sha256sums=('SKIP')
+
+prepare() {
+  cd "$srcdir/$pkgname"
+  flutter config --no-analytics
+  flutter pub get
+}
+
+build() {
+  cd "$srcdir/$pkgname"
+  # 编译 Rust FFI 动态库并复制到 linux/ （CMake 打包时自动装入 bundle/lib/）
+  bash build_rust.sh
+  flutter build linux --release
+}
+
+package() {
+  cd "$srcdir/$pkgname"
+  local bundle="build/linux/x64/release/bundle"
+
+  install -d "$pkgdir/usr/lib/$pkgname"
+  install -m755 "$bundle/IriX" "$pkgdir/usr/lib/$pkgname/IriX"
+  cp -a "$bundle/lib" "$pkgdir/usr/lib/$pkgname/"
+  cp -a "$bundle/data" "$pkgdir/usr/lib/$pkgname/"
+
+  install -d "$pkgdir/usr/bin"
+  ln -s "/usr/lib/$pkgname/IriX" "$pkgdir/usr/bin/$pkgname"
+
+  install -d "$pkgdir/usr/share/applications"
+  install -m644 -D /dev/stdin "$pkgdir/usr/share/applications/$pkgname.desktop" <<EOF
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=IriX
+GenericName=Minecraft Server Manager
+Comment=X Minecraft Server Launcher
+Exec=$pkgname
+Icon=$pkgname
+Terminal=false
+Categories=Utility;Network;
+StartupNotify=true
+EOF
+
+  install -d "$pkgdir/usr/share/icons/hicolor/512x512/apps"
+  install -m644 \
+    "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_512.png" \
+    "$pkgdir/usr/share/icons/hicolor/512x512/apps/$pkgname.png"
+
+  install -d "$pkgdir/usr/share/licenses/$pkgname"
+  install -m644 LICENSE.txt "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
