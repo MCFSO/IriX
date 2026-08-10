@@ -12,6 +12,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
@@ -415,7 +416,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
               ),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Text(event.text ?? '', style: const TextStyle(height: 1.5)),
+            child: _buildMarkdown(event.text ?? ''),
           ),
         );
       case AiEventKind.thinking:
@@ -508,6 +509,80 @@ class _AiChatPanelState extends State<AiChatPanel> {
             ],
           ),
         );
+    }
+  }
+
+  /// 渲染 AI 回复中的 markdown 内容（适配全局暗色主题）。
+  Widget _buildMarkdown(String text) {
+    final theme = Theme.of(context);
+    final base = MarkdownStyleSheet.fromTheme(theme);
+    // 代码块使用深色底 + 等宽字体，与日志面板风格一致。
+    final codeColor = theme.colorScheme.surfaceContainerHighest.withValues(
+      alpha: 0.9,
+    );
+    final styleSheet = base.copyWith(
+      codeblockDecoration: BoxDecoration(
+        color: codeColor,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      codeblockPadding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 8,
+      ),
+      code: base.code?.copyWith(
+        backgroundColor: codeColor,
+        fontFamily: 'monospace',
+        fontSize: 12.5,
+      ) ??
+        TextStyle(
+          backgroundColor: codeColor,
+          fontFamily: 'monospace',
+          fontSize: 12.5,
+        ),
+      p: base.p?.copyWith(height: 1.5) ?? const TextStyle(height: 1.5),
+      blockquoteDecoration: BoxDecoration(
+        color: theme.colorScheme.tertiaryContainer.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      blockquotePadding: const EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 6,
+      ),
+      tableHead: base.tableHead?.copyWith(
+        color: theme.colorScheme.onSurface,
+        fontWeight: FontWeight.bold,
+      ),
+      tableBorder: TableBorder.all(
+        color: theme.colorScheme.outline.withValues(alpha: 0.4),
+      ),
+      tableCellsPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    );
+    return MarkdownBody(
+      data: text,
+      styleSheet: styleSheet,
+      softLineBreak: true,
+      onTapLink: (text, href, title) {
+        if (href == null || href.isEmpty) return;
+        // 尝试用系统浏览器打开。
+        if (Uri.tryParse(href) case final uri?) {
+          _openExternal(uri);
+        }
+      },
+    );
+  }
+
+  /// 打开外部链接（系统浏览器）。
+  Future<void> _openExternal(Uri uri) async {
+    try {
+      if (uri.scheme == 'http' || uri.scheme == 'https') {
+        await Process.start(
+          Platform.isWindows ? 'cmd' : 'xdg-open',
+          Platform.isWindows ? ['/c', 'start', uri.toString()] : [uri.toString()],
+          mode: ProcessStartMode.detached,
+        );
+      }
+    } catch (e) {
+      debugPrint('打开链接失败: $e');
     }
   }
 
