@@ -312,24 +312,23 @@ class _AiChatPanelState extends State<AiChatPanel> {
 
   Widget _buildChat(AiConversation conversation) {
     final controller = widget.controller;
-    if (controller.events.isEmpty) {
-      return _buildEmptyState();
-    }
     return Column(
       children: [
         Expanded(
-          child: ListView.builder(
-            controller: _scroll,
-            padding: const EdgeInsets.all(12),
-            itemCount: controller.events.length,
-            itemBuilder: (context, index) {
-              final event = controller.events[index];
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: _buildEvent(event),
-              );
-            },
-          ),
+          child: controller.events.isEmpty
+              ? _buildEmptyState()
+              : ListView.builder(
+                  controller: _scroll,
+                  padding: const EdgeInsets.all(12),
+                  itemCount: controller.events.length,
+                  itemBuilder: (context, index) {
+                    final event = controller.events[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _buildEvent(event),
+                    );
+                  },
+                ),
         ),
         _buildInputBar(conversation),
       ],
