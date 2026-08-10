@@ -260,9 +260,7 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
             expands: true,
             textAlignVertical: TextAlignVertical.top,
             style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-            ),
+            decoration: const InputDecoration(border: OutlineInputBorder()),
           ),
         ),
         actions: [
@@ -292,8 +290,11 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
   }
 
   Future<void> _rename(RemoteFileEntry entry) async {
-    final name = await _promptText('重命名 ${entry.name}', '新名称',
-        initial: entry.name);
+    final name = await _promptText(
+      '重命名 ${entry.name}',
+      '新名称',
+      initial: entry.name,
+    );
     if (name == null || name.trim().isEmpty || !mounted) return;
     try {
       await widget.client.moveFiles(
@@ -310,8 +311,11 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
   }
 
   Future<void> _compress(RemoteFileEntry entry) async {
-    final zipName = await _promptText('压缩 ${entry.name}', '压缩包文件名',
-        initial: '${p.basenameWithoutExtension(entry.name)}.zip');
+    final zipName = await _promptText(
+      '压缩 ${entry.name}',
+      '压缩包文件名',
+      initial: '${p.basenameWithoutExtension(entry.name)}.zip',
+    );
     if (zipName == null || !mounted) return;
     try {
       await widget.client.compress(
@@ -345,9 +349,7 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
       context,
       (_) => AlertDialog(
         title: Text('删除「${entry.name}」？'),
-        content: entry.isDirectory
-            ? const Text('将递归删除整个文件夹及其内容。')
-            : null,
+        content: entry.isDirectory ? const Text('将递归删除整个文件夹及其内容。') : null,
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -457,8 +459,7 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
   }
 
   /// 通用文本输入对话框。
-  Future<String?> _promptText(String title, String label,
-      {String? initial}) {
+  Future<String?> _promptText(String title, String label, {String? initial}) {
     final controller = TextEditingController(text: initial ?? '');
     return showAppDialog<String>(
       context,
@@ -525,9 +526,7 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
         children: [
           _buildToolbar(theme),
           const Divider(height: 1),
-          Expanded(
-            child: _buildBody(theme),
-          ),
+          Expanded(child: _buildBody(theme)),
         ],
       ),
     );
@@ -577,16 +576,17 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
                   child: Row(
                     children: [
                       _breadcrumbChip(theme, '/', _path == '/', -1),
-                      for (var i = 0;
-                          i <
-                              _path
-                                  .split('/')
-                                  .where((e) => e.isNotEmpty)
-                                  .length;
-                          i++)
+                      for (
+                        var i = 0;
+                        i < _path.split('/').where((e) => e.isNotEmpty).length;
+                        i++
+                      )
                         _breadcrumbChip(
                           theme,
-                          _path.split('/').where((e) => e.isNotEmpty).toList()[i],
+                          _path
+                              .split('/')
+                              .where((e) => e.isNotEmpty)
+                              .toList()[i],
                           i ==
                               _path
                                       .split('/')
@@ -708,14 +708,16 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
         final entry = entries[index];
         return Card(
           elevation: 0,
-          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.6,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           child: ListTile(
             dense: true,
             leading: Icon(
-              entry.isDirectory
-                  ? Icons.folder
-                  : _fileIcon(entry.name),
+              entry.isDirectory ? Icons.folder : _fileIcon(entry.name),
               color: entry.isDirectory
                   ? Colors.amber
                   : theme.colorScheme.primary,
@@ -734,10 +736,7 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
               ),
             ),
             onTap: () => _openEntry(entry),
-            trailing: Icon(
-              Icons.more_horiz,
-              color: theme.colorScheme.outline,
-            ),
+            trailing: Icon(Icons.more_horiz, color: theme.colorScheme.outline),
             onLongPress: () => _showFileActions(entry),
           ),
         );

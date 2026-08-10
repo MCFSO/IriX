@@ -45,14 +45,14 @@ class _ArchiveViewerScreenState extends State<ArchiveViewerScreen> {
       await outputFile.parent.create(recursive: true);
       await outputFile.writeAsBytes(entry.content as List<int>);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已解压: ${entry.name}')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('已解压: ${entry.name}')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('解压失败: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('解压失败: $e')));
     }
   }
 
@@ -71,10 +71,12 @@ class _ArchiveViewerScreenState extends State<ArchiveViewerScreen> {
     return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 
-  void _showContextMenu(BuildContext context, Offset position,
-      ArchiveFile entry) {
-    final overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox;
+  void _showContextMenu(
+    BuildContext context,
+    Offset position,
+    ArchiveFile entry,
+  ) {
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
     final overlayRect = Rect.fromPoints(
       overlay.localToGlobal(Offset.zero),
       overlay.localToGlobal(overlay.size.bottomRight(Offset.zero)),
@@ -167,8 +169,11 @@ class _ArchiveViewerScreenState extends State<ArchiveViewerScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.broken_image_outlined,
-                        size: 64, color: Colors.red),
+                    const Icon(
+                      Icons.broken_image_outlined,
+                      size: 64,
+                      color: Colors.red,
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       '无法打开压缩文件',
@@ -224,10 +229,9 @@ class _ArchiveViewerScreenState extends State<ArchiveViewerScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Theme.of(context)
-            .colorScheme
-            .surfaceContainerHighest
-            .withValues(alpha: 0.5),
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
       ),
       child: Row(
         children: [
@@ -252,10 +256,9 @@ class _ArchiveViewerScreenState extends State<ArchiveViewerScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: Theme.of(context)
-            .colorScheme
-            .surfaceContainerHighest
-            .withValues(alpha: 0.6),
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
         border: const Border(bottom: BorderSide(color: Colors.white12)),
       ),
       child: const Row(
@@ -263,18 +266,24 @@ class _ArchiveViewerScreenState extends State<ArchiveViewerScreen> {
           SizedBox(width: 28),
           Expanded(
             flex: 3,
-            child: Text('文件名',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            child: Text(
+              '文件名',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            ),
           ),
           Expanded(
             flex: 1,
-            child: Text('大小',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            child: Text(
+              '大小',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            ),
           ),
           Expanded(
             flex: 2,
-            child: Text('修改时间',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            child: Text(
+              '修改时间',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -298,11 +307,7 @@ class _ArchiveViewerScreenState extends State<ArchiveViewerScreen> {
           ),
           child: Row(
             children: [
-              Icon(
-                _entryIcon(name),
-                size: 18,
-                color: Colors.grey[400],
-              ),
+              Icon(_entryIcon(name), size: 18, color: Colors.grey[400]),
               const SizedBox(width: 6),
               Expanded(
                 flex: 3,
@@ -317,7 +322,9 @@ class _ArchiveViewerScreenState extends State<ArchiveViewerScreen> {
                 child: Text(
                   _formatSize(entry.size),
                   style: TextStyle(
-                      fontSize: 12, color: theme.colorScheme.outline),
+                    fontSize: 12,
+                    color: theme.colorScheme.outline,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -326,7 +333,9 @@ class _ArchiveViewerScreenState extends State<ArchiveViewerScreen> {
                 child: Text(
                   _formatDate(entry.lastModDateTime),
                   style: TextStyle(
-                      fontSize: 12, color: theme.colorScheme.outline),
+                    fontSize: 12,
+                    color: theme.colorScheme.outline,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -341,15 +350,12 @@ class _ArchiveViewerScreenState extends State<ArchiveViewerScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
-        color: Theme.of(context)
-            .colorScheme
-            .surfaceContainerHighest
-            .withValues(alpha: 0.5),
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
       ),
       child: Row(
-        children: [
-          Text('$count 个条目', style: const TextStyle(fontSize: 12)),
-        ],
+        children: [Text('$count 个条目', style: const TextStyle(fontSize: 12))],
       ),
     );
   }

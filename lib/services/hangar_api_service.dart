@@ -22,8 +22,7 @@ class HangarApiException implements Exception {
 /// Hangar API 服务。
 class HangarApiService {
   static const String _baseUrl = 'https://hangar.papermc.io/api/v1';
-  static const String _userAgent =
-      'IriX/1.0.0 (https://github.com/MCFSO/IriX)';
+  static const String _userAgent = 'IriX/1.0.0 (https://github.com/MCFSO/IriX)';
 
   /// 搜索项目。
   ///
@@ -78,11 +77,11 @@ class HangarApiService {
       );
       final json = await _get(uri) as Map<String, dynamic>;
       final result = (json['result'] as List<dynamic>? ?? const [])
-          .map((e) =>
-              HangarVersion.fromJson(e as Map<String, dynamic>, slug))
+          .map((e) => HangarVersion.fromJson(e as Map<String, dynamic>, slug))
           .toList();
       all.addAll(result);
-      final pagination = json['pagination'] as Map<String, dynamic>? ?? const {};
+      final pagination =
+          json['pagination'] as Map<String, dynamic>? ?? const {};
       final total = (pagination['count'] as num?)?.toInt() ?? all.length;
       if (all.length >= total || result.isEmpty) break;
       offset += pageSize;

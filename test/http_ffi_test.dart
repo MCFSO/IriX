@@ -30,11 +30,11 @@ void main() {
         request.response
           ..statusCode = 200
           ..headers.set('Content-Type', 'application/octet-stream')
-          ..add(utf8.encode(
-              '${request.method}:${request.uri.query}'));
+          ..add(utf8.encode('${request.method}:${request.uri.query}'));
       } else if (path == '/binary') {
-        request.response.add(Uint8List.fromList(
-            [0x00, 0x01, 0xFF, 0xFE, 0x80, 0x41]));
+        request.response.add(
+          Uint8List.fromList([0x00, 0x01, 0xFF, 0xFE, 0x80, 0x41]),
+        );
       } else if (path == '/notfound') {
         request.response
           ..statusCode = 404

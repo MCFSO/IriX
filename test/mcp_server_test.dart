@@ -27,10 +27,9 @@ void main() {
   Uri uri(String path) => Uri.parse('http://127.0.0.1:${server.port}$path');
 
   Future<TestHttpResponse> post(Map<String, dynamic> body) async {
-    final request =
-        await client.postUrl(uri('/mcp'))
-          ..headers.set('Content-Type', 'application/json')
-          ..add(utf8.encode(jsonEncode(body)));
+    final request = await client.postUrl(uri('/mcp'))
+      ..headers.set('Content-Type', 'application/json')
+      ..add(utf8.encode(jsonEncode(body)));
     final response = await request.close();
     return TestHttpResponse.read(response);
   }

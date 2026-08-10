@@ -79,7 +79,8 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
       if (overview != null && overview.remote.isNotEmpty) {
         // 优先选择可用守护进程
         final available = overview.remote.where((d) => d.available).toList();
-        _daemonId = (available.isNotEmpty ? available : overview.remote).first.uuid;
+        _daemonId =
+            (available.isNotEmpty ? available : overview.remote).first.uuid;
       }
     });
   }
@@ -197,9 +198,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
               ],
             ),
             Expanded(
-              child: TabBarView(
-                children: [for (final tab in tabs) tab.child],
-              ),
+              child: TabBarView(children: [for (final tab in tabs) tab.child]),
             ),
           ],
         ),
@@ -227,13 +226,9 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              online
-                  ? '节点在线 · ${node.address}'
-                  : '节点离线：${_error ?? '无法连接'}',
+              online ? '节点在线 · ${node.address}' : '节点离线：${_error ?? '无法连接'}',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: online
-                    ? Colors.green
-                    : theme.colorScheme.error,
+                color: online ? Colors.green : theme.colorScheme.error,
               ),
             ),
           ),
@@ -241,9 +236,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
             TextButton.icon(
               icon: const Icon(Icons.play_arrow, size: 16),
               label: const Text('启动本地节点'),
-              style: TextButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-              ),
+              style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
               onPressed: _launchLocalDaemon,
             ),
         ],
@@ -374,9 +367,7 @@ class _OverviewTab extends StatelessWidget {
             ),
             (
               '节点进程内存',
-              data.process.memory > 0
-                  ? _formatBytes(data.process.memory)
-                  : '—',
+              data.process.memory > 0 ? _formatBytes(data.process.memory) : '—',
             ),
             ('节点版本', data.version.isEmpty ? '—' : data.version),
           ],
@@ -386,10 +377,7 @@ class _OverviewTab extends StatelessWidget {
           title: '实例统计',
           icon: Icons.storage,
           rows: [
-            (
-              '守护进程',
-              data.remote.isEmpty ? '—' : '${data.remote.length} 个',
-            ),
+            ('守护进程', data.remote.isEmpty ? '—' : '${data.remote.length} 个'),
             for (final daemon in data.remote)
               (
                 daemon.displayName,
@@ -488,10 +476,7 @@ class _InfoCard extends StatelessWidget {
                       ),
                     ),
                     Expanded(
-                      child: Text(
-                        value,
-                        style: theme.textTheme.bodySmall,
-                      ),
+                      child: Text(value, style: theme.textTheme.bodySmall),
                     ),
                   ],
                 ),
@@ -552,7 +537,8 @@ class _InstancesTabState extends State<_InstancesTab> {
   void initState() {
     super.initState();
     final daemons = widget.overview?.remote ?? [];
-    _daemonId = widget.initialDaemonId ??
+    _daemonId =
+        widget.initialDaemonId ??
         (daemons.isNotEmpty ? daemons.first.uuid : null);
     _load();
   }
@@ -638,10 +624,7 @@ class _InstancesTabState extends State<_InstancesTab> {
   void _openDockerEnv() {
     pushPage<void>(
       context,
-      (_) => _DockerEnvScreen(
-        client: widget.client,
-        daemonId: _daemonId ?? '',
-      ),
+      (_) => _DockerEnvScreen(client: widget.client, daemonId: _daemonId ?? ''),
     );
   }
 
@@ -679,7 +662,10 @@ class _InstancesTabState extends State<_InstancesTab> {
                   underline: const SizedBox.shrink(),
                   items: [
                     for (final d in daemons)
-                      DropdownMenuItem(value: d.uuid, child: Text(d.displayName)),
+                      DropdownMenuItem(
+                        value: d.uuid,
+                        child: Text(d.displayName),
+                      ),
                   ],
                   onChanged: (value) {
                     setState(() => _daemonId = value);
@@ -844,9 +830,7 @@ class _RemoteInstanceCard extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                instance.config.cwd.isEmpty
-                    ? '工作目录未知'
-                    : instance.config.cwd,
+                instance.config.cwd.isEmpty ? '工作目录未知' : instance.config.cwd,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
@@ -923,8 +907,9 @@ class _ActionButton extends StatelessWidget {
         foregroundColor: color,
         visualDensity: VisualDensity.compact,
         padding: const EdgeInsets.symmetric(horizontal: 8),
-        disabledForegroundColor:
-            Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+        disabledForegroundColor: Theme.of(
+          context,
+        ).colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
       ),
     );
   }
@@ -1107,8 +1092,12 @@ class _UsersTabState extends State<_UsersTab> {
         final isBanned = user.permission == -1;
         return Card(
           elevation: 0,
-          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.6,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
           child: ListTile(
             leading: CircleAvatar(
               radius: 18,
@@ -1123,21 +1112,29 @@ class _UsersTabState extends State<_UsersTab> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
-                    color: (isBanned
-                            ? Colors.red
-                            : isAdmin
+                    color:
+                        (isBanned
+                                ? Colors.red
+                                : isAdmin
                                 ? Colors.blue
                                 : Colors.grey)
-                        .withValues(alpha: 0.2),
+                            .withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     isBanned ? '已禁用' : (isAdmin ? '管理员' : '普通用户'),
                     style: TextStyle(
                       fontSize: 11,
-                      color: isBanned ? Colors.red : isAdmin ? Colors.blue : Colors.grey,
+                      color: isBanned
+                          ? Colors.red
+                          : isAdmin
+                          ? Colors.blue
+                          : Colors.grey,
                     ),
                   ),
                 ),
@@ -1388,8 +1385,14 @@ class _DockerEnvScreenState extends State<_DockerEnvScreen> {
                     padding: const EdgeInsets.only(right: 8),
                     child: Text(
                       _progress.entries
-                          .map((e) =>
-                              '${e.key}: ${e.value == 2 ? '完成' : e.value == 1 ? '构建中' : '失败'}')
+                          .map(
+                            (e) =>
+                                '${e.key}: ${e.value == 2
+                                    ? '完成'
+                                    : e.value == 1
+                                    ? '构建中'
+                                    : '失败'}',
+                          )
                           .join(', '),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.primary,
@@ -1411,9 +1414,21 @@ class _DockerEnvScreenState extends State<_DockerEnvScreen> {
           ),
           SegmentedButton<int>(
             segments: const [
-              ButtonSegment(value: 0, label: Text('镜像'), icon: Icon(Icons.image_outlined, size: 16)),
-              ButtonSegment(value: 1, label: Text('容器'), icon: Icon(Icons.view_in_ar, size: 16)),
-              ButtonSegment(value: 2, label: Text('网络'), icon: Icon(Icons.hub_outlined, size: 16)),
+              ButtonSegment(
+                value: 0,
+                label: Text('镜像'),
+                icon: Icon(Icons.image_outlined, size: 16),
+              ),
+              ButtonSegment(
+                value: 1,
+                label: Text('容器'),
+                icon: Icon(Icons.view_in_ar, size: 16),
+              ),
+              ButtonSegment(
+                value: 2,
+                label: Text('网络'),
+                icon: Icon(Icons.hub_outlined, size: 16),
+              ),
             ],
             selected: {_subIndex},
             onSelectionChanged: (s) => setState(() => _subIndex = s.first),
@@ -1475,8 +1490,12 @@ class _DockerEnvScreenState extends State<_DockerEnvScreen> {
         final item = items[index];
         return Card(
           elevation: 0,
-          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.6,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: rowBuilder(item),
@@ -1498,7 +1517,11 @@ class _DockerEnvScreenState extends State<_DockerEnvScreen> {
       children: [
         Row(
           children: [
-            Icon(Icons.image_outlined, size: 18, color: theme.colorScheme.primary),
+            Icon(
+              Icons.image_outlined,
+              size: 18,
+              color: theme.colorScheme.primary,
+            ),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -1529,9 +1552,11 @@ class _DockerEnvScreenState extends State<_DockerEnvScreen> {
     final state = container['State'] as String? ?? '—';
     final ports = (container['Ports'] as List<dynamic>? ?? [])
         .map((e) => e is Map<String, dynamic> ? e : <String, dynamic>{})
-        .map((p) => p['PublicPort'] != null
-            ? '${p['IP'] ?? ''}:${p['PublicPort']}->${p['PrivatePort']}/${p['Type'] ?? ''}'
-            : '${p['PrivatePort']}/${p['Type'] ?? ''}')
+        .map(
+          (p) => p['PublicPort'] != null
+              ? '${p['IP'] ?? ''}:${p['PublicPort']}->${p['PrivatePort']}/${p['Type'] ?? ''}'
+              : '${p['PrivatePort']}/${p['Type'] ?? ''}',
+        )
         .join(', ');
     final theme = Theme.of(context);
     return Column(
@@ -1827,10 +1852,17 @@ class _CreateInstanceDialogState extends State<_CreateInstanceDialog> {
                     border: OutlineInputBorder(),
                   ),
                   items: const [
-                    DropdownMenuItem(value: 'universal', child: Text('通用（直接运行进程）')),
-                    DropdownMenuItem(value: 'docker', child: Text('Docker（容器内运行）')),
+                    DropdownMenuItem(
+                      value: 'universal',
+                      child: Text('通用（直接运行进程）'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'docker',
+                      child: Text('Docker（容器内运行）'),
+                    ),
                   ],
-                  onChanged: (v) => setState(() => _processType = v ?? 'universal'),
+                  onChanged: (v) =>
+                      setState(() => _processType = v ?? 'universal'),
                 ),
                 if (_processType == 'docker') ..._buildDockerFields(theme),
               ],
@@ -1849,13 +1881,15 @@ class _CreateInstanceDialogState extends State<_CreateInstanceDialog> {
             final cwd = _cwd.text.trim();
             final command = _command.text.trim();
             if (name.isEmpty || cwd.isEmpty || command.isEmpty) return;
-            Navigator.of(context).pop(_CreateInstanceResult(
-              nickname: name,
-              cwd: cwd,
-              startCommand: command,
-              processType: _processType,
-              docker: _buildDockerConfig(),
-            ));
+            Navigator.of(context).pop(
+              _CreateInstanceResult(
+                nickname: name,
+                cwd: cwd,
+                startCommand: command,
+                processType: _processType,
+                docker: _buildDockerConfig(),
+              ),
+            );
           },
           child: const Text('创建'),
         ),

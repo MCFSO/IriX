@@ -14,16 +14,18 @@ import 'package:ffi/ffi.dart';
 import 'package:path/path.dart' as p;
 
 /// FFI 函数签名定义
-typedef DbRequestC = Pointer<Utf8> Function(
-  Pointer<Utf8> connJson,
-  Pointer<Utf8> op,
-  Pointer<Utf8> argsJson,
-);
-typedef DbRequestDart = Pointer<Utf8> Function(
-  Pointer<Utf8> connJson,
-  Pointer<Utf8> op,
-  Pointer<Utf8> argsJson,
-);
+typedef DbRequestC =
+    Pointer<Utf8> Function(
+      Pointer<Utf8> connJson,
+      Pointer<Utf8> op,
+      Pointer<Utf8> argsJson,
+    );
+typedef DbRequestDart =
+    Pointer<Utf8> Function(
+      Pointer<Utf8> connJson,
+      Pointer<Utf8> op,
+      Pointer<Utf8> argsJson,
+    );
 
 typedef FreeStringC = Void Function(Pointer<Utf8> ptr);
 typedef FreeStringDart = void Function(Pointer<Utf8> ptr);
@@ -71,8 +73,8 @@ class DbClientFfi {
     final libName = Platform.isWindows
         ? 'xmc_db_client.dll'
         : Platform.isMacOS
-            ? 'libxmc_db_client.dylib'
-            : 'libxmc_db_client.so';
+        ? 'libxmc_db_client.dylib'
+        : 'libxmc_db_client.so';
 
     for (final libPath in _getPossibleLibraryPaths(libName)) {
       try {
@@ -194,10 +196,13 @@ class DbClientFfi {
         ),
       );
       // Dart 层硬超时兜底：超时后尽力终止后台 isolate。
-      return await completer.future.timeout(timeout, onTimeout: () {
-        isolate?.kill(priority: Isolate.immediate);
-        throw DbClientFfiException('数据库操作超时: $timeout');
-      });
+      return await completer.future.timeout(
+        timeout,
+        onTimeout: () {
+          isolate?.kill(priority: Isolate.immediate);
+          throw DbClientFfiException('数据库操作超时: $timeout');
+        },
+      );
     } finally {
       await sub.cancel();
       responsePort.close();
@@ -213,8 +218,9 @@ class DbClientFfi {
 
     try {
       final lib = _openLibrary();
-      final dbRequest =
-          lib.lookupFunction<DbRequestC, DbRequestDart>('db_request');
+      final dbRequest = lib.lookupFunction<DbRequestC, DbRequestDart>(
+        'db_request',
+      );
 
       connPtr = req.connJson.toNativeUtf8();
       opPtr = req.op.toNativeUtf8();
@@ -223,8 +229,7 @@ class DbClientFfi {
       resultPtr = dbRequest(connPtr, opPtr, argsPtr);
 
       if (resultPtr == nullptr) {
-        req.sendPort
-            .send(const DbClientFfiException('db_request 返回空指针'));
+        req.sendPort.send(const DbClientFfiException('db_request 返回空指针'));
         return;
       }
 
@@ -248,8 +253,9 @@ class DbClientFfi {
         // resultPtr 由 Rust 分配，需用 Rust 侧 free_string 释放
         try {
           final lib = _openLibrary();
-          final freeString =
-              lib.lookupFunction<FreeStringC, FreeStringDart>('free_string');
+          final freeString = lib.lookupFunction<FreeStringC, FreeStringDart>(
+            'free_string',
+          );
           freeString(resultPtr);
         } catch (_) {
           // 库句柄无法再次打开时忽略（指针泄漏可接受，仅调试场景）

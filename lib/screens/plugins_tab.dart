@@ -66,19 +66,23 @@ class _PluginsTabState extends State<PluginsTab> {
         final jar = jars[i];
         final meta = metas[i];
         final rawName = p.basenameWithoutExtension(jar.path);
-        final displayName = meta.name?.isNotEmpty == true ? meta.name! : rawName;
+        final displayName = meta.name?.isNotEmpty == true
+            ? meta.name!
+            : rawName;
         pluginJarNames.add(displayName.toLowerCase());
         pluginJarNames.add(rawName.toLowerCase());
         final configDir = _resolvePluginConfigDir(root, rawName, meta.name);
-        items.add(_PluginItem(
-          kind: _ItemKind.plugin,
-          displayName: displayName,
-          rawName: rawName,
-          jarPath: jar.path,
-          meta: meta,
-          configDir: configDir,
-          hasConfig: configDir != null,
-        ));
+        items.add(
+          _PluginItem(
+            kind: _ItemKind.plugin,
+            displayName: displayName,
+            rawName: rawName,
+            jarPath: jar.path,
+            meta: meta,
+            configDir: configDir,
+            hasConfig: configDir != null,
+          ),
+        );
       }
     }
 
@@ -94,19 +98,23 @@ class _PluginsTabState extends State<PluginsTab> {
         final jar = jars[i];
         final meta = metas[i];
         final rawName = p.basenameWithoutExtension(jar.path);
-        final displayName = meta.name?.isNotEmpty == true ? meta.name! : rawName;
+        final displayName = meta.name?.isNotEmpty == true
+            ? meta.name!
+            : rawName;
         final modId = _extractModId(meta, rawName);
         final configDir = _resolveModConfigDir(root, modId, displayName);
-        items.add(_PluginItem(
-          kind: _ItemKind.mod,
-          displayName: displayName,
-          rawName: rawName,
-          jarPath: jar.path,
-          meta: meta,
-          configDir: configDir?.dir,
-          configFilter: configDir?.filter,
-          hasConfig: configDir != null,
-        ));
+        items.add(
+          _PluginItem(
+            kind: _ItemKind.mod,
+            displayName: displayName,
+            rawName: rawName,
+            jarPath: jar.path,
+            meta: meta,
+            configDir: configDir?.dir,
+            configFilter: configDir?.filter,
+            hasConfig: configDir != null,
+          ),
+        );
       }
     }
 
@@ -117,16 +125,18 @@ class _PluginsTabState extends State<PluginsTab> {
         final name = p.basename(e.path);
         if (name.toLowerCase().startsWith('.')) continue;
         if (pluginJarNames.contains(name.toLowerCase())) continue;
-        items.add(_PluginItem(
-          kind: _ItemKind.plugin,
-          displayName: name,
-          rawName: name,
-          jarPath: null,
-          meta: const JarMetadata(),
-          configDir: e.path,
-          hasConfig: true,
-          orphan: true,
-        ));
+        items.add(
+          _PluginItem(
+            kind: _ItemKind.plugin,
+            displayName: name,
+            rawName: name,
+            jarPath: null,
+            meta: const JarMetadata(),
+            configDir: e.path,
+            hasConfig: true,
+            orphan: true,
+          ),
+        );
       }
     }
 
@@ -180,14 +190,27 @@ class _PluginsTabState extends State<PluginsTab> {
     final base = meta.name?.isNotEmpty == true ? meta.name! : rawName;
     // 去掉形如 -1.20.1 / -fabric / -forge / -build.123 的后缀
     final cleaned = base
-        .replaceAll(RegExp(r'[-_]\d+\.\d+(?:\.\d+)*.*$', caseSensitive: false), '')
-        .replaceAll(RegExp(r'[-_](fabric|forge|neoforge|quilt)$', caseSensitive: false), '')
-        .replaceAll(RegExp(r'[-_](client|server|common)$', caseSensitive: false), '');
+        .replaceAll(
+          RegExp(r'[-_]\d+\.\d+(?:\.\d+)*.*$', caseSensitive: false),
+          '',
+        )
+        .replaceAll(
+          RegExp(r'[-_](fabric|forge|neoforge|quilt)$', caseSensitive: false),
+          '',
+        )
+        .replaceAll(
+          RegExp(r'[-_](client|server|common)$', caseSensitive: false),
+          '',
+        );
     return cleaned.isEmpty ? base : cleaned;
   }
 
   /// 解析 mod 配置目录：优先 `/config/<modId>/`，否则用 `/config/` + 文件名过滤。
-  _ConfigRef? _resolveModConfigDir(String root, String modId, String displayName) {
+  _ConfigRef? _resolveModConfigDir(
+    String root,
+    String modId,
+    String displayName,
+  ) {
     final configRoot = p.join(root, 'config');
     // 1. 专用目录 /config/<modId>/
     for (final name in [modId, displayName]) {
@@ -217,9 +240,9 @@ class _PluginsTabState extends State<PluginsTab> {
   /// 点击卡片：进入配置编辑详情。
   void _openItem(_PluginItem item) {
     if (!item.hasConfig) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${item.displayName} 暂无可管理的配置文件')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('${item.displayName} 暂无可管理的配置文件')));
       return;
     }
     setState(() => _selected = item);
@@ -255,10 +278,7 @@ class _PluginsTabState extends State<PluginsTab> {
           children: [
             const Icon(Icons.extension_off, size: 64, color: Colors.grey),
             const SizedBox(height: 16),
-            Text(
-              '暂无插件 / Mod',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
+            Text('暂无插件 / Mod', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             const Text('将插件放入 plugins/、Mod 放入 mods/ 后重新扫描'),
             const SizedBox(height: 16),
@@ -277,7 +297,9 @@ class _PluginsTabState extends State<PluginsTab> {
         if (_pluginItems.isNotEmpty) ...[
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-            sliver: SliverToBoxAdapter(child: _sectionHeader('插件', Icons.extension)),
+            sliver: SliverToBoxAdapter(
+              child: _sectionHeader('插件', Icons.extension),
+            ),
           ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
@@ -288,23 +310,19 @@ class _PluginsTabState extends State<PluginsTab> {
                 crossAxisSpacing: 12,
                 childAspectRatio: 0.92,
               ),
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final item = _pluginItems[index];
-                  return _PluginCard(
-                    item: item,
-                    onTap: () => _openItem(item),
-                  );
-                },
-                childCount: _pluginItems.length,
-              ),
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final item = _pluginItems[index];
+                return _PluginCard(item: item, onTap: () => _openItem(item));
+              }, childCount: _pluginItems.length),
             ),
           ),
         ],
         if (_modItems.isNotEmpty) ...[
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-            sliver: SliverToBoxAdapter(child: _sectionHeader('Mod', Icons.widgets)),
+            sliver: SliverToBoxAdapter(
+              child: _sectionHeader('Mod', Icons.widgets),
+            ),
           ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
@@ -315,16 +333,10 @@ class _PluginsTabState extends State<PluginsTab> {
                 crossAxisSpacing: 12,
                 childAspectRatio: 0.92,
               ),
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final item = _modItems[index];
-                  return _PluginCard(
-                    item: item,
-                    onTap: () => _openItem(item),
-                  );
-                },
-                childCount: _modItems.length,
-              ),
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final item = _modItems[index];
+                return _PluginCard(item: item, onTap: () => _openItem(item));
+              }, childCount: _modItems.length),
             ),
           ),
         ],
@@ -342,9 +354,9 @@ class _PluginsTabState extends State<PluginsTab> {
           const SizedBox(width: 8),
           Text(
             label,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
         ],
       ),
@@ -422,9 +434,7 @@ class _PluginCardState extends State<_PluginCard> {
         margin: EdgeInsets.zero,
         clipBehavior: Clip.antiAlias,
         elevation: 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
         child: InkWell(
           onTap: widget.onTap,
@@ -470,16 +480,10 @@ class _PluginCardState extends State<_PluginCard> {
                     _KindBadge(label: kindLabel, color: kindColor),
                     if (!item.hasConfig) ...[
                       const SizedBox(width: 6),
-                      _KindBadge(
-                        label: '无配置',
-                        color: Colors.grey,
-                      ),
+                      _KindBadge(label: '无配置', color: Colors.grey),
                     ] else if (item.orphan) ...[
                       const SizedBox(width: 6),
-                      _KindBadge(
-                        label: '仅配置',
-                        color: Colors.orange,
-                      ),
+                      _KindBadge(label: '仅配置', color: Colors.orange),
                     ],
                   ],
                 ),
@@ -538,4 +542,3 @@ class _KindBadge extends StatelessWidget {
     );
   }
 }
-

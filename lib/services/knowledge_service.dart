@@ -157,10 +157,7 @@ class KnowledgeService {
         ? model.embeddingModel!.trim()
         : model.name;
 
-    final body = jsonEncode({
-      'model': embedModel,
-      'input': texts,
-    });
+    final body = jsonEncode({'model': embedModel, 'input': texts});
 
     final res = await HttpFfiService.instance.post(
       _embeddingEndpoint(model.baseUrl),
@@ -175,8 +172,7 @@ class KnowledgeService {
     if (res.statusCode != 200) {
       throw Exception('Embedding API ${res.statusCode}: ${_snippet(res.body)}');
     }
-    final json =
-        jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
     final data = json['data'] as List?;
     if (data == null || data.isEmpty) {
       throw Exception('Embedding API 返回为空（data 为空）');

@@ -66,7 +66,7 @@ dependencies:
   # NaCl crypto_box (XSalsa20-Poly1305) for OpenFrp remote login decryption
   pinenacl:
     path: third_party/pinenacl
-
+  flutter_markdown_plus: ^1.0.12
 dev_dependencies:
   flutter_test:
     sdk: flutter

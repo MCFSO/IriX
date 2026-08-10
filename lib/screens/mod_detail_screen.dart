@@ -89,9 +89,9 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
     final instances = state.instances;
     if (instances.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请先创建一个服务器实例')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('请先创建一个服务器实例')));
       }
       return null;
     }
@@ -99,36 +99,33 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
     if (state.selected != null) return state.selected;
 
     if (!mounted) return null;
-    return showAppDialog<ServerInstance>(
-      context,
-      (ctx) {
-        return AlertDialog(
-          title: const Text('选择目标实例'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: instances.length,
-              itemBuilder: (context, index) {
-                final instance = instances[index];
-                return ListTile(
-                  leading: const Icon(Icons.storage),
-                  title: Text(instance.name),
-                  subtitle: Text(instance.rootPath),
-                  onTap: () => Navigator.pop(ctx, instance),
-                );
-              },
-            ),
+    return showAppDialog<ServerInstance>(context, (ctx) {
+      return AlertDialog(
+        title: const Text('选择目标实例'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: instances.length,
+            itemBuilder: (context, index) {
+              final instance = instances[index];
+              return ListTile(
+                leading: const Icon(Icons.storage),
+                title: Text(instance.name),
+                subtitle: Text(instance.rootPath),
+                onTap: () => Navigator.pop(ctx, instance),
+              );
+            },
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('取消'),
-            ),
-          ],
-        );
-      },
-    );
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+        ],
+      );
+    });
   }
 
   Future<void> _downloadVersion(ModrinthVersion version) async {
@@ -141,8 +138,8 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
     // 选择主文件（优先 primary）
     if (version.files.isEmpty) return;
     final file = version.files.firstWhere(
-        (f) => f.primary,
-        orElse: () => version.files.first,
+      (f) => f.primary,
+      orElse: () => version.files.first,
     );
 
     final instance = await _pickInstance();
@@ -155,18 +152,13 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
     setState(() => _downloadProgress[version.id] = 0.0);
 
     try {
-      await _downloader.downloadFile(
-        file.url,
-        targetPath,
-        (progress) {
-          if (mounted) {
-            setState(() {
-              _downloadProgress[version.id] = progress.percent;
-            });
-          }
-        },
-        threads: threads,
-      );
+      await _downloader.downloadFile(file.url, targetPath, (progress) {
+        if (mounted) {
+          setState(() {
+            _downloadProgress[version.id] = progress.percent;
+          });
+        }
+      }, threads: threads);
       if (mounted) {
         setState(() => _downloadProgress.remove(version.id));
         ScaffoldMessenger.of(context).showSnackBar(
@@ -182,9 +174,9 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _downloadProgress.remove(version.id));
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('下载失败: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('下载失败: $e')));
       }
     }
   }
@@ -192,18 +184,16 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
   Future<void> _openFolder(String dirPath) async {
     // 简单提示：此处不引入额外的进程打开依赖，只显示路径
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('目录: $dirPath')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('目录: $dirPath')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_project?.title ?? '加载中...'),
-      ),
+      appBar: AppBar(title: Text(_project?.title ?? '加载中...')),
       body: _buildBody(),
     );
   }
@@ -324,7 +314,9 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        title: Text(version.name.isNotEmpty ? version.name : version.versionNumber),
+        title: Text(
+          version.name.isNotEmpty ? version.name : version.versionNumber,
+        ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -337,8 +329,10 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
             if (isDownloading) ...[
               const SizedBox(height: 6),
               LinearProgressIndicator(value: progress / 100),
-              Text('${progress.toStringAsFixed(1)}%',
-                  style: const TextStyle(fontSize: 11)),
+              Text(
+                '${progress.toStringAsFixed(1)}%',
+                style: const TextStyle(fontSize: 11),
+              ),
             ],
           ],
         ),

@@ -76,10 +76,7 @@ class NodeStore {
   /// 更新节点字段并持久化。
   Future<void> updateNode(NodeInfo node) async {
     try {
-      await DatabaseManager.instance.updateNode(
-        node.id,
-        _toDbRow(node),
-      );
+      await DatabaseManager.instance.updateNode(node.id, _toDbRow(node));
       if (_cache != null) {
         final index = _cache!.indexWhere((e) => e.id == node.id);
         if (index >= 0) {

@@ -130,8 +130,9 @@ class InstanceStore {
   /// 若 [id] 不存在则不做任何更改。
   Future<void> updateStartCommand(String id, String newCommand) async {
     try {
-      await DatabaseManager.instance
-          .updateServer(id, {'start_command': newCommand});
+      await DatabaseManager.instance.updateServer(id, {
+        'start_command': newCommand,
+      });
       if (_cache != null) {
         for (final e in _cache!) {
           if (e.id == id) {

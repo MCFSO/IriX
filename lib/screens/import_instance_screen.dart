@@ -25,8 +25,9 @@ class _ImportInstanceScreenState extends State<ImportInstanceScreen> {
   final TextEditingController _rootPathController = TextEditingController();
 
   /// 启动命令控制器，预填示例命令。
-  final TextEditingController _startCommandController =
-      TextEditingController(text: 'java -Xmx2G -jar server.jar nogui');
+  final TextEditingController _startCommandController = TextEditingController(
+    text: 'java -Xmx2G -jar server.jar nogui',
+  );
 
   /// 是否正在处理创建（避免重复提交）。
   bool _creating = false;
@@ -55,18 +56,18 @@ class _ImportInstanceScreenState extends State<ImportInstanceScreen> {
     final rootPath = _rootPathController.text.trim();
     final startCommand = _startCommandController.text.trim();
     if (rootPath.isEmpty || startCommand.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请填写服务器根目录路径与启动命令')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请填写服务器根目录路径与启动命令')));
       return;
     }
 
     setState(() => _creating = true);
     try {
       await context.read<AppState>().createImportedInstance(
-            rootPath: rootPath,
-            startCommand: startCommand,
-          );
+        rootPath: rootPath,
+        startCommand: startCommand,
+      );
       if (mounted) {
         Navigator.pop(context);
       }
@@ -81,9 +82,7 @@ class _ImportInstanceScreenState extends State<ImportInstanceScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('导入实例'),
-      ),
+      appBar: AppBar(title: const Text('导入实例')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: ListView(
@@ -137,10 +136,7 @@ class _ImportInstanceScreenState extends State<ImportInstanceScreen> {
               label: Text(_creating ? '创建中…' : '创建实例'),
             ),
             const SizedBox(height: 8),
-            Text(
-              '导入一个已存在的服务器目录，使用其原有文件结构。',
-              style: theme.textTheme.bodySmall,
-            ),
+            Text('导入一个已存在的服务器目录，使用其原有文件结构。', style: theme.textTheme.bodySmall),
           ],
         ),
       ),

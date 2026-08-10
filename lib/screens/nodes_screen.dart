@@ -171,11 +171,11 @@ class _NodesScreenState extends State<NodesScreen> {
                   sliver: SliverGrid.builder(
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 12,
-                      crossAxisSpacing: 12,
-                      childAspectRatio: 2.6,
-                    ),
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 12,
+                          childAspectRatio: 2.6,
+                        ),
                     itemCount: nodes.length,
                     itemBuilder: (context, index) {
                       final node = nodes[index];
@@ -198,8 +198,8 @@ class _NodesScreenState extends State<NodesScreen> {
                         ? '本地节点守护进程正在运行'
                         : '提示：Node 类型节点需要先运行 node/ 目录构建的 irix-node 服务',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.outline,
-                        ),
+                      color: Theme.of(context).colorScheme.outline,
+                    ),
                   ),
                 ),
               ),
@@ -242,10 +242,11 @@ class _NodeCard extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: (online
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.surfaceContainerHighest)
-                  .withValues(alpha: 0.25),
+              color:
+                  (online
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.surfaceContainerHighest)
+                      .withValues(alpha: 0.25),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(

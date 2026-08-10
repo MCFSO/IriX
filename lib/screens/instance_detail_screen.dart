@@ -274,6 +274,8 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
                 width: 380,
                 child: AiChatPanel(
                   controller: _aiController,
+                  rootPath: instance.rootPath,
+                  instanceName: instance.name,
                   onClose: () => setState(() => _showAi = false),
                 ),
               ),

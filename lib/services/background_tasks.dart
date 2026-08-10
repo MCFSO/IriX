@@ -65,8 +65,7 @@ class BackgroundTaskManager extends ChangeNotifier {
   List<FileTask> get completedTasks =>
       _tasks.where((t) => t.status == TaskStatus.completed).toList();
 
-  bool get hasRunningTasks =>
-      _tasks.any((t) => t.status == TaskStatus.running);
+  bool get hasRunningTasks => _tasks.any((t) => t.status == TaskStatus.running);
 
   Future<FileTask> addCopyTask(String source, String dest, int totalBytes) {
     final task = FileTask(
@@ -118,7 +117,9 @@ class BackgroundTaskManager extends ChangeNotifier {
 
   void dismissCompleted() {
     _tasks.removeWhere(
-        (t) => t.status == TaskStatus.completed || t.status == TaskStatus.cancelled);
+      (t) =>
+          t.status == TaskStatus.completed || t.status == TaskStatus.cancelled,
+    );
     notifyListeners();
   }
 
@@ -176,7 +177,8 @@ class BackgroundTaskManager extends ChangeNotifier {
 
   Future<void> _executeSmall(FileTask task, File file) async {
     if (task.cancelled) {
-      _tasks[_tasks.indexWhere((t) => t.id == task.id)].status = TaskStatus.cancelled;
+      _tasks[_tasks.indexWhere((t) => t.id == task.id)].status =
+          TaskStatus.cancelled;
       notifyListeners();
       return;
     }
@@ -194,7 +196,8 @@ class BackgroundTaskManager extends ChangeNotifier {
       err = e.toString();
     }
     if (task.cancelled) {
-      _tasks[_tasks.indexWhere((t) => t.id == task.id)].status = TaskStatus.cancelled;
+      _tasks[_tasks.indexWhere((t) => t.id == task.id)].status =
+          TaskStatus.cancelled;
       notifyListeners();
       return;
     }
@@ -248,9 +251,12 @@ class BackgroundTaskManager extends ChangeNotifier {
       await completer.future;
 
       if (task.cancelled) {
-        _tasks[_tasks.indexWhere((t) => t.id == task.id)].status = TaskStatus.cancelled;
+        _tasks[_tasks.indexWhere((t) => t.id == task.id)].status =
+            TaskStatus.cancelled;
         notifyListeners();
-        try { await destFile.delete(); } catch (_) {}
+        try {
+          await destFile.delete();
+        } catch (_) {}
         return;
       }
       markComplete(task.id);
@@ -259,7 +265,9 @@ class BackgroundTaskManager extends ChangeNotifier {
       if (!task.cancelled) {
         markFailed(task.id, e.toString());
       }
-      try { await destFile.delete(); } catch (_) {}
+      try {
+        await destFile.delete();
+      } catch (_) {}
     } finally {
       await sub?.cancel();
     }
@@ -268,7 +276,8 @@ class BackgroundTaskManager extends ChangeNotifier {
   Future<void> _streamMove(FileTask task, File srcFile) async {
     try {
       if (task.cancelled) {
-        _tasks[_tasks.indexWhere((t) => t.id == task.id)].status = TaskStatus.cancelled;
+        _tasks[_tasks.indexWhere((t) => t.id == task.id)].status =
+            TaskStatus.cancelled;
         notifyListeners();
         return;
       }
@@ -277,21 +286,25 @@ class BackgroundTaskManager extends ChangeNotifier {
     } on FileSystemException {
       await _streamCopy(task, srcFile);
       if (!task.cancelled && task.status == TaskStatus.completed) {
-        try { await srcFile.delete(); } catch (_) {}
+        try {
+          await srcFile.delete();
+        } catch (_) {}
       }
     }
   }
 
   Future<void> _executeDelete(FileTask task, File file) async {
     if (task.cancelled) {
-      _tasks[_tasks.indexWhere((t) => t.id == task.id)].status = TaskStatus.cancelled;
+      _tasks[_tasks.indexWhere((t) => t.id == task.id)].status =
+          TaskStatus.cancelled;
       notifyListeners();
       return;
     }
     try {
       await file.delete();
       if (task.cancelled) {
-        _tasks[_tasks.indexWhere((t) => t.id == task.id)].status = TaskStatus.cancelled;
+        _tasks[_tasks.indexWhere((t) => t.id == task.id)].status =
+            TaskStatus.cancelled;
         notifyListeners();
         return;
       }
@@ -362,7 +375,11 @@ class _FileProgressDialogBody extends StatelessWidget {
         return AlertDialog(
           title: Row(
             children: [
-              const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+              const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
               const SizedBox(width: 12),
               Text('文件操作 (${running.length})'),
               const Spacer(),
@@ -388,7 +405,9 @@ class _FileProgressDialogBody extends StatelessWidget {
                 if (others.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   const Divider(),
-                  ...others.take(10).map((t) => _TaskTile(task: t, manager: manager)),
+                  ...others
+                      .take(10)
+                      .map((t) => _TaskTile(task: t, manager: manager)),
                   if (others.length > 10)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
@@ -435,9 +454,11 @@ class FileProgressOverlay extends StatelessWidget {
         final running = manager.runningTasks;
         if (running.isEmpty) {
           final lastDone = manager.tasks
-              .where((t) =>
-                  t.status == TaskStatus.completed ||
-                  t.status == TaskStatus.failed)
+              .where(
+                (t) =>
+                    t.status == TaskStatus.completed ||
+                    t.status == TaskStatus.failed,
+              )
               .toList();
           if (lastDone.isEmpty) return const SizedBox.shrink();
 
@@ -447,15 +468,26 @@ class FileProgressOverlay extends StatelessWidget {
               padding: const EdgeInsets.all(12),
               child: Row(
                 children: [
-                  Icon(Icons.check_circle_outline, color: Colors.green[600], size: 20),
+                  Icon(
+                    Icons.check_circle_outline,
+                    color: Colors.green[600],
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
-                  Text('最后完成: ${path.basename(lastDone.first.sourcePath)}',
-                      style: const TextStyle(fontSize: 13)),
+                  Text(
+                    '最后完成: ${path.basename(lastDone.first.sourcePath)}',
+                    style: const TextStyle(fontSize: 13),
+                  ),
                   const Spacer(),
                   InkWell(
                     onTap: () => manager.dismissCompleted(),
-                    child: Icon(Icons.close, size: 18,
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
+                    child: Icon(
+                      Icons.close,
+                      size: 18,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.5),
+                    ),
                   ),
                 ],
               ),
@@ -473,11 +505,19 @@ class FileProgressOverlay extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const SizedBox(width: 14, height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 1.5)),
+                    const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 1.5),
+                    ),
                     const SizedBox(width: 8),
-                    Text('${running.length} 个任务运行中',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                    Text(
+                      '${running.length} 个任务运行中',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                     const Spacer(),
                     InkWell(
                       onTap: () => FileProgressDialog.show(context, manager),
@@ -489,12 +529,16 @@ class FileProgressOverlay extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 4),
-                ...running.take(3).map((t) => _CompactTaskTile(task: t, manager: manager)),
+                ...running
+                    .take(3)
+                    .map((t) => _CompactTaskTile(task: t, manager: manager)),
                 if (running.length > 3)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
-                    child: Text('... 还有 ${running.length - 3} 个任务',
-                        style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+                    child: Text(
+                      '... 还有 ${running.length - 3} 个任务',
+                      style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                    ),
                   ),
               ],
             ),
@@ -665,5 +709,3 @@ String _formatBytes(int bytes) {
   }
   return '${(bytes / (_oneMegabyte * 1024)).toStringAsFixed(1)} GB';
 }
-
-

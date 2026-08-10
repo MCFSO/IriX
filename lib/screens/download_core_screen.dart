@@ -35,14 +35,19 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
 
   /// MSL 源：API 返回的核心标识符列表（如 paper、purpur）。
   List<String>? _mslCores;
+
   /// MSL 源：当前选中核心的版本列表。
   List<String>? _mslVersions;
+
   /// MSL 源：当前选中核心的描述。
   String? _mslDescription;
+
   /// MSL 源：选中的核心标识符。
   String? _selectedMslCore;
+
   /// MSL 源：选中的版本。
   String? _selectedMslVersion;
+
   /// MSL 加载中。
   bool _mslLoading = false;
   String? _mslError;
@@ -231,12 +236,15 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
     final rootPath = _instanceRootDir;
     if (coreFilePath == null || rootPath == null) return;
 
-    final coreType =
-        _downloadSource == 'MSL' ? (_selectedMslCore ?? 'unknown') : _selectedCore?.id ?? 'unknown';
-    final coreName =
-        _downloadSource == 'MSL' ? (_selectedMslCore ?? 'Unknown') : _selectedCore?.name ?? 'Unknown';
-    final category =
-        _downloadSource == 'MSL' ? CoreCategory.vanilla : _selectedCore?.category ?? CoreCategory.vanilla;
+    final coreType = _downloadSource == 'MSL'
+        ? (_selectedMslCore ?? 'unknown')
+        : _selectedCore?.id ?? 'unknown';
+    final coreName = _downloadSource == 'MSL'
+        ? (_selectedMslCore ?? 'Unknown')
+        : _selectedCore?.name ?? 'Unknown';
+    final category = _downloadSource == 'MSL'
+        ? CoreCategory.vanilla
+        : _selectedCore?.category ?? CoreCategory.vanilla;
 
     final dummyCore = ServerCore(
       id: coreType,
@@ -246,17 +254,19 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
       versions: const [],
     );
     final dummyVersion = CoreVersionInfo(
-      _downloadSource == 'MSL' ? (_selectedMslVersion ?? '') : _selectedVersion?.version ?? '',
+      _downloadSource == 'MSL'
+          ? (_selectedMslVersion ?? '')
+          : _selectedVersion?.version ?? '',
       '',
     );
 
     await context.read<AppState>().createDownloadedInstance(
-          core: dummyCore,
-          versionInfo: dummyVersion,
-          coreFilePath: coreFilePath,
-          rootPath: rootPath,
-          startCommand: _commandController.text.trim(),
-        );
+      core: dummyCore,
+      versionInfo: dummyVersion,
+      coreFilePath: coreFilePath,
+      rootPath: rootPath,
+      startCommand: _commandController.text.trim(),
+    );
 
     if (mounted) {
       Navigator.of(context).popUntil((route) => route.isFirst);
@@ -280,11 +290,12 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
   }
 
   Widget _stepHeader(String text) {
-    return Text(text,
-        style: Theme.of(context)
-            .textTheme
-            .titleMedium
-            ?.copyWith(color: Theme.of(context).colorScheme.primary));
+    return Text(
+      text,
+      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+        color: Theme.of(context).colorScheme.primary,
+      ),
+    );
   }
 
   Widget _labelField({required String label, required Widget child}) {
@@ -319,7 +330,10 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
               value: _downloadSource,
               isExpanded: true,
               items: const [
-                DropdownMenuItem(value: 'FastMirror', child: Text('FastMirror')),
+                DropdownMenuItem(
+                  value: 'FastMirror',
+                  child: Text('FastMirror'),
+                ),
                 DropdownMenuItem(value: 'MSL', child: Text('MSL 镜像源')),
               ],
               onChanged: _onDownloadSourceChanged,
@@ -335,10 +349,7 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
 
           const SizedBox(height: 24),
 
-          if (isMsl)
-            _buildMslSelection()
-          else
-            _buildFastMirrorSelection(),
+          if (isMsl) _buildMslSelection() else _buildFastMirrorSelection(),
         ],
       ),
     );
@@ -394,7 +405,9 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
                   hint: const Text('请选择核心'),
                   isExpanded: true,
                   items: serverCores
-                      .map((c) => DropdownMenuItem(value: c, child: Text(c.name)))
+                      .map(
+                        (c) => DropdownMenuItem(value: c, child: Text(c.name)),
+                      )
                       .toList(),
                   onChanged: _onCoreChanged,
                 ),
@@ -409,11 +422,13 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
           label: '服务器版本',
           child: DropdownButton<CoreVersionInfo>(
             value: _selectedVersion,
-            hint: Text(core == null
-                ? '请先选择核心'
-                : versions.isEmpty
-                    ? '该核心暂无可用版本'
-                    : '请选择版本'),
+            hint: Text(
+              core == null
+                  ? '请先选择核心'
+                  : versions.isEmpty
+                  ? '该核心暂无可用版本'
+                  : '请选择版本',
+            ),
             isExpanded: true,
             items: versions
                 .map((v) => DropdownMenuItem(value: v, child: Text(v.version)))
@@ -462,10 +477,12 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
   Widget _buildMslSelection() {
     final error = _mslError;
     if (_mslLoading && _mslCores == null) {
-      return const Center(child: Padding(
-        padding: EdgeInsets.all(32),
-        child: CircularProgressIndicator(),
-      ));
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: CircularProgressIndicator(),
+        ),
+      );
     }
 
     if (error != null && _mslCores == null) {
@@ -477,7 +494,11 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
             const SizedBox(height: 12),
             Text('加载失败', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 4),
-            Text(error, style: Theme.of(context).textTheme.bodySmall, textAlign: TextAlign.center),
+            Text(
+              error,
+              style: Theme.of(context).textTheme.bodySmall,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: _fetchMslCores,
@@ -507,7 +528,12 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
                   hint: const Text('请选择核心'),
                   isExpanded: true,
                   items: cores
-                      .map((c) => DropdownMenuItem(value: c, child: Text(_mslCoreDisplayName(c))))
+                      .map(
+                        (c) => DropdownMenuItem(
+                          value: c,
+                          child: Text(_mslCoreDisplayName(c)),
+                        ),
+                      )
                       .toList(),
                   onChanged: _onMslCoreChanged,
                 ),
@@ -524,9 +550,15 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text('简介', style: Theme.of(context).textTheme.labelSmall),
+                            Text(
+                              '简介',
+                              style: Theme.of(context).textTheme.labelSmall,
+                            ),
                             const SizedBox(height: 4),
-                            Text(_mslDescription!, style: Theme.of(context).textTheme.bodyMedium),
+                            Text(
+                              _mslDescription!,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
                           ],
                         ),
                       ),
@@ -539,19 +571,28 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
         _labelField(
           label: '服务器版本',
           child: _mslLoading && _selectedMslCore != null && _mslVersions == null
-              ? const SizedBox(height: 40, child: Center(child: CircularProgressIndicator(strokeWidth: 2)))
+              ? const SizedBox(
+                  height: 40,
+                  child: Center(
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
               : DropdownButton<String>(
                   value: _selectedMslVersion,
-                  hint: Text(_selectedMslCore == null
-                      ? '请先选择核心'
-                      : (_mslVersions?.isEmpty ?? true)
-                          ? '该核心暂无可用版本'
-                          : '请选择版本'),
+                  hint: Text(
+                    _selectedMslCore == null
+                        ? '请先选择核心'
+                        : (_mslVersions?.isEmpty ?? true)
+                        ? '该核心暂无可用版本'
+                        : '请选择版本',
+                  ),
                   isExpanded: true,
                   items: (_mslVersions ?? [])
                       .map((v) => DropdownMenuItem(value: v, child: Text(v)))
                       .toList(),
-                  onChanged: _selectedMslCore != null && (_mslVersions?.isNotEmpty ?? false)
+                  onChanged:
+                      _selectedMslCore != null &&
+                          (_mslVersions?.isNotEmpty ?? false)
                       ? (v) => setState(() => _selectedMslVersion = v)
                       : null,
                 ),
@@ -615,15 +656,25 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+              const Icon(
+                Icons.error_outline,
+                size: 48,
+                color: Colors.redAccent,
+              ),
               const SizedBox(height: 16),
               Text('下载失败', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
-              Text(error, textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodySmall),
+              Text(
+                error,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
               const SizedBox(height: 24),
               FilledButton(
-                onPressed: () => setState(() { _step = 0; _downloadError = null; }),
+                onPressed: () => setState(() {
+                  _step = 0;
+                  _downloadError = null;
+                }),
                 child: const Text('返回'),
               ),
             ],
@@ -649,15 +700,19 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
           const SizedBox(height: 16),
           Text('${percent.toStringAsFixed(1)}%'),
           const SizedBox(height: 8),
-          Text(total > 0
-              ? '${_formatBytes(downloaded)} / ${_formatBytes(total.toDouble())}'
-              : '已下载 ${_formatBytes(downloaded)}'),
+          Text(
+            total > 0
+                ? '${_formatBytes(downloaded)} / ${_formatBytes(total.toDouble())}'
+                : '已下载 ${_formatBytes(downloaded)}',
+          ),
           const SizedBox(height: 8),
           Text('速度 ${_formatBytes(speed)}/s'),
           const SizedBox(height: 24),
           if (_downloading)
-            const Text('正在下载…请勿离开',
-                style: TextStyle(fontStyle: FontStyle.italic)),
+            const Text(
+              '正在下载…请勿离开',
+              style: TextStyle(fontStyle: FontStyle.italic),
+            ),
         ],
       ),
     );
@@ -668,7 +723,8 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
   Widget _buildCommandStep() {
     String fileName;
     if (_downloadSource == 'MSL') {
-      fileName = '${_selectedMslCore ?? 'core'}-${_selectedMslVersion ?? 'unknown'}.jar';
+      fileName =
+          '${_selectedMslCore ?? 'core'}-${_selectedMslVersion ?? 'unknown'}.jar';
     } else {
       fileName = (_selectedCore != null && _selectedVersion != null)
           ? buildCoreFileName(_selectedCore!, _selectedVersion!)

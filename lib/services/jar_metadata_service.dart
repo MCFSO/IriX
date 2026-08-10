@@ -37,10 +37,13 @@ class JarMetadata {
 enum JarKind {
   /// Bukkit/Spigot/Paper 插件。
   plugin,
+
   /// Fabric Mod。
   fabric,
+
   /// Forge / NeoForge Mod。
   forge,
+
   /// 未知（无法识别）。
   unknown,
 }
@@ -112,10 +115,9 @@ class JarMetadataService {
         iconPath = iconEntry;
       } else if (iconEntry is Map) {
         // 取最大尺寸的图标
-        final sizes = iconEntry.keys
-            .map((k) => int.tryParse(k.toString()) ?? 0)
-            .toList()
-          ..sort();
+        final sizes =
+            iconEntry.keys.map((k) => int.tryParse(k.toString()) ?? 0).toList()
+              ..sort();
         if (sizes.isNotEmpty) {
           iconPath = iconEntry[sizes.last.toString()] as String?;
         }
@@ -142,10 +144,8 @@ class JarMetadataService {
       String? description = _tomlValue(content, 'description');
       String? logoFile = _tomlValue(content, 'logoFile');
       // logoFile 路径相对于 jar 根目录（可能带前导 ./）。
-      final iconPath =
-          logoFile?.replaceAll(RegExp(r'^\./'), '');
-      final iconBytes =
-          iconPath != null ? _readIcon(archive, iconPath) : null;
+      final iconPath = logoFile?.replaceAll(RegExp(r'^\./'), '');
+      final iconBytes = iconPath != null ? _readIcon(archive, iconPath) : null;
       return JarMetadata(
         name: name,
         description: description,
@@ -210,6 +210,5 @@ class JarMetadataService {
   }
 
   /// 判断路径是否为 jar 文件。
-  static bool isJar(String path) =>
-      p.extension(path).toLowerCase() == '.jar';
+  static bool isJar(String path) => p.extension(path).toLowerCase() == '.jar';
 }

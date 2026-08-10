@@ -63,7 +63,8 @@ class UploadTicket {
     required this.uploadDir,
   });
 
-  String get url => '${addr.contains('://') ? addr : 'http://$addr'}/upload/$password';
+  String get url =>
+      '${addr.contains('://') ? addr : 'http://$addr'}/upload/$password';
 }
 
 /// 节点 API 客户端。
@@ -110,9 +111,9 @@ class NodeApiClient {
     bool retryOnce = true,
   }) async {
     final uri = _uri(path, query);
-    final headers = body != null ? _headers : const {
-      'X-Requested-With': 'XMLHttpRequest',
-    };
+    final headers = body != null
+        ? _headers
+        : const {'X-Requested-With': 'XMLHttpRequest'};
     HttpFfiResponse resp;
     try {
       resp = await HttpFfiService.instance.request(
@@ -133,16 +134,17 @@ class NodeApiClient {
       throw NodeApiException(401, '节点需要 API 密钥');
     }
     if (resp.statusCode >= 400) {
-      throw NodeApiException(resp.statusCode, 'HTTP ${resp.statusCode}: ${resp.body}');
+      throw NodeApiException(
+        resp.statusCode,
+        'HTTP ${resp.statusCode}: ${resp.body}',
+      );
     }
 
     final decoded = _decode(resp);
     final status = (decoded['status'] as num?)?.toInt() ?? 500;
     if (status != 200) {
       final data = decoded['data'];
-      final message = data is String
-          ? data
-          : '节点返回错误（status $status）';
+      final message = data is String ? data : '节点返回错误（status $status）';
       throw NodeApiException(status, message);
     }
     return decoded['data'];
@@ -201,17 +203,20 @@ class NodeApiClient {
     String? name,
     String? status,
   }) async {
-    final data = await _request(
-      'GET',
-      '/api/service/remote_service_instances',
-      query: {
-        'daemonId': daemonId,
-        'page': '$page',
-        'page_size': '$pageSize',
-        'instance_name': name ?? '',
-        'status': status ?? '',
-      },
-    ) as Map<String, dynamic>? ?? {};
+    final data =
+        await _request(
+              'GET',
+              '/api/service/remote_service_instances',
+              query: {
+                'daemonId': daemonId,
+                'page': '$page',
+                'page_size': '$pageSize',
+                'instance_name': name ?? '',
+                'status': status ?? '',
+              },
+            )
+            as Map<String, dynamic>? ??
+        {};
     final list = <RemoteInstance>[];
     for (final item in (data['data'] as List<dynamic>? ?? [])) {
       if (item is Map<String, dynamic>) {
@@ -239,12 +244,14 @@ class NodeApiClient {
     required String daemonId,
     required Map<String, dynamic> config,
   }) async {
-    final data = await _request(
-      'POST',
-      '/api/instance',
-      query: {'daemonId': daemonId},
-      body: config,
-    ) as Map<String, dynamic>?;
+    final data =
+        await _request(
+              'POST',
+              '/api/instance',
+              query: {'daemonId': daemonId},
+              body: config,
+            )
+            as Map<String, dynamic>?;
     return data?['instanceUuid'] as String? ?? '';
   }
 
@@ -288,11 +295,7 @@ class NodeApiClient {
       RemoteAction.restart => '/api/protected_instance/restart',
       RemoteAction.kill => '/api/protected_instance/kill',
     };
-    await _request(
-      'GET',
-      path,
-      query: {'uuid': uuid, 'daemonId': daemonId},
-    );
+    await _request('GET', path, query: {'uuid': uuid, 'daemonId': daemonId});
   }
 
   /// 发送命令（GET /api/protected_instance/command）。
@@ -448,7 +451,12 @@ class NodeApiClient {
       'POST',
       '/api/files/compress',
       query: {'daemonId': daemonId, 'uuid': uuid},
-      body: {'type': 2, 'code': 'utf-8', 'source': source, 'targets': [dest]},
+      body: {
+        'type': 2,
+        'code': 'utf-8',
+        'source': source,
+        'targets': [dest],
+      },
     );
   }
 
@@ -486,15 +494,17 @@ class NodeApiClient {
     required String uuid,
     required String fileName,
   }) async {
-    final data = await _request(
-      'POST',
-      '/api/files/download',
-      query: {
-        'daemonId': daemonId,
-        'uuid': uuid,
-        'file_name': fileName,
-      },
-    ) as Map<String, dynamic>?;
+    final data =
+        await _request(
+              'POST',
+              '/api/files/download',
+              query: {
+                'daemonId': daemonId,
+                'uuid': uuid,
+                'file_name': fileName,
+              },
+            )
+            as Map<String, dynamic>?;
     return DownloadTicket(
       password: data?['password'] as String? ?? '',
       addr: data?['addr'] as String? ?? '',
@@ -508,15 +518,17 @@ class NodeApiClient {
     required String uuid,
     required String uploadDir,
   }) async {
-    final data = await _request(
-      'POST',
-      '/api/files/upload',
-      query: {
-        'daemonId': daemonId,
-        'uuid': uuid,
-        'upload_dir': uploadDir,
-      },
-    ) as Map<String, dynamic>?;
+    final data =
+        await _request(
+              'POST',
+              '/api/files/upload',
+              query: {
+                'daemonId': daemonId,
+                'uuid': uuid,
+                'upload_dir': uploadDir,
+              },
+            )
+            as Map<String, dynamic>?;
     return UploadTicket(
       password: data?['password'] as String? ?? '',
       addr: data?['addr'] as String? ?? '',
@@ -603,7 +615,11 @@ class NodeApiClient {
     await _request(
       'POST',
       '/api/auth',
-      body: {'username': username, 'password': password, 'permission': permission},
+      body: {
+        'username': username,
+        'password': password,
+        'permission': permission,
+      },
     );
   }
 

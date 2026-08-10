@@ -360,23 +360,19 @@ class OfrpService {
     final x25519 = X25519();
     final keyPair = await x25519.newKeyPair();
     final publicKey = await keyPair.extractPublicKey();
-    return (
-      publicKey: base64UrlEncode(publicKey.bytes),
-      keyPair: keyPair,
-    );
+    return (publicKey: base64UrlEncode(publicKey.bytes), keyPair: keyPair);
   }
 
   /// 请求远程登录授权，返回 (授权 URL, 请求 UUID)。
   Future<({String authorizationUrl, String requestUuid})> requestRemoteLogin(
     String publicKey,
   ) async {
-    final res = await HttpFfiService.instance
-        .post(
-          'https://access.openfrp.net/argoAccess/requestLogin',
-          headers: {'Content-Type': 'application/json', 'User-Agent': _ua},
-          body: jsonEncode({'public_key': publicKey}),
-          timeout: const Duration(seconds: 30),
-        );
+    final res = await HttpFfiService.instance.post(
+      'https://access.openfrp.net/argoAccess/requestLogin',
+      headers: {'Content-Type': 'application/json', 'User-Agent': _ua},
+      body: jsonEncode({'public_key': publicKey}),
+      timeout: const Duration(seconds: 30),
+    );
     if (res.statusCode != 200) {
       throw Exception('请求授权失败 HTTP ${res.statusCode}: ${_snippet(res.body)}');
     }

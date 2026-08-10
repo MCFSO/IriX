@@ -15,24 +15,26 @@ import 'package:ffi/ffi.dart';
 import 'package:path/path.dart' as p;
 
 /// FFI 函数签名定义
-typedef HttpRequestC = Pointer<Utf8> Function(
-  Pointer<Utf8> method,
-  Pointer<Utf8> url,
-  Pointer<Utf8> headersJson,
-  Pointer<Uint8> body,
-  IntPtr bodyLen,
-  Uint64 timeoutSecs,
-  Uint32 maxRedirects,
-);
-typedef HttpRequestDart = Pointer<Utf8> Function(
-  Pointer<Utf8> method,
-  Pointer<Utf8> url,
-  Pointer<Utf8> headersJson,
-  Pointer<Uint8> body,
-  int bodyLen,
-  int timeoutSecs,
-  int maxRedirects,
-);
+typedef HttpRequestC =
+    Pointer<Utf8> Function(
+      Pointer<Utf8> method,
+      Pointer<Utf8> url,
+      Pointer<Utf8> headersJson,
+      Pointer<Uint8> body,
+      IntPtr bodyLen,
+      Uint64 timeoutSecs,
+      Uint32 maxRedirects,
+    );
+typedef HttpRequestDart =
+    Pointer<Utf8> Function(
+      Pointer<Utf8> method,
+      Pointer<Utf8> url,
+      Pointer<Utf8> headersJson,
+      Pointer<Uint8> body,
+      int bodyLen,
+      int timeoutSecs,
+      int maxRedirects,
+    );
 
 typedef FreeStringC = Void Function(Pointer<Utf8> ptr);
 typedef FreeStringDart = void Function(Pointer<Utf8> ptr);
@@ -72,8 +74,9 @@ class HttpFfiException implements Exception {
   const HttpFfiException(this.message, {this.statusCode});
 
   @override
-  String toString() =>
-      statusCode == null ? 'HttpFfiException: $message' : 'HttpFfiException($statusCode): $message';
+  String toString() => statusCode == null
+      ? 'HttpFfiException: $message'
+      : 'HttpFfiException($statusCode): $message';
 }
 
 /// 传递给后台 isolate 的请求
@@ -116,8 +119,8 @@ class HttpFfiService {
     final libName = Platform.isWindows
         ? 'xmc_http_client.dll'
         : Platform.isMacOS
-            ? 'libxmc_http_client.dylib'
-            : 'libxmc_http_client.so';
+        ? 'libxmc_http_client.dylib'
+        : 'libxmc_http_client.so';
 
     for (final libPath in _getPossibleLibraryPaths(libName)) {
       try {
@@ -232,10 +235,13 @@ class HttpFfiService {
       );
       // Dart 层硬超时兜底：Rust 侧 SO_RCVTIMEO 在个别平台/环境下可能失效，
       // 这里保证调用方总能按预期超时返回，并尽力终止后台 isolate。
-      return await completer.future.timeout(timeout, onTimeout: () {
-        isolate?.kill(priority: Isolate.immediate);
-        throw HttpFfiException('请求超时: $timeout');
-      });
+      return await completer.future.timeout(
+        timeout,
+        onTimeout: () {
+          isolate?.kill(priority: Isolate.immediate);
+          throw HttpFfiException('请求超时: $timeout');
+        },
+      );
     } finally {
       await sub.cancel();
       responsePort.close();
@@ -247,8 +253,7 @@ class HttpFfiService {
     String url, {
     Map<String, String>? headers,
     Duration timeout = const Duration(seconds: 30),
-  }) =>
-      request(method: 'GET', url: url, headers: headers, timeout: timeout);
+  }) => request(method: 'GET', url: url, headers: headers, timeout: timeout);
 
   /// POST 请求（[body] 为字节数组或 UTF-8 字符串）。
   Future<HttpFfiResponse> post(
@@ -256,14 +261,13 @@ class HttpFfiService {
     Map<String, String>? headers,
     Object? body,
     Duration timeout = const Duration(seconds: 30),
-  }) =>
-      request(
-        method: 'POST',
-        url: url,
-        headers: headers,
-        body: _encodeBody(body),
-        timeout: timeout,
-      );
+  }) => request(
+    method: 'POST',
+    url: url,
+    headers: headers,
+    body: _encodeBody(body),
+    timeout: timeout,
+  );
 
   /// PUT 请求。
   Future<HttpFfiResponse> put(
@@ -271,14 +275,13 @@ class HttpFfiService {
     Map<String, String>? headers,
     Object? body,
     Duration timeout = const Duration(seconds: 30),
-  }) =>
-      request(
-        method: 'PUT',
-        url: url,
-        headers: headers,
-        body: _encodeBody(body),
-        timeout: timeout,
-      );
+  }) => request(
+    method: 'PUT',
+    url: url,
+    headers: headers,
+    body: _encodeBody(body),
+    timeout: timeout,
+  );
 
   /// PATCH 请求。
   Future<HttpFfiResponse> patch(
@@ -286,30 +289,27 @@ class HttpFfiService {
     Map<String, String>? headers,
     Object? body,
     Duration timeout = const Duration(seconds: 30),
-  }) =>
-      request(
-        method: 'PATCH',
-        url: url,
-        headers: headers,
-        body: _encodeBody(body),
-        timeout: timeout,
-      );
+  }) => request(
+    method: 'PATCH',
+    url: url,
+    headers: headers,
+    body: _encodeBody(body),
+    timeout: timeout,
+  );
 
   /// DELETE 请求。
   Future<HttpFfiResponse> delete(
     String url, {
     Map<String, String>? headers,
     Duration timeout = const Duration(seconds: 30),
-  }) =>
-      request(method: 'DELETE', url: url, headers: headers, timeout: timeout);
+  }) => request(method: 'DELETE', url: url, headers: headers, timeout: timeout);
 
   /// HEAD 请求。
   Future<HttpFfiResponse> head(
     String url, {
     Map<String, String>? headers,
     Duration timeout = const Duration(seconds: 30),
-  }) =>
-      request(method: 'HEAD', url: url, headers: headers, timeout: timeout);
+  }) => request(method: 'HEAD', url: url, headers: headers, timeout: timeout);
 
   static List<int>? _encodeBody(Object? body) {
     if (body == null) return null;
@@ -329,8 +329,9 @@ class HttpFfiService {
 
     try {
       final lib = _openLibrary();
-      final httpRequest =
-          lib.lookupFunction<HttpRequestC, HttpRequestDart>('http_request');
+      final httpRequest = lib.lookupFunction<HttpRequestC, HttpRequestDart>(
+        'http_request',
+      );
 
       methodPtr = req.method.toNativeUtf8();
       urlPtr = req.url.toNativeUtf8();
@@ -351,9 +352,7 @@ class HttpFfiService {
       );
 
       if (resultPtr == nullptr) {
-        req.sendPort.send(
-          const HttpFfiException('http_request 返回空指针'),
-        );
+        req.sendPort.send(const HttpFfiException('http_request 返回空指针'));
         return;
       }
 
@@ -382,9 +381,7 @@ class HttpFfiService {
         req.sendPort.send(HttpFfiException(message, statusCode: status));
       }
     } catch (e) {
-      req.sendPort.send(
-        HttpFfiException('后台 isolate 异常: $e'),
-      );
+      req.sendPort.send(HttpFfiException('后台 isolate 异常: $e'));
     } finally {
       if (methodPtr != null) calloc.free(methodPtr);
       if (urlPtr != null) calloc.free(urlPtr);
@@ -394,8 +391,9 @@ class HttpFfiService {
         // resultPtr 由 Rust 分配，需用 Rust 侧 free_string 释放
         try {
           final lib = _openLibrary();
-          final freeString =
-              lib.lookupFunction<FreeStringC, FreeStringDart>('free_string');
+          final freeString = lib.lookupFunction<FreeStringC, FreeStringDart>(
+            'free_string',
+          );
           freeString(resultPtr);
         } catch (_) {
           // 库句柄无法再次打开时忽略（指针泄漏可接受，仅调试场景）

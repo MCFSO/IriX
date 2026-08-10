@@ -64,8 +64,14 @@ void main() {
         'title': '魔兽',
         'created_at': '2026-01-01T00:00:00Z',
         'chunks': [
-          {'text': '末影龙是结束之地的 Boss', 'embedding': [1.0, 0.0, 0.0]},
-          {'text': '下界合金装备最坚固', 'embedding': [0.0, 1.0, 0.0]},
+          {
+            'text': '末影龙是结束之地的 Boss',
+            'embedding': [1.0, 0.0, 0.0],
+          },
+          {
+            'text': '下界合金装备最坚固',
+            'embedding': [0.0, 1.0, 0.0],
+          },
         ],
       },
     );
@@ -77,7 +83,10 @@ void main() {
         'title': '红石',
         'created_at': '2026-01-02T00:00:00Z',
         'chunks': [
-          {'text': '红石中继器可延长信号', 'embedding': [0.0, 0.0, 1.0]},
+          {
+            'text': '红石中继器可延长信号',
+            'embedding': [0.0, 0.0, 1.0],
+          },
         ],
       },
     );
@@ -85,7 +94,10 @@ void main() {
     final res = await VectorStoreFfi.instance.request(
       dbPath: dbPath,
       op: 'search',
-      args: {'embedding': [0.9, 0.1, 0.1], 'top_k': 3},
+      args: {
+        'embedding': [0.9, 0.1, 0.1],
+        'top_k': 3,
+      },
     );
     final results = res['results'] as List;
     expect(results, isNotEmpty);
@@ -109,7 +121,10 @@ void main() {
         'title': '魔兽新',
         'created_at': '2026-01-03T00:00:00Z',
         'chunks': [
-          {'text': '新版末影龙更强', 'embedding': [1.0, 1.0, 1.0]},
+          {
+            'text': '新版末影龙更强',
+            'embedding': [1.0, 1.0, 1.0],
+          },
         ],
       },
     );
@@ -148,7 +163,10 @@ void main() {
           'doc_id': 'd',
           'title': 't',
           'chunks': [
-            {'text': 'x', 'embedding': [1.0, 2.0]},
+            {
+              'text': 'x',
+              'embedding': [1.0, 2.0],
+            },
           ],
         },
       ),
@@ -164,10 +182,7 @@ void main() {
 
   test('未知操作报错', () async {
     expect(
-      () => VectorStoreFfi.instance.request(
-        dbPath: dbPath,
-        op: 'unknown_op',
-      ),
+      () => VectorStoreFfi.instance.request(dbPath: dbPath, op: 'unknown_op'),
       throwsA(
         isA<VectorStoreFfiException>().having(
           (e) => e.toString(),

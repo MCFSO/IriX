@@ -12,8 +12,10 @@ import 'package:path/path.dart' as p;
 typedef LogInitNative = Int32 Function(Pointer<Utf8> logDir);
 typedef LogInitDart = int Function(Pointer<Utf8> logDir);
 
-typedef LogWriteNative = Int32 Function(Pointer<Utf8> instanceId, Pointer<Utf8> line);
-typedef LogWriteDart = int Function(Pointer<Utf8> instanceId, Pointer<Utf8> line);
+typedef LogWriteNative =
+    Int32 Function(Pointer<Utf8> instanceId, Pointer<Utf8> line);
+typedef LogWriteDart =
+    int Function(Pointer<Utf8> instanceId, Pointer<Utf8> line);
 
 typedef LogFlushNative = Int32 Function();
 typedef LogFlushDart = int Function();
@@ -45,10 +47,18 @@ class LoggerNative {
     logInit = _lib.lookupFunction<LogInitNative, LogInitDart>('log_init');
     logWrite = _lib.lookupFunction<LogWriteNative, LogWriteDart>('log_write');
     logFlush = _lib.lookupFunction<LogFlushNative, LogFlushDart>('log_flush');
-    logShutdown = _lib.lookupFunction<LogShutdownNative, LogShutdownDart>('log_shutdown');
-    logDelete = _lib.lookupFunction<LogDeleteNative, LogDeleteDart>('log_delete');
-    getLastError = _lib.lookupFunction<GetLastErrorNative, GetLastErrorDart>('get_last_error');
-    freeString = _lib.lookupFunction<FreeStringNative, FreeStringDart>('free_string');
+    logShutdown = _lib.lookupFunction<LogShutdownNative, LogShutdownDart>(
+      'log_shutdown',
+    );
+    logDelete = _lib.lookupFunction<LogDeleteNative, LogDeleteDart>(
+      'log_delete',
+    );
+    getLastError = _lib.lookupFunction<GetLastErrorNative, GetLastErrorDart>(
+      'get_last_error',
+    );
+    freeString = _lib.lookupFunction<FreeStringNative, FreeStringDart>(
+      'free_string',
+    );
   }
 
   static LoggerNative init() {
@@ -56,8 +66,8 @@ class LoggerNative {
     final libName = Platform.isWindows
         ? 'xmc_logger.dll'
         : Platform.isMacOS
-            ? 'libxmc_logger.dylib'
-            : 'libxmc_logger.so';
+        ? 'libxmc_logger.dylib'
+        : 'libxmc_logger.so';
 
     DynamicLibrary? lib;
     try {

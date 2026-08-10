@@ -251,8 +251,11 @@ class FrpcManager extends ChangeNotifier {
       frpcDir.deleteSync(recursive: true);
     }
     frpcDir.createSync(recursive: true);
-    await Downloader()
-        .downloadFile('$_sakuraFrpcBase/$version/$fileName', exe.path, (_) {});
+    await Downloader().downloadFile(
+      '$_sakuraFrpcBase/$version/$fileName',
+      exe.path,
+      (_) {},
+    );
     if (!Platform.isWindows) {
       await Process.run('chmod', ['+x', exe.path]);
     }
@@ -311,14 +314,15 @@ class FrpcManager extends ChangeNotifier {
       'arm' => 'arm',
       final a => a,
     };
-    return (
-      $1: Platform.operatingSystem,
-      $2: arch,
-    );
+    return ($1: Platform.operatingSystem, $2: arch);
   }
 
   /// GitHub 加速镜像（国内可达），依次尝试后回退直连。
-  static const List<String> _ghMirrors = ['https://ghfast.top', 'https://ghproxy.net', ''];
+  static const List<String> _ghMirrors = [
+    'https://ghfast.top',
+    'https://ghproxy.net',
+    '',
+  ];
 
   /// 下载 fatedier 官方 frpc（HayFrp/SakuraFrp/自建 frps 等标准 frp 服务共用）。
   ///
@@ -464,24 +468,25 @@ class FrpcManager extends ChangeNotifier {
     String configContent,
     String key, {
     String flavor = 'openfrp',
-  }) =>
-      _spawn(key, flavor, (path) async {
-        final appDir = await getApplicationDocumentsDirectory();
-        final configDir = Directory(p.join(appDir.path, 'ofrp', 'configs'));
-        if (!configDir.existsSync()) {
-          configDir.createSync(recursive: true);
-        }
-        final ext = flavor == 'chmlfrp' ? 'ini' : 'toml';
-        final configFile = File(p.join(configDir.path, '$key.$ext'));
-        await configFile.writeAsString(configContent);
-        // OpenFrp 官方 frpc 移除了 -c 短参数（直接退出），必须用 --config；
-        // 标准版与 ChmlFrp 版均支持 -c。
-        final flag = (flavor == 'chmlfrp' || flavor == 'standard') ? '-c' : '--config';
-        return Process.start(path, [
-          flag,
-          configFile.path,
-        ], workingDirectory: p.dirname(path));
-      });
+  }) => _spawn(key, flavor, (path) async {
+    final appDir = await getApplicationDocumentsDirectory();
+    final configDir = Directory(p.join(appDir.path, 'ofrp', 'configs'));
+    if (!configDir.existsSync()) {
+      configDir.createSync(recursive: true);
+    }
+    final ext = flavor == 'chmlfrp' ? 'ini' : 'toml';
+    final configFile = File(p.join(configDir.path, '$key.$ext'));
+    await configFile.writeAsString(configContent);
+    // OpenFrp 官方 frpc 移除了 -c 短参数（直接退出），必须用 --config；
+    // 标准版与 ChmlFrp 版均支持 -c。
+    final flag = (flavor == 'chmlfrp' || flavor == 'standard')
+        ? '-c'
+        : '--config';
+    return Process.start(path, [
+      flag,
+      configFile.path,
+    ], workingDirectory: p.dirname(path));
+  });
 
   Future<void> _spawn(
     String key,
@@ -499,9 +504,9 @@ class FrpcManager extends ChangeNotifier {
     IOSink? logSink;
     try {
       final logsDir = await _ensureLogsDir();
-      logSink = File(p.join(logsDir, 'frpc-$key.log')).openWrite(
-        mode: FileMode.append,
-      );
+      logSink = File(
+        p.join(logsDir, 'frpc-$key.log'),
+      ).openWrite(mode: FileMode.append);
       logSink.writeln(
         '===== ${DateTime.now().toIso8601String()} frpc 启动 (flavor: $flavor) =====',
       );
@@ -512,8 +517,9 @@ class FrpcManager extends ChangeNotifier {
     void onOutput(String chunk) {
       _outputs[key] = (_outputs[key] ?? '') + chunk;
       if (_outputs[key]!.length > maxOutputChars) {
-        _outputs[key] = _outputs[key]!
-            .substring(_outputs[key]!.length - maxOutputChars);
+        _outputs[key] = _outputs[key]!.substring(
+          _outputs[key]!.length - maxOutputChars,
+        );
       }
       logSink?.write(chunk);
       notifyListeners();

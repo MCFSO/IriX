@@ -51,11 +51,13 @@ class ModrinthSearchHit {
       iconUrl: json['icon_url'] as String?,
       downloads: (json['downloads'] as num?)?.toInt() ?? 0,
       follows: (json['follows'] as num?)?.toInt() ?? 0,
-      versions: (json['versions'] as List<dynamic>?)
+      versions:
+          (json['versions'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           const [],
-      categories: (json['categories'] as List<dynamic>?)
+      categories:
+          (json['categories'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           const [],
@@ -80,9 +82,11 @@ class ModrinthSearchResult {
 
   factory ModrinthSearchResult.fromJson(Map<String, dynamic> json) {
     return ModrinthSearchResult(
-      hits: (json['hits'] as List<dynamic>?)
-              ?.map((e) =>
-                  ModrinthSearchHit.fromJson(e as Map<String, dynamic>))
+      hits:
+          (json['hits'] as List<dynamic>?)
+              ?.map(
+                (e) => ModrinthSearchHit.fromJson(e as Map<String, dynamic>),
+              )
               .toList() ??
           const [],
       offset: (json['offset'] as num?)?.toInt() ?? 0,
@@ -136,15 +140,18 @@ class ModrinthProject {
       iconUrl: json['icon_url'] as String?,
       downloads: (json['downloads'] as num?)?.toInt() ?? 0,
       followers: (json['followers'] as num?)?.toInt() ?? 0,
-      categories: (json['categories'] as List<dynamic>?)
+      categories:
+          (json['categories'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           const [],
-      loaders: (json['loaders'] as List<dynamic>?)
+      loaders:
+          (json['loaders'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           const [],
-      gameVersions: (json['game_versions'] as List<dynamic>?)
+      gameVersions:
+          (json['game_versions'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           const [],
@@ -218,7 +225,10 @@ class ModrinthTag {
     this.projectId,
   });
 
-  factory ModrinthTag.fromJson(Map<String, dynamic> json, ModrinthTagType type) {
+  factory ModrinthTag.fromJson(
+    Map<String, dynamic> json,
+    ModrinthTagType type,
+  ) {
     return ModrinthTag(
       icon: json['icon'] as String? ?? '',
       name: json['name'] as String? ?? '',
@@ -282,16 +292,19 @@ class ModrinthVersion {
       projectId: json['project_id'] as String? ?? '',
       name: json['name'] as String? ?? '',
       versionNumber: json['version_number'] as String? ?? '',
-      gameVersions: (json['game_versions'] as List<dynamic>?)
+      gameVersions:
+          (json['game_versions'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           const [],
-      loaders: (json['loaders'] as List<dynamic>?)
+      loaders:
+          (json['loaders'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           const [],
       versionType: json['version_type'] as String? ?? 'release',
-      files: (json['files'] as List<dynamic>?)
+      files:
+          (json['files'] as List<dynamic>?)
               ?.map((e) => ModrinthFile.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],

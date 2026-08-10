@@ -152,7 +152,9 @@ class _RemoteInstanceDetailScreenState
 
   Future<void> _editConfig() async {
     final cfg = _instance.config;
-    final showDocker = shouldShowDockerSettings(nodePlatform: widget.nodePlatform);
+    final showDocker = shouldShowDockerSettings(
+      nodePlatform: widget.nodePlatform,
+    );
     final result = await showAppDialog<_ConfigEditResult?>(
       context,
       (_) => _ConfigEditDialog(cfg: cfg, showDocker: showDocker),
@@ -229,9 +231,11 @@ class _RemoteInstanceDetailScreenState
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: Text(_instance.config.nickname.isEmpty
-            ? '实例详情'
-            : _instance.config.nickname),
+        title: Text(
+          _instance.config.nickname.isEmpty
+              ? '实例详情'
+              : _instance.config.nickname,
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.folder_outlined),
@@ -281,10 +285,7 @@ class _RemoteInstanceDetailScreenState
                   ),
                   Expanded(
                     child: TabBarView(
-                      children: [
-                        _buildConsole(theme),
-                        _buildConfig(theme),
-                      ],
+                      children: [_buildConsole(theme), _buildConfig(theme)],
                     ),
                   ),
                 ],
@@ -449,11 +450,19 @@ class _RemoteInstanceDetailScreenState
     ];
     if (cfg.processType == 'docker') {
       rows.addAll([
-        ('容器名称', cfg.docker.containerName.isEmpty ? '—' : cfg.docker.containerName),
+        (
+          '容器名称',
+          cfg.docker.containerName.isEmpty ? '—' : cfg.docker.containerName,
+        ),
         ('镜像', cfg.docker.image.isEmpty ? '—' : cfg.docker.image),
         ('内存限制', '${cfg.docker.memory} MB'),
         ('端口映射', cfg.docker.ports.isEmpty ? '—' : cfg.docker.ports.join(', ')),
-        ('额外挂载卷', cfg.docker.extraVolumes.isEmpty ? '—' : cfg.docker.extraVolumes.join(', ')),
+        (
+          '额外挂载卷',
+          cfg.docker.extraVolumes.isEmpty
+              ? '—'
+              : cfg.docker.extraVolumes.join(', '),
+        ),
         ('网络模式', cfg.docker.networkMode),
       ]);
     }
@@ -471,8 +480,12 @@ class _RemoteInstanceDetailScreenState
         const SizedBox(height: 8),
         Card(
           elevation: 0,
-          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.6,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -493,10 +506,7 @@ class _RemoteInstanceDetailScreenState
                           ),
                         ),
                         Expanded(
-                          child: Text(
-                            value,
-                            style: theme.textTheme.bodySmall,
-                          ),
+                          child: Text(value, style: theme.textTheme.bodySmall),
                         ),
                       ],
                     ),
@@ -605,8 +615,9 @@ class _ConfigEditDialogState extends State<_ConfigEditDialog> {
     _dockerImage = TextEditingController(text: docker.image);
     _dockerMemory = TextEditingController(text: '${docker.memory}');
     _dockerPorts = TextEditingController(text: docker.ports.join(', '));
-    _dockerVolumes =
-        TextEditingController(text: docker.extraVolumes.join(', '));
+    _dockerVolumes = TextEditingController(
+      text: docker.extraVolumes.join(', '),
+    );
     _dockerContainerName = TextEditingController(text: docker.containerName);
     _networkMode = docker.networkMode;
   }
@@ -684,10 +695,17 @@ class _ConfigEditDialogState extends State<_ConfigEditDialog> {
                     border: OutlineInputBorder(),
                   ),
                   items: const [
-                    DropdownMenuItem(value: 'universal', child: Text('通用（直接运行进程）')),
-                    DropdownMenuItem(value: 'docker', child: Text('Docker（容器内运行）')),
+                    DropdownMenuItem(
+                      value: 'universal',
+                      child: Text('通用（直接运行进程）'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'docker',
+                      child: Text('Docker（容器内运行）'),
+                    ),
                   ],
-                  onChanged: (v) => setState(() => _processType = v ?? 'universal'),
+                  onChanged: (v) =>
+                      setState(() => _processType = v ?? 'universal'),
                 ),
                 if (_processType == 'docker') ..._buildDockerFields(theme),
               ],
@@ -702,15 +720,17 @@ class _ConfigEditDialogState extends State<_ConfigEditDialog> {
         ),
         FilledButton(
           onPressed: () {
-            Navigator.of(context).pop(_ConfigEditResult(
-              nickname: _nickname.text.trim(),
-              startCommand: _startCommand.text.trim(),
-              stopCommand: _stopCommand.text.trim(),
-              cwd: _cwd.text.trim(),
-              autoRestart: _autoRestart,
-              processType: _processType,
-              docker: _buildDockerConfig(),
-            ));
+            Navigator.of(context).pop(
+              _ConfigEditResult(
+                nickname: _nickname.text.trim(),
+                startCommand: _startCommand.text.trim(),
+                stopCommand: _stopCommand.text.trim(),
+                cwd: _cwd.text.trim(),
+                autoRestart: _autoRestart,
+                processType: _processType,
+                docker: _buildDockerConfig(),
+              ),
+            );
           },
           child: const Text('保存'),
         ),

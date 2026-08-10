@@ -20,8 +20,7 @@ class ModrinthApiException implements Exception {
 /// Modrinth API 服务
 class ModrinthApiService {
   static const String _baseUrl = 'https://api.modrinth.com/v2';
-  static const String _userAgent =
-      'IriX/1.0.0 (https://github.com/MCFSO/IriX)';
+  static const String _userAgent = 'IriX/1.0.0 (https://github.com/MCFSO/IriX)';
 
   /// 搜索项目
   ///
@@ -40,8 +39,7 @@ class ModrinthApiService {
     final uri = Uri.parse('$_baseUrl/search').replace(
       queryParameters: <String, String>{
         if (query.isNotEmpty) 'query': query,
-        if (facets != null && facets.isNotEmpty)
-          'facets': jsonEncode(facets),
+        if (facets != null && facets.isNotEmpty) 'facets': jsonEncode(facets),
         'index': index,
         'offset': offset.toString(),
         'limit': limit.toString(),
@@ -49,8 +47,7 @@ class ModrinthApiService {
     );
 
     final response = await _get(uri);
-    return ModrinthSearchResult.fromJson(
-        response as Map<String, dynamic>);
+    return ModrinthSearchResult.fromJson(response as Map<String, dynamic>);
   }
 
   /// 获取项目详情
@@ -108,8 +105,12 @@ class ModrinthApiService {
     final response = await _get(uri);
     final list = response as List<dynamic>;
     return list
-        .map((e) =>
-            ModrinthTag.fromJson(e as Map<String, dynamic>, ModrinthTagType.category))
+        .map(
+          (e) => ModrinthTag.fromJson(
+            e as Map<String, dynamic>,
+            ModrinthTagType.category,
+          ),
+        )
         .toList();
   }
 
@@ -119,8 +120,12 @@ class ModrinthApiService {
     final response = await _get(uri);
     final list = response as List<dynamic>;
     return list
-        .map((e) =>
-            ModrinthTag.fromJson(e as Map<String, dynamic>, ModrinthTagType.loader))
+        .map(
+          (e) => ModrinthTag.fromJson(
+            e as Map<String, dynamic>,
+            ModrinthTagType.loader,
+          ),
+        )
         .toList();
   }
 
@@ -130,8 +135,7 @@ class ModrinthApiService {
     final response = await _get(uri);
     final list = response as List<dynamic>;
     return list
-        .map((e) =>
-            ModrinthGameVersionTag.fromJson(e as Map<String, dynamic>))
+        .map((e) => ModrinthGameVersionTag.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 

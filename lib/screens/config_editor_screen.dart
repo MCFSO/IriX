@@ -111,9 +111,7 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
     final filter = widget.nameFilter?.toLowerCase();
     final filtered = filter == null || filter.isEmpty
         ? all
-        : all
-            .where((f) => f.name.toLowerCase().contains(filter))
-            .toList();
+        : all.where((f) => f.name.toLowerCase().contains(filter)).toList();
     setState(() {
       _files = filtered;
       _selectedIndex = 0;
@@ -166,9 +164,9 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
       });
       _resetGutterScroll();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('解析失败，已切换到文本模式：$e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('解析失败，已切换到文本模式：$e')));
       }
     }
   }
@@ -185,15 +183,15 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
       }
       setState(() => _dirty = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('已保存 ${file.name}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('已保存 ${file.name}')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('保存失败：$e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('保存失败：$e')));
       }
     }
   }
@@ -254,14 +252,14 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
       if (!mounted) return;
       // 刷新表单以显示新注释
       setState(() {});
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已导入 $count 条注释')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('已导入 $count 条注释')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('导入失败：$e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('导入失败：$e')));
     }
   }
 
@@ -290,12 +288,12 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
 
   /// 配置文件类型对应的小图标。
   IconData _fileTypeIcon(ConfigFileType type) => switch (type) {
-        ConfigFileType.yaml => Icons.description,
-        ConfigFileType.properties => Icons.tune,
-        ConfigFileType.json => Icons.data_object,
-        ConfigFileType.toml => Icons.data_object,
-        ConfigFileType.text => Icons.notes,
-      };
+    ConfigFileType.yaml => Icons.description,
+    ConfigFileType.properties => Icons.tune,
+    ConfigFileType.json => Icons.data_object,
+    ConfigFileType.toml => Icons.data_object,
+    ConfigFileType.text => Icons.notes,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -306,10 +304,7 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
           children: [
             const Icon(Icons.folder_off, size: 64, color: Colors.grey),
             const SizedBox(height: 16),
-            Text(
-              '该目录中暂无配置文件',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
+            Text('该目录中暂无配置文件', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             const Text('启动服务器后会生成配置文件'),
             const SizedBox(height: 16),
@@ -378,10 +373,7 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
                       return ListTile(
                         dense: true,
                         selected: selected,
-                        leading: Icon(
-                          _fileTypeIcon(file.type),
-                          size: 20,
-                        ),
+                        leading: Icon(_fileTypeIcon(file.type), size: 20),
                         title: Text(
                           file.name,
                           style: const TextStyle(fontSize: 13),
@@ -407,7 +399,9 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
                 // 工具栏
                 Padding(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 8),
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   child: Row(
                     children: [
                       // 返回按钮（嵌入到子页面时显示）
@@ -449,8 +443,9 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
                         onPressed: (index) {
                           setState(() => _textMode = index == 1);
                           if (_textMode) {
-                            _textController.text =
-                                _service.readRaw(_files[_selectedIndex].path);
+                            _textController.text = _service.readRaw(
+                              _files[_selectedIndex].path,
+                            );
                             _undoStack.clear();
                             _previousText = _textController.text;
                             _resetGutterScroll();
@@ -461,8 +456,9 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
                       IconButton(
                         icon: const Icon(Icons.undo, size: 20),
                         tooltip: '撤销',
-                        onPressed:
-                            _textMode && _undoStack.isNotEmpty ? _undo : null,
+                        onPressed: _textMode && _undoStack.isNotEmpty
+                            ? _undo
+                            : null,
                       ),
                       const SizedBox(width: 8),
                       FilledButton.icon(
@@ -494,19 +490,21 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
                         hintText: '搜索配置项（中英文均可）',
                         border: const OutlineInputBorder(),
                         contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 8),
+                          horizontal: 8,
+                          vertical: 8,
+                        ),
                       ),
                       onChanged: (value) {
-                        setState(() => _searchQuery = value.trim().toLowerCase());
+                        setState(
+                          () => _searchQuery = value.trim().toLowerCase(),
+                        );
                       },
                     ),
                   ),
                 const Divider(height: 1),
                 // 编辑区域
                 Expanded(
-                  child: _textMode
-                      ? _buildTextEditor()
-                      : _buildFormEditor(),
+                  child: _textMode ? _buildTextEditor() : _buildFormEditor(),
                 ),
               ],
             ),
@@ -561,9 +559,7 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
             child: NotificationListener<ScrollNotification>(
               onNotification: (notification) {
                 if (_gutterScrollController.hasClients) {
-                  _gutterScrollController.jumpTo(
-                    notification.metrics.pixels,
-                  );
+                  _gutterScrollController.jumpTo(notification.metrics.pixels);
                 }
                 return false;
               },
@@ -592,9 +588,7 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
   /// 图形表单编辑模式。
   Widget _buildFormEditor() {
     if (_configData.isEmpty) {
-      return const Center(
-        child: Text('该文件为空或无法解析为表单，请切换到文本模式编辑'),
-      );
+      return const Center(child: Text('该文件为空或无法解析为表单，请切换到文本模式编辑'));
     }
     // 搜索模式：递归收集匹配的叶节点，扁平化展示。
     if (_searchQuery.isNotEmpty) {
@@ -703,11 +697,9 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
     final desc = ConfigAnnotationService.instance.get(fileName, keyPath) ?? '';
     if (keyPath.toLowerCase().contains(query) ||
         desc.toLowerCase().contains(query)) {
-      results.add(_SearchResult(
-        keyPath: keyPath,
-        value: data,
-        onChanged: updateValue,
-      ));
+      results.add(
+        _SearchResult(keyPath: keyPath, value: data, onChanged: updateValue),
+      );
     }
   }
 
@@ -806,8 +798,7 @@ class _ConfigFieldState extends State<_ConfigField> {
   @override
   void initState() {
     super.initState();
-    _controller =
-        TextEditingController(text: widget.value?.toString() ?? '');
+    _controller = TextEditingController(text: widget.value?.toString() ?? '');
   }
 
   @override
@@ -833,10 +824,7 @@ class _ConfigFieldState extends State<_ConfigField> {
       padding: const EdgeInsets.only(left: 4, bottom: 4),
       child: Text(
         description!,
-        style: TextStyle(
-          fontSize: 12,
-          color: Colors.grey[600],
-        ),
+        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
       ),
     );
   }
@@ -883,10 +871,7 @@ class _ConfigFieldState extends State<_ConfigField> {
                   style: const TextStyle(fontWeight: FontWeight.w500),
                 ),
               ),
-              Switch(
-                value: value,
-                onChanged: (v) => widget.onChanged(v),
-              ),
+              Switch(value: value, onChanged: (v) => widget.onChanged(v)),
             ],
           ),
           if (_buildDescription() != null) _buildDescription()!,
@@ -1011,7 +996,10 @@ class _ConfigFieldState extends State<_ConfigField> {
         style: const TextStyle(fontWeight: FontWeight.w500),
       ),
       subtitle: description != null
-          ? Text(description!, style: TextStyle(fontSize: 12, color: Colors.grey[600]))
+          ? Text(
+              description!,
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            )
           : null,
       initiallyExpanded: false,
       childrenPadding: const EdgeInsets.only(left: 16),
@@ -1042,7 +1030,10 @@ class _ConfigFieldState extends State<_ConfigField> {
         style: const TextStyle(fontWeight: FontWeight.w500),
       ),
       subtitle: description != null
-          ? Text(description!, style: TextStyle(fontSize: 12, color: Colors.grey[600]))
+          ? Text(
+              description!,
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            )
           : null,
       initiallyExpanded: false,
       childrenPadding: const EdgeInsets.only(left: 16),

@@ -12,11 +12,14 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
 import '../services/ai_assistant_service.dart';
 import '../services/ai_settings.dart';
 import '../services/knowledge_service.dart';
+import '../services/log_parser.dart';
 import '../services/mcp_server.dart';
 import '../state/app_state.dart';
 import '../utils/apple_widgets.dart';
@@ -49,9 +52,11 @@ class AiChatController extends ChangeNotifier {
   }
 
   /// 发送一条用户消息并运行一轮 agent 循环。
-  Future<void> send(AppState state, String text) async {
+  ///
+  /// [displayText] 非空时，聊天气泡仅展示该摘要，而完整内容仍发给 AI。
+  Future<void> send(AppState state, String text, {String? displayText}) async {
     if (conversation.running) return;
-    _onEvent(AiEvent.user(text));
+    _onEvent(AiEvent.user(displayText ?? text));
     await conversation.runTurn(state, text, emit: _onEvent);
   }
 
@@ -66,12 +71,25 @@ class AiChatController extends ChangeNotifier {
 /// AI 聊天面板（无 Scaffold，可嵌入任意页面）。
 ///
 /// [controller] 由外部持有以保持对话状态；[onClose] 非空时在面板
-/// 顶部显示关闭按钮（用于侧栏场景）。
+/// 顶部显示关闭按钮（用于侧栏场景）；[rootPath] 为实例根目录，
+/// 非空时输入框上方显示「看日志」按钮，可从实例 logs/ 文件夹挑选日志。
 class AiChatPanel extends StatefulWidget {
   final AiChatController controller;
   final VoidCallback? onClose;
 
-  const AiChatPanel({super.key, required this.controller, this.onClose});
+  /// 实例根目录（用于读取实例 logs/ 文件夹中的日志）。
+  final String? rootPath;
+
+  /// 实例名称（发送日志给 AI 时附带）。
+  final String? instanceName;
+
+  const AiChatPanel({
+    super.key,
+    required this.controller,
+    this.onClose,
+    this.rootPath,
+    this.instanceName,
+  });
 
   @override
   State<AiChatPanel> createState() => _AiChatPanelState();
@@ -118,6 +136,65 @@ class _AiChatPanelState extends State<AiChatPanel> {
   Future<void> _openModels() async {
     await showAppDialog<void>(context, (_) => const _ModelsDialog());
     await widget.controller.refreshModel();
+  }
+
+  /// 从实例 logs/ 文件夹选择日志文件，解析后发送给 AI。
+  Future<void> _pickServerLog() async {
+    final rootPath = widget.rootPath;
+    if (rootPath == null) return;
+    final path = await showAppDialog<String>(
+      context,
+      (_) => _ServerLogPickerDialog(rootPath: rootPath),
+    );
+    if (path == null || !mounted) return;
+    await _analyzeAndSendLog(path, source: '实例 logs/ 文件夹');
+  }
+
+  /// 通过系统文件选择器挑选 .log / .log.gz 文件，解析后发送给 AI。
+  Future<void> _pickExternalLog() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['log', 'gz'],
+      withData: false,
+    );
+    final path = result?.files.first.path;
+    if (path == null || !mounted) return;
+    await _analyzeAndSendLog(path, source: '本地文件');
+  }
+
+  /// 解析日志文件并将格式化内容发送给 AI。
+  Future<void> _analyzeAndSendLog(String path, {required String source}) async {
+    final controller = widget.controller;
+    if (controller.conversation.running) return;
+    if (controller.activeModel == null) {
+      await _openModels();
+      return;
+    }
+
+    try {
+      final parsed = await parseServerLog(path);
+      if (!mounted) return;
+      final message = buildLogAiMessage(
+        parsed,
+        instanceName: widget.instanceName,
+        source: source,
+      );
+      final display =
+          '已发送日志「${parsed.fileName}」'
+          '（${parsed.compressed ? 'gzip 已解压，' : ''}${parsed.lineCount} 行'
+          '${parsed.truncated ? '，已保留末尾' : ''}）供 AI 分析';
+      _scrollToBottom();
+      await controller.send(
+        context.read<AppState>(),
+        message,
+        displayText: display,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('日志解析失败: $e')));
+    }
   }
 
   @override
@@ -236,24 +313,23 @@ class _AiChatPanelState extends State<AiChatPanel> {
 
   Widget _buildChat(AiConversation conversation) {
     final controller = widget.controller;
-    if (controller.events.isEmpty) {
-      return _buildEmptyState();
-    }
     return Column(
       children: [
         Expanded(
-          child: ListView.builder(
-            controller: _scroll,
-            padding: const EdgeInsets.all(12),
-            itemCount: controller.events.length,
-            itemBuilder: (context, index) {
-              final event = controller.events[index];
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: _buildEvent(event),
-              );
-            },
-          ),
+          child: controller.events.isEmpty
+              ? _buildEmptyState()
+              : ListView.builder(
+                  controller: _scroll,
+                  padding: const EdgeInsets.all(12),
+                  itemCount: controller.events.length,
+                  itemBuilder: (context, index) {
+                    final event = controller.events[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _buildEvent(event),
+                    );
+                  },
+                ),
         ),
         _buildInputBar(conversation),
       ],
@@ -340,7 +416,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
               ),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Text(event.text ?? '', style: const TextStyle(height: 1.5)),
+            child: _buildMarkdown(event.text ?? ''),
           ),
         );
       case AiEventKind.thinking:
@@ -436,6 +512,80 @@ class _AiChatPanelState extends State<AiChatPanel> {
     }
   }
 
+  /// 渲染 AI 回复中的 markdown 内容（适配全局暗色主题）。
+  Widget _buildMarkdown(String text) {
+    final theme = Theme.of(context);
+    final base = MarkdownStyleSheet.fromTheme(theme);
+    // 代码块使用深色底 + 等宽字体，与日志面板风格一致。
+    final codeColor = theme.colorScheme.surfaceContainerHighest.withValues(
+      alpha: 0.9,
+    );
+    final styleSheet = base.copyWith(
+      codeblockDecoration: BoxDecoration(
+        color: codeColor,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      codeblockPadding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 8,
+      ),
+      code: base.code?.copyWith(
+        backgroundColor: codeColor,
+        fontFamily: 'monospace',
+        fontSize: 12.5,
+      ) ??
+        TextStyle(
+          backgroundColor: codeColor,
+          fontFamily: 'monospace',
+          fontSize: 12.5,
+        ),
+      p: base.p?.copyWith(height: 1.5) ?? const TextStyle(height: 1.5),
+      blockquoteDecoration: BoxDecoration(
+        color: theme.colorScheme.tertiaryContainer.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      blockquotePadding: const EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 6,
+      ),
+      tableHead: base.tableHead?.copyWith(
+        color: theme.colorScheme.onSurface,
+        fontWeight: FontWeight.bold,
+      ),
+      tableBorder: TableBorder.all(
+        color: theme.colorScheme.outline.withValues(alpha: 0.4),
+      ),
+      tableCellsPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    );
+    return MarkdownBody(
+      data: text,
+      styleSheet: styleSheet,
+      softLineBreak: true,
+      onTapLink: (text, href, title) {
+        if (href == null || href.isEmpty) return;
+        // 尝试用系统浏览器打开。
+        if (Uri.tryParse(href) case final uri?) {
+          _openExternal(uri);
+        }
+      },
+    );
+  }
+
+  /// 打开外部链接（系统浏览器）。
+  Future<void> _openExternal(Uri uri) async {
+    try {
+      if (uri.scheme == 'http' || uri.scheme == 'https') {
+        await Process.start(
+          Platform.isWindows ? 'cmd' : 'xdg-open',
+          Platform.isWindows ? ['/c', 'start', uri.toString()] : [uri.toString()],
+          mode: ProcessStartMode.detached,
+        );
+      }
+    } catch (e) {
+      debugPrint('打开链接失败: $e');
+    }
+  }
+
   Widget _buildToolChip({
     required IconData icon,
     required Color color,
@@ -526,42 +676,86 @@ class _AiChatPanelState extends State<AiChatPanel> {
   Widget _buildInputBar(AiConversation conversation) {
     final theme = Theme.of(context);
     final hasModel = widget.controller.activeModel != null;
+    final busy = conversation.running;
+    final hasLogsShortcut = widget.rootPath != null;
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+      padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: TextField(
-              controller: _input,
-              enabled: !conversation.running,
-              minLines: 1,
-              maxLines: 4,
-              textInputAction: TextInputAction.send,
-              onSubmitted: (_) => _send(),
-              decoration: InputDecoration(
-                hintText: hasModel ? '向 AI 提问…' : '请先添加模型再开始对话',
-                isDense: true,
-                filled: true,
-                fillColor: theme.colorScheme.surface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+          // 上排：看日志按钮
+          if (hasLogsShortcut) ...[
+            Row(
+              children: [
+                TextButton.icon(
+                  onPressed: busy ? null : _pickServerLog,
+                  icon: const Icon(Icons.manage_search, size: 16),
+                  label: const Text('看日志'),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    minimumSize: const Size(0, 32),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '从实例 logs/ 文件夹挑选日志，解析后发送给 AI 分析',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.outline,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
+          ],
+          // 下排：文件选择（左）+ 输入框 + 发送
+          Row(
+            children: [
+              IconButton(
+                tooltip: '选择日志文件（.log / .log.gz），解析后发送给 AI',
+                visualDensity: VisualDensity.compact,
+                onPressed: busy ? null : _pickExternalLog,
+                icon: const Icon(Icons.attach_file, size: 18),
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: TextField(
+                  controller: _input,
+                  enabled: !conversation.running,
+                  minLines: 1,
+                  maxLines: 4,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (_) => _send(),
+                  decoration: InputDecoration(
+                    hintText: hasModel ? '向 AI 提问…' : '请先添加模型再开始对话',
+                    isDense: true,
+                    filled: true,
+                    fillColor: theme.colorScheme.surface,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          IconButton.filled(
-            tooltip: hasModel ? '发送' : '添加模型',
-            onPressed: conversation.running
-                ? null
-                : hasModel
-                ? _send
-                : _openModels,
-            icon: Icon(hasModel ? Icons.send : Icons.add, size: 20),
+              const SizedBox(width: 8),
+              IconButton.filled(
+                tooltip: hasModel ? '发送' : '添加模型',
+                onPressed: conversation.running
+                    ? null
+                    : hasModel
+                    ? _send
+                    : _openModels,
+                icon: Icon(hasModel ? Icons.send : Icons.add, size: 20),
+              ),
+            ],
           ),
         ],
       ),
@@ -693,9 +887,9 @@ class _ModelsDialogState extends State<_ModelsDialog> {
       );
       await _loadKnowledge();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('知识库导入完成')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('知识库导入完成')));
       }
     } catch (e) {
       if (mounted) {
@@ -1144,6 +1338,183 @@ class _ModelsDialogState extends State<_ModelsDialog> {
   }
 }
 
+/// 从实例 logs/ 文件夹挑选日志文件的对话框。
+///
+/// 列出目录下所有 .log 与 .log.gz 文件（按修改时间倒序），
+/// 点击文件后返回其绝对路径。
+class _ServerLogPickerDialog extends StatefulWidget {
+  final String rootPath;
+
+  const _ServerLogPickerDialog({required this.rootPath});
+
+  @override
+  State<_ServerLogPickerDialog> createState() => _ServerLogPickerDialogState();
+}
+
+class _ServerLogPickerDialogState extends State<_ServerLogPickerDialog> {
+  List<FileSystemEntity> _entries = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final logsDir = Directory(p.join(widget.rootPath, 'logs'));
+      if (!await logsDir.exists()) {
+        if (!mounted) return;
+        setState(() {
+          _entries = [];
+          _loading = false;
+          _error = 'logs/ 文件夹不存在: ${logsDir.path}';
+        });
+        return;
+      }
+      final files =
+          logsDir.listSync(recursive: false).whereType<File>().where((f) {
+            final name = p.basename(f.path).toLowerCase();
+            return name.endsWith('.log') || name.endsWith('.log.gz');
+          }).toList()..sort((a, b) {
+            final am = a.statSync().modified;
+            final bm = b.statSync().modified;
+            final cmp = bm.compareTo(am);
+            return cmp != 0 ? cmp : a.path.compareTo(b.path);
+          });
+      if (!mounted) return;
+      setState(() {
+        _entries = files;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _entries = [];
+        _loading = false;
+        _error = '读取日志文件夹失败: $e';
+      });
+    }
+  }
+
+  static String _sizeLabel(int bytes) {
+    if (bytes >= 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} MB';
+    }
+    if (bytes >= 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    }
+    return '$bytes B';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AlertDialog(
+      title: Row(
+        children: [
+          const Icon(Icons.manage_search, size: 20),
+          const SizedBox(width: 8),
+          const Text('选择日志文件（logs/）'),
+          const Spacer(),
+          IconButton(
+            tooltip: '刷新',
+            visualDensity: VisualDensity.compact,
+            onPressed: _loading ? null : _load,
+            icon: const Icon(Icons.refresh, size: 18),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: 460,
+        height: 320,
+        child: _loading
+            ? const Center(
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            : _error != null
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    _error!,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              )
+            : _entries.isEmpty
+            ? Center(
+                child: Text(
+                  'logs/ 文件夹内没有 .log / .log.gz 文件',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              )
+            : ListView.separated(
+                itemCount: _entries.length,
+                separatorBuilder: (_, _) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final file = _entries[index] as File;
+                  final stat = file.statSync();
+                  final name = p.basename(file.path);
+                  final isGz = name.toLowerCase().endsWith('.gz');
+                  return ListTile(
+                    dense: true,
+                    leading: Icon(
+                      isGz ? Icons.compress : Icons.description_outlined,
+                      size: 20,
+                      color: theme.colorScheme.primary,
+                    ),
+                    title: Text(
+                      name,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      '${_sizeLabel(stat.size)} · '
+                      '${stat.modified.year}-${stat.modified.month.toString().padLeft(2, '0')}-${stat.modified.day.toString().padLeft(2, '0')} '
+                      '${stat.modified.hour.toString().padLeft(2, '0')}:${stat.modified.minute.toString().padLeft(2, '0')}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.outline,
+                      ),
+                    ),
+                    trailing: isGz
+                        ? null
+                        : const Icon(Icons.chevron_right, size: 18),
+                    onTap: () => Navigator.of(context).pop(file.path),
+                  );
+                },
+              ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+      ],
+    );
+  }
+}
+
 /// 添加 / 编辑模型对话框。
 class _ModelEditDialog extends StatefulWidget {
   final AiModelConfig? model;
@@ -1283,7 +1654,7 @@ class _ModelEditDialogState extends State<_ModelEditDialog> {
                   errorText: _contextError,
                 ),
               ),
-const SizedBox(height: 12),
+              const SizedBox(height: 12),
               TextField(
                 controller: _embeddingController,
                 style: const TextStyle(fontFamily: 'monospace', fontSize: 13),

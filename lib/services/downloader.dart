@@ -43,34 +43,38 @@ class DownloadProgress {
 }
 
 /// FFI 函数签名定义
-typedef DownloadFileC = Int32 Function(
-  Pointer<Utf8> url,
-  Pointer<Utf8> targetPath,
-  Pointer<Utf8> userAgent,
-  Pointer<NativeFunction<DownloadProgressCallbackC>> progressCb,
-);
-typedef DownloadFileDart = int Function(
-  Pointer<Utf8> url,
-  Pointer<Utf8> targetPath,
-  Pointer<Utf8> userAgent,
-  Pointer<NativeFunction<DownloadProgressCallbackC>> progressCb,
-);
+typedef DownloadFileC =
+    Int32 Function(
+      Pointer<Utf8> url,
+      Pointer<Utf8> targetPath,
+      Pointer<Utf8> userAgent,
+      Pointer<NativeFunction<DownloadProgressCallbackC>> progressCb,
+    );
+typedef DownloadFileDart =
+    int Function(
+      Pointer<Utf8> url,
+      Pointer<Utf8> targetPath,
+      Pointer<Utf8> userAgent,
+      Pointer<NativeFunction<DownloadProgressCallbackC>> progressCb,
+    );
 
 /// 多线程分片下载 FFI 签名 (对应 Rust download_file_multipart)
-typedef DownloadFileMultipartC = Int32 Function(
-  Pointer<Utf8> url,
-  Pointer<Utf8> targetPath,
-  Pointer<Utf8> userAgent,
-  Int32 threads,
-  Pointer<NativeFunction<DownloadProgressCallbackC>> progressCb,
-);
-typedef DownloadFileMultipartDart = int Function(
-  Pointer<Utf8> url,
-  Pointer<Utf8> targetPath,
-  Pointer<Utf8> userAgent,
-  int threads,
-  Pointer<NativeFunction<DownloadProgressCallbackC>> progressCb,
-);
+typedef DownloadFileMultipartC =
+    Int32 Function(
+      Pointer<Utf8> url,
+      Pointer<Utf8> targetPath,
+      Pointer<Utf8> userAgent,
+      Int32 threads,
+      Pointer<NativeFunction<DownloadProgressCallbackC>> progressCb,
+    );
+typedef DownloadFileMultipartDart =
+    int Function(
+      Pointer<Utf8> url,
+      Pointer<Utf8> targetPath,
+      Pointer<Utf8> userAgent,
+      int threads,
+      Pointer<NativeFunction<DownloadProgressCallbackC>> progressCb,
+    );
 
 typedef CancelDownloadC = Void Function();
 typedef CancelDownloadDart = void Function();
@@ -87,14 +91,19 @@ typedef DownloadProgressCallbackC = Void Function(Uint64, Uint64);
 enum DownloadResultCode {
   /// 成功
   success(0),
+
   /// URL 或路径无效
   invalidPath(1),
+
   /// 网络/IO 错误
   networkError(2),
+
   /// 用户取消
   cancelled(3),
+
   /// HTTP 状态码非 2xx
   httpError(4),
+
   /// 其他错误
   unknown(5);
 
@@ -115,8 +124,10 @@ class _DownloadRequest {
   final String targetFilePath;
   final String userAgent;
   final SendPort sendPort;
+
   /// 主 isolate 创建的 NativeCallable 的 native 函数指针地址。
   final int progressCbAddress;
+
   /// 多线程下载的线程数；为 null 时使用单线程 download_file。
   final int? threads;
 
@@ -166,8 +177,8 @@ class Downloader {
     final sysName = Platform.isWindows
         ? 'xmc_downloader.dll'
         : Platform.isMacOS
-            ? 'libxmc_downloader.dylib'
-            : 'libxmc_downloader.so';
+        ? 'libxmc_downloader.dylib'
+        : 'libxmc_downloader.so';
     try {
       return DynamicLibrary.open(sysName);
     } catch (e) {
@@ -188,13 +199,13 @@ class Downloader {
     final libName = Platform.isWindows
         ? 'xmc_downloader.dll'
         : Platform.isMacOS
-            ? 'libxmc_downloader.dylib'
-            : 'libxmc_downloader.so';
+        ? 'libxmc_downloader.dylib'
+        : 'libxmc_downloader.so';
 
     final cwd = Directory.current.path;
-      paths.add(p.join(cwd, libName));
-      paths.add(p.join(cwd, 'lib', libName));
-      if (Platform.isWindows) {
+    paths.add(p.join(cwd, libName));
+    paths.add(p.join(cwd, 'lib', libName));
+    if (Platform.isWindows) {
       paths.add(p.join(cwd, 'windows', 'runner', libName));
     } else if (Platform.isMacOS) {
       paths.add(p.join(cwd, 'macos', libName));
@@ -254,18 +265,23 @@ class Downloader {
     // 主 isolate 创建 NativeCallable.listener：Rust 调用它时，
     // 参数通过内部 SendPort 投递到主 isolate (未阻塞)，进度回调实时执行。
     late NativeCallable<DownloadProgressCallbackC> cb;
-    cb = NativeCallable<DownloadProgressCallbackC>.listener((int downloaded, int total) {
+    cb = NativeCallable<DownloadProgressCallbackC>.listener((
+      int downloaded,
+      int total,
+    ) {
       final elapsedSeconds = stopwatch.elapsedMilliseconds / 1000.0;
       final deltaBytes = downloaded - lastTickBytes;
       final speed = elapsedSeconds > 0 ? deltaBytes / elapsedSeconds : 0.0;
       lastTickBytes = downloaded;
       stopwatch.reset();
 
-      onProgress(DownloadProgress(
-        downloadedBytes: downloaded,
-        totalBytes: total > 0 ? total : -1,
-        speedBytesPerSec: speed,
-      ));
+      onProgress(
+        DownloadProgress(
+          downloadedBytes: downloaded,
+          totalBytes: total > 0 ? total : -1,
+          speedBytesPerSec: speed,
+        ),
+      );
     });
 
     late StreamSubscription sub;
@@ -274,12 +290,12 @@ class Downloader {
         if (msg.code == 0) {
           completer.complete(targetFilePath);
         } else if (msg.code == 3) {
-          completer.completeError(
-            Exception('下载已取消'),
-          );
+          completer.completeError(Exception('下载已取消'));
         } else {
           completer.completeError(
-            Exception('下载失败 (${DownloadResultCode.fromValue(msg.code)}): ${msg.error ?? "未知错误"}'),
+            Exception(
+              '下载失败 (${DownloadResultCode.fromValue(msg.code)}): ${msg.error ?? "未知错误"}',
+            ),
           );
         }
       }
@@ -318,16 +334,18 @@ class Downloader {
     try {
       // 后台 isolate 独立打开库
       final lib = _openLibrary();
-      final getLastError =
-          lib.lookupFunction<GetLastErrorC, GetLastErrorDart>('get_last_error');
-      final freeString =
-          lib.lookupFunction<FreeStringC, FreeStringDart>('free_string');
+      final getLastError = lib.lookupFunction<GetLastErrorC, GetLastErrorDart>(
+        'get_last_error',
+      );
+      final freeString = lib.lookupFunction<FreeStringC, FreeStringDart>(
+        'free_string',
+      );
 
       // 由主 isolate 创建的进度回调 native 函数指针
       final progressCb =
           Pointer<NativeFunction<DownloadProgressCallbackC>>.fromAddress(
-        req.progressCbAddress,
-      );
+            req.progressCbAddress,
+          );
 
       // 分配 native 内存 (非空局部指针供 FFI 调用，可空外层指针供 finally 清理)。
       final Pointer<Utf8> url = req.url.toNativeUtf8();
@@ -340,14 +358,15 @@ class Downloader {
       // threads > 1 时使用多线程分片断点续传下载，否则使用单线程流式下载。
       final code = () {
         if (req.threads != null && req.threads! > 1) {
-          final downloadMultipart = lib.lookupFunction<
-              DownloadFileMultipartC, DownloadFileMultipartDart>(
-              'download_file_multipart');
-          return downloadMultipart(
-              url, target, ua, req.threads!, progressCb);
+          final downloadMultipart = lib
+              .lookupFunction<
+                DownloadFileMultipartC,
+                DownloadFileMultipartDart
+              >('download_file_multipart');
+          return downloadMultipart(url, target, ua, req.threads!, progressCb);
         }
-        final downloadFile =
-            lib.lookupFunction<DownloadFileC, DownloadFileDart>('download_file');
+        final downloadFile = lib
+            .lookupFunction<DownloadFileC, DownloadFileDart>('download_file');
         return downloadFile(url, target, ua, progressCb);
       }();
 

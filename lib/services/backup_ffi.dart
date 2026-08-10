@@ -11,22 +11,24 @@ import 'package:ffi/ffi.dart';
 import 'package:path/path.dart' as p;
 
 /// FFI 函数签名定义
-typedef BackupDirectoryC = Int32 Function(
-  Pointer<Utf8> srcPath,
-  Pointer<Utf8> dstPath,
-  Pointer<Pointer<Utf8>> files,
-  IntPtr filesCount,
-  Uint32 compressionLevel,
-  Pointer<NativeFunction<ProgressCallbackC>> progressCb,
-);
-typedef BackupDirectoryDart = int Function(
-  Pointer<Utf8> srcPath,
-  Pointer<Utf8> dstPath,
-  Pointer<Pointer<Utf8>> files,
-  int filesCount,
-  int compressionLevel,
-  Pointer<NativeFunction<ProgressCallbackC>> progressCb,
-);
+typedef BackupDirectoryC =
+    Int32 Function(
+      Pointer<Utf8> srcPath,
+      Pointer<Utf8> dstPath,
+      Pointer<Pointer<Utf8>> files,
+      IntPtr filesCount,
+      Uint32 compressionLevel,
+      Pointer<NativeFunction<ProgressCallbackC>> progressCb,
+    );
+typedef BackupDirectoryDart =
+    int Function(
+      Pointer<Utf8> srcPath,
+      Pointer<Utf8> dstPath,
+      Pointer<Pointer<Utf8>> files,
+      int filesCount,
+      int compressionLevel,
+      Pointer<NativeFunction<ProgressCallbackC>> progressCb,
+    );
 
 typedef CancelBackupC = Void Function();
 typedef CancelBackupDart = void Function();
@@ -60,6 +62,7 @@ class _BackupRequest {
   final List<String> files;
   final int compressionLevel;
   final SendPort sendPort;
+
   /// 主 isolate 创建的 NativeCallable 的 native 函数指针地址。
   /// Rust (rayon 线程) 调用它时，参数投递到主 isolate 实时处理。
   final int progressCbAddress;
@@ -124,8 +127,8 @@ class BackupService {
     final sysName = Platform.isWindows
         ? 'xmc_backup.dll'
         : Platform.isMacOS
-            ? 'libxmc_backup.dylib'
-            : 'libxmc_backup.so';
+        ? 'libxmc_backup.dylib'
+        : 'libxmc_backup.so';
     try {
       return DynamicLibrary.open(sysName);
     } catch (e) {
@@ -146,8 +149,8 @@ class BackupService {
     final libName = Platform.isWindows
         ? 'xmc_backup.dll'
         : Platform.isMacOS
-            ? 'libxmc_backup.dylib'
-            : 'libxmc_backup.so';
+        ? 'libxmc_backup.dylib'
+        : 'libxmc_backup.so';
 
     // 当前工作目录
     final cwd = Directory.current.path;
@@ -257,14 +260,16 @@ class BackupService {
     try {
       // 后台 isolate 独立打开库 (DynamicLibrary 句柄不能跨 isolate 传递)
       final lib = _openLibrary();
-      final backupDirectory =
-          lib.lookupFunction<BackupDirectoryC, BackupDirectoryDart>(
-        'backup_directory',
+      final backupDirectory = lib
+          .lookupFunction<BackupDirectoryC, BackupDirectoryDart>(
+            'backup_directory',
+          );
+      final getLastError = lib.lookupFunction<GetLastErrorC, GetLastErrorDart>(
+        'get_last_error',
       );
-      final getLastError =
-          lib.lookupFunction<GetLastErrorC, GetLastErrorDart>('get_last_error');
-      final freeString =
-          lib.lookupFunction<FreeStringC, FreeStringDart>('free_string');
+      final freeString = lib.lookupFunction<FreeStringC, FreeStringDart>(
+        'free_string',
+      );
 
       // 分配 native 内存
       srcPtr = req.srcPath.toNativeUtf8();
