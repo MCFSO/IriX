@@ -73,11 +73,12 @@ class NodeDaemonLauncher {
     _attempted = true;
     try {
       _exited = false;
-      _process = await Process.start(
-        binary,
-        ['-port', '$port', '-data', _dataDir()],
-        mode: ProcessStartMode.normal,
-      );
+      _process = await Process.start(binary, [
+        '-port',
+        '$port',
+        '-data',
+        _dataDir(),
+      ], mode: ProcessStartMode.normal);
       _process!.stdout.listen((_) {});
       _process!.stderr.listen((_) {});
       _process!.exitCode.then((_) {
@@ -85,10 +86,7 @@ class NodeDaemonLauncher {
         _process = null;
         _attempted = false;
       });
-      return NodeDaemonLaunchResult(
-        true,
-        '已启动本地节点守护进程（端口 $port）',
-      );
+      return NodeDaemonLaunchResult(true, '已启动本地节点守护进程（端口 $port）');
     } catch (e) {
       _exited = true;
       debugPrint('启动本地节点失败: $e');

@@ -14,16 +14,18 @@ import 'package:ffi/ffi.dart';
 import 'package:path/path.dart' as p;
 
 /// FFI 函数签名定义
-typedef VectorRequestC = Pointer<Utf8> Function(
-  Pointer<Utf8> dbPath,
-  Pointer<Utf8> op,
-  Pointer<Utf8> argsJson,
-);
-typedef VectorRequestDart = Pointer<Utf8> Function(
-  Pointer<Utf8> dbPath,
-  Pointer<Utf8> op,
-  Pointer<Utf8> argsJson,
-);
+typedef VectorRequestC =
+    Pointer<Utf8> Function(
+      Pointer<Utf8> dbPath,
+      Pointer<Utf8> op,
+      Pointer<Utf8> argsJson,
+    );
+typedef VectorRequestDart =
+    Pointer<Utf8> Function(
+      Pointer<Utf8> dbPath,
+      Pointer<Utf8> op,
+      Pointer<Utf8> argsJson,
+    );
 
 typedef FreeStringC = Void Function(Pointer<Utf8> ptr);
 typedef FreeStringDart = void Function(Pointer<Utf8> ptr);
@@ -71,8 +73,8 @@ class VectorStoreFfi {
     final libName = Platform.isWindows
         ? 'xmc_vector_store.dll'
         : Platform.isMacOS
-            ? 'libxmc_vector_store.dylib'
-            : 'libxmc_vector_store.so';
+        ? 'libxmc_vector_store.dylib'
+        : 'libxmc_vector_store.so';
 
     for (final libPath in _getPossibleLibraryPaths(libName)) {
       try {
@@ -177,10 +179,13 @@ class VectorStoreFfi {
           sendPort: responsePort.sendPort,
         ),
       );
-      return await completer.future.timeout(timeout, onTimeout: () {
-        isolate?.kill(priority: Isolate.immediate);
-        throw VectorStoreFfiException('向量库操作超时: $timeout');
-      });
+      return await completer.future.timeout(
+        timeout,
+        onTimeout: () {
+          isolate?.kill(priority: Isolate.immediate);
+          throw VectorStoreFfiException('向量库操作超时: $timeout');
+        },
+      );
     } finally {
       await sub.cancel();
       responsePort.close();
@@ -196,8 +201,8 @@ class VectorStoreFfi {
 
     try {
       final lib = _openLibrary();
-      final vectorRequest =
-          lib.lookupFunction<VectorRequestC, VectorRequestDart>('vector_request');
+      final vectorRequest = lib
+          .lookupFunction<VectorRequestC, VectorRequestDart>('vector_request');
 
       dbPtr = req.dbPath.toNativeUtf8();
       opPtr = req.op.toNativeUtf8();
@@ -206,8 +211,9 @@ class VectorStoreFfi {
       resultPtr = vectorRequest(dbPtr, opPtr, argsPtr);
 
       if (resultPtr == nullptr) {
-        req.sendPort
-            .send(const VectorStoreFfiException('vector_request 返回空指针'));
+        req.sendPort.send(
+          const VectorStoreFfiException('vector_request 返回空指针'),
+        );
         return;
       }
 
@@ -230,8 +236,9 @@ class VectorStoreFfi {
       if (resultPtr != null) {
         try {
           final lib = _openLibrary();
-          final freeString =
-              lib.lookupFunction<FreeStringC, FreeStringDart>('free_string');
+          final freeString = lib.lookupFunction<FreeStringC, FreeStringDart>(
+            'free_string',
+          );
           freeString(resultPtr);
         } catch (_) {
           // 库句柄无法再次打开时忽略（指针泄漏可接受，仅调试场景）

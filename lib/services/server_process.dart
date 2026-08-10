@@ -156,10 +156,12 @@ class ServerProcessManager {
         .listen(_emitLog);
 
     // 监听进程退出，完成退出完成器并清理引用。
-    unawaited(process.exitCode.then((code) {
-      _exitCompleter?.complete(code);
-      _cleanup();
-    }));
+    unawaited(
+      process.exitCode.then((code) {
+        _exitCompleter?.complete(code);
+        _cleanup();
+      }),
+    );
   }
 
   /// 向服务器标准输入发送命令。

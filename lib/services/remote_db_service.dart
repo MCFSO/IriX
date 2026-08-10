@@ -191,13 +191,10 @@ class RemoteDatabaseService {
 
   /// 获取指定数据库中的表列表。Redis 不支持，返回空列表（UI 层判断）。
   Future<List<String>> getTables(DbConnectionInfo info, String database) async {
-    final result = await _call(
-      info,
-      'get_tables',
-      {'database': database},
-    );
+    final result = await _call(info, 'get_tables', {'database': database});
     return [
-      for (final name in (result['tables'] as List? ?? const [])) name.toString(),
+      for (final name in (result['tables'] as List? ?? const []))
+        name.toString(),
     ];
   }
 
@@ -212,11 +209,12 @@ class RemoteDatabaseService {
     int limit = 100,
     int offset = 0,
   }) async {
-    final result = await _call(
-      info,
-      'query_table',
-      {'database': database, 'table': table, 'limit': limit, 'offset': offset},
-    );
+    final result = await _call(info, 'query_table', {
+      'database': database,
+      'table': table,
+      'limit': limit,
+      'offset': offset,
+    });
     return [
       for (final row in (result['rows'] as List? ?? const []))
         Map<String, dynamic>.from(row as Map),
@@ -229,11 +227,10 @@ class RemoteDatabaseService {
     String database,
     String table,
   ) async {
-    final result = await _call(
-      info,
-      'count_rows',
-      {'database': database, 'table': table},
-    );
+    final result = await _call(info, 'count_rows', {
+      'database': database,
+      'table': table,
+    });
     return (result['count'] as num?)?.toInt() ?? 0;
   }
 
@@ -255,11 +252,11 @@ class RemoteDatabaseService {
         trimmed.startsWith('DESCRIBE') ||
         trimmed.startsWith('EXPLAIN');
 
-    final result = await _call(
-      info,
-      'execute',
-      {'database': database, 'sql': sql, 'is_query': isQuery},
-    );
+    final result = await _call(info, 'execute', {
+      'database': database,
+      'sql': sql,
+      'is_query': isQuery,
+    });
     final affected = (result['affected'] as num?)?.toInt() ?? 0;
     if (!isQuery) {
       return (
@@ -350,11 +347,11 @@ class RemoteDatabaseService {
     required String username,
     required String password,
   }) async {
-    await _call(
-      info,
-      'create_database_with_user',
-      {'database': database, 'username': username, 'password': password},
-    );
+    await _call(info, 'create_database_with_user', {
+      'database': database,
+      'username': username,
+      'password': password,
+    });
   }
 
   /// 删除数据库（DROP DATABASE）。Redis 不支持。
@@ -388,11 +385,11 @@ class RemoteDatabaseService {
     required String password,
     String host = '%',
   }) async {
-    await _call(
-      info,
-      'create_user',
-      {'username': username, 'password': password, 'host': host},
-    );
+    await _call(info, 'create_user', {
+      'username': username,
+      'password': password,
+      'host': host,
+    });
   }
 
   /// 删除数据库用户。MySQL/MariaDB 需指定登录主机（默认 '%'）。
@@ -401,11 +398,7 @@ class RemoteDatabaseService {
     required String username,
     String? host,
   }) async {
-    await _call(
-      info,
-      'drop_user',
-      {'username': username, 'host': host ?? '%'},
-    );
+    await _call(info, 'drop_user', {'username': username, 'host': host ?? '%'});
   }
 
   // === 行级数据编辑 ===
@@ -416,11 +409,10 @@ class RemoteDatabaseService {
     String database,
     String table,
   ) async {
-    final result = await _call(
-      info,
-      'get_primary_keys',
-      {'database': database, 'table': table},
-    );
+    final result = await _call(info, 'get_primary_keys', {
+      'database': database,
+      'table': table,
+    });
     return [
       for (final key in (result['keys'] as List? ?? const [])) key.toString(),
     ];
@@ -463,18 +455,15 @@ class RemoteDatabaseService {
       throw StateError('无法定位数据行（表为空 WHERE）');
     }
     final whereMap = <String, dynamic>{
-      for (final col in whereCols) if (whereRow.containsKey(col)) col: whereRow[col],
+      for (final col in whereCols)
+        if (whereRow.containsKey(col)) col: whereRow[col],
     };
-    final result = await _call(
-      info,
-      'update_row',
-      {
-        'database': database,
-        'table': table,
-        'new_values': newValues,
-        'where_row': whereMap,
-      },
-    );
+    final result = await _call(info, 'update_row', {
+      'database': database,
+      'table': table,
+      'new_values': newValues,
+      'where_row': whereMap,
+    });
     return (result['affected'] as num?)?.toInt() ?? 0;
   }
 
@@ -485,11 +474,11 @@ class RemoteDatabaseService {
     String table,
     Map<String, dynamic> values,
   ) async {
-    await _call(
-      info,
-      'insert_row',
-      {'database': database, 'table': table, 'values': values},
-    );
+    await _call(info, 'insert_row', {
+      'database': database,
+      'table': table,
+      'values': values,
+    });
   }
 
   /// 删除一行：以主键定位（无主键则用整行旧值匹配）。返回受影响行数。
@@ -510,11 +499,11 @@ class RemoteDatabaseService {
       for (final col in whereCols)
         if (whereRow.containsKey(col)) col: whereRow[col],
     };
-    final result = await _call(
-      info,
-      'delete_row',
-      {'database': database, 'table': table, 'where_row': whereMap},
-    );
+    final result = await _call(info, 'delete_row', {
+      'database': database,
+      'table': table,
+      'where_row': whereMap,
+    });
     return (result['affected'] as num?)?.toInt() ?? 0;
   }
 }

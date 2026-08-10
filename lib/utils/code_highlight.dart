@@ -19,7 +19,11 @@ class _Token {
   _Token(this.start, this.end, this.style);
 }
 
-TextSpan highlightCode(String content, String? fileName, {TextStyle? baseStyle}) {
+TextSpan highlightCode(
+  String content,
+  String? fileName, {
+  TextStyle? baseStyle,
+}) {
   if (content.isEmpty) {
     return TextSpan(text: content, style: baseStyle);
   }
@@ -51,8 +55,11 @@ String? _detectLanguage(String? fileName) {
 TextSpan _highlightYaml(String content, TextStyle? baseStyle) {
   final tokens = <_Token>[];
 
-  for (final m
-      in RegExp(r"'[^']*'" r'|"' r'[^"]*"').allMatches(content)) {
+  for (final m in RegExp(
+    r"'[^']*'"
+    r'|"'
+    r'[^"]*"',
+  ).allMatches(content)) {
     tokens.add(_Token(m.start, m.end, _stringStyle));
   }
 
@@ -60,9 +67,10 @@ TextSpan _highlightYaml(String content, TextStyle? baseStyle) {
     tokens.add(_Token(m.start, m.end, _commentStyle));
   }
 
-  for (final m
-      in RegExp(r'^([ \t]*)([\w][\w.\-]*)\s*(:)', multiLine: true)
-          .allMatches(content)) {
+  for (final m in RegExp(
+    r'^([ \t]*)([\w][\w.\-]*)\s*(:)',
+    multiLine: true,
+  ).allMatches(content)) {
     final indentLen = m.group(1)!.length;
     final keyLen = m.group(2)!.length;
     final keyStart = m.start + indentLen;
@@ -73,9 +81,10 @@ TextSpan _highlightYaml(String content, TextStyle? baseStyle) {
     tokens.add(_Token(m.start, m.end, _numberStyle));
   }
 
-  for (final m in RegExp(r'\b(?:true|false|yes|no|on|off|null|~)\b',
-          caseSensitive: false)
-      .allMatches(content)) {
+  for (final m in RegExp(
+    r'\b(?:true|false|yes|no|on|off|null|~)\b',
+    caseSensitive: false,
+  ).allMatches(content)) {
     tokens.add(_Token(m.start, m.end, _numberStyle));
   }
 
@@ -85,14 +94,17 @@ TextSpan _highlightYaml(String content, TextStyle? baseStyle) {
 TextSpan _highlightProperties(String content, TextStyle? baseStyle) {
   final tokens = <_Token>[];
 
-  for (final m in RegExp(r'^[ \t]*[#!].*$', multiLine: true)
-      .allMatches(content)) {
+  for (final m in RegExp(
+    r'^[ \t]*[#!].*$',
+    multiLine: true,
+  ).allMatches(content)) {
     tokens.add(_Token(m.start, m.end, _commentStyle));
   }
 
-  for (final m
-      in RegExp(r'^([ \t]*)([^=:\s]+)\s*[=:]\s*(.*)$', multiLine: true)
-          .allMatches(content)) {
+  for (final m in RegExp(
+    r'^([ \t]*)([^=:\s]+)\s*[=:]\s*(.*)$',
+    multiLine: true,
+  ).allMatches(content)) {
     final indentLen = m.group(1)!.length;
     final keyLen = m.group(2)!.length;
     final keyStart = m.start + indentLen;
@@ -110,14 +122,18 @@ TextSpan _highlightProperties(String content, TextStyle? baseStyle) {
 TextSpan _highlightJson(String content, TextStyle? baseStyle) {
   final tokens = <_Token>[];
 
-  for (final m
-      in RegExp(r'"(?:[^"\\]' r'|\\.)*"\s*:').allMatches(content)) {
+  for (final m in RegExp(
+    r'"(?:[^"\\]'
+    r'|\\.)*"\s*:',
+  ).allMatches(content)) {
     final colonIdx = m.group(0)!.indexOf(':');
     tokens.add(_Token(m.start, m.start + colonIdx, _keyStyle));
   }
 
-  for (final m
-      in RegExp(r'"(?:[^"\\]' r'|\\.)*"').allMatches(content)) {
+  for (final m in RegExp(
+    r'"(?:[^"\\]'
+    r'|\\.)*"',
+  ).allMatches(content)) {
     tokens.add(_Token(m.start, m.end, _stringStyle));
   }
 
@@ -125,9 +141,10 @@ TextSpan _highlightJson(String content, TextStyle? baseStyle) {
     tokens.add(_Token(m.start, m.end, _numberStyle));
   }
 
-  for (final m
-      in RegExp(r'\b(?:true|false|null)\b', caseSensitive: false)
-          .allMatches(content)) {
+  for (final m in RegExp(
+    r'\b(?:true|false|null)\b',
+    caseSensitive: false,
+  ).allMatches(content)) {
     tokens.add(_Token(m.start, m.end, _numberStyle));
   }
 
@@ -137,8 +154,10 @@ TextSpan _highlightJson(String content, TextStyle? baseStyle) {
 TextSpan _highlightToml(String content, TextStyle? baseStyle) {
   final tokens = <_Token>[];
 
-  for (final m in RegExp(r'^[ \t]*\[[^\]]+\]', multiLine: true)
-      .allMatches(content)) {
+  for (final m in RegExp(
+    r'^[ \t]*\[[^\]]+\]',
+    multiLine: true,
+  ).allMatches(content)) {
     tokens.add(_Token(m.start, m.end, _sectionStyle));
   }
 
@@ -146,14 +165,17 @@ TextSpan _highlightToml(String content, TextStyle? baseStyle) {
     tokens.add(_Token(m.start, m.end, _commentStyle));
   }
 
-  for (final m
-      in RegExp(r'"(?:[^"\\]' r'|\\.)*"').allMatches(content)) {
+  for (final m in RegExp(
+    r'"(?:[^"\\]'
+    r'|\\.)*"',
+  ).allMatches(content)) {
     tokens.add(_Token(m.start, m.end, _stringStyle));
   }
 
-  for (final m
-      in RegExp(r'^([ \t]*)([\w][\w.\-]*)\s*=\s*', multiLine: true)
-          .allMatches(content)) {
+  for (final m in RegExp(
+    r'^([ \t]*)([\w][\w.\-]*)\s*=\s*',
+    multiLine: true,
+  ).allMatches(content)) {
     final indentLen = m.group(1)!.length;
     final keyLen = m.group(2)!.length;
     final keyStart = m.start + indentLen;
@@ -164,9 +186,10 @@ TextSpan _highlightToml(String content, TextStyle? baseStyle) {
     tokens.add(_Token(m.start, m.end, _numberStyle));
   }
 
-  for (final m
-      in RegExp(r'\b(?:true|false)\b', caseSensitive: false)
-          .allMatches(content)) {
+  for (final m in RegExp(
+    r'\b(?:true|false)\b',
+    caseSensitive: false,
+  ).allMatches(content)) {
     tokens.add(_Token(m.start, m.end, _numberStyle));
   }
 
@@ -189,14 +212,14 @@ TextSpan _buildSpan(String content, List<_Token> tokens, TextStyle? baseStyle) {
   var pos = 0;
   for (final token in clean) {
     if (token.start > pos) {
-      children.add(TextSpan(
-        text: content.substring(pos, token.start),
-      ));
+      children.add(TextSpan(text: content.substring(pos, token.start)));
     }
-    children.add(TextSpan(
-      text: content.substring(token.start, token.end),
-      style: baseStyle?.merge(token.style) ?? token.style,
-    ));
+    children.add(
+      TextSpan(
+        text: content.substring(token.start, token.end),
+        style: baseStyle?.merge(token.style) ?? token.style,
+      ),
+    );
     pos = token.end;
   }
   if (pos < content.length) {

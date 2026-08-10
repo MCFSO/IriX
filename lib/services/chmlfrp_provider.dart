@@ -72,13 +72,12 @@ class ChmlFrpProvider extends FrpProvider {
     final refreshToken = await _refreshToken();
     if (refreshToken == null || refreshToken.isEmpty) return false;
     try {
-      final res = await HttpFfiService.instance
-          .post(
-            '$chmlFrpApiBase/sso/refresh',
-            headers: await _headers(),
-            body: jsonEncode({'refresh_token': refreshToken}),
-            timeout: const Duration(seconds: 30),
-          );
+      final res = await HttpFfiService.instance.post(
+        '$chmlFrpApiBase/sso/refresh',
+        headers: await _headers(),
+        body: jsonEncode({'refresh_token': refreshToken}),
+        timeout: const Duration(seconds: 30),
+      );
       if (res.statusCode != 200) return false;
       final json =
           jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;

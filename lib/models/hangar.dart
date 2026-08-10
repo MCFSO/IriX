@@ -10,9 +10,9 @@ enum MarketplaceSource {
   hangar;
 
   String get label => switch (this) {
-        MarketplaceSource.modrinth => 'Modrinth',
-        MarketplaceSource.hangar => 'Hangar',
-      };
+    MarketplaceSource.modrinth => 'Modrinth',
+    MarketplaceSource.hangar => 'Hangar',
+  };
 }
 
 /// Hangar 平台标识（用于版本下载与筛选）。
@@ -160,7 +160,8 @@ class HangarPlatformDownload {
     String versionName,
   ) {
     final platform = json['platform'] as String? ?? 'paper';
-    final versions = (json['versions'] as List<dynamic>?)
+    final versions =
+        (json['versions'] as List<dynamic>?)
             ?.map((e) => e.toString())
             .toList() ??
         const [];
@@ -202,11 +203,13 @@ class HangarVersion {
       downloads: (downloads['total'] as num?)?.toInt() ?? 0,
       description: json['description'] as String?,
       downloadsPerPlatform: platformEntries
-          .map((e) => HangarPlatformDownload.fromJson(
-                e as Map<String, dynamic>,
-                projectSlug,
-                json['name'] as String? ?? '',
-              ))
+          .map(
+            (e) => HangarPlatformDownload.fromJson(
+              e as Map<String, dynamic>,
+              projectSlug,
+              json['name'] as String? ?? '',
+            ),
+          )
           .toList(),
     );
   }

@@ -75,13 +75,13 @@ class NodeInfo {
 
   /// 序列化为 JSON，用于本地持久化。
   String toJson() => jsonEncode({
-        'id': id,
-        'name': name,
-        'type': type.name,
-        'address': address,
-        'apiKey': apiKey,
-        'createdAt': createdAt.toIso8601String(),
-      });
+    'id': id,
+    'name': name,
+    'type': type.name,
+    'address': address,
+    'apiKey': apiKey,
+    'createdAt': createdAt.toIso8601String(),
+  });
 
   /// 从 JSON 字符串反序列化。
   factory NodeInfo.fromJson(String source) {

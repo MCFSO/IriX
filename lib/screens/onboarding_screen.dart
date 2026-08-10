@@ -25,7 +25,10 @@ class OnboardingScreen extends StatelessWidget {
   final bool embedded;
 
   /// 推入子界面，待其返回后再 pop 本界面，使底层 HomeScreen 刷新。
-  Future<void> _pushAndReturn(BuildContext context, WidgetBuilder builder) async {
+  Future<void> _pushAndReturn(
+    BuildContext context,
+    WidgetBuilder builder,
+  ) async {
     await pushPage(context, builder);
     if (!context.mounted) return;
     // 子流程结束（已创建/导入实例或取消）后返回上层，触发 HomeScreen 刷新。
@@ -84,10 +87,7 @@ class OnboardingScreen extends StatelessWidget {
       return _buildBody(context);
     }
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('IriX'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('IriX'), centerTitle: true),
       body: _buildBody(context),
     );
   }

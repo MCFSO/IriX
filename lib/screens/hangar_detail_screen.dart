@@ -75,48 +75,48 @@ class _HangarDetailScreenState extends State<HangarDetailScreen> {
     final instances = state.instances;
     if (instances.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请先创建一个服务器实例')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('请先创建一个服务器实例')));
       }
       return null;
     }
     if (state.selected != null) return state.selected;
 
     if (!mounted) return null;
-    return showAppDialog<ServerInstance>(
-      context,
-      (ctx) {
-        return AlertDialog(
-          title: const Text('选择目标实例'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: instances.length,
-              itemBuilder: (context, index) {
-                final instance = instances[index];
-                return ListTile(
-                  leading: const Icon(Icons.storage),
-                  title: Text(instance.name),
-                  subtitle: Text(instance.rootPath),
-                  onTap: () => Navigator.pop(ctx, instance),
-                );
-              },
-            ),
+    return showAppDialog<ServerInstance>(context, (ctx) {
+      return AlertDialog(
+        title: const Text('选择目标实例'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: instances.length,
+            itemBuilder: (context, index) {
+              final instance = instances[index];
+              return ListTile(
+                leading: const Icon(Icons.storage),
+                title: Text(instance.name),
+                subtitle: Text(instance.rootPath),
+                onTap: () => Navigator.pop(ctx, instance),
+              );
+            },
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('取消'),
-            ),
-          ],
-        );
-      },
-    );
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+        ],
+      );
+    });
   }
 
-  Future<void> _downloadPlatform(HangarVersion version, HangarPlatformDownload pd) async {
+  Future<void> _downloadPlatform(
+    HangarVersion version,
+    HangarPlatformDownload pd,
+  ) async {
     final project = _project;
     if (project == null) return;
 
@@ -132,18 +132,13 @@ class _HangarDetailScreenState extends State<HangarDetailScreen> {
     setState(() => _downloadProgress[progressKey] = 0.0);
 
     try {
-      await _downloader.downloadFile(
-        pd.downloadUrl,
-        targetPath,
-        (progress) {
-          if (mounted) {
-            setState(() {
-              _downloadProgress[progressKey] = progress.percent;
-            });
-          }
-        },
-        threads: threads,
-      );
+      await _downloader.downloadFile(pd.downloadUrl, targetPath, (progress) {
+        if (mounted) {
+          setState(() {
+            _downloadProgress[progressKey] = progress.percent;
+          });
+        }
+      }, threads: threads);
       if (mounted) {
         setState(() => _downloadProgress.remove(progressKey));
         ScaffoldMessenger.of(context).showSnackBar(
@@ -152,9 +147,9 @@ class _HangarDetailScreenState extends State<HangarDetailScreen> {
             action: SnackBarAction(
               label: '查看路径',
               onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('目录: $targetDir')),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text('目录: $targetDir')));
               },
             ),
           ),
@@ -163,9 +158,9 @@ class _HangarDetailScreenState extends State<HangarDetailScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _downloadProgress.remove(progressKey));
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('下载失败: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('下载失败: $e')));
       }
     }
   }
@@ -173,9 +168,7 @@ class _HangarDetailScreenState extends State<HangarDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_project?.name ?? '加载中...'),
-      ),
+      appBar: AppBar(title: Text(_project?.name ?? '加载中...')),
       body: _buildBody(),
     );
   }
@@ -212,8 +205,10 @@ class _HangarDetailScreenState extends State<HangarDetailScreen> {
         const SizedBox(height: 8),
         Text(project.description),
         const SizedBox(height: 24),
-        Text('版本列表 (${_versions.length})',
-            style: Theme.of(context).textTheme.titleMedium),
+        Text(
+          '版本列表 (${_versions.length})',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
         const SizedBox(height: 8),
         ..._versions.map(_buildVersionTile),
       ],
@@ -302,8 +297,10 @@ class _HangarDetailScreenState extends State<HangarDetailScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       LinearProgressIndicator(value: progress / 100),
-                      Text('${progress.toStringAsFixed(1)}%',
-                          style: const TextStyle(fontSize: 11)),
+                      Text(
+                        '${progress.toStringAsFixed(1)}%',
+                        style: const TextStyle(fontSize: 11),
+                      ),
                     ],
                   )
                 : null,

@@ -56,8 +56,7 @@ class AppState extends ChangeNotifier {
   /// 生成实例唯一标识：微秒时间戳的 36 进制串 + 随机后缀。
   String _generateId() {
     final random = Random();
-    final suffix =
-        random.nextInt(1 << 20).toRadixString(36).padLeft(4, '0');
+    final suffix = random.nextInt(1 << 20).toRadixString(36).padLeft(4, '0');
     return '${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}-$suffix';
   }
 
@@ -214,20 +213,22 @@ class AppState extends ChangeNotifier {
   /// 由 [restartInstance] 在重启结束后重新挂载监听。
   void _watchExit(String id, ServerProcessManager manager) {
     final captured = manager;
-    unawaited(captured.onExit.then((code) {
-      final instance = _instanceById(id);
-      if (instance == null) return;
-      if (instance.status == InstanceStatus.restarting) {
-        return;
-      }
-      instance.status = InstanceStatus.stopped;
-      if (_managers[id] == captured) {
-        _managers.remove(id);
-        captured.dispose();
-      }
-      LogPersistence.instance.stopWatching(id);
-      notifyListeners();
-    }));
+    unawaited(
+      captured.onExit.then((code) {
+        final instance = _instanceById(id);
+        if (instance == null) return;
+        if (instance.status == InstanceStatus.restarting) {
+          return;
+        }
+        instance.status = InstanceStatus.stopped;
+        if (_managers[id] == captured) {
+          _managers.remove(id);
+          captured.dispose();
+        }
+        LogPersistence.instance.stopWatching(id);
+        notifyListeners();
+      }),
+    );
   }
 
   /// 启动指定实例。
@@ -238,7 +239,10 @@ class AppState extends ChangeNotifier {
   Future<void> startInstance(String id) async {
     final instance = _instanceById(id);
     if (instance == null) return;
-    if (instance.status.isActive || instance.status == InstanceStatus.restarting) return;
+    if (instance.status.isActive ||
+        instance.status == InstanceStatus.restarting) {
+      return;
+    }
 
     var manager = _managers[id];
     if (manager == null) {

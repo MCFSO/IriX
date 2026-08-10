@@ -24,11 +24,7 @@ class ConfigFileInfo {
   /// 文件类型。
   final ConfigFileType type;
 
-  ConfigFileInfo({
-    required this.path,
-    required this.name,
-    required this.type,
-  });
+  ConfigFileInfo({required this.path, required this.name, required this.type});
 }
 
 /// 配置文件编辑服务。
@@ -99,44 +95,54 @@ class ConfigService {
     switch (ext) {
       case '.yml':
       case '.yaml':
-        files.add(ConfigFileInfo(
-          path: file.path,
-          name: p.basename(file.path),
-          type: ConfigFileType.yaml,
-        ));
+        files.add(
+          ConfigFileInfo(
+            path: file.path,
+            name: p.basename(file.path),
+            type: ConfigFileType.yaml,
+          ),
+        );
         break;
       case '.properties':
       case '.conf':
       case '.cfg':
-        files.add(ConfigFileInfo(
-          path: file.path,
-          name: p.basename(file.path),
-          type: ConfigFileType.properties,
-        ));
+        files.add(
+          ConfigFileInfo(
+            path: file.path,
+            name: p.basename(file.path),
+            type: ConfigFileType.properties,
+          ),
+        );
         break;
       case '.json':
-        files.add(ConfigFileInfo(
-          path: file.path,
-          name: p.basename(file.path),
-          type: ConfigFileType.json,
-        ));
+        files.add(
+          ConfigFileInfo(
+            path: file.path,
+            name: p.basename(file.path),
+            type: ConfigFileType.json,
+          ),
+        );
         break;
       case '.toml':
-        files.add(ConfigFileInfo(
-          path: file.path,
-          name: p.basename(file.path),
-          type: ConfigFileType.toml,
-        ));
+        files.add(
+          ConfigFileInfo(
+            path: file.path,
+            name: p.basename(file.path),
+            type: ConfigFileType.toml,
+          ),
+        );
         break;
       default:
         // scanAll 模式下，未知扩展名也纳入（作为纯文本处理），
         // 但跳过明显的二进制 / 媒体 / 锁文件。
         if (scanAll && !_isBinaryExt(ext) && ext != '.jar') {
-          files.add(ConfigFileInfo(
-            path: file.path,
-            name: p.basename(file.path),
-            type: ConfigFileType.text,
-          ));
+          files.add(
+            ConfigFileInfo(
+              path: file.path,
+              name: p.basename(file.path),
+              type: ConfigFileType.text,
+            ),
+          );
         }
         break;
     }
@@ -145,11 +151,26 @@ class ConfigService {
   /// 判断是否为常见二进制扩展名（应跳过）。
   bool _isBinaryExt(String ext) {
     const binary = {
-      '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.webp',
-      '.db', '.sqlite', '.dat', '.bin',
-      '.lock', '.lck',
-      '.class', '.nbt', '.mca', '.mcr',
-      '.zip', '.gz', '.tar',
+      '.png',
+      '.jpg',
+      '.jpeg',
+      '.gif',
+      '.bmp',
+      '.ico',
+      '.webp',
+      '.db',
+      '.sqlite',
+      '.dat',
+      '.bin',
+      '.lock',
+      '.lck',
+      '.class',
+      '.nbt',
+      '.mca',
+      '.mcr',
+      '.zip',
+      '.gz',
+      '.tar',
     };
     return binary.contains(ext);
   }

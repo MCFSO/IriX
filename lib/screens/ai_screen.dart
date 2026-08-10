@@ -53,11 +53,7 @@ class AiChatController extends ChangeNotifier {
   /// 发送一条用户消息并运行一轮 agent 循环。
   ///
   /// [displayText] 非空时，聊天气泡仅展示该摘要，而完整内容仍发给 AI。
-  Future<void> send(
-    AppState state,
-    String text, {
-    String? displayText,
-  }) async {
+  Future<void> send(AppState state, String text, {String? displayText}) async {
     if (conversation.running) return;
     _onEvent(AiEvent.user(displayText ?? text));
     await conversation.runTurn(state, text, emit: _onEvent);
@@ -166,10 +162,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
   }
 
   /// 解析日志文件并将格式化内容发送给 AI。
-  Future<void> _analyzeAndSendLog(
-    String path, {
-    required String source,
-  }) async {
+  Future<void> _analyzeAndSendLog(String path, {required String source}) async {
     final controller = widget.controller;
     if (controller.conversation.running) return;
     if (controller.activeModel == null) {
@@ -185,7 +178,8 @@ class _AiChatPanelState extends State<AiChatPanel> {
         instanceName: widget.instanceName,
         source: source,
       );
-final display = '已发送日志「${parsed.fileName}」'
+      final display =
+          '已发送日志「${parsed.fileName}」'
           '（${parsed.compressed ? 'gzip 已解压，' : ''}${parsed.lineCount} 行'
           '${parsed.truncated ? '，已保留末尾' : ''}）供 AI 分析';
       _scrollToBottom();
@@ -196,9 +190,9 @@ final display = '已发送日志「${parsed.fileName}」'
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('日志解析失败: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('日志解析失败: $e')));
     }
   }
 
@@ -819,9 +813,9 @@ class _ModelsDialogState extends State<_ModelsDialog> {
       );
       await _loadKnowledge();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('知识库导入完成')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('知识库导入完成')));
       }
     } catch (e) {
       if (mounted) {
@@ -1310,20 +1304,16 @@ class _ServerLogPickerDialogState extends State<_ServerLogPickerDialog> {
         });
         return;
       }
-      final files = logsDir
-          .listSync(recursive: false)
-          .whereType<File>()
-          .where((f) {
+      final files =
+          logsDir.listSync(recursive: false).whereType<File>().where((f) {
             final name = p.basename(f.path).toLowerCase();
             return name.endsWith('.log') || name.endsWith('.log.gz');
-          })
-          .toList()
-        ..sort((a, b) {
-          final am = a.statSync().modified;
-          final bm = b.statSync().modified;
-          final cmp = bm.compareTo(am);
-          return cmp != 0 ? cmp : a.path.compareTo(b.path);
-        });
+          }).toList()..sort((a, b) {
+            final am = a.statSync().modified;
+            final bm = b.statSync().modified;
+            final cmp = bm.compareTo(am);
+            return cmp != 0 ? cmp : a.path.compareTo(b.path);
+          });
       if (!mounted) return;
       setState(() {
         _entries = files;
@@ -1590,7 +1580,7 @@ class _ModelEditDialogState extends State<_ModelEditDialog> {
                   errorText: _contextError,
                 ),
               ),
-const SizedBox(height: 12),
+              const SizedBox(height: 12),
               TextField(
                 controller: _embeddingController,
                 style: const TextStyle(fontFamily: 'monospace', fontSize: 13),

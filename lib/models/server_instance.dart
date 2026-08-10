@@ -29,11 +29,11 @@ enum InstanceStatus {
   /// [starting] 显示"启动中"，[running] 显示"运行中"，
   /// 便于用户区分服务器是正在启动还是已成功运行。
   String get label => switch (this) {
-        InstanceStatus.starting => '启动中',
-        InstanceStatus.running => '运行中',
-        InstanceStatus.restarting => '重启中',
-        InstanceStatus.stopped => '已关闭',
-      };
+    InstanceStatus.starting => '启动中',
+    InstanceStatus.running => '运行中',
+    InstanceStatus.restarting => '重启中',
+    InstanceStatus.stopped => '已关闭',
+  };
 
   /// 服务器是否处于活跃（启动中或运行中）状态。
   ///
@@ -103,15 +103,15 @@ class ServerInstance {
   ///
   /// 注意：[status] 不会被序列化，加载时始终重置为 [InstanceStatus.stopped]。
   String toJson() => jsonEncode({
-        'id': id,
-        'name': name,
-        'rootPath': rootPath,
-        'coreFilePath': coreFilePath,
-        'startCommand': startCommand,
-        'coreType': coreType,
-        'coreVersion': coreVersion,
-        'createdAt': createdAt.toIso8601String(),
-      });
+    'id': id,
+    'name': name,
+    'rootPath': rootPath,
+    'coreFilePath': coreFilePath,
+    'startCommand': startCommand,
+    'coreType': coreType,
+    'coreVersion': coreVersion,
+    'createdAt': createdAt.toIso8601String(),
+  });
 
   /// 从 JSON 字符串反序列化构建 [ServerInstance]。
   ///

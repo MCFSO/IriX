@@ -20,9 +20,9 @@ enum _ProjectTypeFilter {
   const _ProjectTypeFilter(this.label);
 
   String? get apiValue => switch (this) {
-        _ProjectTypeFilter.mod => 'mod',
-        _ProjectTypeFilter.plugin => 'plugin',
-      };
+    _ProjectTypeFilter.mod => 'mod',
+    _ProjectTypeFilter.plugin => 'plugin',
+  };
 }
 
 /// 排序方式
@@ -37,12 +37,12 @@ enum _SortIndex {
   const _SortIndex(this.label);
 
   String get apiValue => switch (this) {
-        _SortIndex.relevance => 'relevance',
-        _SortIndex.downloads => 'downloads',
-        _SortIndex.follows => 'follows',
-        _SortIndex.newest => 'newest',
-        _SortIndex.updated => 'updated',
-      };
+    _SortIndex.relevance => 'relevance',
+    _SortIndex.downloads => 'downloads',
+    _SortIndex.follows => 'follows',
+    _SortIndex.newest => 'newest',
+    _SortIndex.updated => 'updated',
+  };
 }
 
 /// 市场搜索页面
@@ -137,8 +137,14 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
   /// 插件加载器集合（Modrinth API 支持的 loader 名称）。
   static const _pluginLoaders = {
-    'paper', 'spigot', 'purpur', 'bukkit', 'folia',
-    'waterfall', 'velocity', 'bungeecord',
+    'paper',
+    'spigot',
+    'purpur',
+    'bukkit',
+    'folia',
+    'waterfall',
+    'velocity',
+    'bungeecord',
   };
 
   /// 加载器显示名称映射。
@@ -177,8 +183,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   /// 优先使用 API 返回的 loader（确保 API 支持），
   /// API 不可用时回退到已知集合（均为 Modrinth 支持的 loader 名称）。
   List<String> get _relevantLoaders {
-    final set =
-        _typeFilter == _ProjectTypeFilter.mod ? _modLoaders : _pluginLoaders;
+    final set = _typeFilter == _ProjectTypeFilter.mod
+        ? _modLoaders
+        : _pluginLoaders;
     if (_loaders.isEmpty) return set.toList()..sort();
     final names = _loaders.map((l) => l.name).toSet();
     final result = names.intersection(set).toList()..sort();
@@ -268,17 +275,19 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
           limit: limit,
         );
         final hits = result.hits
-            .map((h) => _MarketHit(
-                  id: h.projectId,
-                  slug: h.slug,
-                  title: h.title,
-                  description: h.description,
-                  iconUrl: h.iconUrl,
-                  downloads: h.downloads,
-                  stars: h.follows,
-                  category: h.projectType,
-                  source: MarketplaceSource.modrinth,
-                ))
+            .map(
+              (h) => _MarketHit(
+                id: h.projectId,
+                slug: h.slug,
+                title: h.title,
+                description: h.description,
+                iconUrl: h.iconUrl,
+                downloads: h.downloads,
+                stars: h.follows,
+                category: h.projectType,
+                source: MarketplaceSource.modrinth,
+              ),
+            )
             .toList();
         return (hits: hits, hasMore: result.hits.length < result.totalHits);
 
@@ -299,17 +308,19 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
           limit: limit,
         );
         final hits = result.hits
-            .map((h) => _MarketHit(
-                  id: h.slug,
-                  slug: h.slug,
-                  title: h.name,
-                  description: h.description,
-                  iconUrl: h.avatarUrl,
-                  downloads: h.downloads,
-                  stars: h.stars,
-                  category: h.category,
-                  source: MarketplaceSource.hangar,
-                ))
+            .map(
+              (h) => _MarketHit(
+                id: h.slug,
+                slug: h.slug,
+                title: h.name,
+                description: h.description,
+                iconUrl: h.avatarUrl,
+                downloads: h.downloads,
+                stars: h.stars,
+                category: h.category,
+                source: MarketplaceSource.hangar,
+              ),
+            )
             .toList();
         return (hits: hits, hasMore: _hits.length + hits.length < result.total);
     }
@@ -395,9 +406,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                   : const SizedBox.shrink();
             },
           ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           filled: true,
         ),
         onChanged: _onSearchChanged,
@@ -433,15 +442,17 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         _search();
       },
       itemBuilder: (context) => _ProjectTypeFilter.values
-          .map((e) => PopupMenuItem(
-                value: e,
-                textStyle: TextStyle(
-                  color: e == _typeFilter
-                      ? Theme.of(context).colorScheme.primary
-                      : null,
-                ),
-                child: Text(e.label),
-              ))
+          .map(
+            (e) => PopupMenuItem(
+              value: e,
+              textStyle: TextStyle(
+                color: e == _typeFilter
+                    ? Theme.of(context).colorScheme.primary
+                    : null,
+              ),
+              child: Text(e.label),
+            ),
+          )
           .toList(),
     );
   }
@@ -454,15 +465,17 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         _search();
       },
       itemBuilder: (context) => _SortIndex.values
-          .map((e) => PopupMenuItem(
-                value: e,
-                textStyle: TextStyle(
-                  color: e == _sortIndex
-                      ? Theme.of(context).colorScheme.primary
-                      : null,
-                ),
-                child: Text(e.label),
-              ))
+          .map(
+            (e) => PopupMenuItem(
+              value: e,
+              textStyle: TextStyle(
+                color: e == _sortIndex
+                    ? Theme.of(context).colorScheme.primary
+                    : null,
+              ),
+              child: Text(e.label),
+            ),
+          )
           .toList(),
     );
   }
@@ -482,10 +495,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       },
       itemBuilder: (context) => [
         const PopupMenuItem(value: null, child: Text('全部')),
-        ...relevant.map((name) => PopupMenuItem(
-              value: name,
-              child: Text(_loaderDisplayName(name)),
-            )),
+        ...relevant.map(
+          (name) =>
+              PopupMenuItem(value: name, child: Text(_loaderDisplayName(name))),
+        ),
       ],
     );
   }
@@ -502,10 +515,12 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       },
       itemBuilder: (context) => [
         const PopupMenuItem(value: null, child: Text('全部')),
-        ..._gameVersions.map((v) => PopupMenuItem(
-              value: v.version,
-              child: Text('${v.version} (${v.versionType})'),
-            )),
+        ..._gameVersions.map(
+          (v) => PopupMenuItem(
+            value: v.version,
+            child: Text('${v.version} (${v.versionType})'),
+          ),
+        ),
       ],
     );
   }
@@ -583,10 +598,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                 case MarketplaceSource.hangar:
                   screen = HangarDetailScreen(slug: hit.slug);
               }
-              await pushPage<void>(
-                context,
-                (_) => screen,
-              );
+              await pushPage<void>(context, (_) => screen);
             },
           );
         },
@@ -623,8 +635,7 @@ class _SearchResultCard extends StatelessWidget {
                         width: 64,
                         height: 64,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) =>
-                            _placeholderIcon(theme),
+                        errorBuilder: (_, _, _) => _placeholderIcon(theme),
                       )
                     : _placeholderIcon(theme),
               ),
@@ -652,9 +663,10 @@ class _SearchResultCard extends StatelessWidget {
                       runSpacing: 4,
                       children: [
                         _infoChip(
-                            '${_formatNumber(hit.downloads)} 下载', Icons.download),
-                        _infoChip(
-                            '${_formatNumber(hit.stars)} 收藏', Icons.star),
+                          '${_formatNumber(hit.downloads)} 下载',
+                          Icons.download,
+                        ),
+                        _infoChip('${_formatNumber(hit.stars)} 收藏', Icons.star),
                         _infoChip(hit.category, Icons.category),
                         _infoChip(hit.source.label, Icons.cloud),
                       ],

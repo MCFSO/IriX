@@ -38,9 +38,10 @@ class _AppleButtonState extends State<AppleButton>
       duration: const Duration(milliseconds: 100),
       vsync: this,
     );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.97).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
+    _scaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.97,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
   }
 
   @override
@@ -78,10 +79,7 @@ class _AppleButtonState extends State<AppleButton>
                 style: widget.style,
                 child: widget.child,
               )
-            : FilledButton(
-                onPressed: widget.onPressed,
-                child: widget.child,
-              ),
+            : FilledButton(onPressed: widget.onPressed, child: widget.child),
       ),
     );
   }
@@ -123,9 +121,10 @@ class _AppleCardState extends State<AppleCard>
       duration: const Duration(milliseconds: 200),
       vsync: this,
     );
-    _elevationAnimation = Tween<double>(begin: 2.0, end: 8.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
+    _elevationAnimation = Tween<double>(
+      begin: 2.0,
+      end: 8.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
   }
 
   @override
@@ -153,7 +152,9 @@ class _AppleCardState extends State<AppleCard>
           child: Card(
             margin: widget.margin ?? const EdgeInsets.all(8),
             elevation: _elevationAnimation.value,
-            color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.85),
+            color: Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.85),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
@@ -178,11 +179,7 @@ class _AppleCardState extends State<AppleCard>
 /// - 切换时颜色渐变过渡
 /// - 符合 Apple 人机界面指南
 class AppleSwitch extends StatelessWidget {
-  const AppleSwitch({
-    super.key,
-    required this.value,
-    required this.onChanged,
-  });
+  const AppleSwitch({super.key, required this.value, required this.onChanged});
 
   final bool value;
   final ValueChanged<bool>? onChanged;
@@ -235,10 +232,7 @@ class AppleListTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             children: [
-              if (leading != null) ...[
-                leading!,
-                const SizedBox(width: 16),
-              ],
+              if (leading != null) ...[leading!, const SizedBox(width: 16)],
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -266,10 +260,7 @@ class AppleListTile extends StatelessWidget {
 /// - 使用系统配色
 /// - 平滑动画
 class AppleProgressIndicator extends StatelessWidget {
-  const AppleProgressIndicator({
-    super.key,
-    this.value,
-  });
+  const AppleProgressIndicator({super.key, this.value});
 
   final double? value;
 
@@ -301,13 +292,13 @@ Future<T?> pushPage<T>(BuildContext context, WidgetBuilder builder) {
       reverseTransitionDuration: const Duration(milliseconds: 300),
       transitionsBuilder: (_, animation, _, child) {
         return SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(1.0, 0.0),
-            end: Offset.zero,
-          ).animate(CurvedAnimation(
-            parent: animation,
-            curve: Curves.easeInOut,
-          )),
+          position:
+              Tween<Offset>(
+                begin: const Offset(1.0, 0.0),
+                end: Offset.zero,
+              ).animate(
+                CurvedAnimation(parent: animation, curve: Curves.easeInOut),
+              ),
           child: child,
         );
       },

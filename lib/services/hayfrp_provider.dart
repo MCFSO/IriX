@@ -42,16 +42,12 @@ class HayFrpProvider extends FrpProvider {
     String path,
     Map<String, dynamic> body,
   ) async {
-    final res = await HttpFfiService.instance
-        .post(
-          '$hayFrpApiBase$path',
-          headers: {
-            'Content-Type': 'application/json;charset=UTF-8',
-            'waf': 'off',
-          },
-          body: jsonEncode(body),
-          timeout: const Duration(seconds: 30),
-        );
+    final res = await HttpFfiService.instance.post(
+      '$hayFrpApiBase$path',
+      headers: {'Content-Type': 'application/json;charset=UTF-8', 'waf': 'off'},
+      body: jsonEncode(body),
+      timeout: const Duration(seconds: 30),
+    );
     if (res.statusCode != 200) {
       throw Exception('HTTP ${res.statusCode}: ${_snippet(res.body)}');
     }
@@ -269,21 +265,17 @@ class HayFrpProvider extends FrpProvider {
     if (token == null || token.isEmpty) throw Exception('未登录');
     // 注意：config 接口的隧道参数是 id（传 node=隧道ID 会返回空响应），
     // 且响应为纯 TOML 文本（非 JSON 包装），因此不走 _proxyPost/_decode。
-    final res = await HttpFfiService.instance
-        .post(
-          '$hayFrpApiBase/proxy',
-          headers: {
-            'Content-Type': 'application/json;charset=UTF-8',
-            'waf': 'off',
-          },
-          body: jsonEncode({
-            'type': 'config',
-            'format': 'toml',
-            'csrf': token,
-            'id': tunnelId,
-          }),
-          timeout: const Duration(seconds: 30),
-        );
+    final res = await HttpFfiService.instance.post(
+      '$hayFrpApiBase/proxy',
+      headers: {'Content-Type': 'application/json;charset=UTF-8', 'waf': 'off'},
+      body: jsonEncode({
+        'type': 'config',
+        'format': 'toml',
+        'csrf': token,
+        'id': tunnelId,
+      }),
+      timeout: const Duration(seconds: 30),
+    );
     if (res.statusCode != 200) {
       throw Exception('HTTP ${res.statusCode}: ${_snippet(res.body)}');
     }

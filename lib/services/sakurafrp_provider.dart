@@ -173,7 +173,9 @@ class SakuraFrpProvider extends FrpProvider {
     final res = await _send('GET', '/nodes');
     // v4 接口直接返回 节点id -> 节点信息 的 Map（无 data 包装）。
     final decoded = jsonDecode(utf8.decode(res.bodyBytes));
-    final data = decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
+    final data = decoded is Map<String, dynamic>
+        ? decoded
+        : <String, dynamic>{};
     return {
       for (final entry in data.entries)
         if (entry.value is Map)
@@ -189,7 +191,9 @@ class SakuraFrpProvider extends FrpProvider {
   Future<List<FrpNode>> listNodes() async {
     final res = await _send('GET', '/nodes');
     final decoded = jsonDecode(utf8.decode(res.bodyBytes));
-    final data = decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
+    final data = decoded is Map<String, dynamic>
+        ? decoded
+        : <String, dynamic>{};
     final nodes = <FrpNode>[];
     for (final entry in data.entries) {
       if (entry.value is! Map) continue;

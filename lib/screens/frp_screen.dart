@@ -363,10 +363,7 @@ class _FrpScreenState extends State<FrpScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(flex: 5, child: _buildTunnelList(theme)),
-              SizedBox(
-                width: 320,
-                child: _buildLogPanel(theme),
-              ),
+              SizedBox(width: 320, child: _buildLogPanel(theme)),
             ],
           ),
         ),
@@ -400,7 +397,11 @@ class _FrpScreenState extends State<FrpScreen> {
               padding: const EdgeInsets.fromLTRB(12, 10, 8, 6),
               child: Row(
                 children: [
-                  Icon(Icons.terminal, size: 18, color: theme.colorScheme.primary),
+                  Icon(
+                    Icons.terminal,
+                    size: 18,
+                    color: theme.colorScheme.primary,
+                  ),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
@@ -698,111 +699,111 @@ class _FrpScreenState extends State<FrpScreen> {
         onTap: () => setState(() => _selectedTunnelId = tunnel.id),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(typeIcon, size: 24, color: theme.colorScheme.primary),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              tunnel.name,
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          _TypeTag(text: tunnel.type.toUpperCase()),
-                        ],
-                      ),
-                      if (tunnel.nodeName.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          tunnel.nodeName,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                _StatusDot(
-                  color: tunnel.online
-                      ? Colors.green
-                      : running
-                      ? Colors.orange
-                      : theme.colorScheme.outline,
-                  label: tunnel.online
-                      ? '在线'
-                      : running
-                      ? '连接中'
-                      : '离线',
-                ),
-                IconButton(
-                  tooltip: running ? '停止' : '启动',
-                  visualDensity: VisualDensity.compact,
-                  icon: Icon(
-                    running ? Icons.stop_circle_outlined : Icons.play_circle,
-                    color: running ? theme.colorScheme.error : Colors.green,
-                  ),
-                  onPressed: () => _toggleTunnel(tunnel),
-                ),
-                IconButton(
-                  tooltip: '删除',
-                  visualDensity: VisualDensity.compact,
-                  icon: const Icon(Icons.delete_outline),
-                  onPressed: () => _deleteTunnel(tunnel),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              '本地 ${tunnel.localAddr}:${tunnel.localPort}  →  $remoteText',
-              style: theme.textTheme.bodySmall,
-            ),
-            if (tunnel.remoteAddress.isNotEmpty) ...[
-              const SizedBox(height: 2),
-              Text(
-                '连接地址 ${tunnel.remoteAddress}',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.primary,
-                  fontFamily: 'monospace',
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-            if (tunnel.useEncryption ||
-                tunnel.useCompression ||
-                !tunnel.enabled) ...[
-              const SizedBox(height: 4),
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Row(
                 children: [
-                  if (tunnel.useEncryption)
-                    _buildMiniTag(text: '加密', theme: theme),
-                  if (tunnel.useCompression) ...[
-                    const SizedBox(width: 6),
-                    _buildMiniTag(text: '压缩', theme: theme),
-                  ],
-                  if (!tunnel.enabled) ...[
-                    const SizedBox(width: 6),
-                    _buildMiniTag(text: '未启用', theme: theme),
-                  ],
+                  Icon(typeIcon, size: 24, color: theme.colorScheme.primary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                tunnel.name,
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            _TypeTag(text: tunnel.type.toUpperCase()),
+                          ],
+                        ),
+                        if (tunnel.nodeName.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            tunnel.nodeName,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  _StatusDot(
+                    color: tunnel.online
+                        ? Colors.green
+                        : running
+                        ? Colors.orange
+                        : theme.colorScheme.outline,
+                    label: tunnel.online
+                        ? '在线'
+                        : running
+                        ? '连接中'
+                        : '离线',
+                  ),
+                  IconButton(
+                    tooltip: running ? '停止' : '启动',
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(
+                      running ? Icons.stop_circle_outlined : Icons.play_circle,
+                      color: running ? theme.colorScheme.error : Colors.green,
+                    ),
+                    onPressed: () => _toggleTunnel(tunnel),
+                  ),
+                  IconButton(
+                    tooltip: '删除',
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: () => _deleteTunnel(tunnel),
+                  ),
                 ],
               ),
+              const SizedBox(height: 6),
+              Text(
+                '本地 ${tunnel.localAddr}:${tunnel.localPort}  →  $remoteText',
+                style: theme.textTheme.bodySmall,
+              ),
+              if (tunnel.remoteAddress.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  '连接地址 ${tunnel.remoteAddress}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontFamily: 'monospace',
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+              if (tunnel.useEncryption ||
+                  tunnel.useCompression ||
+                  !tunnel.enabled) ...[
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    if (tunnel.useEncryption)
+                      _buildMiniTag(text: '加密', theme: theme),
+                    if (tunnel.useCompression) ...[
+                      const SizedBox(width: 6),
+                      _buildMiniTag(text: '压缩', theme: theme),
+                    ],
+                    if (!tunnel.enabled) ...[
+                      const SizedBox(width: 6),
+                      _buildMiniTag(text: '未启用', theme: theme),
+                    ],
+                  ],
+                ),
+              ],
             ],
-          ],
-        ),
+          ),
         ),
       ),
     );

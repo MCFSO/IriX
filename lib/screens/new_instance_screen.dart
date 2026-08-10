@@ -33,10 +33,8 @@ class NewInstanceScreen extends StatelessWidget {
                       icon: Icons.download,
                       title: '下载',
                       description: '自动下载核心并新建服务器实例',
-                      onTap: () => pushPage(
-                        context,
-                        (_) => const DownloadCoreScreen(),
-                      ),
+                      onTap: () =>
+                          pushPage(context, (_) => const DownloadCoreScreen()),
                     ),
                   ),
                   const SizedBox(width: 24),
@@ -45,10 +43,8 @@ class NewInstanceScreen extends StatelessWidget {
                       icon: Icons.file_download_done,
                       title: '导入',
                       description: '导入一个服务器核心新建服务器实例',
-                      onTap: () => pushPage(
-                        context,
-                        (_) => const ImportCoreScreen(),
-                      ),
+                      onTap: () =>
+                          pushPage(context, (_) => const ImportCoreScreen()),
                     ),
                   ),
                 ],

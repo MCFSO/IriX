@@ -36,8 +36,8 @@ class FileEntry {
       isDirectory: json['is_directory'] as bool,
       size: json['size'] as int,
       modified: DateTime.fromMillisecondsSinceEpoch(
-          (json['modified'] as int) * 1000,
-        ),
+        (json['modified'] as int) * 1000,
+      ),
     );
   }
 }
@@ -58,36 +58,36 @@ typedef ClipboardGetDart = Pointer<Utf8> Function();
 typedef ClipboardClearC = Void Function();
 typedef ClipboardClearDart = void Function();
 
-typedef CopyFileC = Int32 Function(
-  Pointer<Utf8> src,
-  Pointer<Utf8> dst,
-  Pointer<NativeFunction<ProgressCallbackC>> progressCb,
-);
-typedef CopyFileDart = int Function(
-  Pointer<Utf8> src,
-  Pointer<Utf8> dst,
-  Pointer<NativeFunction<ProgressCallbackC>> progressCb,
-);
+typedef CopyFileC =
+    Int32 Function(
+      Pointer<Utf8> src,
+      Pointer<Utf8> dst,
+      Pointer<NativeFunction<ProgressCallbackC>> progressCb,
+    );
+typedef CopyFileDart =
+    int Function(
+      Pointer<Utf8> src,
+      Pointer<Utf8> dst,
+      Pointer<NativeFunction<ProgressCallbackC>> progressCb,
+    );
 
-typedef MoveFileC = Int32 Function(
-  Pointer<Utf8> src,
-  Pointer<Utf8> dst,
-  Pointer<NativeFunction<ProgressCallbackC>> progressCb,
-);
-typedef MoveFileDart = int Function(
-  Pointer<Utf8> src,
-  Pointer<Utf8> dst,
-  Pointer<NativeFunction<ProgressCallbackC>> progressCb,
-);
+typedef MoveFileC =
+    Int32 Function(
+      Pointer<Utf8> src,
+      Pointer<Utf8> dst,
+      Pointer<NativeFunction<ProgressCallbackC>> progressCb,
+    );
+typedef MoveFileDart =
+    int Function(
+      Pointer<Utf8> src,
+      Pointer<Utf8> dst,
+      Pointer<NativeFunction<ProgressCallbackC>> progressCb,
+    );
 
-typedef DeleteToTrashC = Int32 Function(
-  Pointer<Utf8> rootPath,
-  Pointer<Utf8> filePath,
-);
-typedef DeleteToTrashDart = int Function(
-  Pointer<Utf8> rootPath,
-  Pointer<Utf8> filePath,
-);
+typedef DeleteToTrashC =
+    Int32 Function(Pointer<Utf8> rootPath, Pointer<Utf8> filePath);
+typedef DeleteToTrashDart =
+    int Function(Pointer<Utf8> rootPath, Pointer<Utf8> filePath);
 
 typedef DeletePermanentlyC = Int32 Function(Pointer<Utf8> path);
 typedef DeletePermanentlyDart = int Function(Pointer<Utf8> path);
@@ -95,14 +95,10 @@ typedef DeletePermanentlyDart = int Function(Pointer<Utf8> path);
 typedef CreateDirectoryC = Int32 Function(Pointer<Utf8> path);
 typedef CreateDirectoryDart = int Function(Pointer<Utf8> path);
 
-typedef RenameEntryC = Int32 Function(
-  Pointer<Utf8> oldPath,
-  Pointer<Utf8> newPath,
-);
-typedef RenameEntryDart = int Function(
-  Pointer<Utf8> oldPath,
-  Pointer<Utf8> newPath,
-);
+typedef RenameEntryC =
+    Int32 Function(Pointer<Utf8> oldPath, Pointer<Utf8> newPath);
+typedef RenameEntryDart =
+    int Function(Pointer<Utf8> oldPath, Pointer<Utf8> newPath);
 
 typedef CancelOperationC = Void Function();
 typedef CancelOperationDart = void Function();
@@ -168,8 +164,8 @@ abstract class _FileOpsLib {
     final libName = Platform.isWindows
         ? 'xmc_file_ops.dll'
         : Platform.isMacOS
-            ? 'libxmc_file_ops.dylib'
-            : 'libxmc_file_ops.so';
+        ? 'libxmc_file_ops.dylib'
+        : 'libxmc_file_ops.so';
 
     for (final libPath in _getPossibleLibraryPaths(libName)) {
       try {
@@ -246,10 +242,10 @@ class FileOps {
   /// 扫描目录，返回文件/目录条目列表
   static List<FileEntry> scanDir(String path) {
     final lib = _FileOpsLib.lib;
-    final scanDir =
-        lib.lookupFunction<ScanDirC, ScanDirDart>('scan_dir');
-    final freeString =
-        lib.lookupFunction<FreeStringC, FreeStringDart>('free_string');
+    final scanDir = lib.lookupFunction<ScanDirC, ScanDirDart>('scan_dir');
+    final freeString = lib.lookupFunction<FreeStringC, FreeStringDart>(
+      'free_string',
+    );
 
     final pathPtr = path.toNativeUtf8();
     try {
@@ -272,10 +268,12 @@ class FileOps {
   /// 获取单个文件/目录信息，不存在时返回 null
   static FileEntry? getFileInfo(String path) {
     final lib = _FileOpsLib.lib;
-    final getFileInfo =
-        lib.lookupFunction<GetFileInfoC, GetFileInfoDart>('get_file_info');
-    final freeString =
-        lib.lookupFunction<FreeStringC, FreeStringDart>('free_string');
+    final getFileInfo = lib.lookupFunction<GetFileInfoC, GetFileInfoDart>(
+      'get_file_info',
+    );
+    final freeString = lib.lookupFunction<FreeStringC, FreeStringDart>(
+      'free_string',
+    );
 
     final pathPtr = path.toNativeUtf8();
     try {
@@ -297,8 +295,9 @@ class FileOps {
   /// 设置剪贴板内容
   static void clipboardSet(String path, bool isCut) {
     final lib = _FileOpsLib.lib;
-    final clipboardSet =
-        lib.lookupFunction<ClipboardSetC, ClipboardSetDart>('clipboard_set');
+    final clipboardSet = lib.lookupFunction<ClipboardSetC, ClipboardSetDart>(
+      'clipboard_set',
+    );
 
     final pathPtr = path.toNativeUtf8();
     try {
@@ -311,10 +310,12 @@ class FileOps {
   /// 获取剪贴板内容，无内容时返回 null
   static ({String path, bool isCut})? clipboardGet() {
     final lib = _FileOpsLib.lib;
-    final clipboardGet =
-        lib.lookupFunction<ClipboardGetC, ClipboardGetDart>('clipboard_get');
-    final freeString =
-        lib.lookupFunction<FreeStringC, FreeStringDart>('free_string');
+    final clipboardGet = lib.lookupFunction<ClipboardGetC, ClipboardGetDart>(
+      'clipboard_get',
+    );
+    final freeString = lib.lookupFunction<FreeStringC, FreeStringDart>(
+      'free_string',
+    );
 
     final jsonPtr = clipboardGet();
     if (jsonPtr == nullptr) return null;
@@ -322,10 +323,7 @@ class FileOps {
       final json = jsonPtr.toDartString();
       if (json.isEmpty) return null;
       final map = jsonDecode(json) as Map<String, dynamic>;
-      return (
-        path: map['path'] as String,
-        isCut: map['is_cut'] as bool,
-      );
+      return (path: map['path'] as String, isCut: map['is_cut'] as bool);
     } finally {
       freeString(jsonPtr);
     }
@@ -334,9 +332,8 @@ class FileOps {
   /// 清空剪贴板
   static void clipboardClear() {
     final lib = _FileOpsLib.lib;
-    final clipboardClear =
-        lib.lookupFunction<ClipboardClearC, ClipboardClearDart>(
-            'clipboard_clear');
+    final clipboardClear = lib
+        .lookupFunction<ClipboardClearC, ClipboardClearDart>('clipboard_clear');
     clipboardClear();
   }
 
@@ -372,9 +369,7 @@ class FileOps {
     void Function(int current, int total)? onProgress,
   }) async {
     final srcFile = File(src);
-    final size = await srcFile.exists()
-        ? await srcFile.length()
-        : -1;
+    final size = await srcFile.exists() ? await srcFile.length() : -1;
 
     final isSmall = size >= 0 && size < 1024 * 1024;
 
@@ -383,15 +378,16 @@ class FileOps {
     }
 
     if (onProgress == null) {
-      return await Isolate.run(() => _fileOpIsolateNoProgress(src, dst, isMove));
+      return await Isolate.run(
+        () => _fileOpIsolateNoProgress(src, dst, isMove),
+      );
     }
 
     final responsePort = ReceivePort();
     final completer = Completer<bool>();
 
     late NativeCallable<ProgressCallbackC> cb;
-    cb = NativeCallable<ProgressCallbackC>.listener(
-        (int current, int total) {
+    cb = NativeCallable<ProgressCallbackC>.listener((int current, int total) {
       onProgress(current, total);
     });
 
@@ -457,13 +453,14 @@ class FileOps {
 
     try {
       final lib = _FileOpsLib.lib;
-      final getLastError =
-          lib.lookupFunction<GetLastErrorC, GetLastErrorDart>('get_last_error');
-      final freeString =
-          lib.lookupFunction<FreeStringC, FreeStringDart>('free_string');
+      final getLastError = lib.lookupFunction<GetLastErrorC, GetLastErrorDart>(
+        'get_last_error',
+      );
+      final freeString = lib.lookupFunction<FreeStringC, FreeStringDart>(
+        'free_string',
+      );
 
-      final progressCb =
-          Pointer<NativeFunction<ProgressCallbackC>>.fromAddress(
+      final progressCb = Pointer<NativeFunction<ProgressCallbackC>>.fromAddress(
         req.progressCbAddress!,
       );
 
@@ -505,9 +502,9 @@ class FileOps {
 
   static bool _deleteToTrashSync(String rootPath, String filePath) {
     final lib = _FileOpsLib.lib;
-    final deleteToTrash =
-        lib.lookupFunction<DeleteToTrashC, DeleteToTrashDart>(
-            'delete_to_trash');
+    final deleteToTrash = lib.lookupFunction<DeleteToTrashC, DeleteToTrashDart>(
+      'delete_to_trash',
+    );
 
     final rootPtr = rootPath.toNativeUtf8();
     final filePtr = filePath.toNativeUtf8();
@@ -529,9 +526,10 @@ class FileOps {
 
   static bool _deletePermanentlySync(String path) {
     final lib = _FileOpsLib.lib;
-    final deletePermanently =
-        lib.lookupFunction<DeletePermanentlyC, DeletePermanentlyDart>(
-            'delete_permanently');
+    final deletePermanently = lib
+        .lookupFunction<DeletePermanentlyC, DeletePermanentlyDart>(
+          'delete_permanently',
+        );
 
     final pathPtr = path.toNativeUtf8();
     try {
@@ -551,9 +549,10 @@ class FileOps {
 
   static bool _createDirectorySync(String path) {
     final lib = _FileOpsLib.lib;
-    final createDirectory =
-        lib.lookupFunction<CreateDirectoryC, CreateDirectoryDart>(
-            'create_directory');
+    final createDirectory = lib
+        .lookupFunction<CreateDirectoryC, CreateDirectoryDart>(
+          'create_directory',
+        );
 
     final pathPtr = path.toNativeUtf8();
     try {
@@ -573,8 +572,9 @@ class FileOps {
 
   static bool _renameEntrySync(String oldPath, String newPath) {
     final lib = _FileOpsLib.lib;
-    final renameEntry =
-        lib.lookupFunction<RenameEntryC, RenameEntryDart>('rename_entry');
+    final renameEntry = lib.lookupFunction<RenameEntryC, RenameEntryDart>(
+      'rename_entry',
+    );
 
     final oldPtr = oldPath.toNativeUtf8();
     final newPtr = newPath.toNativeUtf8();
@@ -591,9 +591,10 @@ class FileOps {
   static void cancelOperation() {
     try {
       final lib = _FileOpsLib.lib;
-      final cancelOperation =
-          lib.lookupFunction<CancelOperationC, CancelOperationDart>(
-              'cancel_operation');
+      final cancelOperation = lib
+          .lookupFunction<CancelOperationC, CancelOperationDart>(
+            'cancel_operation',
+          );
       cancelOperation();
     } catch (_) {}
   }
@@ -602,10 +603,12 @@ class FileOps {
   static String? getLastError() {
     try {
       final lib = _FileOpsLib.lib;
-      final getLastError =
-          lib.lookupFunction<GetLastErrorC, GetLastErrorDart>('get_last_error');
-      final freeString =
-          lib.lookupFunction<FreeStringC, FreeStringDart>('free_string');
+      final getLastError = lib.lookupFunction<GetLastErrorC, GetLastErrorDart>(
+        'get_last_error',
+      );
+      final freeString = lib.lookupFunction<FreeStringC, FreeStringDart>(
+        'free_string',
+      );
 
       final ptr = getLastError();
       if (ptr == nullptr) return null;

@@ -249,22 +249,22 @@ class InstanceDockerConfig {
 
   /// 转回 MCSM API 所需的完整 docker 配置 JSON。
   Map<String, dynamic> toJson() => {
-        'containerName': containerName,
-        'image': image,
-        'memory': memory,
-        'ports': ports,
-        'extraVolumes': extraVolumes,
-        'maxSpace': null,
-        'network': null,
-        'io': null,
-        'networkMode': networkMode,
-        'networkAliases': networkAliases,
-        'cpusetCpus': '',
-        'cpuUsage': cpuUsage,
-        'workingDir': '',
-        'changeWorkdir': false,
-        'env': env,
-      };
+    'containerName': containerName,
+    'image': image,
+    'memory': memory,
+    'ports': ports,
+    'extraVolumes': extraVolumes,
+    'maxSpace': null,
+    'network': null,
+    'io': null,
+    'networkMode': networkMode,
+    'networkAliases': networkAliases,
+    'cpusetCpus': '',
+    'cpuUsage': cpuUsage,
+    'workingDir': '',
+    'changeWorkdir': false,
+    'env': env,
+  };
 }
 
 /// 实例配置（MCSM InstanceConfig）。
@@ -464,17 +464,17 @@ class RemoteUser {
 
   /// 构建 PUT /api/auth 所需的完整用户配置。
   Map<String, dynamic> toConfigJson() => {
-        'uuid': uuid,
-        'userName': userName,
-        'loginTime': loginTime,
-        'registerTime': registerTime,
-        'instances': instances,
-        'permission': permission,
-        'apiKey': apiKey,
-        'isInit': isInit,
-        'secret': '',
-        'open2FA': open2FA,
-      };
+    'uuid': uuid,
+    'userName': userName,
+    'loginTime': loginTime,
+    'registerTime': registerTime,
+    'instances': instances,
+    'permission': permission,
+    'apiKey': apiKey,
+    'isInit': isInit,
+    'secret': '',
+    'open2FA': open2FA,
+  };
 }
 
 /// 用户列表数据（GET /api/auth/search）。

@@ -14,10 +14,7 @@ import '../utils/apple_widgets.dart';
 
 /// 打开添加节点向导；返回创建的节点，取消返回 null。
 Future<NodeInfo?> showAddNodeDialog(BuildContext context) {
-  return showAppDialog<NodeInfo>(
-    context,
-    (_) => const _AddNodeDialog(),
-  );
+  return showAppDialog<NodeInfo>(context, (_) => const _AddNodeDialog());
 }
 
 class _AddNodeDialog extends StatefulWidget {
@@ -101,11 +98,11 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
       return;
     }
     final node = await context.read<NodeState>().addNode(
-          name: name,
-          type: _type,
-          address: address,
-          apiKey: _apiKeyController.text.trim(),
-        );
+      name: name,
+      type: _type,
+      address: address,
+      apiKey: _apiKeyController.text.trim(),
+    );
     if (!mounted) return;
     Navigator.of(context).pop(node);
   }
@@ -138,9 +135,9 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
         TextButton(
           onPressed: _step > 0
               ? () => setState(() {
-                    _step--;
-                    _testResult = null;
-                  })
+                  _step--;
+                  _testResult = null;
+                })
               : () => Navigator.of(context).pop(),
           child: Text(_step > 0 ? '上一步' : '取消'),
         ),
@@ -166,10 +163,7 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
                   )
                 : const Text('测试连接'),
           ),
-          FilledButton(
-            onPressed: _finish,
-            child: const Text('完成'),
-          ),
+          FilledButton(onPressed: _finish, child: const Text('完成')),
         ],
       ],
     );
@@ -236,27 +230,31 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(child: _TypeCard(
-              icon: Icons.dns,
-              title: 'MCSM',
-              subtitle: '连接远程 MCSManager 面板\n需填写面板 API Key',
-              selected: _type == NodeType.mcsm,
-              onTap: () => setState(() {
-                _type = NodeType.mcsm;
-                _applyTypeDefaults();
-              }),
-            )),
+            Expanded(
+              child: _TypeCard(
+                icon: Icons.dns,
+                title: 'MCSM',
+                subtitle: '连接远程 MCSManager 面板\n需填写面板 API Key',
+                selected: _type == NodeType.mcsm,
+                onTap: () => setState(() {
+                  _type = NodeType.mcsm;
+                  _applyTypeDefaults();
+                }),
+              ),
+            ),
             const SizedBox(width: 12),
-            Expanded(child: _TypeCard(
-              icon: Icons.terminal,
-              title: 'Node',
-              subtitle: 'IriX 本地 Go 语言节点\n默认无需密钥',
-              selected: _type == NodeType.node,
-              onTap: () => setState(() {
-                _type = NodeType.node;
-                _applyTypeDefaults();
-              }),
-            )),
+            Expanded(
+              child: _TypeCard(
+                icon: Icons.terminal,
+                title: 'Node',
+                subtitle: 'IriX 本地 Go 语言节点\n默认无需密钥',
+                selected: _type == NodeType.node,
+                onTap: () => setState(() {
+                  _type = NodeType.node;
+                  _applyTypeDefaults();
+                }),
+              ),
+            ),
           ],
         ),
       ],
@@ -393,9 +391,7 @@ class _TypeCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               width: 2,
-              color: selected
-                  ? theme.colorScheme.primary
-                  : Colors.transparent,
+              color: selected ? theme.colorScheme.primary : Colors.transparent,
             ),
           ),
           child: Column(

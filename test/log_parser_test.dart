@@ -20,9 +20,11 @@ void main() {
 
   test('解析普通 .log 文件', () async {
     final file = File('${tempDir.path}/latest.log');
-    await file.writeAsString('2024-01-01 10:00:00 [INFO] Server started\n'
-        '2024-01-01 10:00:01 [WARN] low memory\n'
-        '2024-01-01 10:00:02 [ERROR] crash detected');
+    await file.writeAsString(
+      '2024-01-01 10:00:00 [INFO] Server started\n'
+      '2024-01-01 10:00:01 [WARN] low memory\n'
+      '2024-01-01 10:00:02 [ERROR] crash detected',
+    );
 
     final parsed = await parseServerLog(file.path);
     expect(parsed.fileName, 'latest.log');
