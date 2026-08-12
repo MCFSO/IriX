@@ -93,9 +93,14 @@ class ClusterMonitor {
     final role = deriveMonitorRole(nodes);
     if (role.strategy != ClusterMonitorStrategy.monitor) {
       cluster.setMonitorNode(null);
-    } else if (cluster.monitorNodeId == null ||
-        !nodes.any((n) => n.id == cluster.monitorNodeId)) {
-      cluster.setMonitorNode(role.monitorNodeId);
+    } else {
+      // 监控节点必须是仍然存在的 irix-node（MCSM 不能充当监控节点）。
+      final current = cluster.monitorNodeId;
+      final valid = current != null &&
+          nodes.any((n) => n.id == current && n.type == NodeType.node);
+      if (!valid) {
+        cluster.setMonitorNode(role.monitorNodeId);
+      }
     }
   }
 
@@ -205,7 +210,7 @@ class ClusterMonitor {
     final candidates = (_nodeState?.nodes ?? const <NodeInfo>[])
         .where((n) => n.id != instance.nodeId)
         .toList();
-    final targetId = pickNodeForAllocation(candidates, cluster.resourceSnapshot);
+    final targetId = pickMigrationTarget(candidates, cluster.resourceSnapshot);
     if (targetId == null) {
       debugPrint('无可用目标节点，无法迁移实例 ${instance.name}');
       return;

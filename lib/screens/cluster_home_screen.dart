@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../models/node.dart';
 import '../models/remote.dart';
+import '../services/cluster_allocator.dart';
 import '../state/cluster_state.dart';
 import '../state/node_state.dart';
 import '../utils/apple_widgets.dart';
@@ -143,24 +144,28 @@ class _ClusterHomeScreenState extends State<ClusterHomeScreen> {
   /// 底部监控策略提示。
   Widget _monitorHint(List<NodeInfo> nodes, ClusterState cluster) {
     final theme = Theme.of(context);
-    final String text;
-    if (nodes.length >= 3) {
-      final monitorName = nodes
-          .where((n) => n.id == cluster.monitorNodeId)
-          .map((n) => n.name)
-          .firstOrNull;
-      text = monitorName != null ? '已指定监控节点：$monitorName' : '已指定监控节点';
-    } else if (nodes.length == 2) {
-      text = '节点互相监控';
-    } else {
-      text = '至少需要 2 个节点才能形成集群';
-    }
+    final role = deriveMonitorRole(nodes);
+    final String text = switch (role.strategy) {
+      ClusterMonitorStrategy.monitor => '已指定监控节点：${_nodeName(nodes, role.monitorNodeId)}',
+      ClusterMonitorStrategy.mutual => '节点互相监控',
+      ClusterMonitorStrategy.noEligibleMonitor =>
+        '节点 ≥3 台，但均为 MCSM，无可用监控节点（MCSM 不支持节点互联）',
+      ClusterMonitorStrategy.insufficient => '至少需要 2 个节点才能形成集群',
+    };
     return Text(
       text,
       style: theme.textTheme.bodySmall?.copyWith(
         color: theme.colorScheme.outline,
       ),
     );
+  }
+
+  String _nodeName(List<NodeInfo> nodes, String? id) {
+    if (id == null) return '—';
+    for (final node in nodes) {
+      if (node.id == id) return node.name;
+    }
+    return '—';
   }
 }
 
@@ -225,6 +230,23 @@ class _ClusterNodeCard extends StatelessWidget {
                         node.name,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.titleSmall,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 1,
+                      ),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.secondaryContainer,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        node.type.label,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSecondaryContainer,
+                        ),
                       ),
                     ),
                     if (isMonitor) ...[

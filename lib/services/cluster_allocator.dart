@@ -50,17 +50,24 @@ String? pickNodeForAllocation(
   return bestId;
 }
 
-/// 依据节点数量推导监控节点 id 与监控策略。
+/// 依据节点数量与类型推导监控节点 id 与监控策略。
 ///
+/// 监控节点必须是 irix-node（MCSM 无法节点互联，不能承担监控 / 资源同步角色）。
 /// 返回 `(monitorNodeId, strategy)`：
-/// - `nodes.length >= 3`：返回第一个节点作为监控节点，策略为 `monitor`。
-/// - `nodes.length == 2`：互相监控，监控节点为空，策略为 `mutual`。
-/// - `nodes.length < 2`：节点不足，策略为 `insufficient`。
+/// - `nodes.length >= 3` 且存在 irix-node：指定第一个 irix-node 为监控节点，策略 `monitor`。
+/// - `nodes.length >= 3` 但全部为 MCSM：无可用监控节点，策略 `noEligibleMonitor`。
+/// - `nodes.length == 2`：互相监控，监控节点为空，策略 `mutual`。
+/// - `nodes.length < 2`：节点不足，策略 `insufficient`。
 ({String? monitorNodeId, ClusterMonitorStrategy strategy}) deriveMonitorRole(
   List<NodeInfo> nodes,
 ) {
   if (nodes.length >= 3) {
-    return (monitorNodeId: nodes.first.id, strategy: ClusterMonitorStrategy.monitor);
+    for (final node in nodes) {
+      if (node.type == NodeType.node) {
+        return (monitorNodeId: node.id, strategy: ClusterMonitorStrategy.monitor);
+      }
+    }
+    return (monitorNodeId: null, strategy: ClusterMonitorStrategy.noEligibleMonitor);
   }
   if (nodes.length == 2) {
     return (monitorNodeId: null, strategy: ClusterMonitorStrategy.mutual);
@@ -68,16 +75,34 @@ String? pickNodeForAllocation(
   return (monitorNodeId: null, strategy: ClusterMonitorStrategy.insufficient);
 }
 
+/// 挑选迁移目标节点：优先 irix-node（完整能力），无 irix-node 时退回 MCSM。
+///
+/// MCSM 无法节点互联，属于「受限」节点；只有在没有 irix-node 可选时才作为迁移目标。
+String? pickMigrationTarget(
+  List<NodeInfo> candidateNodes,
+  Map<String, OverviewSystem> snapshot,
+) {
+  final irix = <NodeInfo>[];
+  for (final node in candidateNodes) {
+    if (node.type == NodeType.node) irix.add(node);
+  }
+  final pool = irix.isNotEmpty ? irix : candidateNodes;
+  return pickNodeForAllocation(pool, snapshot);
+}
+
 /// 集群监控策略。
 enum ClusterMonitorStrategy {
-  /// ≥3 节点：指定单一监控节点。
+  /// ≥3 节点且存在 irix-node：指定单一 irix-node 为监控节点。
   monitor('指定监控节点'),
 
   /// 2 节点：互相监控。
   mutual('互相监控'),
 
   /// <2 节点：节点不足。
-  insufficient('节点不足');
+  insufficient('节点不足'),
+
+  /// ≥3 节点但全部为 MCSM：无可用监控节点。
+  noEligibleMonitor('无可用监控节点');
 
   const ClusterMonitorStrategy(this.label);
 
