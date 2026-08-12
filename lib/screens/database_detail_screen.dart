@@ -2372,11 +2372,7 @@ class _DbUserManagementDialogState extends State<_DbUserManagementDialog> {
           ),
         ],
       ),
-      content: SizedBox(
-        width: 480,
-        height: 360,
-        child: _buildBody(theme),
-      ),
+      content: SizedBox(width: 480, height: 360, child: _buildBody(theme)),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),

@@ -525,20 +525,18 @@ class _AiChatPanelState extends State<AiChatPanel> {
         color: codeColor,
         borderRadius: BorderRadius.circular(8),
       ),
-      codeblockPadding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 8,
-      ),
-      code: base.code?.copyWith(
-        backgroundColor: codeColor,
-        fontFamily: 'monospace',
-        fontSize: 12.5,
-      ) ??
-        TextStyle(
-          backgroundColor: codeColor,
-          fontFamily: 'monospace',
-          fontSize: 12.5,
-        ),
+      codeblockPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      code:
+          base.code?.copyWith(
+            backgroundColor: codeColor,
+            fontFamily: 'monospace',
+            fontSize: 12.5,
+          ) ??
+          TextStyle(
+            backgroundColor: codeColor,
+            fontFamily: 'monospace',
+            fontSize: 12.5,
+          ),
       p: base.p?.copyWith(height: 1.5) ?? const TextStyle(height: 1.5),
       blockquoteDecoration: BoxDecoration(
         color: theme.colorScheme.tertiaryContainer.withValues(alpha: 0.3),
@@ -577,7 +575,9 @@ class _AiChatPanelState extends State<AiChatPanel> {
       if (uri.scheme == 'http' || uri.scheme == 'https') {
         await Process.start(
           Platform.isWindows ? 'cmd' : 'xdg-open',
-          Platform.isWindows ? ['/c', 'start', uri.toString()] : [uri.toString()],
+          Platform.isWindows
+              ? ['/c', 'start', uri.toString()]
+              : [uri.toString()],
           mode: ProcessStartMode.detached,
         );
       }
