@@ -496,6 +496,16 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
     }
   }
 
+  // ---------- 用户管理对话框 ----------
+
+  Future<void> _showUserManagementDialog() async {
+    await showAppDialog<void>(
+      context,
+      (_) => _DbUserManagementDialog(connection: _connection),
+    );
+    _loadUsers(); // 对话框关闭后刷新顶部用户列表卡
+  }
+
   // ---------- 构建 ----------
 
   @override
@@ -579,6 +589,12 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
                     onPressed: _showSqlDialog,
                     icon: const Icon(Icons.terminal, size: 18),
                     label: const Text('执行 SQL'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.tonalIcon(
+                    onPressed: _showUserManagementDialog,
+                    icon: const Icon(Icons.manage_accounts, size: 18),
+                    label: const Text('用户管理'),
                   ),
                 ],
               ],
@@ -2221,6 +2237,217 @@ class _CreateDatabaseDialogState extends State<_CreateDatabaseDialog> {
         ),
         FilledButton(onPressed: _submit, child: const Text('创建')),
       ],
+    );
+  }
+}
+
+/// 用户管理对话框。
+///
+/// 针对当前已连接的关系型数据库，展示用户列表，支持新建与删除用户。
+class _DbUserManagementDialog extends StatefulWidget {
+  final DbConnectionInfo connection;
+
+  const _DbUserManagementDialog({required this.connection});
+
+  @override
+  State<_DbUserManagementDialog> createState() =>
+      _DbUserManagementDialogState();
+}
+
+class _DbUserManagementDialogState extends State<_DbUserManagementDialog> {
+  final RemoteDatabaseService _service = RemoteDatabaseService.instance;
+
+  List<DbUserInfo> _users = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUsers();
+  }
+
+  Future<void> _loadUsers() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final users = await _service.getUsers(widget.connection);
+      if (!mounted) return;
+      setState(() {
+        _users = users;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _showCreateUserDialog() async {
+    final creds =
+        await showAppDialog<({String username, String password, String host})>(
+          context,
+          (ctx) => _CreateUserDialog(connection: widget.connection),
+        );
+    if (creds == null || !mounted) return;
+    try {
+      await _service.createUser(
+        widget.connection,
+        username: creds.username,
+        password: creds.password,
+        host: creds.host,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('已创建用户 ${creds.username}')));
+      _loadUsers();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('创建失败: $e')));
+    }
+  }
+
+  Future<void> _confirmDropUser(DbUserInfo user) async {
+    final hostText = user.host == null ? '' : '@${user.host}';
+    final confirmed = await showAppDialog<bool>(
+      context,
+      (ctx) => AlertDialog(
+        title: const Text('删除用户'),
+        content: Text('确定要删除用户 ${user.username}$hostText 吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await _service.dropUser(
+        widget.connection,
+        username: user.username,
+        host: user.host,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('已删除用户 ${user.username}')));
+      _loadUsers();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('删除失败: $e')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AlertDialog(
+      title: Row(
+        children: [
+          const Text('用户管理'),
+          const Spacer(),
+          FilledButton.tonalIcon(
+            onPressed: _showCreateUserDialog,
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('新建用户'),
+          ),
+        ],
+      ),
+      content: SizedBox(width: 480, height: 360, child: _buildBody(theme)),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('关闭'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBody(ThemeData theme) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _error!,
+              style: TextStyle(color: theme.colorScheme.error),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            TextButton(onPressed: _loadUsers, child: const Text('重试')),
+          ],
+        ),
+      );
+    }
+    if (_users.isEmpty) {
+      return Center(
+        child: Text(
+          '暂无用户',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      );
+    }
+    return ListView.builder(
+      itemCount: _users.length,
+      itemBuilder: (context, index) {
+        final user = _users[index];
+        return ListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(
+            Icons.person_outline,
+            size: 20,
+            color: theme.colorScheme.primary,
+          ),
+          title: Text(
+            user.username,
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          subtitle: user.host == null
+              ? null
+              : Text(
+                  '@${user.host}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+          trailing: IconButton(
+            tooltip: '删除',
+            icon: const Icon(Icons.delete_outline, size: 20),
+            onPressed: () => _confirmDropUser(user),
+          ),
+        );
+      },
     );
   }
 }
