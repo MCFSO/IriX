@@ -30,6 +30,11 @@ void main() {
 
   testWidgets('MyApp 能够正常构建', (WidgetTester tester) async {
     // 构建应用并触发一帧，期望不抛出异常。
-    expect(() => tester.pumpWidget(const MyApp()), returnsNormally);
+    // 在真实异步环境中运行，让各状态层的 SQLite 初始化完成，避免遗留挂起定时器。
+    await tester.runAsync(() async {
+      await tester.pumpWidget(const MyApp());
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pump();
   });
 }
