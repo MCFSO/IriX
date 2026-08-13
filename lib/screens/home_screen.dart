@@ -7,12 +7,18 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/server_instance.dart';
+import '../services/cluster_monitor.dart';
 import '../services/db_page_settings.dart';
 import '../services/download_settings.dart';
+import '../services/management_mode_settings.dart';
 import '../services/mcp_server.dart';
 import '../state/app_state.dart';
+import '../state/cluster_state.dart';
+import '../state/node_state.dart';
 import '../utils/apple_widgets.dart';
 import 'ai_screen.dart';
+import 'cluster_home_screen.dart';
+import 'cluster_instances_screen.dart';
 import 'database_screen.dart';
 import 'frp_screen.dart';
 import 'instance_detail_screen.dart';
@@ -40,6 +46,16 @@ class _HomeScreenState extends State<HomeScreen> {
     McpServer.instance.attachState(context.read<AppState>());
     McpServer.instance.currentRequest.addListener(_onMcpRequest);
     _startMcpServer();
+    // 若已处于多机模式，启动集群监控循环。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      // 测试环境跳过（监控循环的 Timer 会挂起导致测试失败）。
+      if (Platform.environment['FLUTTER_TEST'] == 'true') return;
+      final cluster = context.read<ClusterState>();
+      if (cluster.mode == ManagementMode.multi) {
+        ClusterMonitor.instance.start(context.read<NodeState>(), cluster);
+      }
+    });
   }
 
   @override
@@ -96,6 +112,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final multi = context.watch<ClusterState>().mode == ManagementMode.multi;
     return Scaffold(
       body: Row(
         children: [
@@ -106,45 +123,102 @@ class _HomeScreenState extends State<HomeScreen> {
               setState(() => _selectedIndex = index);
             },
             labelType: NavigationRailLabelType.all,
-            destinations: const [
-              NavigationRailDestination(
-                icon: Icon(Icons.storage_outlined),
-                selectedIcon: Icon(Icons.storage),
-                label: Text('实例'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.lan_outlined),
-                selectedIcon: Icon(Icons.lan),
-                label: Text('节点'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.store_outlined),
-                selectedIcon: Icon(Icons.store),
-                label: Text('市场'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.dns_outlined),
-                selectedIcon: Icon(Icons.dns),
-                label: Text('数据库'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.smart_toy_outlined),
-                selectedIcon: Icon(Icons.smart_toy),
-                label: Text('AI'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.hub_outlined),
-                selectedIcon: Icon(Icons.hub),
-                label: Text('FRP'),
-              ),
-            ],
+            destinations: multi ? _multiDestinations() : _singleDestinations(),
           ),
           const VerticalDivider(thickness: 1, width: 1),
           // 右侧内容区
-          Expanded(child: _buildContent()),
+          Expanded(child: multi ? _buildMultiContent() : _buildContent()),
         ],
       ),
     );
+  }
+
+  /// 单机模式导航（默认 6 个标签）。
+  List<NavigationRailDestination> _singleDestinations() => const [
+    NavigationRailDestination(
+      icon: Icon(Icons.storage_outlined),
+      selectedIcon: Icon(Icons.storage),
+      label: Text('实例'),
+    ),
+    NavigationRailDestination(
+      icon: Icon(Icons.lan_outlined),
+      selectedIcon: Icon(Icons.lan),
+      label: Text('节点'),
+    ),
+    NavigationRailDestination(
+      icon: Icon(Icons.store_outlined),
+      selectedIcon: Icon(Icons.store),
+      label: Text('市场'),
+    ),
+    NavigationRailDestination(
+      icon: Icon(Icons.dns_outlined),
+      selectedIcon: Icon(Icons.dns),
+      label: Text('数据库'),
+    ),
+    NavigationRailDestination(
+      icon: Icon(Icons.smart_toy_outlined),
+      selectedIcon: Icon(Icons.smart_toy),
+      label: Text('AI'),
+    ),
+    NavigationRailDestination(
+      icon: Icon(Icons.hub_outlined),
+      selectedIcon: Icon(Icons.hub),
+      label: Text('FRP'),
+    ),
+  ];
+
+  /// 多机模式导航（节点优先）。
+  List<NavigationRailDestination> _multiDestinations() => const [
+    NavigationRailDestination(
+      icon: Icon(Icons.lan_outlined),
+      selectedIcon: Icon(Icons.lan),
+      label: Text('主页'),
+    ),
+    NavigationRailDestination(
+      icon: Icon(Icons.storage_outlined),
+      selectedIcon: Icon(Icons.storage),
+      label: Text('实例'),
+    ),
+    NavigationRailDestination(
+      icon: Icon(Icons.store_outlined),
+      selectedIcon: Icon(Icons.store),
+      label: Text('市场'),
+    ),
+    NavigationRailDestination(
+      icon: Icon(Icons.dns_outlined),
+      selectedIcon: Icon(Icons.dns),
+      label: Text('数据库'),
+    ),
+    NavigationRailDestination(
+      icon: Icon(Icons.smart_toy_outlined),
+      selectedIcon: Icon(Icons.smart_toy),
+      label: Text('AI'),
+    ),
+    NavigationRailDestination(
+      icon: Icon(Icons.hub_outlined),
+      selectedIcon: Icon(Icons.hub),
+      label: Text('FRP'),
+    ),
+  ];
+
+  /// 多机模式内容区。
+  Widget _buildMultiContent() {
+    switch (_selectedIndex) {
+      case 0:
+        return const ClusterHomeScreen();
+      case 1:
+        return const ClusterInstancesScreen();
+      case 2:
+        return const MarketplaceScreen();
+      case 3:
+        return const DatabaseScreen();
+      case 4:
+        return const AiScreen();
+      case 5:
+        return const FrpScreen();
+      default:
+        return const ClusterHomeScreen();
+    }
   }
 
   Widget _buildContent() {
@@ -189,10 +263,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 IconButton(
                   icon: const Icon(Icons.settings_outlined),
                   tooltip: '设置',
-                  onPressed: () => showAppDialog<void>(
-                    context,
-                    (_) => const _SettingsDialog(),
-                  ),
+                  onPressed: () => showSettingsDialog(context),
                 ),
                 const SizedBox(width: 4),
               ],
@@ -295,20 +366,25 @@ class _StatusChip extends StatelessWidget {
   }
 }
 
-/// 设置对话框 — 调节下载线程数。
-///
-/// 下载线程数控制多线程分片断点续传下载的并发数 (1-32)。
-/// 修改即时生效并持久化 (SharedPreferences)。
-class _SettingsDialog extends StatefulWidget {
-  const _SettingsDialog();
-
-  @override
-  State<_SettingsDialog> createState() => _SettingsDialogState();
+/// 打开全局设置对话框（单机 / 多机模式通用）。
+Future<void> showSettingsDialog(BuildContext context) {
+  return showAppDialog<void>(context, (_) => const SettingsDialog());
 }
 
-class _SettingsDialogState extends State<_SettingsDialog> {
+/// 设置对话框 — 管理模式、下载线程数、数据库每页行数。
+///
+/// 修改即时生效并持久化到 SQLite `settings` 表。
+class SettingsDialog extends StatefulWidget {
+  const SettingsDialog({super.key});
+
+  @override
+  State<SettingsDialog> createState() => SettingsDialogState();
+}
+
+class SettingsDialogState extends State<SettingsDialog> {
   late double _threads;
   late double _pageSize;
+  late bool _multi;
   bool _loading = true;
 
   @override
@@ -317,7 +393,20 @@ class _SettingsDialogState extends State<_SettingsDialog> {
     final state = context.read<AppState>();
     _threads = state.downloadThreads.toDouble();
     _pageSize = DbPageSettings.pageSize.toDouble();
+    _multi = context.read<ClusterState>().mode == ManagementMode.multi;
     _loading = false;
+  }
+
+  /// 切换管理模式，并启停集群监控循环。
+  void _toggleMode(bool multi) {
+    final cluster = context.read<ClusterState>();
+    cluster.setMode(multi ? ManagementMode.multi : ManagementMode.single);
+    if (multi) {
+      ClusterMonitor.instance.start(context.read<NodeState>(), cluster);
+    } else {
+      ClusterMonitor.instance.stop();
+    }
+    setState(() => _multi = multi);
   }
 
   @override
@@ -331,6 +420,35 @@ class _SettingsDialogState extends State<_SettingsDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 管理模式
+          Row(
+            children: [
+              const Icon(Icons.lan_outlined, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '多机管理模式',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    Text(
+                      _multi ? '实例分布到多个节点，自动分配资源、崩溃迁移与数据同步' : '单机模式：实例在本机运行',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              AppleSwitch(value: _multi, onChanged: _toggleMode),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '多机模式需至少 2 个节点，可在「主页」中添加。',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const Divider(height: 24),
           // 下载线程数
           Text(
             '下载线程数: ${_threads.round()}',

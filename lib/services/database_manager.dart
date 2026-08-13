@@ -16,7 +16,7 @@ class DatabaseManager {
   DatabaseManager._();
 
   static const String _dbName = 'irix.db';
-  static const int _dbVersion = 4;
+  static const int _dbVersion = 5;
 
   Database? _db;
 
@@ -115,6 +115,29 @@ class DatabaseManager {
         created_at TEXT NOT NULL
       )
     ''');
+    batch.execute('''
+      CREATE TABLE cluster_instances (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        node_id TEXT NOT NULL,
+        daemon_id TEXT NOT NULL,
+        remote_uuid TEXT NOT NULL,
+        cwd TEXT NOT NULL,
+        start_command TEXT NOT NULL,
+        crash_count INTEGER NOT NULL DEFAULT 0,
+        last_synced_at TEXT,
+        created_at TEXT NOT NULL
+      )
+    ''');
+    batch.execute('''
+      CREATE TABLE cluster_sync_manifest (
+        instance_id TEXT NOT NULL,
+        rel_path TEXT NOT NULL,
+        size INTEGER NOT NULL,
+        mtime TEXT NOT NULL,
+        PRIMARY KEY (instance_id, rel_path)
+      )
+    ''');
     await batch.commit(noResult: true);
   }
 
@@ -155,6 +178,32 @@ class DatabaseManager {
           'ALTER TABLE db_connections ADD COLUMN use_ssl INTEGER NOT NULL DEFAULT 0',
         );
       }
+    }
+    if (oldVersion < 5) {
+      // 多机管理模式：集群实例与增量同步清单。
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS cluster_instances (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          node_id TEXT NOT NULL,
+          daemon_id TEXT NOT NULL,
+          remote_uuid TEXT NOT NULL,
+          cwd TEXT NOT NULL,
+          start_command TEXT NOT NULL,
+          crash_count INTEGER NOT NULL DEFAULT 0,
+          last_synced_at TEXT,
+          created_at TEXT NOT NULL
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS cluster_sync_manifest (
+          instance_id TEXT NOT NULL,
+          rel_path TEXT NOT NULL,
+          size INTEGER NOT NULL,
+          mtime TEXT NOT NULL,
+          PRIMARY KEY (instance_id, rel_path)
+        )
+      ''');
     }
   }
 
@@ -413,6 +462,112 @@ class DatabaseManager {
       await db.delete('nodes', where: 'id = ?', whereArgs: [id]);
     } catch (e) {
       debugPrint('Failed to delete node $id: $e');
+    }
+  }
+
+  // === cluster_instances 表 ===
+
+  Future<List<Map<String, dynamic>>> getAllClusterInstances() async {
+    try {
+      final db = await _database;
+      return await db.query('cluster_instances', orderBy: 'created_at ASC');
+    } catch (e) {
+      debugPrint('Failed to get all cluster instances: $e');
+      return [];
+    }
+  }
+
+  Future<void> insertClusterInstance(Map<String, dynamic> instance) async {
+    try {
+      final db = await _database;
+      await db.insert(
+        'cluster_instances',
+        instance,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    } catch (e) {
+      debugPrint('Failed to insert cluster instance: $e');
+    }
+  }
+
+  Future<void> updateClusterInstance(
+    String id,
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      final db = await _database;
+      await db.update(
+        'cluster_instances',
+        data,
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    } catch (e) {
+      debugPrint('Failed to update cluster instance $id: $e');
+    }
+  }
+
+  Future<void> deleteClusterInstance(String id) async {
+    try {
+      final db = await _database;
+      await db.delete('cluster_instances', where: 'id = ?', whereArgs: [id]);
+    } catch (e) {
+      debugPrint('Failed to delete cluster instance $id: $e');
+    }
+  }
+
+  // === cluster_sync_manifest 表 ===
+
+  Future<List<Map<String, dynamic>>> getSyncManifest(String instanceId) async {
+    try {
+      final db = await _database;
+      return await db.query(
+        'cluster_sync_manifest',
+        where: 'instance_id = ?',
+        whereArgs: [instanceId],
+      );
+    } catch (e) {
+      debugPrint('Failed to get sync manifest for $instanceId: $e');
+      return [];
+    }
+  }
+
+  /// 整体替换某集群实例的同步清单（先删后插，事务化）。
+  Future<void> replaceSyncManifest(
+    String instanceId,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    try {
+      final db = await _database;
+      await db.transaction((txn) async {
+        await txn.delete(
+          'cluster_sync_manifest',
+          where: 'instance_id = ?',
+          whereArgs: [instanceId],
+        );
+        for (final row in rows) {
+          await txn.insert(
+            'cluster_sync_manifest',
+            {'instance_id': instanceId, ...row},
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        }
+      });
+    } catch (e) {
+      debugPrint('Failed to replace sync manifest for $instanceId: $e');
+    }
+  }
+
+  Future<void> deleteSyncManifest(String instanceId) async {
+    try {
+      final db = await _database;
+      await db.delete(
+        'cluster_sync_manifest',
+        where: 'instance_id = ?',
+        whereArgs: [instanceId],
+      );
+    } catch (e) {
+      debugPrint('Failed to delete sync manifest for $instanceId: $e');
     }
   }
 

@@ -9,6 +9,7 @@ import 'screens/home_screen.dart';
 import 'services/config_annotation_service.dart';
 import 'services/database_manager.dart';
 import 'state/app_state.dart';
+import 'state/cluster_state.dart';
 import 'state/node_state.dart';
 
 void main() async {
@@ -41,6 +42,14 @@ class MyApp extends StatelessWidget {
           create: (_) {
             final state = NodeState();
             // 异步加载持久化节点列表，加载后 notifyListeners 会刷新 UI。
+            state.init();
+            return state;
+          },
+        ),
+        ChangeNotifierProvider(
+          create: (_) {
+            final state = ClusterState();
+            // 异步加载管理模式、监控节点与集群实例列表。
             state.init();
             return state;
           },
