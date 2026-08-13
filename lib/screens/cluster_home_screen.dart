@@ -1,5 +1,6 @@
 // 集群主页（多机模式首页）
-// 只展示信息：顶部聚合网络折线图 + 节点资源总览表。
+// 顶部节点管理卡片网格（⋮ 菜单重命名 / 删除，点击卡片不进入详情），
+// 下方聚合网络折线图 + 节点资源总览表。
 // 资源总览将所有节点的 CPU / 内存 / 磁盘 并排列出，一眼可见全部节点的
 // 占用情况（按使用率着色：绿 <70% / 黄 70~90% / 红 ≥90%），
 // 底部附带内存 / 磁盘跨节点合计。不使用单机管理模式的节点管理界面。
@@ -16,6 +17,7 @@ import '../state/node_state.dart';
 import '../utils/apple_widgets.dart';
 import '../widgets/add_node_dialog.dart';
 import '../widgets/network_line_chart.dart';
+import '../widgets/node_card_grid.dart';
 import 'home_screen.dart' show showSettingsDialog;
 
 /// 集群主页。
@@ -49,6 +51,21 @@ class _ClusterHomeScreenState extends State<ClusterHomeScreen> {
     if (node == null || !mounted) return;
     await context.read<NodeState>().pingNode(node.id);
     await ClusterMonitor.instance.refreshNow();
+  }
+
+  /// 多机模式不进入节点详情，仅通过卡片 ⋮ 菜单重命名 / 删除。
+  Future<void> _rename(NodeInfo node) async {
+    final name = await showRenameNodeDialog(context, node);
+    if (name != null && name.trim().isNotEmpty && mounted) {
+      await context.read<NodeState>().renameNode(node.id, name);
+    }
+  }
+
+  Future<void> _delete(NodeInfo node) async {
+    final confirmed = await showDeleteNodeConfirmDialog(context, node);
+    if (confirmed == true && mounted) {
+      await context.read<NodeState>().removeNode(node.id);
+    }
   }
 
   @override
@@ -111,6 +128,14 @@ class _ClusterHomeScreenState extends State<ClusterHomeScreen> {
                 ),
               )
             else ...[
+              NodeCardGrid(
+                nodes: nodes,
+                onlineOf: nodeState.isOnline,
+                errorOf: nodeState.errorOf,
+                onTapNode: null, // 多机模式不进入节点详情
+                onRenameNode: _rename,
+                onDeleteNode: _delete,
+              ),
               SliverToBoxAdapter(
                 child: _NetworkChartCard(history: cluster.networkHistory),
               ),
