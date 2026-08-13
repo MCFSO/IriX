@@ -183,8 +183,29 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      # package:sqlite3 3.x ships a build hook that downloads a prebuilt
+      # libsqlite3.so from github.com/simolus3/sqlite3.dart releases with no
+      # timeout/retry/status check, and fails the whole build on any network
+      # hiccup (seen as "Building assets for package:sqlite3 failed").
+      # Pre-seeding the hook's shared cache (verified by its SHA-256) makes the
+      # build skip the download. Update the download-<hash8> dir and URL when
+      # sqlite3 is bumped: hash = first 8 chars of libsqlite3.x64.linux.so's
+      # sha256 (see package's lib/src/hook/asset_hashes.dart).
+      - name: Pre-seed sqlite3 hook asset
+        run: |
+          mkdir -p .dart_tool/hooks_runner/shared/sqlite3/build/download-2219febf
+          curl -fL --retry 5 --retry-all-errors \
+            -o .dart_tool/hooks_runner/shared/sqlite3/build/download-2219febf/libsqlite3.so \
+            https://github.com/simolus3/sqlite3.dart/releases/download/sqlite3-3.5.0/libsqlite3.x64.linux.so
+
       - name: Build Linux
         run: flutter build linux --release
+
+      - name: Dump hook logs (diagnostic)
+        if: failure()
+        run: |
+          find .dart_tool/hooks_runner -type f \( -name 'stdout.txt' -o -name 'stderr.txt' \) \
+            -exec sh -c 'echo "=== $1 ==="; cat "$1"' _ {} \;
 
       - name: Copy Rust so to bundle
         run: |
