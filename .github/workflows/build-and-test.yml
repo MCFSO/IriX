@@ -52,6 +52,22 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      # package:sqlite3 3.x ships a build hook that downloads a prebuilt
+      # libsqlite3.so from github.com/simolus3/sqlite3.dart releases with no
+      # timeout/retry/status check, and fails the whole build on any network
+      # hiccup (seen as "Building assets for package:sqlite3 failed" /
+      # "HttpException: Connection closed before full header was received").
+      # Pre-seeding the hook's shared cache (verified by its SHA-256) makes the
+      # build skip the download. Update the download-<hash8> dir and URL when
+      # sqlite3 is bumped: hash = first 8 chars of the asset's sha256 (see the
+      # package's lib/src/hook/asset_hashes.dart).
+      - name: Pre-seed sqlite3 hook asset
+        run: |
+          mkdir -p .dart_tool/hooks_runner/shared/sqlite3/build/download-2219febf
+          curl -fL --retry 5 --retry-all-errors \
+            -o .dart_tool/hooks_runner/shared/sqlite3/build/download-2219febf/libsqlite3.so \
+            https://github.com/simolus3/sqlite3.dart/releases/download/sqlite3-3.5.0/libsqlite3.x64.linux.so
+
       - name: Analyze Dart code
         run: flutter analyze
 
@@ -114,8 +130,24 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      # Pre-seed the sqlite3 hook's shared cache; see the same step in the
+      # analyze-and-test job for why.
+      - name: Pre-seed sqlite3 hook asset
+        shell: bash
+        run: |
+          mkdir -p .dart_tool/hooks_runner/shared/sqlite3/build/download-858141a2
+          curl -fL --retry 5 --retry-all-errors \
+            -o .dart_tool/hooks_runner/shared/sqlite3/build/download-858141a2/sqlite3.dll \
+            https://github.com/simolus3/sqlite3.dart/releases/download/sqlite3-3.5.0/sqlite3.x64.windows.dll
+
       - name: Build Windows
         run: flutter build windows --release
+
+      - name: Dump hook logs (diagnostic)
+        if: failure()
+        run: |
+          find .dart_tool/hooks_runner -type f \( -name 'stdout.txt' -o -name 'stderr.txt' \) \
+            -exec sh -c 'echo "=== $1 ==="; cat "$1"' _ {} \;
 
       - name: Copy Rust DLL to build output
         run: |
@@ -298,8 +330,28 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      # Pre-seed the sqlite3 hook's shared cache; see the same step in the
+      # analyze-and-test job for why. Both architectures are seeded in case
+      # macos-latest flips between arm64 and x64.
+      - name: Pre-seed sqlite3 hook asset
+        run: |
+          mkdir -p .dart_tool/hooks_runner/shared/sqlite3/build/download-f84bea51 \
+                   .dart_tool/hooks_runner/shared/sqlite3/build/download-bd96fb24
+          curl -fL --retry 5 --retry-all-errors \
+            -o .dart_tool/hooks_runner/shared/sqlite3/build/download-f84bea51/libsqlite3.dylib \
+            https://github.com/simolus3/sqlite3.dart/releases/download/sqlite3-3.5.0/libsqlite3.arm64.macos.dylib
+          curl -fL --retry 5 --retry-all-errors \
+            -o .dart_tool/hooks_runner/shared/sqlite3/build/download-bd96fb24/libsqlite3.dylib \
+            https://github.com/simolus3/sqlite3.dart/releases/download/sqlite3-3.5.0/libsqlite3.x64.macos.dylib
+
       - name: Build macOS
         run: flutter build macos --release
+
+      - name: Dump hook logs (diagnostic)
+        if: failure()
+        run: |
+          find .dart_tool/hooks_runner -type f \( -name 'stdout.txt' -o -name 'stderr.txt' \) \
+            -exec sh -c 'echo "=== $1 ==="; cat "$1"' _ {} \;
 
       - name: Copy Rust dylib to app bundle
         run: |
