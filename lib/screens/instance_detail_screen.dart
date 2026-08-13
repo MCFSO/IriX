@@ -16,6 +16,7 @@ import '../services/backup_settings.dart';
 import '../services/background_tasks.dart';
 import '../state/app_state.dart';
 import '../utils/apple_widgets.dart';
+import '../widgets/container_environment_panel.dart';
 import 'ai_screen.dart';
 import 'config_editor_screen.dart';
 import 'file_manager_screen.dart';
@@ -70,6 +71,12 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
   /// AI 侧栏的会话状态（页面打开期间保持，收起再展开不丢失）。
   late final AiChatController _aiController;
 
+  /// 本机 Docker 是否可用（决定是否展示「容器」Tab 与容器化选项）。
+  bool _dockerAvailable = false;
+
+  /// 是否正在探测 Docker 环境。
+  bool _dockerProbing = true;
+
   @override
   void initState() {
     super.initState();
@@ -78,6 +85,17 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
     );
     _subscribeLogs();
     context.read<AppState>().addListener(_onAppStateChanged);
+    _probeDocker();
+  }
+
+  /// 探测本机 Docker 可用性（AppState 缓存了探测结果）。
+  Future<void> _probeDocker() async {
+    final env = await context.read<AppState>().dockerEnvironment();
+    if (!mounted) return;
+    setState(() {
+      _dockerAvailable = env.available;
+      _dockerProbing = false;
+    });
   }
 
   @override
@@ -201,8 +219,9 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
       );
     }
 
+    final showContainerTab = _dockerAvailable;
     return DefaultTabController(
-      length: 6,
+      length: showContainerTab ? 7 : 6,
       child: Scaffold(
         appBar: AppBar(
           title: Text(instance.name),
@@ -215,14 +234,16 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
             ),
             const SizedBox(width: 4),
           ],
-          bottom: const TabBar(
+          bottom: TabBar(
             tabs: [
-              Tab(icon: Icon(Icons.dashboard), text: '总览'),
-              Tab(icon: Icon(Icons.description), text: '配置'),
-              Tab(icon: Icon(Icons.extension), text: '插件/Mod'),
-              Tab(icon: Icon(Icons.folder), text: '文件'),
-              Tab(icon: Icon(Icons.backup), text: '备份'),
-              Tab(icon: Icon(Icons.settings), text: '设置'),
+              const Tab(icon: Icon(Icons.dashboard), text: '总览'),
+              const Tab(icon: Icon(Icons.description), text: '配置'),
+              const Tab(icon: Icon(Icons.extension), text: '插件/Mod'),
+              const Tab(icon: Icon(Icons.folder), text: '文件'),
+              const Tab(icon: Icon(Icons.backup), text: '备份'),
+              const Tab(icon: Icon(Icons.settings), text: '设置'),
+              if (showContainerTab)
+                const Tab(icon: Icon(Icons.inventory_2), text: '容器'),
             ],
           ),
         ),
@@ -263,7 +284,19 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
                     instanceId: widget.instanceId,
                   ),
                   // Tab 6: 设置 — 实例名称 + 启动命令
-                  _SettingsTab(instanceId: widget.instanceId),
+                  _SettingsTab(
+                    instanceId: widget.instanceId,
+                    dockerAvailable: _dockerAvailable,
+                    dockerProbing: _dockerProbing,
+                  ),
+                  // Tab 7: 容器 — Docker 全功能管理（本机可用时显示）
+                  if (showContainerTab)
+                    ContainerEnvironmentPanel(
+                      backend: state.dockerCli,
+                      highlightName: instance.runMode == RunMode.docker
+                          ? state.containerNameFor(instance)
+                          : null,
+                    ),
                 ],
               ),
             ),
@@ -857,11 +890,21 @@ class _StartCommandCardState extends State<_StartCommandCard> {
   }
 }
 
-/// 设置 Tab：实例名称 + 启动命令 + 删除实例。
+/// 设置 Tab：实例名称 + 启动命令 + 运行方式 + 删除实例。
 class _SettingsTab extends StatelessWidget {
-  const _SettingsTab({required this.instanceId});
+  const _SettingsTab({
+    required this.instanceId,
+    this.dockerAvailable = false,
+    this.dockerProbing = false,
+  });
 
   final String instanceId;
+
+  /// 本机 Docker 是否可用（决定容器化选项是否可选）。
+  final bool dockerAvailable;
+
+  /// 是否仍在探测 Docker 环境。
+  final bool dockerProbing;
 
   /// 确认删除实例并返回上级。
   ///
@@ -887,6 +930,11 @@ class _SettingsTab extends StatelessWidget {
       children: [
         _InstanceNameCard(instanceId: instanceId),
         _StartCommandCard(instanceId: instanceId),
+        _RunModeCard(
+          instanceId: instanceId,
+          dockerAvailable: dockerAvailable,
+          dockerProbing: dockerProbing,
+        ),
         _EulaCard(instanceId: instanceId),
         _CompressionSettingsCard(instanceId: instanceId),
         const SizedBox(height: 24),
@@ -900,6 +948,405 @@ class _SettingsTab extends StatelessWidget {
             icon: const Icon(Icons.delete_outline),
             label: const Text('删除实例'),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 运行方式卡片：原生进程 / Docker 容器。
+class _RunModeCard extends StatefulWidget {
+  const _RunModeCard({
+    required this.instanceId,
+    required this.dockerAvailable,
+    required this.dockerProbing,
+  });
+
+  final String instanceId;
+  final bool dockerAvailable;
+  final bool dockerProbing;
+
+  @override
+  State<_RunModeCard> createState() => _RunModeCardState();
+}
+
+class _RunModeCardState extends State<_RunModeCard> {
+  /// 切换运行方式。
+  Future<void> _switchMode(RunMode mode) async {
+    if (mode == RunMode.docker && !widget.dockerAvailable) return;
+    final state = context.read<AppState>();
+    final instance = state.instances
+        .where((e) => e.id == widget.instanceId)
+        .firstOrNull;
+    if (instance == null) return;
+    if (instance.status.isActive) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请先停止服务器再切换运行方式')),
+      );
+      return;
+    }
+    await state.updateRunMode(widget.instanceId, mode, instance.container);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('已切换为「${mode.label}」运行')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final instance = context
+        .watch<AppState>()
+        .instances
+        .where((e) => e.id == widget.instanceId)
+        .firstOrNull;
+    final runMode = instance?.runMode ?? RunMode.native;
+    final isDocker = runMode == RunMode.docker;
+
+    return Card(
+      margin: const EdgeInsets.all(8),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.layers_outlined),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    '运行方式',
+                    style: theme.textTheme.titleMedium,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            RadioGroup<RunMode>(
+              groupValue: runMode,
+              onChanged: (mode) {
+                if (mode != null) _switchMode(mode);
+              },
+              child: Column(
+                children: [
+                  RadioListTile<RunMode>(
+                    value: RunMode.native,
+                    title: const Text('原生进程'),
+                    subtitle: const Text('直接以 java 进程运行（默认）'),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  RadioListTile<RunMode>(
+                    value: RunMode.docker,
+                    enabled: !widget.dockerProbing && widget.dockerAvailable,
+                    title: Row(
+                      children: [
+                        const Text('Docker 容器'),
+                        if (widget.dockerProbing) ...[
+                          const SizedBox(width: 8),
+                          const SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ],
+                        if (!widget.dockerProbing &&
+                            !widget.dockerAvailable) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            '不可用',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: theme.colorScheme.outline,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    subtitle: Text(
+                      !widget.dockerProbing && !widget.dockerAvailable
+                          ? '未检测到 Docker CLI，请先安装并启动 Docker Desktop'
+                          : '服务器运行在 Docker 容器中，启停/控制台/文件走容器',
+                    ),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ],
+              ),
+            ),
+            if (isDocker) ...[
+              const Divider(height: 24),
+              _ContainerConfigCard(instanceId: widget.instanceId),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 容器配置卡片（Docker 运行方式下的镜像 / 端口 / 卷 / 环境变量等）。
+class _ContainerConfigCard extends StatefulWidget {
+  const _ContainerConfigCard({required this.instanceId});
+
+  final String instanceId;
+
+  @override
+  State<_ContainerConfigCard> createState() => _ContainerConfigCardState();
+}
+
+class _ContainerConfigCardState extends State<_ContainerConfigCard> {
+  late final TextEditingController _imageController;
+  late final TextEditingController _nameController;
+  late final TextEditingController _portsController;
+  late final TextEditingController _volumesController;
+  late final TextEditingController _envController;
+  late final TextEditingController _memoryController;
+  late final TextEditingController _cpusController;
+  String? _restartPolicy;
+  bool _dirty = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final config = _currentConfig();
+    _imageController = TextEditingController(text: config.image);
+    _nameController = TextEditingController(text: config.containerName ?? '');
+    _portsController = TextEditingController(text: config.ports.join(', '));
+    _volumesController = TextEditingController(text: config.volumes.join(', '));
+    _envController = TextEditingController(
+      text: config.env.entries
+          .map((e) => '${e.key}=${e.value}')
+          .join('\n'),
+    );
+    _memoryController = TextEditingController(
+      text: config.memoryLimitMb?.toString() ?? '',
+    );
+    _cpusController = TextEditingController(text: config.cpus?.toString() ?? '');
+    _restartPolicy = config.restartPolicy;
+  }
+
+  @override
+  void dispose() {
+    _imageController.dispose();
+    _nameController.dispose();
+    _portsController.dispose();
+    _volumesController.dispose();
+    _envController.dispose();
+    _memoryController.dispose();
+    _cpusController.dispose();
+    super.dispose();
+  }
+
+  ContainerConfig _currentConfig() {
+    return context
+            .read<AppState>()
+            .instances
+            .where((e) => e.id == widget.instanceId)
+            .firstOrNull
+            ?.container ??
+        const ContainerConfig();
+  }
+
+  void _markDirty() {
+    if (!_dirty) setState(() => _dirty = true);
+  }
+
+  /// 保存容器配置。
+  Future<void> _save() async {
+    final config = ContainerConfig(
+      image: _imageController.text.trim(),
+      containerName: _nameController.text.trim().isEmpty
+          ? null
+          : _nameController.text.trim(),
+      ports: _splitList(_portsController.text),
+      volumes: _splitList(_volumesController.text),
+      env: _parseEnv(_envController.text),
+      restartPolicy: _restartPolicy,
+      memoryLimitMb: int.tryParse(_memoryController.text.trim()),
+      cpus: int.tryParse(_cpusController.text.trim()),
+    );
+    final error = config.validate();
+    if (error != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error)));
+      return;
+    }
+    await context
+        .read<AppState>()
+        .updateRunMode(widget.instanceId, RunMode.docker, config);
+    if (!mounted) return;
+    setState(() => _dirty = false);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('容器配置已保存')));
+  }
+
+  List<String> _splitList(String text) {
+    return text
+        .split(RegExp(r'[\n,;]'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+  }
+
+  Map<String, String> _parseEnv(String text) {
+    final map = <String, String>{};
+    for (final line in text.split('\n')) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) continue;
+      final idx = trimmed.indexOf('=');
+      if (idx <= 0) continue;
+      map[trimmed.substring(0, idx).trim()] = trimmed.substring(idx + 1).trim();
+    }
+    return map;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.tune),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text('容器配置', style: theme.textTheme.titleSmall),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _imageController,
+          decoration: const InputDecoration(
+            labelText: '镜像',
+            helperText: '如 itzg/minecraft-server:latest',
+            isDense: true,
+            border: OutlineInputBorder(),
+          ),
+          onChanged: (_) => _markDirty(),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _nameController,
+          decoration: const InputDecoration(
+            labelText: '容器名称（留空自动生成）',
+            isDense: true,
+            border: OutlineInputBorder(),
+          ),
+          onChanged: (_) => _markDirty(),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _portsController,
+          decoration: const InputDecoration(
+            labelText: '端口映射',
+            helperText: '宿主机端口:容器端口，多个用逗号分隔，如 25565:25565, 8123:8123',
+            isDense: true,
+            border: OutlineInputBorder(),
+          ),
+          onChanged: (_) => _markDirty(),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _volumesController,
+          decoration: const InputDecoration(
+            labelText: '卷挂载',
+            helperText: '宿主机路径:容器路径；留空默认挂载实例目录到 /data',
+            isDense: true,
+            border: OutlineInputBorder(),
+          ),
+          onChanged: (_) => _markDirty(),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _envController,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            labelText: '环境变量',
+            helperText: '每行一个 KEY=VALUE，如 MEMORY=2G、EULA=TRUE',
+            alignLabelWithHint: true,
+            isDense: true,
+            border: OutlineInputBorder(),
+          ),
+          onChanged: (_) => _markDirty(),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          initialValue: _restartPolicy,
+          decoration: const InputDecoration(
+            labelText: '重启策略',
+            isDense: true,
+            border: OutlineInputBorder(),
+          ),
+          items: const [
+            DropdownMenuItem(value: 'no', child: Text('no — 不自动重启')),
+            DropdownMenuItem(
+              value: 'unless-stopped',
+              child: Text('unless-stopped — 容器退出自动重启'),
+            ),
+            DropdownMenuItem(value: 'always', child: Text('always — 总是重启')),
+            DropdownMenuItem(
+              value: 'on-failure',
+              child: Text('on-failure — 异常退出时重启'),
+            ),
+          ],
+          onChanged: (value) {
+            setState(() {
+              _restartPolicy = value;
+              _dirty = true;
+            });
+          },
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _memoryController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: '内存上限（MB，留空不限）',
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (_) => _markDirty(),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextField(
+                controller: _cpusController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'CPU 核数（留空不限）',
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (_) => _markDirty(),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                '容器由实例名派生，如 xmc-<名称>-<id后缀>',
+                style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+              ),
+            ),
+            FilledButton.icon(
+              onPressed: _dirty ? _save : null,
+              icon: const Icon(Icons.check),
+              label: const Text('保存'),
+            ),
+          ],
         ),
       ],
     );

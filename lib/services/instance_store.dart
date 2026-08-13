@@ -21,6 +21,7 @@ class InstanceStore {
 
   /// 将数据库行记录转换为 [ServerInstance]。
   ServerInstance _fromDbRow(Map<String, dynamic> row) {
+    final containerConfig = row['container_config'] as String?;
     return ServerInstance(
       id: row['id'] as String,
       name: row['name'] as String,
@@ -29,6 +30,10 @@ class InstanceStore {
       startCommand: row['start_command'] as String,
       coreType: row['core_type'] as String?,
       coreVersion: row['core_version'] as String?,
+      runMode: RunMode.fromString(row['run_mode'] as String?),
+      container: containerConfig == null || containerConfig.isEmpty
+          ? null
+          : ContainerConfig.fromJson(containerConfig),
       createdAt: DateTime.parse(row['created_at'] as String),
     );
   }
@@ -45,6 +50,8 @@ class InstanceStore {
       'start_command': instance.startCommand,
       'core_type': instance.coreType,
       'core_version': instance.coreVersion,
+      'run_mode': instance.runMode.name,
+      'container_config': instance.container?.toJson(),
       'created_at': instance.createdAt.toIso8601String(),
     };
   }
@@ -142,6 +149,32 @@ class InstanceStore {
       }
     } catch (e) {
       debugPrint('Failed to update start command: $e');
+    }
+  }
+
+  /// 更新实例的运行方式（原生 / Docker）与容器配置并持久化。
+  ///
+  /// [container] 为 null 表示清除容器配置；同时更新内存缓存。
+  Future<void> updateRunMode(
+    String id,
+    RunMode runMode,
+    ContainerConfig? container,
+  ) async {
+    try {
+      await DatabaseManager.instance.updateServer(id, {
+        'run_mode': runMode.name,
+        'container_config': container?.toJson(),
+      });
+      if (_cache != null) {
+        for (final e in _cache!) {
+          if (e.id == id) {
+            e.runMode = runMode;
+            e.container = container;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to update run mode: $e');
     }
   }
 }

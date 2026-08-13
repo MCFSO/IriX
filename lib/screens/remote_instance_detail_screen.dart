@@ -11,9 +11,11 @@ import 'package:flutter/material.dart';
 
 import '../models/node.dart';
 import '../models/remote.dart';
+import '../services/container/node_container_backend.dart';
 import '../services/node_api_client.dart';
 import '../utils/apple_widgets.dart';
 import '../utils/docker_visibility.dart';
+import '../widgets/container_environment_panel.dart';
 import 'node_detail_screen.dart' show remoteStatusChip;
 import 'remote_file_manager_screen.dart';
 
@@ -229,6 +231,9 @@ class _RemoteInstanceDetailScreenState
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final showContainerTab = shouldShowDockerSettings(
+      nodePlatform: widget.nodePlatform,
+    );
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -274,18 +279,27 @@ class _RemoteInstanceDetailScreenState
             ),
           Expanded(
             child: DefaultTabController(
-              length: 2,
+              length: showContainerTab ? 3 : 2,
               child: Column(
                 children: [
-                  const TabBar(
+                  TabBar(
                     tabs: [
-                      Tab(icon: Icon(Icons.terminal), text: '控制台'),
-                      Tab(icon: Icon(Icons.settings_outlined), text: '配置'),
+                      const Tab(icon: Icon(Icons.terminal), text: '控制台'),
+                      const Tab(
+                        icon: Icon(Icons.settings_outlined),
+                        text: '配置',
+                      ),
+                      if (showContainerTab)
+                        const Tab(icon: Icon(Icons.inventory_2), text: '容器'),
                     ],
                   ),
                   Expanded(
                     child: TabBarView(
-                      children: [_buildConsole(theme), _buildConfig(theme)],
+                      children: [
+                        _buildConsole(theme),
+                        _buildConfig(theme),
+                        if (showContainerTab) _buildContainerTab(),
+                      ],
                     ),
                   ),
                 ],
@@ -294,6 +308,25 @@ class _RemoteInstanceDetailScreenState
           ),
         ],
       ),
+    );
+  }
+
+  /// 容器 Tab：该节点容器环境的全功能管理（Docker / Bastille 按节点平台）。
+  Widget _buildContainerTab() {
+    final backend = nodeContainerBackend(
+      client: widget.client,
+      daemonId: widget.daemonId,
+      platformHint: widget.nodePlatform,
+    );
+    // 实例以 Docker 方式运行时高亮其容器。
+    final docker = _instance.config.docker;
+    final highlightName = _instance.config.processType == 'docker' &&
+            docker.containerName.isNotEmpty
+        ? docker.containerName
+        : null;
+    return ContainerEnvironmentPanel(
+      backend: backend,
+      highlightName: highlightName,
     );
   }
 

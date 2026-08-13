@@ -158,6 +158,13 @@ class _ClusterInstancesScreenState extends State<ClusterInstancesScreen> {
       ).showSnackBar(SnackBar(content: Text('无法打开详情: $e')));
       return;
     }
+    // 取节点平台（决定详情页是否展示容器 Tab：Docker / Bastille）。
+    String? nodePlatform;
+    try {
+      nodePlatform = (await client.overview()).system.platform;
+    } catch (_) {
+      nodePlatform = null;
+    }
     if (!mounted) return;
     await pushPage<void>(
       context,
@@ -166,6 +173,7 @@ class _ClusterInstancesScreenState extends State<ClusterInstancesScreen> {
         client: client,
         daemonId: instance.daemonId,
         initialInstance: remote,
+        nodePlatform: nodePlatform,
       ),
     );
     await _loadStatuses();
