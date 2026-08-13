@@ -1,7 +1,8 @@
 // 集群主页（多机模式首页）
-// 只展示信息：顶部聚合网络折线图 + 各节点信息卡
-// （节点名称 / 类型 / 系统名称与版本 / CPU / 内存 / 磁盘 / 网络）。
-// CPU、内存点击跳节点概览；悬停显示精确数值。
+// 只展示信息：顶部聚合网络折线图 + 节点资源总览表。
+// 资源总览将所有节点的 CPU / 内存 / 磁盘 并排列出，一眼可见全部节点的
+// 占用情况（按使用率着色：绿 <70% / 黄 70~90% / 红 ≥90%），
+// 底部附带内存 / 磁盘跨节点合计。不使用单机管理模式的节点管理界面。
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -16,7 +17,6 @@ import '../utils/apple_widgets.dart';
 import '../widgets/add_node_dialog.dart';
 import '../widgets/network_line_chart.dart';
 import 'home_screen.dart' show showSettingsDialog;
-import 'nodes_screen.dart';
 
 /// 集群主页。
 class ClusterHomeScreen extends StatefulWidget {
@@ -56,7 +56,6 @@ class _ClusterHomeScreenState extends State<ClusterHomeScreen> {
     return Consumer2<NodeState, ClusterState>(
       builder: (context, nodeState, cluster, _) {
         final nodes = nodeState.nodes;
-        final monitorId = cluster.monitorNodeId;
         return CustomScrollView(
           slivers: [
             SliverAppBar(
@@ -117,20 +116,13 @@ class _ClusterHomeScreenState extends State<ClusterHomeScreen> {
               ),
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                sliver: SliverList.builder(
-                  itemCount: nodes.length,
-                  itemBuilder: (context, index) {
-                    final node = nodes[index];
-                    final sys = cluster.resourceSnapshot[node.id];
-                    return _ClusterNodeCard(
-                      node: node,
-                      online: nodeState.isOnline(node.id),
-                      error: nodeState.errorOf(node.id),
-                      system: sys,
-                      isMonitor: node.id == monitorId,
-                      onTap: () => openNode(context, node.id),
-                    );
-                  },
+                sliver: SliverToBoxAdapter(
+                  child: _ResourceOverviewCard(
+                    nodes: nodes,
+                    nodeState: nodeState,
+                    snapshots: cluster.resourceSnapshot,
+                    monitorNodeId: cluster.monitorNodeId,
+                  ),
                 ),
               ),
               SliverPadding(
@@ -151,7 +143,8 @@ class _ClusterHomeScreenState extends State<ClusterHomeScreen> {
     final theme = Theme.of(context);
     final role = deriveMonitorRole(nodes);
     final String text = switch (role.strategy) {
-      ClusterMonitorStrategy.monitor => '已指定监控节点：${_nodeName(nodes, role.monitorNodeId)}',
+      ClusterMonitorStrategy.monitor =>
+        '已指定监控节点：${_nodeName(nodes, role.monitorNodeId)}',
       ClusterMonitorStrategy.mutual => '节点互相监控',
       ClusterMonitorStrategy.noEligibleMonitor =>
         '节点 ≥3 台，但均为 MCSM，无可用监控节点（MCSM 不支持节点互联）',
@@ -193,7 +186,11 @@ class _NetworkChartCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.monitor_heart_outlined, size: 18, color: theme.colorScheme.primary),
+                Icon(
+                  Icons.monitor_heart_outlined,
+                  size: 18,
+                  color: theme.colorScheme.primary,
+                ),
                 const SizedBox(width: 8),
                 Text('网络吞吐（所有节点）', style: theme.textTheme.titleSmall),
                 const Spacer(),
@@ -215,15 +212,167 @@ class _NetworkChartCard extends StatelessWidget {
   }
 }
 
-/// 集群节点信息卡。
-class _ClusterNodeCard extends StatelessWidget {
-  const _ClusterNodeCard({
+/// 节点资源总览卡：所有节点的 CPU / 内存 / 磁盘 统一对比显示。
+class _ResourceOverviewCard extends StatelessWidget {
+  const _ResourceOverviewCard({
+    required this.nodes,
+    required this.nodeState,
+    required this.snapshots,
+    required this.monitorNodeId,
+  });
+
+  final List<NodeInfo> nodes;
+  final NodeState nodeState;
+  final Map<String, OverviewSystem> snapshots;
+  final String? monitorNodeId;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    // 跨节点合计（内存 / 磁盘可累加；CPU 只做简单平均）。
+    var totalMem = 0;
+    var usedMem = 0;
+    var totalDisk = 0;
+    var usedDisk = 0;
+    var cpuSum = 0.0;
+    var cpuCount = 0;
+    for (final node in nodes) {
+      final sys = snapshots[node.id];
+      if (sys == null || !nodeState.isOnline(node.id)) continue;
+      totalMem += sys.totalMem;
+      usedMem += sys.totalMem - sys.freeMem;
+      totalDisk += sys.diskTotal;
+      usedDisk += sys.diskUsed;
+      cpuSum += sys.cpuUsage * 100;
+      cpuCount++;
+    }
+
+    return AppleCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.monitor_heart_outlined,
+                size: 18,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Text('节点资源总览', style: theme.textTheme.titleSmall),
+              const Spacer(),
+              Text(
+                '${nodes.length} 台节点',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          // 表头
+          Row(
+            children: [
+              Expanded(flex: 5, child: _headerLabel(theme, '节点')),
+              const SizedBox(width: 12),
+              Expanded(flex: 4, child: _headerLabel(theme, 'CPU')),
+              const SizedBox(width: 12),
+              Expanded(flex: 4, child: _headerLabel(theme, '内存')),
+              const SizedBox(width: 12),
+              Expanded(flex: 4, child: _headerLabel(theme, '磁盘')),
+            ],
+          ),
+          _rowDivider(theme),
+          for (var i = 0; i < nodes.length; i++) ...[
+            if (i > 0) _rowDivider(theme),
+            _NodeResourceRow(
+              node: nodes[i],
+              online: nodeState.isOnline(nodes[i].id),
+              error: nodeState.errorOf(nodes[i].id),
+              system: snapshots[nodes[i].id],
+              isMonitor: nodes[i].id == monitorNodeId,
+            ),
+          ],
+          if (nodes.isNotEmpty) ...[
+            _rowDivider(theme),
+            // 合计行
+            Row(
+              children: [
+                Expanded(
+                  flex: 5,
+                  child: Text(
+                    '合计',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 4,
+                  child: Text(
+                    cpuCount == 0 ? '—' : '平均 ${(cpuSum / cpuCount).toStringAsFixed(0)}%',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 4,
+                  child: Text(
+                    totalMem == 0 ? '—' : '${_fmtBytes(usedMem)} / ${_fmtBytes(totalMem)}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 4,
+                  child: Text(
+                    totalDisk == 0 ? '—' : '${_fmtBytes(usedDisk)} / ${_fmtBytes(totalDisk)}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _headerLabel(ThemeData theme, String text) {
+    return Text(
+      text,
+      style: theme.textTheme.labelSmall?.copyWith(
+        color: theme.colorScheme.outline,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+  }
+
+  Widget _rowDivider(ThemeData theme) {
+    return Divider(
+      height: 16,
+      color: theme.colorScheme.outlineVariant.withValues(alpha: 0.35),
+    );
+  }
+}
+
+/// 资源总览中的单行：节点信息 + CPU / 内存 / 磁盘 占用。
+class _NodeResourceRow extends StatelessWidget {
+  const _NodeResourceRow({
     required this.node,
     required this.online,
     required this.error,
     required this.system,
     required this.isMonitor,
-    required this.onTap,
   });
 
   final NodeInfo node;
@@ -231,247 +380,229 @@ class _ClusterNodeCard extends StatelessWidget {
   final String? error;
   final OverviewSystem? system;
   final bool isMonitor;
-  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isLocal = node.type == NodeType.node;
     final sys = system;
+    final hasData = online && sys != null;
 
-    final cpu = sys == null ? null : sys.cpuUsage * 100;
-    final mem = sys == null ? null : sys.memUsage * 100;
-    final disk = (sys != null && sys.hasDisk) ? sys.diskUsage * 100 : null;
-    final net =
-        (sys != null && sys.hasNetwork)
-            ? _fmtRate(sys.networkDownload + sys.networkUpload)
-            : null;
+    final cpu = hasData ? sys.cpuUsage * 100 : null;
+    final mem = hasData ? sys.memUsage * 100 : null;
+    final disk = hasData && sys.hasDisk ? sys.diskUsage * 100 : null;
 
     String systemName = '—';
-    String? systemVersion;
+    String systemVersion = '';
     if (sys != null) {
       if (sys.type.isNotEmpty) {
         systemName = sys.type;
       } else if (sys.platform.isNotEmpty) {
         systemName = sys.platform;
       }
-      if (sys.systemVersion.isNotEmpty) systemVersion = sys.systemVersion;
+      systemVersion = sys.systemVersion;
     }
 
-    return AppleCard(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      onTap: onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // 节点名称列
+        Expanded(
+          flex: 5,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: (online
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.surfaceContainerHighest)
-                      .withValues(alpha: 0.25),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  isLocal ? Icons.terminal : Icons.dns,
-                  color: online
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        node.name,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleSmall,
-                      ),
+              Row(
+                children: [
+                  Icon(
+                    online ? Icons.circle : Icons.circle_outlined,
+                    size: 8,
+                    color: online ? Colors.green : theme.colorScheme.outline,
+                  ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      node.name,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall,
                     ),
+                  ),
+                  const SizedBox(width: 6),
+                  _badge(
+                    theme,
+                    node.type.label,
+                    theme.colorScheme.secondaryContainer,
+                    theme.colorScheme.onSecondaryContainer,
+                  ),
+                  if (isMonitor) ...[
                     const SizedBox(width: 6),
                     _badge(
                       theme,
-                      node.type.label,
-                      theme.colorScheme.secondaryContainer,
-                      theme.colorScheme.onSecondaryContainer,
+                      '监控',
+                      theme.colorScheme.primary,
+                      theme.colorScheme.onPrimary,
                     ),
-                    if (isMonitor) ...[
-                      const SizedBox(width: 6),
-                      _badge(
-                        theme,
-                        '监控',
-                        theme.colorScheme.primary,
-                        theme.colorScheme.onPrimary,
-                      ),
-                    ],
                   ],
-                ),
+                ],
               ),
-              const SizedBox(width: 8),
-              Icon(
-                online ? Icons.circle : Icons.circle_outlined,
-                size: 10,
-                color: online ? Colors.green : theme.colorScheme.outline,
-              ),
-              const SizedBox(width: 4),
+              const SizedBox(height: 2),
               Text(
-                online ? '在线' : '离线',
+                online
+                    ? '系统：$systemName${systemVersion.isEmpty ? '' : ' · $systemVersion'}'
+                    : (error ?? '离线'),
+                overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: online ? Colors.green : theme.colorScheme.outline,
+                  color: online
+                      ? theme.colorScheme.onSurfaceVariant
+                      : (error != null
+                            ? theme.colorScheme.error
+                            : theme.colorScheme.outline),
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            systemVersion == null
-                ? '系统：$systemName'
-                : '系统：$systemName · $systemVersion',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          if (!online && error != null) ...[
-            const SizedBox(height: 2),
-            Text(
-              error!,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.error,
-                fontSize: 11,
-              ),
-            ),
-          ],
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              _StatItem(
-                theme: theme,
-                icon: Icons.speed,
-                label: 'CPU',
-                value: cpu == null ? '—' : '${cpu.toStringAsFixed(0)}%',
-                tooltip: cpu == null ? null : 'CPU ${cpu.toStringAsFixed(1)}%',
-                onTap: onTap,
-              ),
-              _StatItem(
-                theme: theme,
-                icon: Icons.memory,
-                label: '内存',
-                value: mem == null ? '—' : '${mem.toStringAsFixed(0)}%',
-                tooltip: mem == null
-                    ? null
-                    : '内存 ${mem.toStringAsFixed(1)}%${_memDetail(sys)}',
-                onTap: onTap,
-              ),
-              _StatItem(
-                theme: theme,
-                icon: Icons.storage,
-                label: '磁盘',
-                value: disk == null ? '—' : '${disk.toStringAsFixed(0)}%',
-                tooltip: disk == null ? null : '磁盘 ${disk.toStringAsFixed(1)}%${_diskDetail(sys)}',
-              ),
-              _StatItem(
-                theme: theme,
-                icon: Icons.swap_vert,
-                label: '网络',
-                value: net ?? '—',
-                tooltip: (sys != null && sys.hasNetwork)
-                    ? '↓ ${_fmtRate(sys.networkDownload)}  ↑ ${_fmtRate(sys.networkUpload)}'
-                    : null,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _badge(ThemeData theme, String text, Color bg, Color fg) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-      decoration: BoxDecoration(
-        color: bg.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        text,
-        style: theme.textTheme.labelSmall?.copyWith(color: fg),
-      ),
-    );
-  }
-
-  static String _memDetail(OverviewSystem? sys) {
-    if (sys == null || sys.totalMem <= 0) return '';
-    return '（${_fmtBytes(sys.totalMem - sys.freeMem)} / ${_fmtBytes(sys.totalMem)}）';
-  }
-
-  static String _diskDetail(OverviewSystem? sys) {
-    if (sys == null || sys.diskTotal <= 0) return '';
-    return '（${_fmtBytes(sys.diskUsed)} / ${_fmtBytes(sys.diskTotal)}）';
-  }
-}
-
-/// 单个指标块（悬停 Tooltip，可选点击）。
-class _StatItem extends StatelessWidget {
-  const _StatItem({
-    required this.theme,
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.tooltip,
-    this.onTap,
-  });
-
-  final ThemeData theme;
-  final IconData icon;
-  final String label;
-  final String value;
-  final String? tooltip;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    Widget content = Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.bold,
+        const SizedBox(width: 12),
+        Expanded(
+          flex: 4,
+          child: _metricCell(
+            theme,
+            cpu,
+            tooltip: cpu == null ? null : 'CPU ${cpu.toStringAsFixed(1)}%',
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          flex: 4,
+          child: _metricCell(
+            theme,
+            mem,
+            detail: _memDetail(sys),
+            tooltip: mem == null
+                ? null
+                : '内存 ${mem.toStringAsFixed(1)}%（${_memDetail(sys)}）',
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          flex: 4,
+          child: _metricCell(
+            theme,
+            disk,
+            detail: _diskDetail(sys),
+            tooltip: disk == null
+                ? null
+                : '磁盘 ${disk.toStringAsFixed(1)}%（${_diskDetail(sys)}）',
           ),
         ),
       ],
     );
-    if (onTap != null) {
-      content = InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: content,
-      );
-    }
-    if (tooltip != null && tooltip!.isNotEmpty) {
-      content = Tooltip(message: tooltip!, child: content);
-    }
-    return Expanded(child: content);
   }
+
+  /// 单个指标的单元格：百分比 + 用量条（悬停显示精确值）。
+  Widget _metricCell(
+    ThemeData theme,
+    double? percent, {
+    String? detail,
+    String? tooltip,
+  }) {
+    final pct = percent;
+    Widget cell = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              pct == null ? '—' : '${pct.toStringAsFixed(0)}%',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const Spacer(),
+            if (detail != null && detail.isNotEmpty)
+              Flexible(
+                child: Text(
+                  detail,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.outline,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        if (pct == null)
+          const SizedBox(height: 8)
+        else
+          _UsageBar(fraction: pct / 100, color: _usageColor(theme, pct)),
+      ],
+    );
+    if (tooltip != null && tooltip.isNotEmpty) {
+      cell = Tooltip(message: tooltip, child: cell);
+    }
+    return cell;
+  }
+}
+
+/// 使用率进度条（按比例填充）。
+class _UsageBar extends StatelessWidget {
+  const _UsageBar({required this.fraction, required this.color});
+
+  final double fraction;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      height: 8,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: FractionallySizedBox(
+        alignment: Alignment.centerLeft,
+        widthFactor: fraction.clamp(0.0, 1.0),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Widget _badge(ThemeData theme, String text, Color bg, Color fg) {
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+    decoration: BoxDecoration(
+      color: bg.withValues(alpha: 0.2),
+      borderRadius: BorderRadius.circular(6),
+    ),
+    child: Text(
+      text,
+      style: theme.textTheme.labelSmall?.copyWith(color: fg),
+    ),
+  );
+}
+
+/// 按使用率返回警示色：<70% 绿 / 70~90% 黄 / ≥90% 红。
+Color _usageColor(ThemeData theme, double pct) {
+  if (pct >= 90) return theme.colorScheme.error;
+  if (pct >= 70) return Colors.amber;
+  return Colors.green;
+}
+
+String _memDetail(OverviewSystem? sys) {
+  if (sys == null || sys.totalMem <= 0) return '';
+  return '${_fmtBytes(sys.totalMem - sys.freeMem)} / ${_fmtBytes(sys.totalMem)}';
+}
+
+String _diskDetail(OverviewSystem? sys) {
+  if (sys == null || sys.diskTotal <= 0) return '';
+  return '${_fmtBytes(sys.diskUsed)} / ${_fmtBytes(sys.diskTotal)}';
 }
 
 String _fmtBytes(int bytes) {
