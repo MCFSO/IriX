@@ -28,6 +28,9 @@ class ClusterState extends ChangeNotifier {
   /// 节点资源快照（nodeId → 最近概览系统信息）。
   final Map<String, OverviewSystem> _resourceSnapshot = {};
 
+  /// 聚合网络吞吐历史（最近 N 个采样点，用于主页折线图）。
+  final List<NetworkSample> _networkHistory = [];
+
   /// 监控循环是否在运行。
   bool _monitorActive = false;
 
@@ -43,6 +46,9 @@ class ClusterState extends ChangeNotifier {
   /// 节点资源快照（只读视图）。
   Map<String, OverviewSystem> get resourceSnapshot =>
       Map.unmodifiable(_resourceSnapshot);
+
+  /// 聚合网络吞吐历史（只读视图）。
+  List<NetworkSample> get networkHistory => List.unmodifiable(_networkHistory);
 
   /// 监控循环是否在运行。
   bool get monitorActive => _monitorActive;
@@ -91,6 +97,23 @@ class ClusterState extends ChangeNotifier {
   /// 清空全部资源快照。
   void clearResourceSnapshot() {
     _resourceSnapshot.clear();
+    notifyListeners();
+  }
+
+  /// 追加一个聚合网络采样点（限长 [maxNetworkSamples]）。
+  void pushNetworkSample(double download, double upload) {
+    _networkHistory.add(
+      NetworkSample(DateTime.now(), download: download, upload: upload),
+    );
+    if (_networkHistory.length > maxNetworkSamples) {
+      _networkHistory.removeRange(0, _networkHistory.length - maxNetworkSamples);
+    }
+    notifyListeners();
+  }
+
+  /// 清空网络历史。
+  void clearNetworkHistory() {
+    _networkHistory.clear();
     notifyListeners();
   }
 
@@ -202,3 +225,22 @@ class ClusterState extends ChangeNotifier {
     notifyListeners();
   }
 }
+
+/// 聚合网络吞吐采样点。
+class NetworkSample {
+  final DateTime time;
+
+  /// 下载速率（字节/秒）。
+  final double download;
+
+  /// 上传速率（字节/秒）。
+  final double upload;
+
+  const NetworkSample(this.time, {required this.download, required this.upload});
+
+  /// 总吞吐（下载 + 上传）。
+  double get total => download + upload;
+}
+
+/// 网络历史保留的最大采样点数（约 15 分钟 @ 15s）。
+const int maxNetworkSamples = 60;

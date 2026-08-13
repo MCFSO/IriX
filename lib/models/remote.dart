@@ -52,22 +52,43 @@ class OverviewSystem {
   final String hostname;
   final String platform;
   final String release;
+
+  /// 系统版本（如 "22.04"），部分面板单独返回；缺失时回退 [release]。
+  final String version;
+
   final double uptime;
   final int totalMem;
   final int freeMem;
   final double cpuUsage;
   final double memUsage;
 
+  /// 磁盘使用率（0~1）。
+  final double diskUsage;
+
+  /// 磁盘总容量 / 已用（字节）。
+  final int diskTotal;
+  final int diskUsed;
+
+  /// 网络下载 / 上传速率（字节/秒）。
+  final double networkDownload;
+  final double networkUpload;
+
   const OverviewSystem({
     this.type = '',
     this.hostname = '',
     this.platform = '',
     this.release = '',
+    this.version = '',
     this.uptime = 0,
     this.totalMem = 0,
     this.freeMem = 0,
     this.cpuUsage = 0,
     this.memUsage = 0,
+    this.diskUsage = 0,
+    this.diskTotal = 0,
+    this.diskUsed = 0,
+    this.networkDownload = 0,
+    this.networkUpload = 0,
   });
 
   factory OverviewSystem.fromJson(Map<String, dynamic> json) {
@@ -76,11 +97,50 @@ class OverviewSystem {
       hostname: json['hostname'] as String? ?? '',
       platform: json['platform'] as String? ?? '',
       release: json['release'] as String? ?? '',
+      version: json['version'] as String? ?? '',
       uptime: (json['uptime'] as num?)?.toDouble() ?? 0,
       totalMem: (json['totalmem'] as num?)?.toInt() ?? 0,
       freeMem: (json['freemem'] as num?)?.toInt() ?? 0,
       cpuUsage: (json['cpuUsage'] as num?)?.toDouble() ?? 0,
       memUsage: (json['memUsage'] as num?)?.toDouble() ?? 0,
+      diskUsage: (json['diskusage'] as num?)?.toDouble() ?? 0,
+      diskTotal: (json['disktotal'] as num?)?.toInt() ?? 0,
+      diskUsed: (json['diskused'] as num?)?.toInt() ?? 0,
+      networkDownload: (json['networkDownload'] as num?)?.toDouble() ?? 0,
+      networkUpload: (json['networkUpload'] as num?)?.toDouble() ?? 0,
+    );
+  }
+
+  /// 系统版本（优先 [version]，回退 [release]）。
+  String get systemVersion => version.isNotEmpty ? version : release;
+
+  /// 是否有磁盘数据。
+  bool get hasDisk => diskTotal > 0 || diskUsage > 0;
+
+  /// 是否有网络数据。
+  bool get hasNetwork => networkDownload > 0 || networkUpload > 0;
+
+  /// 用 [other] 填充本实例缺失的磁盘 / 网络字段，返回新实例。
+  ///
+  /// 供 MCSM 场景使用：面板 `system` 可能不含磁盘 / 网络，而数据位于
+  /// `overview.remote` 的 daemon 中，需要合并。
+  OverviewSystem mergedWith(OverviewSystem other) {
+    return OverviewSystem(
+      type: type,
+      hostname: hostname,
+      platform: platform,
+      release: release,
+      version: version,
+      uptime: uptime,
+      totalMem: totalMem,
+      freeMem: freeMem,
+      cpuUsage: cpuUsage,
+      memUsage: memUsage,
+      diskUsage: hasDisk ? diskUsage : other.diskUsage,
+      diskTotal: hasDisk ? diskTotal : other.diskTotal,
+      diskUsed: hasDisk ? diskUsed : other.diskUsed,
+      networkDownload: hasNetwork ? networkDownload : other.networkDownload,
+      networkUpload: hasNetwork ? networkUpload : other.networkUpload,
     );
   }
 }

@@ -83,6 +83,7 @@ class ClusterMonitor {
     _resourceMigratedCooldown.clear();
     _clusterState?.setMonitorActive(false);
     _clusterState?.clearResourceSnapshot();
+    _clusterState?.clearNetworkHistory();
   }
 
   /// 依据节点数量推导并落盘监控节点。
@@ -117,12 +118,34 @@ class ClusterMonitor {
     await _detectResourcePressure(nodeState, cluster, migrator);
   }
 
-  /// 刷新全部节点资源快照。
+  /// 手动刷新资源快照（不触发崩溃/资源检测与迁移）。
+  Future<void> refreshNow() async {
+    final nodeState = _nodeState;
+    final cluster = _clusterState;
+    if (nodeState == null || cluster == null) return;
+    _applyMonitorRole();
+    await _refreshResources(nodeState, cluster);
+  }
+
+  /// 刷新全部节点资源快照，并聚合网络吞吐推入历史。
   Future<void> _refreshResources(NodeState nodeState, ClusterState cluster) async {
+    var totalDownload = 0.0;
+    var totalUpload = 0.0;
     for (final node in nodeState.nodes) {
       try {
         final overview = await nodeState.clientFor(node).overview();
-        cluster.updateResourceSnapshot(node.id, overview.system);
+        var sys = overview.system;
+        // MCSM 面板的磁盘 / 网络数据位于 daemon（remote）而非 system，需要合并。
+        if (!sys.hasDisk || !sys.hasNetwork) {
+          OverviewSystem merged = sys;
+          for (final daemon in overview.remote) {
+            merged = merged.mergedWith(daemon.system);
+          }
+          sys = merged;
+        }
+        cluster.updateResourceSnapshot(node.id, sys);
+        totalDownload += sys.networkDownload;
+        totalUpload += sys.networkUpload;
         if (!nodeState.isOnline(node.id)) {
           await nodeState.pingNode(node.id);
         }
@@ -130,6 +153,7 @@ class ClusterMonitor {
         cluster.updateResourceSnapshot(node.id, null);
       }
     }
+    cluster.pushNetworkSample(totalDownload, totalUpload);
   }
 
   /// 检测崩溃：running/starting → stopped 且非用户停止。

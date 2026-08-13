@@ -263,10 +263,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 IconButton(
                   icon: const Icon(Icons.settings_outlined),
                   tooltip: '设置',
-                  onPressed: () => showAppDialog<void>(
-                    context,
-                    (_) => const _SettingsDialog(),
-                  ),
+                  onPressed: () => showSettingsDialog(context),
                 ),
                 const SizedBox(width: 4),
               ],
@@ -369,18 +366,22 @@ class _StatusChip extends StatelessWidget {
   }
 }
 
-/// 设置对话框 — 调节下载线程数。
-///
-/// 下载线程数控制多线程分片断点续传下载的并发数 (1-32)。
-/// 修改即时生效并持久化 (SharedPreferences)。
-class _SettingsDialog extends StatefulWidget {
-  const _SettingsDialog();
-
-  @override
-  State<_SettingsDialog> createState() => _SettingsDialogState();
+/// 打开全局设置对话框（单机 / 多机模式通用）。
+Future<void> showSettingsDialog(BuildContext context) {
+  return showAppDialog<void>(context, (_) => const SettingsDialog());
 }
 
-class _SettingsDialogState extends State<_SettingsDialog> {
+/// 设置对话框 — 管理模式、下载线程数、数据库每页行数。
+///
+/// 修改即时生效并持久化到 SQLite `settings` 表。
+class SettingsDialog extends StatefulWidget {
+  const SettingsDialog({super.key});
+
+  @override
+  State<SettingsDialog> createState() => SettingsDialogState();
+}
+
+class SettingsDialogState extends State<SettingsDialog> {
   late double _threads;
   late double _pageSize;
   late bool _multi;
