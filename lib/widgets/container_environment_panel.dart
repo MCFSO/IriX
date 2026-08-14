@@ -10,6 +10,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart' hide ImageInfo;
+import 'package:flutter/services.dart';
 
 import '../services/container/container_backend.dart';
 import '../utils/apple_widgets.dart';
@@ -1481,12 +1482,15 @@ class _CreateContainerDialogState extends State<_CreateContainerDialog> {
       return;
     }
     if (widget.isBastille) {
-      // Bastille 的 jail 名不允许含点号与斜杠等字符。
-      if (!RegExp(r'^[a-zA-Z0-9_-]+$').hasMatch(name)) {
+      // Bastille 的 jail 名不允许含点号与斜杠等字符，且不能为纯数字
+      // （纯数字会被 jail(8) 当作 jid 解析）。
+      if (!RegExp(r'^(?=.*[a-zA-Z])[a-zA-Z0-9_-]+$').hasMatch(name)) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(
-          const SnackBar(content: Text('Jail 名仅允许字母、数字、- 和 _')),
+          const SnackBar(
+            content: Text('Jail 名仅允许字母、数字、- 和 _，且不能为纯数字'),
+          ),
         );
         return;
       }
@@ -1594,10 +1598,18 @@ class _CreateContainerDialogState extends State<_CreateContainerDialog> {
               TextField(
                 controller: _nameController,
                 autofocus: true,
-                decoration: const InputDecoration(
+                inputFormatters: isBastille
+                    ? [
+                        FilteringTextInputFormatter.allow(
+                          RegExp(r'[a-zA-Z0-9_-]'),
+                        ),
+                      ]
+                    : null,
+                decoration: InputDecoration(
                   labelText: '名称',
+                  helperText: isBastille ? '仅字母、数字、- 和 _，不能为纯数字' : null,
                   isDense: true,
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 12),
@@ -1937,8 +1949,16 @@ class _CloneDialogState extends State<_CloneDialog> {
             TextField(
               controller: _nameController,
               autofocus: true,
-              decoration: const InputDecoration(
+              inputFormatters: widget.isBastille
+                  ? [
+                      FilteringTextInputFormatter.allow(
+                        RegExp(r'[a-zA-Z0-9_-]'),
+                      ),
+                    ]
+                  : null,
+              decoration: InputDecoration(
                 labelText: '新名称',
+                helperText: widget.isBastille ? '不能为纯数字' : null,
                 isDense: true,
                 border: OutlineInputBorder(),
               ),
@@ -1967,6 +1987,15 @@ class _CloneDialogState extends State<_CloneDialog> {
           onPressed: () {
             final name = _nameController.text.trim();
             if (name.isEmpty) return;
+            if (widget.isBastille &&
+                !RegExp(r'^(?=.*[a-zA-Z])[a-zA-Z0-9_-]+$').hasMatch(name)) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Jail 名仅允许字母、数字、- 和 _，且不能为纯数字'),
+                ),
+              );
+              return;
+            }
             Navigator.pop(
               context,
               _CloneInput(

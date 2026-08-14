@@ -202,7 +202,7 @@ body（客户端 `NodeBastilleBackend.createContainer` 组装的**完整实际�
 
 | 字段 | 类型 | 取值 | 服务端命令映射 |
 |------|------|------|---------------|
-| `name` | string | Jail 名（客户端已校验 `^[a-zA-Z0-9_-]+$`） | 位置参数 NAME |
+| `name` | string | Jail 名（客户端已校验 `^(?=.*[a-zA-Z])[a-zA-Z0-9_-]+$`，**不能为纯数字**——纯数字会被 jail(8) 当作 jid 解析） | 位置参数 NAME |
 | `release` | string | 已 bootstrap 的发行版；**`type=empty` 时可为空串** | 位置参数 RELEASE |
 | `ip` | string | 显式必填（empty 除外）；VNET 时必须含 `/掩码` | 位置参数 IP |
 | `type` | string | `thin`(默认) \| `thick` \| `clone` \| `empty` \| `linux` | thin 无标志；`-T`/`-C`/`-E`/`-L` |
