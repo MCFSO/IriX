@@ -58,3 +58,12 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/xmc_vector_store.dll")
     COMMENT "Copying xmc_vector_store.dll to output directory"
   )
 endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/xmc_orchestrator.dll")
+  add_custom_command(TARGET ${BINARY_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "${CMAKE_CURRENT_SOURCE_DIR}/xmc_orchestrator.dll"
+      "$<TARGET_FILE_DIR:${BINARY_NAME}>/xmc_orchestrator.dll"
+    COMMENT "Copying xmc_orchestrator.dll to output directory"
+  )
+endif()

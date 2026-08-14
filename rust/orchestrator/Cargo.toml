@@ -1,0 +1,15 @@
+[package]
+name = "xmc_orchestrator"
+version = "0.1.0"
+edition = "2021"
+description = "K8s 风格 MC 服务器编排引擎：期望状态对账、崩溃自愈、按在线人数弹性扩缩容、跨物理机存档迁移、调度器"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+libc = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# SQLite（bundled）持久化服务/副本/迁移任务状态
+rusqlite = { version = "0.37", features = ["bundled"] }

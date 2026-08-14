@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Rust 模块编译脚本 (workspace: backup + downloader + file_ops + logger + http_client + db_client)
+# Rust 模块编译脚本 (workspace: backup + downloader + file_ops + logger + http_client + db_client + vector_store + orchestrator)
 # Linux/macOS 使用；Windows 请使用 build_rust.bat
 #
-# 编译六个 Rust FFI 动态库并复制到对应 Flutter 平台目录：
+# 编译 Rust FFI 动态库并复制到对应 Flutter 平台目录：
 #   Linux  -> linux/  （开发运行时与 CMake 打包均从这里取）
 #   macOS  -> macos/  （Xcode build phase 复制进 app bundle）
 set -euo pipefail
 cd "$(dirname "$0")/rust"
 
-echo "Compiling Rust workspace (backup + downloader + file_ops + logger + http_client + db_client)..."
+echo "Compiling Rust workspace (backup + downloader + file_ops + logger + http_client + db_client + vector_store + orchestrator)..."
 cargo build --release
 
 case "$(uname -s)" in
@@ -21,6 +21,7 @@ case "$(uname -s)" in
     cp -f target/release/libxmc_http_client.so ../linux/
     cp -f target/release/libxmc_db_client.so ../linux/
     cp -f target/release/libxmc_vector_store.so ../linux/
+    cp -f target/release/libxmc_orchestrator.so ../linux/
     ;;
   Darwin)
     echo "Copying .dylib files to macos/ ..."
@@ -31,6 +32,7 @@ case "$(uname -s)" in
     cp -f target/release/libxmc_http_client.dylib ../macos/
     cp -f target/release/libxmc_db_client.dylib ../macos/
     cp -f target/release/libxmc_vector_store.dylib ../macos/
+    cp -f target/release/libxmc_orchestrator.dylib ../macos/
     ;;
   *)
     echo "Unsupported platform: $(uname -s)" >&2
