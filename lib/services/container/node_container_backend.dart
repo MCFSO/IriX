@@ -163,6 +163,8 @@ class NodeDockerBackend extends NodeContainerBackend {
       'restartPolicy': request.restartPolicy,
       'memoryLimitMb': request.memoryLimitMb,
       'cpus': request.cpus,
+      'diskLimitMb': request.diskLimitMb,
+      'workdir': request.workdir,
     });
     return ContainerInfo(
       id: request.name,
@@ -192,6 +194,47 @@ class NodeDockerBackend extends NodeContainerBackend {
   @override
   Future<void> removeContainer(String idOrName, {bool force = false}) =>
       client.containerRemove(idOrName, force: force);
+
+  @override
+  Future<ContainerInfo> cloneContainer(
+    String idOrName, {
+    required String newName,
+    String? ip,
+  }) async {
+    if (restricted) {
+      throw const ContainerBackendException('MCSM 受限模式不支持克隆容器');
+    }
+    await client.containerClone(idOrName, newName);
+    return ContainerInfo(
+      id: newName,
+      name: newName,
+      image: '',
+      status: 'created',
+      state: 'created',
+    );
+  }
+
+  @override
+  Future<void> updateContainerLimits(
+    String idOrName, {
+    int? memoryLimitMb,
+    int? cpus,
+    int? diskLimitMb,
+  }) async {
+    if (restricted) {
+      throw const ContainerBackendException('MCSM 受限模式不支持资源限制');
+    }
+    if (diskLimitMb != null && diskLimitMb > 0) {
+      throw const ContainerBackendException(
+        'Docker 磁盘上限需在创建容器时指定，不支持热更新',
+      );
+    }
+    await client.containerUpdateLimits(
+      idOrName,
+      memoryMb: memoryLimitMb,
+      cpus: cpus,
+    );
+  }
 
   @override
   Future<void> execInContainer(String idOrName, String command) =>
@@ -360,6 +403,38 @@ class NodeDockerBackend extends NodeContainerBackend {
   Future<void> removePortMapping(PortMappingRequest request) {
     throw const ContainerBackendException('Docker 端口映射在创建容器时指定');
   }
+
+  @override
+  Future<List<PortMappingInfo>> listPortMappings() {
+    throw const ContainerBackendException(
+      'Docker 端口映射不可热管理，请查看容器列表的端口列',
+    );
+  }
+
+  @override
+  Future<BastilleSetupResult> setupEnvironment(BastilleSetupRequest request) {
+    throw const ContainerBackendException(
+      'bastille setup 仅适用于 Bastille，Docker 无需初始化网络设置',
+    );
+  }
+
+  @override
+  Future<String> exportContainer(String idOrName) {
+    throw const ContainerBackendException(
+      'Docker 不支持容器归档导出，可改用镜像保存',
+    );
+  }
+
+  @override
+  Future<ContainerInfo> importContainer(
+    String archivePath, {
+    String? release,
+    bool force = false,
+  }) {
+    throw const ContainerBackendException(
+      'Docker 不支持容器归档导入，可改用镜像导入',
+    );
+  }
 }
 
 /// 远程 Bastille 后端（irix-node,FreeBSD）。
@@ -423,8 +498,13 @@ class NodeBastilleBackend extends NodeContainerBackend {
       'release': request.image,
       'ip': request.ip,
       'type': request.jailType ?? request.restartPolicy ?? 'thin',
-      'vnet': request.vnet,
-      'bridge': request.vnet == true ? true : null,
+      'vnet': request.vnetMode,
+      'interface': request.vnetInterface,
+      'volumes': request.volumes,
+      'workdir': request.workdir,
+      'memoryLimitMb': request.memoryLimitMb,
+      'cpus': request.cpus,
+      'diskLimitMb': request.diskLimitMb,
     });
     // Bastille 端口映射在创建后经 rdr 应用。
     for (final port in request.ports) {
@@ -464,7 +544,40 @@ class NodeBastilleBackend extends NodeContainerBackend {
 
   @override
   Future<void> removeContainer(String idOrName, {bool force = false}) async {
-    await client.bastilleJailAction(idOrName, 'destroy');
+    // bastille destroy 摧毁运行中的 jail 需 -a（--auto）：
+    // force=true 时经 query 参数下发，服务端执行 `bastille destroy -y [-a] <jail>`。
+    await client.bastilleJailAction(idOrName, 'destroy', force: force);
+  }
+
+  @override
+  Future<ContainerInfo> cloneContainer(
+    String idOrName, {
+    required String newName,
+    String? ip,
+  }) async {
+    await client.bastilleJailClone(jail: idOrName, newName: newName, ip: ip);
+    return ContainerInfo(
+      id: newName,
+      name: newName,
+      image: '',
+      status: 'created',
+      state: 'created',
+    );
+  }
+
+  @override
+  Future<void> updateContainerLimits(
+    String idOrName, {
+    int? memoryLimitMb,
+    int? cpus,
+    int? diskLimitMb,
+  }) async {
+    await client.bastilleJailLimits(
+      idOrName,
+      memoryMb: memoryLimitMb,
+      cpus: cpus,
+      diskMb: diskLimitMb,
+    );
   }
 
   @override
@@ -569,4 +682,56 @@ class NodeBastilleBackend extends NodeContainerBackend {
         hostPort: request.hostPort,
         jailPort: request.containerPort,
       );
+
+  @override
+  Future<List<PortMappingInfo>> listPortMappings() async {
+    final rows = await client.bastilleRdrList();
+    return rows.map((json) {
+      return PortMappingInfo(
+        container: json['jail']?.toString() ?? '',
+        proto: json['proto']?.toString() ?? 'tcp',
+        hostPort: (json['hostPort'] as num?)?.toInt() ?? 0,
+        containerPort: (json['jailPort'] as num?)?.toInt() ?? 0,
+      );
+    }).toList();
+  }
+
+  // ==================== 导入 / 导出 ====================
+
+  @override
+  Future<String> exportContainer(String idOrName) =>
+      client.bastilleJailExport(idOrName);
+
+  @override
+  Future<ContainerInfo> importContainer(
+    String archivePath, {
+    String? release,
+    bool force = false,
+  }) async {
+    final name = await client.bastilleJailImport(
+      file: archivePath,
+      release: release,
+      force: force,
+    );
+    return ContainerInfo(
+      id: name,
+      name: name,
+      image: release ?? '',
+      status: 'created',
+      state: 'created',
+    );
+  }
+
+  // ==================== 环境初始化（bastille setup）====================
+
+  @override
+  Future<BastilleSetupResult> setupEnvironment(
+    BastilleSetupRequest request,
+  ) async {
+    final result = await client.bastilleSetup(request.toJson());
+    return BastilleSetupResult(
+      ok: result?['ok'] as bool? ?? true,
+      detail: result?['detail'] as String?,
+    );
+  }
 }

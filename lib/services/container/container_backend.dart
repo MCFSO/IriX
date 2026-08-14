@@ -226,9 +226,12 @@ class CreateContainerRequest {
     this.restartPolicy,
     this.memoryLimitMb,
     this.cpus,
+    this.diskLimitMb,
+    this.workdir,
     this.ip,
     this.jailType,
-    this.vnet,
+    this.vnetMode,
+    this.vnetInterface,
   });
 
   /// 容器名 / jail 名。
@@ -258,14 +261,30 @@ class CreateContainerRequest {
   /// CPU 核数限制。
   final int? cpus;
 
+  /// 磁盘占用上限（MB）。
+  /// Docker：`--storage-opt size=`（依赖存储驱动）；Bastille：ZFS 数据集配额。
+  final int? diskLimitMb;
+
+  /// 容器内工作目录（Docker `-w`；Bastille 设置 `exec.start` 的 cwd）。
+  /// 用于「数据存储目录挂载后强制工作目录」场景。
+  final String? workdir;
+
   /// Bastille：jail 的 IP 地址（如 192.168.1.50/24）。
+  /// Bastille 的 NAME / RELEASE / IP 均为显式声明参数（VNET 时须含子网掩码）。
   final String? ip;
 
   /// Bastille：jail 类型（thin/thick/clone/empty/linux）。
+  /// 对应 `bastille create`：thin 为默认（无标志），thick=-T，clone=-C，empty=-E，linux=-L。
   final String? jailType;
 
-  /// Bastille：是否启用 VNET（宿主网卡 -V / 桥接 -B）。
-  final bool? vnet;
+  /// Bastille：VNET 模式（`bastille create` 的 -V / -B）：
+  /// - `none`：不使用 VNET（默认，共享宿主网络 / NAT）
+  /// - `vnet`：-V，[vnetInterface] 必须是物理网卡
+  /// - `bridge`：-B，[vnetInterface] 必须是已存在的桥接网卡
+  final String? vnetMode;
+
+  /// Bastille：VNET 的 INTERFACE 位置参数（-V 时为物理网卡，-B 时为桥接网卡）。
+  final String? vnetInterface;
 }
 
 /// 端口映射请求（Bastille rdr）。
@@ -281,6 +300,85 @@ class PortMappingRequest {
   final String proto; // tcp | udp
   final int hostPort;
   final int containerPort;
+}
+
+/// 端口映射条目（rdr 列表）。
+class PortMappingInfo {
+  const PortMappingInfo({
+    required this.container,
+    required this.proto,
+    required this.hostPort,
+    required this.containerPort,
+  });
+
+  /// jail 名。
+  final String container;
+
+  /// tcp | udp。
+  final String proto;
+
+  /// 宿主机端口。
+  final int hostPort;
+
+  /// jail 内端口。
+  final int containerPort;
+
+  /// 展示字符串，如 `tcp 25565 -> 25565`。
+  String get display => '$proto $hostPort -> $containerPort';
+}
+
+/// Bastille 环境初始化请求（`bastille setup`）。
+///
+/// 官方用法：`bastille setup [-y] [bridge|linux|loopback|netgraph|firewall|shared|storage|vnet]`。
+/// 不带选项运行 = 自动配置 loopback + firewall + storage。
+///
+/// [mode] 对应 setup 模式：
+/// - `firewall`：配置 PF 防火墙（rdr 端口转发的前提），可选 [extIf]（外网网卡）；
+/// - `vnet`：配置 VNET 网络（-V），可选 [extIf]/[tunIf]/[addr]（部分版本为交互式）；
+/// - `bridge`：配置桥接网卡（-B 桥接 VNET）；
+/// - `shared`：将指定网卡设为共享接口（create 未指定接口时的默认），需 [extIf]；
+/// - `linux`：初始化 Linuxulator（Linux Jail 前提，`bastille setup linux`）；
+/// - `default`：不带选项的自动配置（loopback + firewall + storage）。
+class BastilleSetupRequest {
+  const BastilleSetupRequest({
+    required this.mode,
+    this.extIf,
+    this.tunIf,
+    this.addr,
+  });
+
+  /// firewall | vnet | bridge | shared | linux | default。
+  final String mode;
+
+  /// 外网网卡（firewall / vnet / shared）。
+  final String? extIf;
+
+  /// 桥接网卡名（vnet，如 bastille0）。
+  final String? tunIf;
+
+  /// 网段（vnet，如 10.99.0.0/24）。
+  final String? addr;
+
+  /// 转为节点 API 请求体。
+  Map<String, dynamic> toJson() => {
+        'mode': mode,
+        if (extIf != null && extIf!.isNotEmpty) 'extIf': extIf,
+        if (tunIf != null && tunIf!.isNotEmpty) 'tunIf': tunIf,
+        if (addr != null && addr!.isNotEmpty) 'addr': addr,
+      };
+}
+
+/// Bastille 初始化结果。
+class BastilleSetupResult {
+  const BastilleSetupResult({
+    required this.ok,
+    this.detail,
+  });
+
+  final bool ok;
+
+  /// 命令输出摘要（供 UI 展示）。
+  final String? detail;
 }
 
 /// 容器后端统一接口。
@@ -323,6 +421,16 @@ abstract class ContainerBackend {
   /// 删除（[force] 时先强制终止）。
   Future<void> removeContainer(String idOrName, {bool force = false});
 
+  /// 克隆容器 / jail（[newName] 为新名称，[ip] 为新 IP，可选）。
+  ///
+  /// Docker：`docker commit` + 按新名称 `docker create`；
+  /// Bastille：`bastille clone <source> <newName>`（thin 克隆）。
+  Future<ContainerInfo> cloneContainer(
+    String idOrName, {
+    required String newName,
+    String? ip,
+  });
+
   /// 容器内执行命令（用于发送 MC 控制台指令）。
   Future<void> execInContainer(String idOrName, String command);
 
@@ -331,6 +439,19 @@ abstract class ContainerBackend {
 
   /// 资源统计。
   Future<ContainerStats?> containerStats(String idOrName);
+
+  /// 更新运行中容器的资源限制。
+  ///
+  /// Docker：`docker update -m --cpus`（磁盘上限需创建时指定，不支持热更新）；
+  /// Bastille：内存 → `bastille limits <jail> add memoryuse <N>M`（rctl）；
+  /// CPU 核数 → `bastille limits <jail> cpu 0..N-1`（cpuset，由服务端换算 CPU 列表）；
+  /// 磁盘 → ZFS 数据集配额（`zfs set quota`，Bastille 无内建磁盘限额命令）。
+  Future<void> updateContainerLimits(
+    String idOrName, {
+    int? memoryLimitMb,
+    int? cpus,
+    int? diskLimitMb,
+  });
 
   // ==================== 镜像 / 发行版 ====================
 
@@ -348,6 +469,23 @@ abstract class ContainerBackend {
 
   /// 查询构建进度。
   Future<BuildProgress> buildProgress(String jobId);
+
+  // ==================== 导入 / 导出（Bastille）====================
+
+  /// 导出容器 / jail 为归档（`bastille export`），返回宿主机上的归档路径。
+  ///
+  /// Docker 不支持容器归档导出（可用镜像替代），抛 [ContainerBackendException]。
+  Future<String> exportContainer(String idOrName);
+
+  /// 从归档导入容器 / jail（`bastille import [option(s)] FILE [RELEASE]`）。
+  ///
+  /// [archivePath] 为宿主机上的归档路径；[release] 指定导入到哪个发行版
+  /// （可选，默认按归档内名称）；[force] 跳过校验和验证（-f）。
+  Future<ContainerInfo> importContainer(
+    String archivePath, {
+    String? release,
+    bool force = false,
+  });
 
   // ==================== 卷 ====================
 
@@ -367,4 +505,16 @@ abstract class ContainerBackend {
 
   /// 移除端口映射（Bastille rdr）。
   Future<void> removePortMapping(PortMappingRequest request);
+
+  /// 端口映射列表（Bastille rdr 规则；Docker 不支持热管理）。
+  Future<List<PortMappingInfo>> listPortMappings();
+
+  // ==================== 环境初始化（Bastille）====================
+
+  /// 容器软件设置初始化（`bastille setup`）：
+  /// 网络设置（firewall / vnet / bridge / shared）与 Linux Jail（linux）初始化，
+  /// 以及不带选项的一键默认配置（default）。
+  ///
+  /// Docker 无等效命令，抛 [ContainerBackendException]。
+  Future<BastilleSetupResult> setupEnvironment(BastilleSetupRequest request);
 }

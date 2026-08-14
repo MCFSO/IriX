@@ -25,10 +25,10 @@ typedef DockerCommandRunner = Future<DockerRunResult> Function(
 
 /// 低层 docker CLI 封装：参数组装 + JSON 行解析。
 class DockerCli {
-  DockerCli({this._runner, this.dockerBinary = 'docker'});
+  DockerCli({this.runner, this.dockerBinary = 'docker'});
 
   /// 命令执行器（默认走 Process.run，测试时注入 fake）。
-  final DockerCommandRunner? _runner;
+  final DockerCommandRunner? runner;
 
   /// docker 可执行文件名/路径。
   final String dockerBinary;
@@ -44,7 +44,7 @@ class DockerCli {
     Duration? timeout,
   }) async {
     final effectiveTimeout = timeout ?? _timeout;
-    final result = await (_runner?.call(
+    final result = await (runner?.call(
           args,
           stdin: stdin,
           timeout: effectiveTimeout,
@@ -211,6 +211,13 @@ class DockerCliBackend implements ContainerBackend {
     if (request.cpus != null && request.cpus! > 0) {
       args.addAll(['--cpus', '${request.cpus}']);
     }
+    if (request.diskLimitMb != null && request.diskLimitMb! > 0) {
+      // 依赖存储驱动支持（overlay2 on xfs / devicemapper 等），不支持时 docker 报错。
+      args.addAll(['--storage-opt', 'size=${request.diskLimitMb}m']);
+    }
+    if (request.workdir != null && request.workdir!.trim().isNotEmpty) {
+      args.addAll(['-w', request.workdir!.trim()]);
+    }
     args.add(request.image);
     if (request.command != null && request.command!.trim().isNotEmpty) {
       args.addAll(request.command!.trim().split(RegExp(r'\s+')));
@@ -250,6 +257,51 @@ class DockerCliBackend implements ContainerBackend {
     await _cli.run([
       'rm',
       if (force) '-f',
+      idOrName,
+    ], timeout: const Duration(seconds: 60));
+  }
+
+  @override
+  Future<ContainerInfo> cloneContainer(
+    String idOrName, {
+    required String newName,
+    String? ip,
+  }) async {
+    // Docker 无原生 clone：commit 当前容器状态为临时镜像，再按新名称创建。
+    final tag =
+        'xmc-clone-${DateTime.now().millisecondsSinceEpoch.toRadixString(36)}';
+    await _cli.run(['commit', idOrName, '$newName:$tag']);
+    await _cli.run(['create', '--name', newName, '$newName:$tag']);
+    return ContainerInfo(
+      id: newName,
+      name: newName,
+      image: '$newName:$tag',
+      status: 'created',
+      state: 'created',
+    );
+  }
+
+  @override
+  Future<void> updateContainerLimits(
+    String idOrName, {
+    int? memoryLimitMb,
+    int? cpus,
+    int? diskLimitMb,
+  }) async {
+    if (diskLimitMb != null && diskLimitMb > 0) {
+      throw const ContainerBackendException(
+        'Docker 磁盘上限需在创建容器时通过 --storage-opt 指定，不支持热更新',
+      );
+    }
+    final hasMemory = memoryLimitMb != null && memoryLimitMb > 0;
+    final hasCpus = cpus != null && cpus > 0;
+    if (!hasMemory && !hasCpus) return;
+    await _cli.run([
+      'update',
+      if (hasMemory) '-m',
+      if (hasMemory) '${memoryLimitMb}m',
+      if (hasCpus) '--cpus',
+      if (hasCpus) '$cpus',
       idOrName,
     ], timeout: const Duration(seconds: 60));
   }
@@ -429,6 +481,38 @@ class DockerCliBackend implements ContainerBackend {
   @override
   Future<void> removePortMapping(PortMappingRequest request) {
     throw ContainerBackendException('Docker 端口映射在创建容器时通过 -p 指定');
+  }
+
+  @override
+  Future<List<PortMappingInfo>> listPortMappings() {
+    throw ContainerBackendException('Docker 端口映射不可热管理，请查看容器列表的端口列');
+  }
+
+  // ==================== Bastille 专属能力（Docker 无等效命令）====================
+
+  @override
+  Future<BastilleSetupResult> setupEnvironment(BastilleSetupRequest request) {
+    throw ContainerBackendException(
+      'bastille setup 仅适用于 Bastille，Docker 无需初始化网络设置',
+    );
+  }
+
+  @override
+  Future<String> exportContainer(String idOrName) {
+    throw ContainerBackendException(
+      'Docker 不支持容器归档导出，可改用镜像保存（docker commit/push）',
+    );
+  }
+
+  @override
+  Future<ContainerInfo> importContainer(
+    String archivePath, {
+    String? release,
+    bool force = false,
+  }) {
+    throw ContainerBackendException(
+      'Docker 不支持容器归档导入，可改用镜像导入（docker load）',
+    );
   }
 
   // ==================== 解析工具 ====================

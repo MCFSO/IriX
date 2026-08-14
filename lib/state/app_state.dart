@@ -88,6 +88,8 @@ class AppState extends ChangeNotifier {
       restartPolicy: cfg.restartPolicy,
       memoryLimitMb: cfg.memoryLimitMb,
       cpus: cfg.cpus,
+      diskLimitMb: cfg.diskLimitMb,
+      workdir: cfg.workdir,
     );
   }
 

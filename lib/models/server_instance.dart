@@ -55,6 +55,13 @@ class ContainerConfig {
   /// CPU 限制（核数），对应 `--cpus`。
   final int? cpus;
 
+  /// 磁盘占用上限（MB），对应 `--storage-opt size=`（依赖存储驱动）。
+  final int? diskLimitMb;
+
+  /// 容器内工作目录（`-w`）。用于「数据目录挂载后强制工作目录」：
+  /// 实例目录挂载到 /data 时设 `/data`，保证服务端进程在数据目录内启动。
+  final String? workdir;
+
   const ContainerConfig({
     this.image = 'itzg/minecraft-server:latest',
     this.containerName,
@@ -64,6 +71,8 @@ class ContainerConfig {
     this.restartPolicy,
     this.memoryLimitMb,
     this.cpus,
+    this.diskLimitMb,
+    this.workdir,
   });
 
   /// 序列化为 JSON 字符串。
@@ -76,6 +85,8 @@ class ContainerConfig {
         'restartPolicy': restartPolicy,
         'memoryLimitMb': memoryLimitMb,
         'cpus': cpus,
+        'diskLimitMb': diskLimitMb,
+        'workdir': workdir,
       });
 
   /// 从 JSON 反序列化；字段缺失时使用默认值，保证旧数据兼容。
@@ -98,6 +109,8 @@ class ContainerConfig {
       restartPolicy: map['restartPolicy'] as String?,
       memoryLimitMb: (map['memoryLimitMb'] as num?)?.toInt(),
       cpus: (map['cpus'] as num?)?.toInt(),
+      diskLimitMb: (map['diskLimitMb'] as num?)?.toInt(),
+      workdir: map['workdir'] as String?,
     );
   }
 
@@ -111,10 +124,14 @@ class ContainerConfig {
     String? restartPolicy,
     int? memoryLimitMb,
     int? cpus,
+    int? diskLimitMb,
+    String? workdir,
     bool clearContainerName = false,
     bool clearRestartPolicy = false,
     bool clearMemory = false,
     bool clearCpus = false,
+    bool clearDiskLimit = false,
+    bool clearWorkdir = false,
   }) {
     return ContainerConfig(
       image: image ?? this.image,
@@ -125,6 +142,8 @@ class ContainerConfig {
       restartPolicy: clearRestartPolicy ? null : (restartPolicy ?? this.restartPolicy),
       memoryLimitMb: clearMemory ? null : (memoryLimitMb ?? this.memoryLimitMb),
       cpus: clearCpus ? null : (cpus ?? this.cpus),
+      diskLimitMb: clearDiskLimit ? null : (diskLimitMb ?? this.diskLimitMb),
+      workdir: clearWorkdir ? null : (workdir ?? this.workdir),
     );
   }
 

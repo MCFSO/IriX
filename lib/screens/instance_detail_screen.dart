@@ -1104,6 +1104,8 @@ class _ContainerConfigCardState extends State<_ContainerConfigCard> {
   late final TextEditingController _envController;
   late final TextEditingController _memoryController;
   late final TextEditingController _cpusController;
+  late final TextEditingController _diskController;
+  late final TextEditingController _workdirController;
   String? _restartPolicy;
   bool _dirty = false;
 
@@ -1124,6 +1126,10 @@ class _ContainerConfigCardState extends State<_ContainerConfigCard> {
       text: config.memoryLimitMb?.toString() ?? '',
     );
     _cpusController = TextEditingController(text: config.cpus?.toString() ?? '');
+    _diskController = TextEditingController(
+      text: config.diskLimitMb?.toString() ?? '',
+    );
+    _workdirController = TextEditingController(text: config.workdir ?? '');
     _restartPolicy = config.restartPolicy;
   }
 
@@ -1136,6 +1142,8 @@ class _ContainerConfigCardState extends State<_ContainerConfigCard> {
     _envController.dispose();
     _memoryController.dispose();
     _cpusController.dispose();
+    _diskController.dispose();
+    _workdirController.dispose();
     super.dispose();
   }
 
@@ -1166,6 +1174,10 @@ class _ContainerConfigCardState extends State<_ContainerConfigCard> {
       restartPolicy: _restartPolicy,
       memoryLimitMb: int.tryParse(_memoryController.text.trim()),
       cpus: int.tryParse(_cpusController.text.trim()),
+      diskLimitMb: int.tryParse(_diskController.text.trim()),
+      workdir: _workdirController.text.trim().isEmpty
+          ? null
+          : _workdirController.text.trim(),
     );
     final error = config.validate();
     if (error != null) {
@@ -1324,6 +1336,37 @@ class _ContainerConfigCardState extends State<_ContainerConfigCard> {
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
                   labelText: 'CPU 核数（留空不限）',
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (_) => _markDirty(),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _diskController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: '磁盘上限（MB，留空不限）',
+                  helperText: '需存储驱动支持 size 配额',
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (_) => _markDirty(),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextField(
+                controller: _workdirController,
+                decoration: const InputDecoration(
+                  labelText: '工作目录（留空默认）',
+                  helperText: '如 /data，强制在数据目录启动',
                   isDense: true,
                   border: OutlineInputBorder(),
                 ),

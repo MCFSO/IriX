@@ -856,8 +856,19 @@ class NodeApiClient {
   }
 
   /// jail 操作（POST /api/bastille/jails/{name}/start|stop|restart|destroy）。
-  Future<void> bastilleJailAction(String name, String action) async {
-    await _request('POST', '/api/bastille/jails/$name/$action');
+  ///
+  /// [force] 仅对 destroy 有效：服务端附加 `-a`（`bastille destroy -a`），
+  /// 用于摧毁运行中的 jail。
+  Future<void> bastilleJailAction(
+    String name,
+    String action, {
+    bool force = false,
+  }) async {
+    await _request(
+      'POST',
+      '/api/bastille/jails/$name/$action',
+      query: {if (force) 'force': '1'},
+    );
   }
 
   /// jail 日志（GET /api/bastille/jails/{name}/console）。
@@ -925,6 +936,97 @@ class NodeApiClient {
       'proto': proto,
       'hostPort': hostPort,
       'jailPort': jailPort,
+    });
+  }
+
+  /// 端口转发规则列表（GET /api/bastille/rdr）。
+  /// [jail] 非空时仅返回该 jail 的规则。
+  Future<List<Map<String, dynamic>>> bastilleRdrList({String? jail}) async {
+    final data = await _request(
+      'GET',
+      '/api/bastille/rdr',
+      query: {if (jail != null && jail.isNotEmpty) 'jail': jail},
+    );
+    return _listOfMaps(data);
+  }
+
+  /// 环境初始化（POST /api/bastille/setup，`bastille setup`）。
+  ///
+  /// 返回 `{ok, detail?, checked?}`；[config] 见 BastilleSetupRequest.toJson。
+  Future<Map<String, dynamic>?> bastilleSetup(Map<String, dynamic> config) async {
+    final data = await _request('POST', '/api/bastille/setup', body: config);
+    return data is Map<String, dynamic> ? data : null;
+  }
+
+  /// 克隆 jail（POST /api/bastille/jails/{name}/clone，`bastille clone`）。
+  Future<void> bastilleJailClone({
+    required String jail,
+    required String newName,
+    String? ip,
+  }) async {
+    await _request('POST', '/api/bastille/jails/$jail/clone', body: {
+      'newName': newName,
+      if (ip != null && ip.isNotEmpty) 'ip': ip,
+    });
+  }
+
+  /// 导出 jail 为归档（POST /api/bastille/jails/{name}/export，`bastille export`）。
+  /// 返回宿主机上的归档路径。
+  Future<String> bastilleJailExport(String name) async {
+    final data = await _request('POST', '/api/bastille/jails/$name/export');
+    if (data is Map<String, dynamic>) {
+      return data['path'] as String? ?? data['file'] as String? ?? '';
+    }
+    return data?.toString() ?? '';
+  }
+
+  /// 导入归档为 jail（POST /api/bastille/jails/import，`bastille import FILE [RELEASE]`）。
+  /// [release] 指定导入到哪个发行版（可选）；[force] 跳过校验和验证（-f）。
+  /// 返回新建 jail 名。
+  Future<String> bastilleJailImport({
+    required String file,
+    String? release,
+    bool force = false,
+  }) async {
+    final data = await _request('POST', '/api/bastille/jails/import', body: {
+      'file': file,
+      if (release != null && release.isNotEmpty) 'release': release,
+      if (force) 'force': true,
+    });
+    return (data is Map ? data['name'] : null) as String? ?? '';
+  }
+
+  /// 设置 jail 资源限制（POST /api/bastille/jails/{name}/limits）。
+  ///
+  /// 服务端映射：memoryMb → rctl memoryuse；cpus → cpuset；
+  /// diskMb → ZFS 数据集配额。
+  Future<void> bastilleJailLimits(
+    String name, {
+    int? memoryMb,
+    int? cpus,
+    int? diskMb,
+  }) async {
+    await _request('POST', '/api/bastille/jails/$name/limits', body: {
+      'memoryMb': ?memoryMb,
+      'cpus': ?cpus,
+      'diskMb': ?diskMb,
+    });
+  }
+
+  /// 克隆容器（POST /api/container/{id}/clone）。
+  Future<void> containerClone(String id, String newName) async {
+    await _request('POST', '/api/container/$id/clone', body: {'name': newName});
+  }
+
+  /// 更新容器资源限制（POST /api/container/{id}/limits）。
+  Future<void> containerUpdateLimits(
+    String id, {
+    int? memoryMb,
+    int? cpus,
+  }) async {
+    await _request('POST', '/api/container/$id/limits', body: {
+      'memoryMb': ?memoryMb,
+      'cpus': ?cpus,
     });
   }
 }

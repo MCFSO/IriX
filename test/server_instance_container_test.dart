@@ -15,6 +15,8 @@ void main() {
         restartPolicy: 'unless-stopped',
         memoryLimitMb: 4096,
         cpus: 4,
+        diskLimitMb: 20480,
+        workdir: '/data',
       );
       final restored = ContainerConfig.fromJson(config.toJson());
       expect(restored.image, config.image);
@@ -25,6 +27,8 @@ void main() {
       expect(restored.restartPolicy, config.restartPolicy);
       expect(restored.memoryLimitMb, config.memoryLimitMb);
       expect(restored.cpus, config.cpus);
+      expect(restored.diskLimitMb, config.diskLimitMb);
+      expect(restored.workdir, config.workdir);
     });
 
     test('空 JSON 使用默认值', () {
@@ -33,6 +37,8 @@ void main() {
       expect(config.ports, ['25565:25565']);
       expect(config.containerName, isNull);
       expect(config.memoryLimitMb, isNull);
+      expect(config.diskLimitMb, isNull);
+      expect(config.workdir, isNull);
     });
 
     test('校验端口与卷格式', () {
@@ -55,17 +61,23 @@ void main() {
         restartPolicy: 'always',
         memoryLimitMb: 1024,
         cpus: 2,
+        diskLimitMb: 5120,
+        workdir: '/data',
       );
       final cleared = config.copyWith(
         clearContainerName: true,
         clearRestartPolicy: true,
         clearMemory: true,
         clearCpus: true,
+        clearDiskLimit: true,
+        clearWorkdir: true,
       );
       expect(cleared.containerName, isNull);
       expect(cleared.restartPolicy, isNull);
       expect(cleared.memoryLimitMb, isNull);
       expect(cleared.cpus, isNull);
+      expect(cleared.diskLimitMb, isNull);
+      expect(cleared.workdir, isNull);
       expect(cleared.image, config.image);
     });
   });
