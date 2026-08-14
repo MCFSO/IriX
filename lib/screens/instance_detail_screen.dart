@@ -71,7 +71,8 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
   /// AI 侧栏的会话状态（页面打开期间保持，收起再展开不丢失）。
   late final AiChatController _aiController;
 
-  /// 本机 Docker 是否可用（决定是否展示「容器」Tab 与容器化选项）。
+  /// 本机 Docker 是否可用（决定「设置」Tab 中「Docker 容器」运行方式是否可选；
+  /// 「容器」Tab 始终展示，不可用时面板呈现原因与重新检测按钮）。
   bool _dockerAvailable = false;
 
   /// 是否正在探测 Docker 环境。
@@ -219,9 +220,10 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
       );
     }
 
-    final showContainerTab = _dockerAvailable;
+    // 「容器」Tab 始终展示：本机无 Docker 时面板呈现不可用状态与检测按钮，
+    // 避免用户完全看不到容器管理入口。
     return DefaultTabController(
-      length: showContainerTab ? 7 : 6,
+      length: 7,
       child: Scaffold(
         appBar: AppBar(
           title: Text(instance.name),
@@ -235,15 +237,15 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
             const SizedBox(width: 4),
           ],
           bottom: TabBar(
-            tabs: [
-              const Tab(icon: Icon(Icons.dashboard), text: '总览'),
-              const Tab(icon: Icon(Icons.description), text: '配置'),
-              const Tab(icon: Icon(Icons.extension), text: '插件/Mod'),
-              const Tab(icon: Icon(Icons.folder), text: '文件'),
-              const Tab(icon: Icon(Icons.backup), text: '备份'),
-              const Tab(icon: Icon(Icons.settings), text: '设置'),
-              if (showContainerTab)
-                const Tab(icon: Icon(Icons.inventory_2), text: '容器'),
+            isScrollable: true,
+            tabs: const [
+              Tab(icon: Icon(Icons.dashboard), text: '总览'),
+              Tab(icon: Icon(Icons.description), text: '配置'),
+              Tab(icon: Icon(Icons.extension), text: '插件/Mod'),
+              Tab(icon: Icon(Icons.folder), text: '文件'),
+              Tab(icon: Icon(Icons.backup), text: '备份'),
+              Tab(icon: Icon(Icons.settings), text: '设置'),
+              Tab(icon: Icon(Icons.inventory_2), text: '容器'),
             ],
           ),
         ),
@@ -289,14 +291,13 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
                     dockerAvailable: _dockerAvailable,
                     dockerProbing: _dockerProbing,
                   ),
-                  // Tab 7: 容器 — Docker 全功能管理（本机可用时显示）
-                  if (showContainerTab)
-                    ContainerEnvironmentPanel(
-                      backend: state.dockerCli,
-                      highlightName: instance.runMode == RunMode.docker
-                          ? state.containerNameFor(instance)
-                          : null,
-                    ),
+                  // Tab 7: 容器 — 本机 Docker 全功能管理（不可用时展示原因与重新检测）
+                  ContainerEnvironmentPanel(
+                    backend: state.dockerCli,
+                    highlightName: instance.runMode == RunMode.docker
+                        ? state.containerNameFor(instance)
+                        : null,
+                  ),
                 ],
               ),
             ),

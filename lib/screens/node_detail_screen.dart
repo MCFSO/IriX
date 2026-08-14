@@ -111,7 +111,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
   /// 按节点类型确定标签页。
   ///
   /// 「容器」标签页展示节点容器环境的全功能管理（Docker / Bastille 按节点平台），
-  /// 仅在节点在线且按客户端/节点平台允许显示时出现（见 shouldShowDockerSettings）。
+  /// 节点在线即展示；平台不支持时面板呈现不可用状态与原因。
   List<({String label, IconData icon, Widget child})> _tabs(NodeInfo node) {
     final client = _client!;
     final daemonId = _daemonId;
@@ -149,9 +149,9 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
         ),
       ),
     ];
-    // 容器环境管理（Docker 全功能 / Bastille 全功能），按平台显示。
-    if (overview != null &&
-        shouldShowDockerSettings(nodePlatform: overview.system.platform)) {
+    // 容器环境管理（Docker 全功能 / Bastille 全功能，按节点平台选后端）。
+    // 节点在线即展示；平台不支持时面板呈现不可用状态与原因。
+    if (overview != null) {
       tabs.add((
         label: '容器',
         icon: Icons.inventory_2,

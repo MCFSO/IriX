@@ -382,11 +382,16 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
       return const Center(child: CircularProgressIndicator());
     }
     if (_env == null || !_env!.available) {
+      final isBastille = _isBastille;
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.inventory_2, size: 48, color: Colors.grey),
+            Icon(
+              isBastille ? Icons.deck_outlined : Icons.inventory_2,
+              size: 48,
+              color: Colors.grey,
+            ),
             const SizedBox(height: 12),
             Text(
               '${widget.backend.displayName} 不可用',
@@ -406,6 +411,19 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
                 ),
               ),
             ],
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                isBastille
+                    ? 'Bastille 运行在 FreeBSD 节点上：请在「节点管理」中添加在线 '
+                        'FreeBSD 节点（irix-node）后，从节点详情页的「容器」Tab 管理 jail。'
+                    : '本机使用 Docker 环境：安装并启动 Docker Desktop（或安装 docker '
+                        'CLI）后点击「重新检测」即可使用全部容器功能。',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+              ),
+            ),
             const SizedBox(height: 16),
             OutlinedButton.icon(
               onPressed: _probeEnvironment,

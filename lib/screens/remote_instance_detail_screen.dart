@@ -231,9 +231,6 @@ class _RemoteInstanceDetailScreenState
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final showContainerTab = shouldShowDockerSettings(
-      nodePlatform: widget.nodePlatform,
-    );
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -279,18 +276,17 @@ class _RemoteInstanceDetailScreenState
             ),
           Expanded(
             child: DefaultTabController(
-              length: showContainerTab ? 3 : 2,
+              length: 3,
               child: Column(
                 children: [
                   TabBar(
-                    tabs: [
-                      const Tab(icon: Icon(Icons.terminal), text: '控制台'),
-                      const Tab(
+                    tabs: const [
+                      Tab(icon: Icon(Icons.terminal), text: '控制台'),
+                      Tab(
                         icon: Icon(Icons.settings_outlined),
                         text: '配置',
                       ),
-                      if (showContainerTab)
-                        const Tab(icon: Icon(Icons.inventory_2), text: '容器'),
+                      Tab(icon: Icon(Icons.inventory_2), text: '容器'),
                     ],
                   ),
                   Expanded(
@@ -298,7 +294,7 @@ class _RemoteInstanceDetailScreenState
                       children: [
                         _buildConsole(theme),
                         _buildConfig(theme),
-                        if (showContainerTab) _buildContainerTab(),
+                        _buildContainerTab(),
                       ],
                     ),
                   ),
