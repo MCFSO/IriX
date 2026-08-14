@@ -20,6 +20,7 @@ import 'ai_screen.dart';
 import 'cluster_home_screen.dart';
 import 'cluster_instances_screen.dart';
 import 'cluster_container_screen.dart';
+import 'cluster_orchestration_screen.dart';
 import 'database_screen.dart';
 import 'frp_screen.dart';
 import 'instance_detail_screen.dart';
@@ -173,7 +174,7 @@ class _HomeScreenState extends State<HomeScreen> {
     ),
   ];
 
-  /// 多机模式导航（节点优先，7 项）。
+  /// 多机模式导航（节点优先，8 项）。
   List<NavigationRailDestination> _multiDestinations() => const [
     NavigationRailDestination(
       icon: Icon(Icons.lan_outlined),
@@ -189,6 +190,11 @@ class _HomeScreenState extends State<HomeScreen> {
       icon: Icon(Icons.inventory_2_outlined),
       selectedIcon: Icon(Icons.inventory_2),
       label: Text('容器'),
+    ),
+    NavigationRailDestination(
+      icon: Icon(Icons.dashboard_customize_outlined),
+      selectedIcon: Icon(Icons.dashboard_customize),
+      label: Text('编排'),
     ),
     NavigationRailDestination(
       icon: Icon(Icons.store_outlined),
@@ -222,12 +228,14 @@ class _HomeScreenState extends State<HomeScreen> {
       case 2:
         return const ClusterContainerScreen();
       case 3:
-        return const MarketplaceScreen();
+        return const ClusterOrchestrationScreen();
       case 4:
-        return const DatabaseScreen();
+        return const MarketplaceScreen();
       case 5:
-        return const AiScreen();
+        return const DatabaseScreen();
       case 6:
+        return const AiScreen();
+      case 7:
         return const FrpScreen();
       default:
         return const ClusterHomeScreen();

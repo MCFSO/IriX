@@ -302,6 +302,26 @@ POST /api/bastille/setup     body: { "mode": "firewall", "extIf": "em0", "tunIf"
 | `shared` | `bastille setup shared` | `extIf` 网卡 |
 | `linux` | `bastille setup linux`（加载内核模块 + 安装 debootstrap） | 无 |
 
+### 4.8 节点级归档（编排系统跨物理机迁移存档用）
+
+> 客户端编排引擎（xmc_orchestrator）的迁移状态机执行「压缩 → 传输 → 恢复」时
+> 调用以下节点级端点。**与实例无关**（不需要 uuid）：操作任意宿主机路径。
+> 存档传输以桌面客户端为中继（源节点下载 → 目标节点上传）。
+
+```
+POST /api/container/archive          body: { "path": "/data/mc/world", "archive"?: "world_s1_0.zip" }
+                                     → data: { "path": "/usr/local/bastille/backups/world_s1_0.zip" }
+                                     （服务端在节点上压缩 path 为 zip；archive 缺省自动命名）
+GET  /api/container/archive?file=<归档名>
+                                     → 原始二进制（非 JSON 信封，直接返回文件字节）
+POST /api/container/archive/upload   multipart 字段 "file"（原始字节）→ data: { "path": "<保存路径>" }
+POST /api/container/archive/restore  body: { "file": "<归档名>", "destPath": "/data/mc/world" }
+                                     （服务端解压归档到 destPath，覆盖式恢复）
+```
+
+实现提示：压缩/解压可用系统 `zip`/`tar`（FreeBSD 自带），或复用 zip 库；
+`GET archive` 与 `POST upload` 为原始字节传输，不走统一 JSON 信封。
+
 ---
 
 ## 5. 自测清单（curl 示例，假设 apikey=KEY）

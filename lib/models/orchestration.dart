@@ -74,79 +74,79 @@ class McService {
   final int createdAtMs;
 
   factory McService.fromJson(Map<String, dynamic> json) => McService(
-        id: json['id'] as String? ?? '',
-        name: json['name'] as String? ?? '',
-        runtime: json['runtime'] as String? ?? 'docker',
-        image: json['image'] as String? ?? '',
-        command: json['command'] as String?,
-        ports: (json['ports'] as List<dynamic>? ?? [])
-            .whereType<String>()
-            .toList(),
-        volumes: (json['volumes'] as List<dynamic>? ?? [])
-            .whereType<String>()
-            .toList(),
-        env: (json['env'] as Map<String, dynamic>? ?? {})
-            .map((k, v) => MapEntry(k, v.toString())),
-        restartPolicy: json['restartPolicy'] as String?,
-        memoryLimitMb: (json['memoryLimitMb'] as num?)?.toInt(),
-        cpus: (json['cpus'] as num?)?.toInt(),
-        workdir: json['workdir'] as String?,
-        worldDir: json['worldDir'] as String? ?? '/data/world',
-        jailType: json['jailType'] as String?,
-        vnetMode: json['vnetMode'] as String?,
-        bastilleIpBase: json['bastilleIpBase'] as String?,
-        bastilleIpMask: (json['bastilleIpMask'] as num?)?.toInt() ?? 24,
-        desiredReplicas: (json['desiredReplicas'] as num?)?.toInt() ?? 1,
-        minReplicas: (json['minReplicas'] as num?)?.toInt() ?? 0,
-        maxReplicas: (json['maxReplicas'] as num?)?.toInt() ?? 8,
-        autoscale: json['autoscale'] as bool? ?? false,
-        targetPlayers: (json['targetPlayers'] as num?)?.toInt() ?? 20,
-        scaleUpPlayers: (json['scaleUpPlayers'] as num?)?.toInt() ?? 20,
-        scaleDownPlayers: (json['scaleDownPlayers'] as num?)?.toInt() ?? 10,
-        cooldownSecs: (json['cooldownSecs'] as num?)?.toInt() ?? 300,
-        autoHeal: json['autoHeal'] as bool? ?? true,
-        crashThreshold: (json['crashThreshold'] as num?)?.toInt() ?? 5,
-        backoffBaseSecs: (json['backoffBaseSecs'] as num?)?.toInt() ?? 5,
-        maxBackoffSecs: (json['maxBackoffSecs'] as num?)?.toInt() ?? 300,
-        nodeSelector: (json['nodeSelector'] as Map<String, dynamic>? ?? {})
-            .map((k, v) => MapEntry(k, v.toString())),
-        createdAtMs: (json['createdAtMs'] as num?)?.toInt() ?? 0,
-      );
+    id: json['id'] as String? ?? '',
+    name: json['name'] as String? ?? '',
+    runtime: json['runtime'] as String? ?? 'docker',
+    image: json['image'] as String? ?? '',
+    command: json['command'] as String?,
+    ports: (json['ports'] as List<dynamic>? ?? []).whereType<String>().toList(),
+    volumes: (json['volumes'] as List<dynamic>? ?? [])
+        .whereType<String>()
+        .toList(),
+    env: (json['env'] as Map<String, dynamic>? ?? {}).map(
+      (k, v) => MapEntry(k, v.toString()),
+    ),
+    restartPolicy: json['restartPolicy'] as String?,
+    memoryLimitMb: (json['memoryLimitMb'] as num?)?.toInt(),
+    cpus: (json['cpus'] as num?)?.toInt(),
+    workdir: json['workdir'] as String?,
+    worldDir: json['worldDir'] as String? ?? '/data/world',
+    jailType: json['jailType'] as String?,
+    vnetMode: json['vnetMode'] as String?,
+    bastilleIpBase: json['bastilleIpBase'] as String?,
+    bastilleIpMask: (json['bastilleIpMask'] as num?)?.toInt() ?? 24,
+    desiredReplicas: (json['desiredReplicas'] as num?)?.toInt() ?? 1,
+    minReplicas: (json['minReplicas'] as num?)?.toInt() ?? 0,
+    maxReplicas: (json['maxReplicas'] as num?)?.toInt() ?? 8,
+    autoscale: json['autoscale'] as bool? ?? false,
+    targetPlayers: (json['targetPlayers'] as num?)?.toInt() ?? 20,
+    scaleUpPlayers: (json['scaleUpPlayers'] as num?)?.toInt() ?? 20,
+    scaleDownPlayers: (json['scaleDownPlayers'] as num?)?.toInt() ?? 10,
+    cooldownSecs: (json['cooldownSecs'] as num?)?.toInt() ?? 300,
+    autoHeal: json['autoHeal'] as bool? ?? true,
+    crashThreshold: (json['crashThreshold'] as num?)?.toInt() ?? 5,
+    backoffBaseSecs: (json['backoffBaseSecs'] as num?)?.toInt() ?? 5,
+    maxBackoffSecs: (json['maxBackoffSecs'] as num?)?.toInt() ?? 300,
+    nodeSelector: (json['nodeSelector'] as Map<String, dynamic>? ?? {}).map(
+      (k, v) => MapEntry(k, v.toString()),
+    ),
+    createdAtMs: (json['createdAtMs'] as num?)?.toInt() ?? 0,
+  );
 
   /// 转为 Rust 侧接受的 JSON（camelCase）。
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'runtime': runtime,
-        'image': image,
-        'command': command,
-        'ports': ports,
-        'volumes': volumes,
-        'env': env,
-        'restartPolicy': restartPolicy,
-        'memoryLimitMb': memoryLimitMb,
-        'cpus': cpus,
-        'workdir': workdir,
-        'worldDir': worldDir,
-        'jailType': jailType,
-        'vnetMode': vnetMode,
-        'bastilleIpBase': bastilleIpBase,
-        'bastilleIpMask': bastilleIpMask,
-        'desiredReplicas': desiredReplicas,
-        'minReplicas': minReplicas,
-        'maxReplicas': maxReplicas,
-        'autoscale': autoscale,
-        'targetPlayers': targetPlayers,
-        'scaleUpPlayers': scaleUpPlayers,
-        'scaleDownPlayers': scaleDownPlayers,
-        'cooldownSecs': cooldownSecs,
-        'autoHeal': autoHeal,
-        'crashThreshold': crashThreshold,
-        'backoffBaseSecs': backoffBaseSecs,
-        'maxBackoffSecs': maxBackoffSecs,
-        'nodeSelector': nodeSelector,
-        'createdAtMs': createdAtMs,
-      };
+    'id': id,
+    'name': name,
+    'runtime': runtime,
+    'image': image,
+    'command': command,
+    'ports': ports,
+    'volumes': volumes,
+    'env': env,
+    'restartPolicy': restartPolicy,
+    'memoryLimitMb': memoryLimitMb,
+    'cpus': cpus,
+    'workdir': workdir,
+    'worldDir': worldDir,
+    'jailType': jailType,
+    'vnetMode': vnetMode,
+    'bastilleIpBase': bastilleIpBase,
+    'bastilleIpMask': bastilleIpMask,
+    'desiredReplicas': desiredReplicas,
+    'minReplicas': minReplicas,
+    'maxReplicas': maxReplicas,
+    'autoscale': autoscale,
+    'targetPlayers': targetPlayers,
+    'scaleUpPlayers': scaleUpPlayers,
+    'scaleDownPlayers': scaleDownPlayers,
+    'cooldownSecs': cooldownSecs,
+    'autoHeal': autoHeal,
+    'crashThreshold': crashThreshold,
+    'backoffBaseSecs': backoffBaseSecs,
+    'maxBackoffSecs': maxBackoffSecs,
+    'nodeSelector': nodeSelector,
+    'createdAtMs': createdAtMs,
+  };
 }
 
 /// 副本期望状态。
@@ -201,46 +201,46 @@ class McReplica {
   final int createdAtMs;
 
   factory McReplica.fromJson(Map<String, dynamic> json) => McReplica(
-        id: json['id'] as String? ?? '',
-        serviceId: json['serviceId'] as String? ?? '',
-        indexNo: (json['indexNo'] as num?)?.toInt() ?? 0,
-        nodeId: json['nodeId'] as String? ?? '',
-        containerName: json['containerName'] as String? ?? '',
-        hostPort: (json['hostPort'] as num?)?.toInt(),
-        ip: json['ip'] as String?,
-        desired: ReplicaDesired.fromString(json['desired'] as String?),
-        running: json['running'] as bool? ?? false,
-        ready: json['ready'] as bool? ?? false,
-        playersOnline: (json['playersOnline'] as num?)?.toInt() ?? 0,
-        crashCount: (json['crashCount'] as num?)?.toInt() ?? 0,
-        crashLoop: json['crashLoop'] as bool? ?? false,
-        lastAttemptMs: (json['lastAttemptMs'] as num?)?.toInt() ?? 0,
-        backoffSecs: (json['backoffSecs'] as num?)?.toInt() ?? 0,
-        lastObservedMs: (json['lastObservedMs'] as num?)?.toInt() ?? 0,
-        stableSinceMs: (json['stableSinceMs'] as num?)?.toInt() ?? 0,
-        createdAtMs: (json['createdAtMs'] as num?)?.toInt() ?? 0,
-      );
+    id: json['id'] as String? ?? '',
+    serviceId: json['serviceId'] as String? ?? '',
+    indexNo: (json['indexNo'] as num?)?.toInt() ?? 0,
+    nodeId: json['nodeId'] as String? ?? '',
+    containerName: json['containerName'] as String? ?? '',
+    hostPort: (json['hostPort'] as num?)?.toInt(),
+    ip: json['ip'] as String?,
+    desired: ReplicaDesired.fromString(json['desired'] as String?),
+    running: json['running'] as bool? ?? false,
+    ready: json['ready'] as bool? ?? false,
+    playersOnline: (json['playersOnline'] as num?)?.toInt() ?? 0,
+    crashCount: (json['crashCount'] as num?)?.toInt() ?? 0,
+    crashLoop: json['crashLoop'] as bool? ?? false,
+    lastAttemptMs: (json['lastAttemptMs'] as num?)?.toInt() ?? 0,
+    backoffSecs: (json['backoffSecs'] as num?)?.toInt() ?? 0,
+    lastObservedMs: (json['lastObservedMs'] as num?)?.toInt() ?? 0,
+    stableSinceMs: (json['stableSinceMs'] as num?)?.toInt() ?? 0,
+    createdAtMs: (json['createdAtMs'] as num?)?.toInt() ?? 0,
+  );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'serviceId': serviceId,
-        'indexNo': indexNo,
-        'nodeId': nodeId,
-        'containerName': containerName,
-        'hostPort': hostPort,
-        'ip': ip,
-        'desired': desired.name,
-        'running': running,
-        'ready': ready,
-        'playersOnline': playersOnline,
-        'crashCount': crashCount,
-        'crashLoop': crashLoop,
-        'lastAttemptMs': lastAttemptMs,
-        'backoffSecs': backoffSecs,
-        'lastObservedMs': lastObservedMs,
-        'stableSinceMs': stableSinceMs,
-        'createdAtMs': createdAtMs,
-      };
+    'id': id,
+    'serviceId': serviceId,
+    'indexNo': indexNo,
+    'nodeId': nodeId,
+    'containerName': containerName,
+    'hostPort': hostPort,
+    'ip': ip,
+    'desired': desired.name,
+    'running': running,
+    'ready': ready,
+    'playersOnline': playersOnline,
+    'crashCount': crashCount,
+    'crashLoop': crashLoop,
+    'lastAttemptMs': lastAttemptMs,
+    'backoffSecs': backoffSecs,
+    'lastObservedMs': lastObservedMs,
+    'stableSinceMs': stableSinceMs,
+    'createdAtMs': createdAtMs,
+  };
 }
 
 /// 服务 + 副本聚合状态（UI 快照）。
@@ -262,16 +262,16 @@ class ServiceStatus {
   final bool migrating;
 
   factory ServiceStatus.fromJson(Map<String, dynamic> json) => ServiceStatus(
-        service: McService.fromJson(json),
-        replicas: (json['replicas'] as List<dynamic>? ?? [])
-            .whereType<Map<String, dynamic>>()
-            .map(McReplica.fromJson)
-            .toList(),
-        runningReplicas: (json['runningReplicas'] as num?)?.toInt() ?? 0,
-        totalPlayers: (json['totalPlayers'] as num?)?.toInt() ?? 0,
-        avgPlayers: (json['avgPlayers'] as num?)?.toDouble() ?? 0,
-        migrating: json['migrating'] as bool? ?? false,
-      );
+    service: McService.fromJson(json),
+    replicas: (json['replicas'] as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map(McReplica.fromJson)
+        .toList(),
+    runningReplicas: (json['runningReplicas'] as num?)?.toInt() ?? 0,
+    totalPlayers: (json['totalPlayers'] as num?)?.toInt() ?? 0,
+    avgPlayers: (json['avgPlayers'] as num?)?.toDouble() ?? 0,
+    migrating: json['migrating'] as bool? ?? false,
+  );
 }
 
 /// 迁移状态机状态。
@@ -295,16 +295,16 @@ enum MigrationState {
 
   /// 中文展示标签。
   String get label => switch (this) {
-        MigrationState.pending => '等待开始',
-        MigrationState.stopping => '停止副本',
-        MigrationState.archiving => '压缩存档',
-        MigrationState.transferring => '传输存档',
-        MigrationState.restoring => '恢复存档',
-        MigrationState.creating => '创建容器',
-        MigrationState.starting => '启动副本',
-        MigrationState.done => '完成',
-        MigrationState.failed => '失败',
-      };
+    MigrationState.pending => '等待开始',
+    MigrationState.stopping => '停止副本',
+    MigrationState.archiving => '压缩存档',
+    MigrationState.transferring => '传输存档',
+    MigrationState.restoring => '恢复存档',
+    MigrationState.creating => '创建容器',
+    MigrationState.starting => '启动副本',
+    MigrationState.done => '完成',
+    MigrationState.failed => '失败',
+  };
 
   bool get isActive =>
       this != MigrationState.done && this != MigrationState.failed;
@@ -337,17 +337,17 @@ class MigrationJob {
   final int updatedAtMs;
 
   factory MigrationJob.fromJson(Map<String, dynamic> json) => MigrationJob(
-        id: json['id'] as String? ?? '',
-        serviceId: json['serviceId'] as String? ?? '',
-        replicaId: json['replicaId'] as String? ?? '',
-        fromNode: json['fromNode'] as String? ?? '',
-        toNode: json['toNode'] as String? ?? '',
-        state: MigrationState.fromString(json['state'] as String?),
-        error: json['error'] as String?,
-        archiveName: json['archiveName'] as String? ?? '',
-        createdAtMs: (json['createdAtMs'] as num?)?.toInt() ?? 0,
-        updatedAtMs: (json['updatedAtMs'] as num?)?.toInt() ?? 0,
-      );
+    id: json['id'] as String? ?? '',
+    serviceId: json['serviceId'] as String? ?? '',
+    replicaId: json['replicaId'] as String? ?? '',
+    fromNode: json['fromNode'] as String? ?? '',
+    toNode: json['toNode'] as String? ?? '',
+    state: MigrationState.fromString(json['state'] as String?),
+    error: json['error'] as String?,
+    archiveName: json['archiveName'] as String? ?? '',
+    createdAtMs: (json['createdAtMs'] as num?)?.toInt() ?? 0,
+    updatedAtMs: (json['updatedAtMs'] as num?)?.toInt() ?? 0,
+  );
 }
 
 /// 对账动作种类。
@@ -364,8 +364,11 @@ enum OrchestrationActionKind {
   noop;
 
   static OrchestrationActionKind fromString(String? value) {
+    if (value == null) return OrchestrationActionKind.noop;
+    // 兼容 Rust 的 snake_case（如 restart_container）与 Dart 枚举名
+    final normalized = value.replaceAll('_', '').toLowerCase();
     for (final kind in OrchestrationActionKind.values) {
-      if (kind.name == value) return kind;
+      if (kind.name.toLowerCase() == normalized) return kind;
     }
     return OrchestrationActionKind.noop;
   }
@@ -422,11 +425,11 @@ class McStatus {
   final String? motd;
 
   factory McStatus.fromJson(Map<String, dynamic> json) => McStatus(
-        online: json['online'] as bool? ?? false,
-        players: (json['players'] as num?)?.toInt() ?? 0,
-        maxPlayers: (json['maxPlayers'] as num?)?.toInt() ?? 0,
-        latencyMs: (json['latencyMs'] as num?)?.toInt() ?? 0,
-        version: json['version'] as String?,
-        motd: json['motd'] as String?,
-      );
+    online: json['online'] as bool? ?? false,
+    players: (json['players'] as num?)?.toInt() ?? 0,
+    maxPlayers: (json['maxPlayers'] as num?)?.toInt() ?? 0,
+    latencyMs: (json['latencyMs'] as num?)?.toInt() ?? 0,
+    version: json['version'] as String?,
+    motd: json['motd'] as String?,
+  );
 }

@@ -1049,6 +1049,81 @@ class NodeApiClient {
       body: {'memoryMb': ?memoryMb, 'cpus': ?cpus},
     );
   }
+
+  // ==================== 节点级归档（编排迁移用，见 irix-node-container-api.md §4.8）====================
+
+  /// 压缩节点上的任意路径为归档（POST /api/container/archive）。
+  /// 返回节点上归档文件的完整路径。
+  Future<String> nodeArchive({required String path, String? archive}) async {
+    final data = await _request(
+      'POST',
+      '/api/container/archive',
+      body: {
+        'path': path,
+        if (archive != null && archive.isNotEmpty) 'archive': archive,
+      },
+    );
+    if (data is Map<String, dynamic>) {
+      return data['path'] as String? ?? data['archivePath'] as String? ?? '';
+    }
+    return data?.toString() ?? '';
+  }
+
+  /// 下载节点归档的原始字节（GET /api/container/archive?file=...，二进制响应）。
+  Future<List<int>> nodeArchiveDownload(String archive) async {
+    final uri = _uri('/api/container/archive', {'file': archive});
+    final resp = await HttpFfiService.instance.get(
+      uri.toString(),
+      timeout: timeout,
+    );
+    if (resp.statusCode >= 400) {
+      throw NodeApiException(
+        resp.statusCode,
+        '归档下载失败（HTTP ${resp.statusCode}）',
+      );
+    }
+    return resp.bodyBytes;
+  }
+
+  /// 上传归档到节点（POST /api/container/archive/upload，multipart 字段 file）。
+  Future<void> nodeArchiveUpload(String fileName, List<int> bytes) async {
+    final boundary = 'IriX${DateTime.now().microsecondsSinceEpoch}';
+    final body = BytesBuilder()
+      ..add(
+        utf8.encode(
+          '--$boundary\r\n'
+          'Content-Disposition: form-data; name="file"; filename="$fileName"\r\n'
+          'Content-Type: application/octet-stream\r\n'
+          '\r\n',
+        ),
+      )
+      ..add(bytes)
+      ..add(utf8.encode('\r\n--$boundary--\r\n'));
+    final resp = await HttpFfiService.instance.post(
+      _uri('/api/container/archive/upload').toString(),
+      headers: {'Content-Type': 'multipart/form-data; boundary=$boundary'},
+      body: body.takeBytes(),
+      timeout: timeout,
+    );
+    if (resp.statusCode >= 400) {
+      throw NodeApiException(
+        resp.statusCode,
+        '归档上传失败（HTTP ${resp.statusCode}）',
+      );
+    }
+  }
+
+  /// 在节点上解压归档到目标目录（POST /api/container/archive/restore）。
+  Future<void> nodeArchiveRestore({
+    required String file,
+    required String destPath,
+  }) async {
+    await _request(
+      'POST',
+      '/api/container/archive/restore',
+      body: {'file': file, 'destPath': destPath},
+    );
+  }
 }
 
 /// 实例操作类型。
