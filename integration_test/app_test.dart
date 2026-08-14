@@ -22,9 +22,9 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   Finder railDestination(String label) => find.descendant(
-        of: find.byType(NavigationRail),
-        matching: find.text(label),
-      );
+    of: find.byType(NavigationRail),
+    matching: find.text(label),
+  );
 
   /// 切换左侧导航并确认目标页面已渲染（等待异步加载期间不断帧）。
   Future<void> switchTo(WidgetTester tester, String label) async {
@@ -44,7 +44,10 @@ void main() {
     }
 
     // 实例页：空列表显示引导卡片，否则显示实例列表（AppBar 标题 IriX）
-    final onboardingVisible = find.byType(OnboardingScreen).evaluate().isNotEmpty;
+    final onboardingVisible = find
+        .byType(OnboardingScreen)
+        .evaluate()
+        .isNotEmpty;
     if (onboardingVisible) {
       expect(find.text('新建'), findsOneWidget);
       expect(find.text('导入'), findsOneWidget);

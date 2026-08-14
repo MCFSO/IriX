@@ -9,11 +9,7 @@ import '../state/cluster_state.dart';
 
 /// 网络吞吐折线图。
 class NetworkLineChart extends StatefulWidget {
-  const NetworkLineChart({
-    super.key,
-    required this.samples,
-    this.height = 140,
-  });
+  const NetworkLineChart({super.key, required this.samples, this.height = 140});
 
   final List<NetworkSample> samples;
   final double height;
@@ -65,7 +61,10 @@ class _NetworkLineChartState extends State<NetworkLineChart> {
 
   void _updateHover(double dx, int length) {
     if (length == 0) return;
-    final index = (dx / context.size!.width * length).floor().clamp(0, length - 1);
+    final index = (dx / context.size!.width * length).floor().clamp(
+      0,
+      length - 1,
+    );
     if (index != _hoverIndex) {
       setState(() => _hoverIndex = index);
     }
@@ -119,7 +118,8 @@ class _NetworkLinePainter extends CustomPainter {
 
     final maxValue = _maxTotal();
     final stepY = maxValue <= 0 ? size.height / 4 : size.height / 4;
-    final stepX = size.width / samples.length.clamp(1, samples.length).toDouble();
+    final stepX =
+        size.width / samples.length.clamp(1, samples.length).toDouble();
 
     // 网格横线（4 段）。
     final gridPaint = Paint()
@@ -135,7 +135,9 @@ class _NetworkLinePainter extends CustomPainter {
     final fillPath = Path();
     for (var i = 0; i < samples.length; i++) {
       final x = i * stepX;
-      final y = size.height - (samples[i].total / (maxValue <= 0 ? 1 : maxValue)) * size.height;
+      final y =
+          size.height -
+          (samples[i].total / (maxValue <= 0 ? 1 : maxValue)) * size.height;
       if (i == 0) {
         linePath.moveTo(x, y);
         fillPath.moveTo(x, size.height);
@@ -170,11 +172,7 @@ class _NetworkLinePainter extends CustomPainter {
         Offset(x, size.height),
         Paint()..color = lineColor.withValues(alpha: 0.4),
       );
-      canvas.drawCircle(
-        Offset(x, y),
-        4,
-        Paint()..color = lineColor,
-      );
+      canvas.drawCircle(Offset(x, y), 4, Paint()..color = lineColor);
     }
   }
 

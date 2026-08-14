@@ -152,9 +152,7 @@ class _ClusterHomeScreenState extends State<ClusterHomeScreen> {
               ),
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                sliver: SliverToBoxAdapter(
-                  child: _monitorHint(nodes, cluster),
-                ),
+                sliver: SliverToBoxAdapter(child: _monitorHint(nodes, cluster)),
               ),
             ],
           ],
@@ -338,7 +336,9 @@ class _ResourceOverviewCard extends StatelessWidget {
                 Expanded(
                   flex: 4,
                   child: Text(
-                    cpuCount == 0 ? '—' : '平均 ${(cpuSum / cpuCount).toStringAsFixed(0)}%',
+                    cpuCount == 0
+                        ? '—'
+                        : '平均 ${(cpuSum / cpuCount).toStringAsFixed(0)}%',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -348,7 +348,9 @@ class _ResourceOverviewCard extends StatelessWidget {
                 Expanded(
                   flex: 4,
                   child: Text(
-                    totalMem == 0 ? '—' : '${_fmtBytes(usedMem)} / ${_fmtBytes(totalMem)}',
+                    totalMem == 0
+                        ? '—'
+                        : '${_fmtBytes(usedMem)} / ${_fmtBytes(totalMem)}',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -358,7 +360,9 @@ class _ResourceOverviewCard extends StatelessWidget {
                 Expanded(
                   flex: 4,
                   child: Text(
-                    totalDisk == 0 ? '—' : '${_fmtBytes(usedDisk)} / ${_fmtBytes(totalDisk)}',
+                    totalDisk == 0
+                        ? '—'
+                        : '${_fmtBytes(usedDisk)} / ${_fmtBytes(totalDisk)}',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -606,10 +610,7 @@ Widget _badge(ThemeData theme, String text, Color bg, Color fg) {
       color: bg.withValues(alpha: 0.2),
       borderRadius: BorderRadius.circular(6),
     ),
-    child: Text(
-      text,
-      style: theme.textTheme.labelSmall?.copyWith(color: fg),
-    ),
+    child: Text(text, style: theme.textTheme.labelSmall?.copyWith(color: fg)),
   );
 }
 

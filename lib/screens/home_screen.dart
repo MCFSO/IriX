@@ -19,6 +19,8 @@ import '../utils/apple_widgets.dart';
 import 'ai_screen.dart';
 import 'cluster_home_screen.dart';
 import 'cluster_instances_screen.dart';
+import 'cluster_container_screen.dart';
+import 'cluster_orchestration_screen.dart';
 import 'database_screen.dart';
 import 'frp_screen.dart';
 import 'instance_detail_screen.dart';
@@ -113,21 +115,26 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final multi = context.watch<ClusterState>().mode == ManagementMode.multi;
+    // 单机模式 6 项、多机模式 7 项（多出「容器」）：
+    // 从多机切回单机时把越界的选中索引收敛，避免 NavigationRail 越界。
+    final index = multi ? _selectedIndex : _selectedIndex.clamp(0, 5);
     return Scaffold(
       body: Row(
         children: [
           // 左侧导航栏
           NavigationRail(
-            selectedIndex: _selectedIndex,
-            onDestinationSelected: (index) {
-              setState(() => _selectedIndex = index);
+            selectedIndex: index,
+            onDestinationSelected: (value) {
+              setState(() => _selectedIndex = value);
             },
             labelType: NavigationRailLabelType.all,
             destinations: multi ? _multiDestinations() : _singleDestinations(),
           ),
           const VerticalDivider(thickness: 1, width: 1),
           // 右侧内容区
-          Expanded(child: multi ? _buildMultiContent() : _buildContent()),
+          Expanded(
+            child: multi ? _buildMultiContent(index) : _buildContent(index),
+          ),
         ],
       ),
     );
@@ -167,7 +174,7 @@ class _HomeScreenState extends State<HomeScreen> {
     ),
   ];
 
-  /// 多机模式导航（节点优先）。
+  /// 多机模式导航（节点优先，8 项）。
   List<NavigationRailDestination> _multiDestinations() => const [
     NavigationRailDestination(
       icon: Icon(Icons.lan_outlined),
@@ -178,6 +185,16 @@ class _HomeScreenState extends State<HomeScreen> {
       icon: Icon(Icons.storage_outlined),
       selectedIcon: Icon(Icons.storage),
       label: Text('实例'),
+    ),
+    NavigationRailDestination(
+      icon: Icon(Icons.inventory_2_outlined),
+      selectedIcon: Icon(Icons.inventory_2),
+      label: Text('容器'),
+    ),
+    NavigationRailDestination(
+      icon: Icon(Icons.dashboard_customize_outlined),
+      selectedIcon: Icon(Icons.dashboard_customize),
+      label: Text('编排'),
     ),
     NavigationRailDestination(
       icon: Icon(Icons.store_outlined),
@@ -202,27 +219,31 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   /// 多机模式内容区。
-  Widget _buildMultiContent() {
-    switch (_selectedIndex) {
+  Widget _buildMultiContent(int index) {
+    switch (index) {
       case 0:
         return const ClusterHomeScreen();
       case 1:
         return const ClusterInstancesScreen();
       case 2:
-        return const MarketplaceScreen();
+        return const ClusterContainerScreen();
       case 3:
-        return const DatabaseScreen();
+        return const ClusterOrchestrationScreen();
       case 4:
-        return const AiScreen();
+        return const MarketplaceScreen();
       case 5:
+        return const DatabaseScreen();
+      case 6:
+        return const AiScreen();
+      case 7:
         return const FrpScreen();
       default:
         return const ClusterHomeScreen();
     }
   }
 
-  Widget _buildContent() {
-    switch (_selectedIndex) {
+  Widget _buildContent(int index) {
+    switch (index) {
       case 0:
         return _buildInstancesPage();
       case 1:

@@ -706,6 +706,424 @@ class NodeApiClient {
     if (data is! List) return [];
     return data.whereType<Map<String, dynamic>>().toList();
   }
+
+  // ==================== 容器环境（irix-node 全功能，见 docs/container-support.md §3）====================
+
+  /// 容器运行时信息（GET /api/container/info）。
+  ///
+  /// 用于能力探测：返回 `{runtime, platform, version, available}`。
+  /// 节点不支持时（MCSM 面板）抛 [NodeApiException]（404 等），由调用方回退。
+  Future<Map<String, dynamic>?> containerInfo() async {
+    final data = await _request('GET', '/api/container/info');
+    return data is Map<String, dynamic> ? data : null;
+  }
+
+  /// 容器列表（GET /api/container/ps）。
+  Future<List<Map<String, dynamic>>> containerPs({bool all = true}) async {
+    final data = await _request(
+      'GET',
+      '/api/container/ps',
+      query: {'all': all ? '1' : '0'},
+    );
+    return _listOfMaps(data);
+  }
+
+  /// 创建容器（POST /api/container/create）。
+  Future<void> containerCreate(Map<String, dynamic> config) async {
+    await _request('POST', '/api/container/create', body: config);
+  }
+
+  /// 容器操作（POST /api/container/{id}/start|stop|restart|kill）。
+  Future<void> containerAction(String id, String action) async {
+    await _request('POST', '/api/container/$id/$action');
+  }
+
+  /// 删除容器（DELETE /api/container/{id}）。
+  Future<void> containerRemove(String id, {bool force = false}) async {
+    await _request(
+      'DELETE',
+      '/api/container/$id',
+      query: {'force': force ? '1' : '0'},
+    );
+  }
+
+  /// 容器日志（GET /api/container/{id}/logs）。
+  Future<String> containerLogs(String id, {int? tail}) async {
+    final data = await _request(
+      'GET',
+      '/api/container/$id/logs',
+      query: {if (tail != null) 'tail': '$tail'},
+    );
+    return (data as String?) ?? '';
+  }
+
+  /// 容器内执行命令（POST /api/container/{id}/exec）。
+  Future<void> containerExec(String id, String command) async {
+    await _request(
+      'POST',
+      '/api/container/$id/exec',
+      body: {'command': command},
+    );
+  }
+
+  /// 容器统计（GET /api/container/{id}/stats）。
+  Future<Map<String, dynamic>?> containerStats(String id) async {
+    final data = await _request('GET', '/api/container/$id/stats');
+    return data is Map<String, dynamic> ? data : null;
+  }
+
+  /// 镜像列表（GET /api/image/list）。
+  Future<List<Map<String, dynamic>>> imageList() async {
+    final data = await _request('GET', '/api/image/list');
+    return _listOfMaps(data);
+  }
+
+  /// 拉取镜像（POST /api/image/pull）。
+  Future<void> imagePull(String name) async {
+    await _request('POST', '/api/image/pull', body: {'name': name});
+  }
+
+  /// 构建镜像（POST /api/image/build），返回任务 id。
+  Future<String> imageBuild({
+    required String dockerfile,
+    required String name,
+    required String tag,
+  }) async {
+    final data = await _request(
+      'POST',
+      '/api/image/build',
+      body: {'dockerfile': dockerfile, 'name': name, 'tag': tag},
+    );
+    return (data is Map ? data['jobId'] : null) as String? ?? '';
+  }
+
+  /// 构建进度（GET /api/image/build-progress）。
+  /// 返回 `{status: building|done|failed, log: [...], image: "name:tag"}`。
+  Future<Map<String, dynamic>?> imageBuildProgress(String jobId) async {
+    final data = await _request(
+      'GET',
+      '/api/image/build-progress',
+      query: {'jobId': jobId},
+    );
+    return data is Map<String, dynamic> ? data : null;
+  }
+
+  /// 删除镜像（DELETE /api/image/{name}）。
+  Future<void> imageRemove(String name) async {
+    await _request('DELETE', '/api/image/${Uri.encodeComponent(name)}');
+  }
+
+  /// 卷列表（GET /api/volume/list）。
+  Future<List<Map<String, dynamic>>> volumeList() async {
+    final data = await _request('GET', '/api/volume/list');
+    return _listOfMaps(data);
+  }
+
+  /// 删除卷（DELETE /api/volume/{name}）。
+  Future<void> volumeRemove(String name) async {
+    await _request('DELETE', '/api/volume/${Uri.encodeComponent(name)}');
+  }
+
+  /// 网络列表（GET /api/network/list）。
+  Future<List<Map<String, dynamic>>> networkList() async {
+    final data = await _request('GET', '/api/network/list');
+    return _listOfMaps(data);
+  }
+
+  // ==================== Bastille（irix-node,FreeBSD）====================
+
+  /// 已 bootstrap 的发行版列表（GET /api/bastille/releases）。
+  Future<List<Map<String, dynamic>>> bastilleReleases() async {
+    final data = await _request('GET', '/api/bastille/releases');
+    return _listOfMaps(data);
+  }
+
+  /// bootstrap 发行版（POST /api/bastille/bootstrap），返回任务 id。
+  Future<String> bastilleBootstrap(String release) async {
+    final data = await _request(
+      'POST',
+      '/api/bastille/bootstrap',
+      body: {'release': release},
+    );
+    return (data is Map ? data['jobId'] : null) as String? ?? '';
+  }
+
+  /// jail 列表（GET /api/bastille/jails）。
+  Future<List<Map<String, dynamic>>> bastilleJails() async {
+    final data = await _request('GET', '/api/bastille/jails');
+    return _listOfMaps(data);
+  }
+
+  /// 创建 jail（POST /api/bastille/jails/create）。
+  Future<void> bastilleJailCreate(Map<String, dynamic> config) async {
+    await _request('POST', '/api/bastille/jails/create', body: config);
+  }
+
+  /// jail 操作（POST /api/bastille/jails/{name}/start|stop|restart|destroy）。
+  ///
+  /// [force] 仅对 destroy 有效：服务端附加 `-a`（`bastille destroy -a`），
+  /// 用于摧毁运行中的 jail。
+  Future<void> bastilleJailAction(
+    String name,
+    String action, {
+    bool force = false,
+  }) async {
+    await _request(
+      'POST',
+      '/api/bastille/jails/$name/$action',
+      query: {if (force) 'force': '1'},
+    );
+  }
+
+  /// jail 日志（GET /api/bastille/jails/{name}/console）。
+  Future<String> bastilleJailConsole(String name, {int? tail}) async {
+    final data = await _request(
+      'GET',
+      '/api/bastille/jails/$name/console',
+      query: {if (tail != null) 'tail': '$tail'},
+    );
+    return (data as String?) ?? '';
+  }
+
+  /// jail 内执行命令（POST /api/bastille/jails/{name}/cmd）。
+  Future<void> bastilleJailCmd(String name, String command) async {
+    await _request(
+      'POST',
+      '/api/bastille/jails/$name/cmd',
+      body: {'command': command},
+    );
+  }
+
+  /// 模板列表（GET /api/bastille/templates）。
+  Future<List<Map<String, dynamic>>> bastilleTemplates() async {
+    final data = await _request('GET', '/api/bastille/templates');
+    return _listOfMaps(data);
+  }
+
+  /// 应用模板（POST /api/bastille/templates/apply）。
+  Future<void> bastilleTemplateApply({
+    required String jail,
+    required String template,
+    Map<String, String> args = const {},
+  }) async {
+    await _request(
+      'POST',
+      '/api/bastille/templates/apply',
+      body: {'jail': jail, 'template': template, 'args': args},
+    );
+  }
+
+  /// 端口转发（POST /api/bastille/rdr）。
+  Future<void> bastilleRdr({
+    required String jail,
+    required String proto,
+    required int hostPort,
+    required int jailPort,
+  }) async {
+    await _request(
+      'POST',
+      '/api/bastille/rdr',
+      body: {
+        'jail': jail,
+        'proto': proto,
+        'hostPort': hostPort,
+        'jailPort': jailPort,
+      },
+    );
+  }
+
+  /// 删除端口转发（DELETE /api/bastille/rdr）。
+  Future<void> bastilleRdrRemove({
+    required String jail,
+    required String proto,
+    required int hostPort,
+    required int jailPort,
+  }) async {
+    await _request(
+      'DELETE',
+      '/api/bastille/rdr',
+      body: {
+        'jail': jail,
+        'proto': proto,
+        'hostPort': hostPort,
+        'jailPort': jailPort,
+      },
+    );
+  }
+
+  /// 端口转发规则列表（GET /api/bastille/rdr）。
+  /// [jail] 非空时仅返回该 jail 的规则。
+  Future<List<Map<String, dynamic>>> bastilleRdrList({String? jail}) async {
+    final data = await _request(
+      'GET',
+      '/api/bastille/rdr',
+      query: {if (jail != null && jail.isNotEmpty) 'jail': jail},
+    );
+    return _listOfMaps(data);
+  }
+
+  /// 环境初始化（POST /api/bastille/setup，`bastille setup`）。
+  ///
+  /// 返回 `{ok, detail?, checked?}`；[config] 见 BastilleSetupRequest.toJson。
+  Future<Map<String, dynamic>?> bastilleSetup(
+    Map<String, dynamic> config,
+  ) async {
+    final data = await _request('POST', '/api/bastille/setup', body: config);
+    return data is Map<String, dynamic> ? data : null;
+  }
+
+  /// 克隆 jail（POST /api/bastille/jails/{name}/clone，`bastille clone`）。
+  Future<void> bastilleJailClone({
+    required String jail,
+    required String newName,
+    String? ip,
+  }) async {
+    await _request(
+      'POST',
+      '/api/bastille/jails/$jail/clone',
+      body: {'newName': newName, if (ip != null && ip.isNotEmpty) 'ip': ip},
+    );
+  }
+
+  /// 导出 jail 为归档（POST /api/bastille/jails/{name}/export，`bastille export`）。
+  /// 返回宿主机上的归档路径。
+  Future<String> bastilleJailExport(String name) async {
+    final data = await _request('POST', '/api/bastille/jails/$name/export');
+    if (data is Map<String, dynamic>) {
+      return data['path'] as String? ?? data['file'] as String? ?? '';
+    }
+    return data?.toString() ?? '';
+  }
+
+  /// 导入归档为 jail（POST /api/bastille/jails/import，`bastille import FILE [RELEASE]`）。
+  /// [release] 指定导入到哪个发行版（可选）；[force] 跳过校验和验证（-f）。
+  /// 返回新建 jail 名。
+  Future<String> bastilleJailImport({
+    required String file,
+    String? release,
+    bool force = false,
+  }) async {
+    final data = await _request(
+      'POST',
+      '/api/bastille/jails/import',
+      body: {
+        'file': file,
+        if (release != null && release.isNotEmpty) 'release': release,
+        if (force) 'force': true,
+      },
+    );
+    return (data is Map ? data['name'] : null) as String? ?? '';
+  }
+
+  /// 设置 jail 资源限制（POST /api/bastille/jails/{name}/limits）。
+  ///
+  /// 服务端映射：memoryMb → rctl memoryuse；cpus → cpuset；
+  /// diskMb → ZFS 数据集配额。
+  Future<void> bastilleJailLimits(
+    String name, {
+    int? memoryMb,
+    int? cpus,
+    int? diskMb,
+  }) async {
+    await _request(
+      'POST',
+      '/api/bastille/jails/$name/limits',
+      body: {'memoryMb': ?memoryMb, 'cpus': ?cpus, 'diskMb': ?diskMb},
+    );
+  }
+
+  /// 克隆容器（POST /api/container/{id}/clone）。
+  Future<void> containerClone(String id, String newName) async {
+    await _request('POST', '/api/container/$id/clone', body: {'name': newName});
+  }
+
+  /// 更新容器资源限制（POST /api/container/{id}/limits）。
+  Future<void> containerUpdateLimits(
+    String id, {
+    int? memoryMb,
+    int? cpus,
+  }) async {
+    await _request(
+      'POST',
+      '/api/container/$id/limits',
+      body: {'memoryMb': ?memoryMb, 'cpus': ?cpus},
+    );
+  }
+
+  // ==================== 节点级归档（编排迁移用，见 irix-node-container-api.md §4.8）====================
+
+  /// 压缩节点上的任意路径为归档（POST /api/container/archive）。
+  /// 返回节点上归档文件的完整路径。
+  Future<String> nodeArchive({required String path, String? archive}) async {
+    final data = await _request(
+      'POST',
+      '/api/container/archive',
+      body: {
+        'path': path,
+        if (archive != null && archive.isNotEmpty) 'archive': archive,
+      },
+    );
+    if (data is Map<String, dynamic>) {
+      return data['path'] as String? ?? data['archivePath'] as String? ?? '';
+    }
+    return data?.toString() ?? '';
+  }
+
+  /// 下载节点归档的原始字节（GET /api/container/archive?file=...，二进制响应）。
+  Future<List<int>> nodeArchiveDownload(String archive) async {
+    final uri = _uri('/api/container/archive', {'file': archive});
+    final resp = await HttpFfiService.instance.get(
+      uri.toString(),
+      timeout: timeout,
+    );
+    if (resp.statusCode >= 400) {
+      throw NodeApiException(
+        resp.statusCode,
+        '归档下载失败（HTTP ${resp.statusCode}）',
+      );
+    }
+    return resp.bodyBytes;
+  }
+
+  /// 上传归档到节点（POST /api/container/archive/upload，multipart 字段 file）。
+  Future<void> nodeArchiveUpload(String fileName, List<int> bytes) async {
+    final boundary = 'IriX${DateTime.now().microsecondsSinceEpoch}';
+    final body = BytesBuilder()
+      ..add(
+        utf8.encode(
+          '--$boundary\r\n'
+          'Content-Disposition: form-data; name="file"; filename="$fileName"\r\n'
+          'Content-Type: application/octet-stream\r\n'
+          '\r\n',
+        ),
+      )
+      ..add(bytes)
+      ..add(utf8.encode('\r\n--$boundary--\r\n'));
+    final resp = await HttpFfiService.instance.post(
+      _uri('/api/container/archive/upload').toString(),
+      headers: {'Content-Type': 'multipart/form-data; boundary=$boundary'},
+      body: body.takeBytes(),
+      timeout: timeout,
+    );
+    if (resp.statusCode >= 400) {
+      throw NodeApiException(
+        resp.statusCode,
+        '归档上传失败（HTTP ${resp.statusCode}）',
+      );
+    }
+  }
+
+  /// 在节点上解压归档到目标目录（POST /api/container/archive/restore）。
+  Future<void> nodeArchiveRestore({
+    required String file,
+    required String destPath,
+  }) async {
+    await _request(
+      'POST',
+      '/api/container/archive/restore',
+      body: {'file': file, 'destPath': destPath},
+    );
+  }
 }
 
 /// 实例操作类型。

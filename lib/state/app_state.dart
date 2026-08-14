@@ -10,6 +10,8 @@ import 'package:flutter/foundation.dart';
 
 import '../data/server_cores.dart';
 import '../models/server_instance.dart';
+import '../services/container/container_backend.dart';
+import '../services/container/docker_cli_backend.dart';
 import '../services/download_settings.dart';
 import '../services/instance_store.dart';
 import '../services/log_persistence.dart';
@@ -34,11 +36,96 @@ class AppState extends ChangeNotifier {
   /// 运行中的进程管理器，按实例 id 索引。
   final Map<String, ServerProcessManager> _managers = {};
 
+  /// 本地 Docker 后端（惰性创建，首次 docker 实例启动时初始化）。
+  DockerCliBackend? _dockerCli;
+
+  /// Docker 实例状态轮询定时器。
+  Timer? _dockerPollTimer;
+
   /// 当前选中的实例。
   ServerInstance? _selected;
 
   /// 当前选中的实例（可空）。
   ServerInstance? get selected => _selected;
+
+  /// 本地 Docker 后端。
+  DockerCliBackend get dockerCli => _dockerCli ??= DockerCliBackend();
+
+  /// 探测本地 Docker 是否可用（供 UI 判断是否展示容器功能）。
+  Future<ContainerEnvironmentInfo> dockerEnvironment() =>
+      dockerCli.environment();
+
+  /// 计算实例的 Docker 容器名：
+  /// 优先取 [ContainerConfig.containerName]，否则由实例名净化 + id 后缀派生，
+  /// 保证合法且唯一（docker 名称仅允许 [a-zA-Z0-9_.-]）。
+  String containerNameFor(ServerInstance instance) {
+    final configured = instance.container?.containerName;
+    if (configured != null && configured.trim().isNotEmpty) {
+      return configured.trim();
+    }
+    final base = instance.name
+        .replaceAll(RegExp(r'[^a-zA-Z0-9_.-]'), '-')
+        .replaceAll(RegExp(r'-{2,}'), '-')
+        .replaceAll(RegExp(r'^-+|-+$'), '');
+    final suffix = instance.id.length >= 4
+        ? instance.id.substring(instance.id.length - 4)
+        : instance.id;
+    return 'xmc-${base.isEmpty ? 'server' : base}-$suffix';
+  }
+
+  /// 由实例生成容器创建请求（卷默认挂载实例根目录到 /data）。
+  CreateContainerRequest _containerRequestFor(ServerInstance instance) {
+    final cfg = instance.container ?? const ContainerConfig();
+    final volumes = cfg.volumes.isNotEmpty
+        ? cfg.volumes
+        : <String>['${instance.rootPath}:/data'];
+    return CreateContainerRequest(
+      name: containerNameFor(instance),
+      image: cfg.image,
+      ports: cfg.ports,
+      volumes: volumes,
+      env: cfg.env,
+      restartPolicy: cfg.restartPolicy,
+      memoryLimitMb: cfg.memoryLimitMb,
+      cpus: cfg.cpus,
+      diskLimitMb: cfg.diskLimitMb,
+      workdir: cfg.workdir,
+    );
+  }
+
+  /// 确保 Docker 状态轮询定时器运行（每 5 秒同步容器状态到实例状态）。
+  void _ensureDockerPolling() {
+    if (_dockerPollTimer != null) return;
+    _dockerPollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      unawaited(_pollDockerStatuses());
+    });
+  }
+
+  /// 轮询所有 Docker 实例的容器状态，同步到 [InstanceStatus]。
+  Future<void> _pollDockerStatuses() async {
+    try {
+      final env = await dockerCli.environment();
+      if (!env.available) return;
+      final containers = await dockerCli.listContainers();
+      var changed = false;
+      for (final instance in _instances) {
+        if (instance.runMode != RunMode.docker) continue;
+        final name = containerNameFor(instance);
+        final info = containers.where((c) => c.name == name).firstOrNull;
+        final running = info?.isRunning ?? false;
+        if (!running && instance.status.isActive) {
+          instance.status = InstanceStatus.stopped;
+          changed = true;
+        } else if (running && instance.status == InstanceStatus.stopped) {
+          instance.status = InstanceStatus.running;
+          changed = true;
+        }
+      }
+      if (changed) notifyListeners();
+    } catch (_) {
+      // 轮询失败静默忽略，下轮重试
+    }
+  }
 
   /// 下载线程数 (1-32)，控制多线程分片断点续传下载的并发数。
   int _downloadThreads = DownloadSettings.defaultThreads;
@@ -165,6 +252,15 @@ class AppState extends ChangeNotifier {
       await manager.forceStop();
       manager.dispose();
     }
+    // Docker 实例：尽力删除对应容器（容器不可达时忽略）。
+    if (instance != null && instance.runMode == RunMode.docker) {
+      try {
+        await dockerCli.removeContainer(
+          containerNameFor(instance),
+          force: true,
+        );
+      } catch (_) {}
+    }
     await _store.removeInstance(id);
     _instances.removeWhere((e) => e.id == id);
     if (_selected?.id == id) {
@@ -233,14 +329,20 @@ class AppState extends ChangeNotifier {
 
   /// 启动指定实例。
   ///
-  /// 若实例已处于活跃状态则直接返回。按需创建 [ServerProcessManager]，
-  /// 置为启动中→启动进程→置为运行中，并挂载退出监听。
-  /// 若进程启动失败（如 java 未找到），重置状态为已关闭并清理管理器。
+  /// 原生实例：按需创建 [ServerProcessManager]，置为启动中→启动进程→置为运行中，
+  /// 并挂载退出监听；进程启动失败（如 java 未找到）时重置状态为已关闭并清理管理器。
+  /// Docker 实例：容器不存在则先按 [ContainerConfig] 创建，再 `docker start`，
+  /// 状态经 [_ensureDockerPolling] 轮询同步。
   Future<void> startInstance(String id) async {
     final instance = _instanceById(id);
     if (instance == null) return;
     if (instance.status.isActive ||
         instance.status == InstanceStatus.restarting) {
+      return;
+    }
+
+    if (instance.runMode == RunMode.docker) {
+      await _startDockerInstance(instance);
       return;
     }
 
@@ -270,33 +372,92 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 优雅停止指定实例：向进程标准输入写入 `stop`。
+  /// 以 Docker 容器方式启动实例：探测可用性 → 建容器（如需）→ 启动。
+  Future<void> _startDockerInstance(ServerInstance instance) async {
+    final env = await dockerCli.environment();
+    if (!env.available) {
+      throw ContainerBackendException(
+        'Docker 不可用：${env.errorMessage ?? '未检测到 docker CLI，请先安装并启动 Docker'}',
+      );
+    }
+    instance.status = InstanceStatus.starting;
+    notifyListeners();
+    try {
+      final name = containerNameFor(instance);
+      final containers = await dockerCli.listContainers();
+      if (!containers.any((c) => c.name == name)) {
+        await dockerCli.createContainer(_containerRequestFor(instance));
+      }
+      await dockerCli.startContainer(name);
+      instance.status = InstanceStatus.running;
+    } catch (e) {
+      instance.status = InstanceStatus.stopped;
+      notifyListeners();
+      rethrow;
+    }
+    notifyListeners();
+    _ensureDockerPolling();
+  }
+
+  /// 优雅停止指定实例。
   ///
-  /// 不在此处变更状态；进程退出后由 [_watchExit] 统一处理为已关闭。
-  /// 实例保持活跃状态以供 UI 展示"强制停止"按钮。
+  /// 原生实例：向进程标准输入写入 `stop`，状态由 [_watchExit] 统一处理。
+  /// Docker 实例：`docker stop`（优雅关停），状态由轮询器同步。
+  /// 不在此处变更状态，实例保持活跃状态以供 UI 展示"强制停止"按钮。
   Future<void> stopInstance(String id) async {
+    final instance = _instanceById(id);
+    if (instance == null) return;
+    if (instance.runMode == RunMode.docker) {
+      await dockerCli.stopContainer(containerNameFor(instance));
+      return;
+    }
     final manager = _managers[id];
     if (manager == null) return;
     await manager.stop();
   }
 
-  /// 强制终止指定实例进程。
+  /// 强制终止指定实例。
   ///
-  /// 进程退出后由 [_watchExit] 统一处理状态翻转。
+  /// 原生实例：`kill` 进程；Docker 实例：`docker kill`。
+  /// 状态由 [_watchExit] / 轮询器统一翻转。
   Future<void> forceStopInstance(String id) async {
+    final instance = _instanceById(id);
+    if (instance == null) return;
+    if (instance.runMode == RunMode.docker) {
+      await dockerCli.killContainer(containerNameFor(instance));
+      return;
+    }
     final manager = _managers[id];
     if (manager == null) return;
     await manager.forceStop();
   }
 
-  /// 重启指定实例：置为重启中→stop→等待退出→start→置为运行中。
+  /// 重启指定实例。
   ///
+  /// 原生实例：置为重启中→stop→等待退出→start→置为运行中；
   /// restart 内部的 stop→onExit 会触发旧的退出监听（因状态为重启中而被跳过），
   /// 新进程启动后需重新注册管理器并挂载新的退出监听。
+  /// Docker 实例：`docker restart`，状态由轮询器同步。
   /// 若重启过程中 start 失败，重置状态为已关闭并清理管理器。
   Future<void> restartInstance(String id) async {
     final instance = _instanceById(id);
     if (instance == null) return;
+
+    if (instance.runMode == RunMode.docker) {
+      instance.status = InstanceStatus.restarting;
+      notifyListeners();
+      try {
+        await dockerCli.restartContainer(containerNameFor(instance));
+        instance.status = InstanceStatus.running;
+      } catch (e) {
+        instance.status = InstanceStatus.stopped;
+        notifyListeners();
+        rethrow;
+      }
+      notifyListeners();
+      return;
+    }
+
     final manager = _managers[id];
     if (manager == null) return;
 
@@ -320,16 +481,83 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 更新实例运行方式（原生 / Docker）并持久化。
+  ///
+  /// 切换到 Docker 时 [container] 为空则沿用现有配置或默认配置；
+  /// 切换回原生时保留容器配置（便于用户再次切换）。
+  Future<void> updateRunMode(
+    String id,
+    RunMode runMode,
+    ContainerConfig? container,
+  ) async {
+    final instance = _instanceById(id);
+    if (instance == null) return;
+    instance.runMode = runMode;
+    if (runMode == RunMode.docker) {
+      instance.container = container ?? instance.container ?? ContainerConfig();
+    }
+    await _store.updateRunMode(id, instance.runMode, instance.container);
+    notifyListeners();
+  }
+
   /// 获取指定实例的进程管理器（可空）。
   ServerProcessManager? managerFor(String id) => _managers[id];
 
   /// 获取指定实例的日志流（可空）。
-  Stream<String>? logsFor(String id) => _managers[id]?.logs;
+  ///
+  /// Docker 实例返回基于 `docker logs` 轮询的流（每 2 秒取尾部增量）。
+  Stream<String>? logsFor(String id) {
+    final instance = _instanceById(id);
+    if (instance == null) return null;
+    if (instance.runMode == RunMode.docker) {
+      return _dockerLogsStream(instance);
+    }
+    return _managers[id]?.logs;
+  }
+
+  /// Docker 日志轮询流：每 2 秒拉取容器日志尾部，只发出增量行。
+  Stream<String> _dockerLogsStream(ServerInstance instance) {
+    final name = containerNameFor(instance);
+    var first = true;
+    var watermark = '';
+    return Stream.periodic(const Duration(seconds: 2), (_) => name).asyncExpand(
+      (n) async* {
+        try {
+          final log = await dockerCli.containerLogs(n, tail: 200);
+          final lines = log
+              .split('\n')
+              .map((e) => e.trimRight())
+              .where((e) => e.isNotEmpty)
+              .toList();
+          if (lines.isEmpty) return;
+          if (first) {
+            first = false;
+            watermark = lines.last;
+            for (final line in lines) {
+              yield line;
+            }
+            return;
+          }
+          final idx = lines.indexOf(watermark);
+          final start = idx >= 0 ? idx + 1 : 0;
+          if (start < lines.length) {
+            watermark = lines.last;
+            for (final line in lines.sublist(start)) {
+              yield line;
+            }
+          }
+        } catch (_) {
+          // 容器不可达（未创建/已删除）时静默等待
+        }
+      },
+    );
+  }
 
   /// 释放所有管理器资源。
   @override
   void dispose() {
     LogPersistence.instance.dispose();
+    _dockerPollTimer?.cancel();
     for (final manager in _managers.values) {
       manager.dispose();
     }
@@ -337,8 +565,23 @@ class AppState extends ChangeNotifier {
     super.dispose();
   }
 
-  /// 向指定实例的进程发送命令；进程未运行时为空操作。
+  /// 向指定实例发送命令。
+  ///
+  /// 原生实例：写入进程标准输入；Docker 实例：`docker exec` 到容器内执行。
+  /// 进程/容器未运行时为空操作。
   void sendCommand(String id, String command) {
+    final instance = _instanceById(id);
+    if (instance == null) return;
+    if (instance.runMode == RunMode.docker) {
+      unawaited(
+        dockerCli
+            .execInContainer(containerNameFor(instance), command)
+            .catchError((_) {
+              // 容器不可达时忽略
+            }),
+      );
+      return;
+    }
     _managers[id]?.sendCommand(command);
   }
 }

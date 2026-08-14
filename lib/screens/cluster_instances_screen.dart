@@ -49,10 +49,12 @@ class _ClusterInstancesScreenState extends State<ClusterInstancesScreen> {
       }
       if (node == null) continue;
       try {
-        final remote = await nodeState.clientFor(node).getInstance(
-          uuid: instance.remoteUuid,
-          daemonId: instance.daemonId,
-        );
+        final remote = await nodeState
+            .clientFor(node)
+            .getInstance(
+              uuid: instance.remoteUuid,
+              daemonId: instance.daemonId,
+            );
         if (!mounted) return;
         setState(() => _statuses[instance.id] = remote.status);
       } catch (_) {
@@ -108,9 +110,9 @@ class _ClusterInstancesScreenState extends State<ClusterInstancesScreen> {
         .where((n) => n.id != instance.nodeId)
         .toList();
     if (candidates.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('没有其它节点可迁移')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('没有其它节点可迁移')));
       return;
     }
     String? targetId = candidates.first.id;
@@ -123,10 +125,7 @@ class _ClusterInstancesScreenState extends State<ClusterInstancesScreen> {
     if (targetId == null || !mounted) return;
     setState(() => _busy = true);
     try {
-      await ClusterMonitor.instance.migrateTo(
-        instance,
-        targetNodeId: targetId,
-      );
+      await ClusterMonitor.instance.migrateTo(instance, targetNodeId: targetId);
       await _loadStatuses();
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -158,6 +157,13 @@ class _ClusterInstancesScreenState extends State<ClusterInstancesScreen> {
       ).showSnackBar(SnackBar(content: Text('无法打开详情: $e')));
       return;
     }
+    // 取节点平台（决定详情页是否展示容器 Tab：Docker / Bastille）。
+    String? nodePlatform;
+    try {
+      nodePlatform = (await client.overview()).system.platform;
+    } catch (_) {
+      nodePlatform = null;
+    }
     if (!mounted) return;
     await pushPage<void>(
       context,
@@ -166,6 +172,7 @@ class _ClusterInstancesScreenState extends State<ClusterInstancesScreen> {
         client: client,
         daemonId: instance.daemonId,
         initialInstance: remote,
+        nodePlatform: nodePlatform,
       ),
     );
     await _loadStatuses();
@@ -271,7 +278,8 @@ class _ClusterInstanceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isActive = status == RemoteStatus.running ||
+    final isActive =
+        status == RemoteStatus.running ||
         status == RemoteStatus.starting ||
         status == RemoteStatus.stopping;
     final synced = instance.lastSyncedAt;

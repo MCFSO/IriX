@@ -44,10 +44,7 @@ void main() {
 
   test('pickNodeForAllocation 缺少资源信息时退化为 memUsage', () {
     final nodes = [_node('a'), _node('b')];
-    final snapshot = {
-      'a': _sys(memUsage: 0.9),
-      'b': _sys(memUsage: 0.2),
-    };
+    final snapshot = {'a': _sys(memUsage: 0.9), 'b': _sys(memUsage: 0.2)};
     expect(pickNodeForAllocation(nodes, snapshot), 'b');
   });
 

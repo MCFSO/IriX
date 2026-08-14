@@ -2337,6 +2337,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "xmc_orchestrator"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "rusqlite",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "xmc_vector_store"
 version = "0.1.0"
 dependencies = [

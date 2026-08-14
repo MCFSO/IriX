@@ -16,7 +16,7 @@ class DatabaseManager {
   DatabaseManager._();
 
   static const String _dbName = 'irix.db';
-  static const int _dbVersion = 5;
+  static const int _dbVersion = 6;
 
   Database? _db;
 
@@ -66,6 +66,8 @@ class DatabaseManager {
         start_command TEXT NOT NULL,
         core_type TEXT,
         core_version TEXT,
+        run_mode TEXT NOT NULL DEFAULT 'native',
+        container_config TEXT,
         created_at TEXT NOT NULL
       )
     ''');
@@ -204,6 +206,20 @@ class DatabaseManager {
           PRIMARY KEY (instance_id, rel_path)
         )
       ''');
+    }
+    if (oldVersion < 6) {
+      // 容器化支持：实例运行方式（原生 / Docker）与容器配置。
+      final cols = await db.rawQuery('PRAGMA table_info(servers)');
+      if (!cols.any((c) => c['name'] == 'run_mode')) {
+        await db.execute(
+          "ALTER TABLE servers ADD COLUMN run_mode TEXT NOT NULL DEFAULT 'native'",
+        );
+      }
+      if (!cols.any((c) => c['name'] == 'container_config')) {
+        await db.execute(
+          'ALTER TABLE servers ADD COLUMN container_config TEXT',
+        );
+      }
     }
   }
 
@@ -546,11 +562,10 @@ class DatabaseManager {
           whereArgs: [instanceId],
         );
         for (final row in rows) {
-          await txn.insert(
-            'cluster_sync_manifest',
-            {'instance_id': instanceId, ...row},
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
+          await txn.insert('cluster_sync_manifest', {
+            'instance_id': instanceId,
+            ...row,
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
         }
       });
     } catch (e) {

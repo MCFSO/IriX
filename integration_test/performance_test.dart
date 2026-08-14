@@ -48,10 +48,12 @@ void main() {
     await tester.pumpAndSettle(const Duration(milliseconds: 200));
 
     // 切换到「市场」页
-    await tester.tap(find.descendant(
-      of: find.byType(NavigationRail),
-      matching: find.text('市场'),
-    ));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationRail),
+        matching: find.text('市场'),
+      ),
+    );
     await tester.pump();
 
     // 等待首屏项目列表加载（依赖网络；失败则记录并跳过）
@@ -76,7 +78,7 @@ void main() {
 
     final performance =
         (binding.reportData?['performance'] as Map<String, dynamic>?) ??
-            <String, dynamic>{};
+        <String, dynamic>{};
     final data = <String, dynamic>{
       'test': 'market_scroll',
       ...performance,
@@ -100,8 +102,7 @@ void main() {
 
     // 基本断言：确实采集到帧，且构建耗时在合理范围（debug 桌面端，阈值宽松）
     final frameCount = (data['frame_count'] as num?) ?? 0;
-    final avgBuild =
-        (data['average_frame_build_time_millis'] as num?) ?? 0;
+    final avgBuild = (data['average_frame_build_time_millis'] as num?) ?? 0;
     final avgRaster =
         (data['average_frame_rasterizer_time_millis'] as num?) ?? 0;
     expect(frameCount, greaterThan(0), reason: '未采集到帧时间数据');

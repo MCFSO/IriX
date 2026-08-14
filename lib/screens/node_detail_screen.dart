@@ -3,8 +3,8 @@
 // - 概览：主机信息 / 资源占用 / 实例统计（两类型均有 API）
 // - 实例：实例列表与启动/停止/重启/强制终止（两类型均有 API）
 // - 文件：实例文件管理器（两类型均有 API）
+// - 容器：Docker / Bastille 容器环境全功能管理（irix-node 全功能，MCSM 受限回退）
 // - 用户：用户管理（仅 MCSM 面板提供 API）
-// - Docker：镜像/容器/网络（仅 MCSM 面板提供 API）
 // "只显示 API 有的功能"：MCSM 侧仅展示文档中带 API 的能力。
 
 import 'package:flutter/material.dart';
@@ -12,11 +12,13 @@ import 'package:provider/provider.dart';
 
 import '../models/node.dart';
 import '../models/remote.dart';
+import '../services/container/node_container_backend.dart';
 import '../services/node_api_client.dart';
 import '../services/node_daemon_launcher.dart';
 import '../state/node_state.dart';
 import '../utils/apple_widgets.dart';
 import '../utils/docker_visibility.dart';
+import '../widgets/container_environment_panel.dart';
 import 'remote_file_manager_screen.dart';
 import 'remote_instance_detail_screen.dart';
 
@@ -108,9 +110,8 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
 
   /// 按节点类型确定标签页。
   ///
-  /// Docker 相关能力（实例 Docker 配置 / Docker 环境管理）不占用独立标签页，
-  /// 而是并入「实例」管理内，并按客户端/节点平台决定是否显示
-  /// （见 shouldShowDockerSettings）。
+  /// 「容器」标签页展示节点容器环境的全功能管理（Docker / Bastille 按节点平台），
+  /// 节点在线即展示；平台不支持时面板呈现不可用状态与原因。
   List<({String label, IconData icon, Widget child})> _tabs(NodeInfo node) {
     final client = _client!;
     final daemonId = _daemonId;
@@ -148,7 +149,22 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
         ),
       ),
     ];
-    // MCSM 面板额外提供用户管理 API（Docker 已并入实例管理，按平台显示）
+    // 容器环境管理（Docker 全功能 / Bastille 全功能，按节点平台选后端）。
+    // 节点在线即展示；平台不支持时面板呈现不可用状态与原因。
+    if (overview != null) {
+      tabs.add((
+        label: '容器',
+        icon: Icons.inventory_2,
+        child: ContainerEnvironmentPanel(
+          backend: nodeContainerBackend(
+            client: client,
+            daemonId: daemonId ?? '',
+            platformHint: overview.system.platform,
+          ),
+        ),
+      ));
+    }
+    // MCSM 面板额外提供用户管理 API
     if (node.type == NodeType.mcsm) {
       tabs.add((
         label: '用户',
@@ -620,14 +636,6 @@ class _InstancesTabState extends State<_InstancesTab> {
     }
   }
 
-  /// 打开 Docker 环境管理（镜像 / 容器 / 网络）。
-  void _openDockerEnv() {
-    pushPage<void>(
-      context,
-      (_) => _DockerEnvScreen(client: widget.client, daemonId: _daemonId ?? ''),
-    );
-  }
-
   void _openDetail(RemoteInstance instance) {
     pushPage<void>(
       context,
@@ -689,14 +697,6 @@ class _InstancesTabState extends State<_InstancesTab> {
                 tooltip: '刷新',
                 onPressed: _loading ? null : _load,
               ),
-              if (shouldShowDockerSettings(
-                nodePlatform: widget.overview?.system.platform,
-              ))
-                IconButton(
-                  icon: const Icon(Icons.view_in_ar_outlined),
-                  tooltip: 'Docker 环境（镜像/容器/网络）',
-                  onPressed: _loading ? null : _openDockerEnv,
-                ),
               FilledButton.icon(
                 onPressed: _loading ? null : _create,
                 icon: const Icon(Icons.add, size: 18),
@@ -1259,489 +1259,6 @@ class _CreateUserDialogState extends State<_CreateUserDialog> {
   }
 }
 
-// ==================== Docker 环境（并入实例管理，按平台显示）====================
-
-/// Docker 环境管理：镜像 / 容器 / 网络（只读展示 + 构建镜像）。
-/// 由「实例」标签页的 Docker 按钮进入（客户端 Windows + 节点 Windows 时不显示）。
-class _DockerEnvScreen extends StatefulWidget {
-  const _DockerEnvScreen({required this.client, required this.daemonId});
-
-  final NodeApiClient client;
-  final String daemonId;
-
-  @override
-  State<_DockerEnvScreen> createState() => _DockerEnvScreenState();
-}
-
-class _DockerEnvScreenState extends State<_DockerEnvScreen> {
-  int _subIndex = 0;
-  bool _loading = true;
-  String? _error;
-  List<Map<String, dynamic>> _images = [];
-  List<Map<String, dynamic>> _containers = [];
-  List<Map<String, dynamic>> _networks = [];
-  Map<String, int> _progress = {};
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    final daemonId = widget.daemonId;
-    try {
-      final images = await widget.client.listImages(daemonId);
-      final containers = await widget.client.listContainers(daemonId);
-      final networks = await widget.client.listNetworks(daemonId);
-      if (!mounted) return;
-      setState(() {
-        _images = images;
-        _containers = containers;
-        _networks = networks;
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
-    }
-  }
-
-  Future<void> _buildImage() async {
-    final result = await showAppDialog<(String, String, String)?>(
-      context,
-      (_) => const _BuildImageDialog(),
-    );
-    if (result == null || !mounted) return;
-    final daemonId = widget.daemonId;
-    try {
-      await widget.client.createImage(
-        daemonId: daemonId,
-        dockerFile: result.$3,
-        name: result.$1,
-        tag: result.$2,
-      );
-      _pollProgress();
-    } catch (e) {
-      _showError(e.toString());
-    }
-  }
-
-  Future<void> _pollProgress() async {
-    final daemonId = widget.daemonId;
-    for (var i = 0; i < 30; i++) {
-      await Future.delayed(const Duration(seconds: 2));
-      if (!mounted) return;
-      try {
-        final progress = await widget.client.buildProgress(daemonId);
-        if (!mounted) return;
-        setState(() => _progress = progress);
-        final done = progress.values.every((v) => v != 1);
-        if (done) {
-          await _load();
-          return;
-        }
-      } catch (_) {
-        return;
-      }
-    }
-  }
-
-  void _showError(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), duration: const Duration(seconds: 4)),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Docker 环境')),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '镜像 / 容器 / 网络（面板 API）',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.outline,
-                    ),
-                  ),
-                ),
-                if (_progress.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: Text(
-                      _progress.entries
-                          .map(
-                            (e) =>
-                                '${e.key}: ${e.value == 2
-                                    ? '完成'
-                                    : e.value == 1
-                                    ? '构建中'
-                                    : '失败'}',
-                          )
-                          .join(', '),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  tooltip: '刷新',
-                  onPressed: _loading ? null : _load,
-                ),
-                FilledButton.icon(
-                  onPressed: _loading ? null : _buildImage,
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('构建镜像'),
-                ),
-              ],
-            ),
-          ),
-          SegmentedButton<int>(
-            segments: const [
-              ButtonSegment(
-                value: 0,
-                label: Text('镜像'),
-                icon: Icon(Icons.image_outlined, size: 16),
-              ),
-              ButtonSegment(
-                value: 1,
-                label: Text('容器'),
-                icon: Icon(Icons.view_in_ar, size: 16),
-              ),
-              ButtonSegment(
-                value: 2,
-                label: Text('网络'),
-                icon: Icon(Icons.hub_outlined, size: 16),
-              ),
-            ],
-            selected: {_subIndex},
-            onSelectionChanged: (s) => setState(() => _subIndex = s.first),
-            showSelectedIcon: false,
-            style: ButtonStyle(
-              visualDensity: VisualDensity.compact,
-              padding: WidgetStatePropertyAll(
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              ),
-            ),
-          ),
-          Expanded(child: _buildBody(theme)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBody(ThemeData theme) {
-    if (_loading) return const Center(child: CircularProgressIndicator());
-    if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(_error!, textAlign: TextAlign.center),
-              const SizedBox(height: 12),
-              FilledButton.icon(
-                icon: const Icon(Icons.refresh),
-                label: const Text('重试'),
-                onPressed: _load,
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-    return switch (_subIndex) {
-      0 => _dockerList(theme, _images, _imageRow),
-      1 => _dockerList(theme, _containers, _containerRow),
-      _ => _dockerList(theme, _networks, _networkRow),
-    };
-  }
-
-  Widget _dockerList(
-    ThemeData theme,
-    List<Map<String, dynamic>> items,
-    Widget Function(Map<String, dynamic>) rowBuilder,
-  ) {
-    if (items.isEmpty) {
-      return Center(child: Text('暂无数据', style: theme.textTheme.bodyMedium));
-    }
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: items.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 8),
-      itemBuilder: (context, index) {
-        final item = items[index];
-        return Card(
-          elevation: 0,
-          color: theme.colorScheme.surfaceContainerHighest.withValues(
-            alpha: 0.6,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: rowBuilder(item),
-          ),
-        );
-      },
-    );
-  }
-
-  /// 镜像行：Repository:Tag / ID / Size。
-  Widget _imageRow(Map<String, dynamic> image) {
-    final repoTags = (image['RepoTags'] as List<dynamic>? ?? []).cast<String>();
-    final repoTag = repoTags.isNotEmpty ? repoTags.first : 'unknown:latest';
-    final id = (image['Id'] as String? ?? '').replaceFirst('sha256:', '');
-    final size = (image['Size'] as num?)?.toInt() ?? 0;
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(
-              Icons.image_outlined,
-              size: 18,
-              color: theme.colorScheme.primary,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                repoTag,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleSmall,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'ID: ${id.length > 12 ? id.substring(0, 12) : id} · 大小: ${_formatBytes(size)}',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// 容器行：Name / Image / State / Ports。
-  Widget _containerRow(Map<String, dynamic> container) {
-    final names = (container['Names'] as List<dynamic>? ?? [])
-        .map((e) => e.toString().replaceFirst('/', ''))
-        .toList();
-    final image = container['Image'] as String? ?? '—';
-    final state = container['State'] as String? ?? '—';
-    final ports = (container['Ports'] as List<dynamic>? ?? [])
-        .map((e) => e is Map<String, dynamic> ? e : <String, dynamic>{})
-        .map(
-          (p) => p['PublicPort'] != null
-              ? '${p['IP'] ?? ''}:${p['PublicPort']}->${p['PrivatePort']}/${p['Type'] ?? ''}'
-              : '${p['PrivatePort']}/${p['Type'] ?? ''}',
-        )
-        .join(', ');
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(
-              Icons.view_in_ar,
-              size: 18,
-              color: state == 'running' ? Colors.green : Colors.grey,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                names.isNotEmpty ? names.join(', ') : '未命名容器',
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleSmall,
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: (state == 'running' ? Colors.green : Colors.grey)
-                    .withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                state,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: state == 'running' ? Colors.green : Colors.grey,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          '镜像: $image${ports.isEmpty ? '' : '\n端口: $ports'}',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// 网络行：Name / Driver / Scope。
-  Widget _networkRow(Map<String, dynamic> network) {
-    final name = network['Name'] as String? ?? '—';
-    final driver = network['Driver'] as String? ?? '—';
-    final scope = network['Scope'] as String? ?? '—';
-    final id = (network['Id'] as String? ?? '');
-    final theme = Theme.of(context);
-    return Row(
-      children: [
-        Icon(Icons.hub_outlined, size: 18, color: theme.colorScheme.primary),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            name,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.titleSmall,
-          ),
-        ),
-        Text(
-          '$driver · $scope${id.isNotEmpty ? ' · ${id.substring(0, 12)}' : ''}',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
-    );
-  }
-
-  static String _formatBytes(int bytes) {
-    if (bytes <= 0) return '0 B';
-    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-    var value = bytes.toDouble();
-    var i = 0;
-    while (value >= 1024 && i < units.length - 1) {
-      value /= 1024;
-      i++;
-    }
-    return '${value.toStringAsFixed(1)} ${units[i]}';
-  }
-}
-
-/// 构建镜像对话框。
-class _BuildImageDialog extends StatefulWidget {
-  const _BuildImageDialog();
-
-  @override
-  State<_BuildImageDialog> createState() => _BuildImageDialogState();
-}
-
-class _BuildImageDialogState extends State<_BuildImageDialog> {
-  final _name = TextEditingController(text: 'mcsm-custom');
-  final _tag = TextEditingController(text: 'latest');
-  final _dockerFile = TextEditingController(
-    text: 'FROM mcsm-ubuntu:22.04\n\n# 在此编写 Dockerfile 内容',
-  );
-
-  @override
-  void dispose() {
-    _name.dispose();
-    _tag.dispose();
-    _dockerFile.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('构建镜像'),
-      content: SizedBox(
-        width: 460,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _name,
-                    decoration: const InputDecoration(
-                      labelText: '镜像名称',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                SizedBox(
-                  width: 100,
-                  child: TextField(
-                    controller: _tag,
-                    decoration: const InputDecoration(
-                      labelText: '标签',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _dockerFile,
-              maxLines: 8,
-              decoration: const InputDecoration(
-                labelText: 'Dockerfile 内容',
-                border: OutlineInputBorder(),
-                alignLabelWithHint: true,
-              ),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
-        ),
-        FilledButton(
-          onPressed: () {
-            final name = _name.text.trim();
-            final tag = _tag.text.trim();
-            final dockerFile = _dockerFile.text;
-            if (name.isEmpty || tag.isEmpty || dockerFile.isEmpty) return;
-            Navigator.of(context).pop((name, tag, dockerFile));
-          },
-          child: const Text('开始构建'),
-        ),
-      ],
-    );
-  }
-}
-
-extension on RemoteStatus {
-  bool get isActive =>
-      this == RemoteStatus.running ||
-      this == RemoteStatus.starting ||
-      this == RemoteStatus.stopping;
-}
-
 /// 新建远程实例的结果。
 class _CreateInstanceResult {
   final String nickname;
@@ -1983,4 +1500,11 @@ class _CreateInstanceDialogState extends State<_CreateInstanceDialog> {
       networkMode: _networkMode,
     );
   }
+}
+
+extension on RemoteStatus {
+  bool get isActive =>
+      this == RemoteStatus.running ||
+      this == RemoteStatus.starting ||
+      this == RemoteStatus.stopping;
 }

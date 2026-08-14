@@ -64,10 +64,16 @@ String? pickNodeForAllocation(
   if (nodes.length >= 3) {
     for (final node in nodes) {
       if (node.type == NodeType.node) {
-        return (monitorNodeId: node.id, strategy: ClusterMonitorStrategy.monitor);
+        return (
+          monitorNodeId: node.id,
+          strategy: ClusterMonitorStrategy.monitor,
+        );
       }
     }
-    return (monitorNodeId: null, strategy: ClusterMonitorStrategy.noEligibleMonitor);
+    return (
+      monitorNodeId: null,
+      strategy: ClusterMonitorStrategy.noEligibleMonitor,
+    );
   }
   if (nodes.length == 2) {
     return (monitorNodeId: null, strategy: ClusterMonitorStrategy.mutual);
