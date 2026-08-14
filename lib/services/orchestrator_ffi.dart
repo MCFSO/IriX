@@ -192,8 +192,8 @@ class OrchestratorFfi {
 
     try {
       final lib = _openLibrary();
-      final orchestratorRequest =
-          lib.lookupFunction<OrchestratorRequestC, OrchestratorRequestDart>(
+      final orchestratorRequest = lib
+          .lookupFunction<OrchestratorRequestC, OrchestratorRequestDart>(
             'orchestrator_request',
           );
 
@@ -203,7 +203,9 @@ class OrchestratorFfi {
       resultPtr = orchestratorRequest(argsPtr, opPtr);
 
       if (resultPtr == nullptr) {
-        req.sendPort.send(const OrchestratorFfiException('orchestrator_request 返回空指针'));
+        req.sendPort.send(
+          const OrchestratorFfiException('orchestrator_request 返回空指针'),
+        );
         return;
       }
 
@@ -224,10 +226,11 @@ class OrchestratorFfi {
         // resultPtr 由 Rust 分配，需用 Rust 侧 free 函数释放
         try {
           final lib = _openLibrary();
-          final freeString = lib.lookupFunction<
-            OrchestratorFreeStringC,
-            OrchestratorFreeStringDart
-          >('orchestrator_free_string');
+          final freeString = lib
+              .lookupFunction<
+                OrchestratorFreeStringC,
+                OrchestratorFreeStringDart
+              >('orchestrator_free_string');
           freeString(resultPtr);
         } catch (_) {
           // 库句柄无法再次打开时忽略
