@@ -17,11 +17,12 @@ typedef DockerRunResult = ({int exitCode, String stdout, String stderr});
 /// docker 命令执行函数签名，便于测试注入。
 ///
 /// [timeout] 为可空：闭包实现可省略，由 [DockerCli.run] 兜底为默认超时。
-typedef DockerCommandRunner = Future<DockerRunResult> Function(
-  List<String> args, {
-  String? stdin,
-  Duration? timeout,
-});
+typedef DockerCommandRunner =
+    Future<DockerRunResult> Function(
+      List<String> args, {
+      String? stdin,
+      Duration? timeout,
+    });
 
 /// 低层 docker CLI 封装：参数组装 + JSON 行解析。
 class DockerCli {
@@ -44,12 +45,9 @@ class DockerCli {
     Duration? timeout,
   }) async {
     final effectiveTimeout = timeout ?? _timeout;
-    final result = await (runner?.call(
-          args,
-          stdin: stdin,
-          timeout: effectiveTimeout,
-        ) ??
-        _runProcess(args, stdin: stdin, timeout: effectiveTimeout));
+    final result =
+        await (runner?.call(args, stdin: stdin, timeout: effectiveTimeout) ??
+            _runProcess(args, stdin: stdin, timeout: effectiveTimeout));
     if (check && result.exitCode != 0) {
       final err = result.stderr.trim().isNotEmpty
           ? result.stderr.trim()
@@ -123,10 +121,11 @@ class DockerCliBackend implements ContainerBackend {
   Future<ContainerEnvironmentInfo> environment() async {
     if (_cachedEnvironment != null) return _cachedEnvironment!;
     try {
-      final result = await _cli.run(
-        ['version', '--format', '{{json .}}'],
-        timeout: const Duration(seconds: 5),
-      );
+      final result = await _cli.run([
+        'version',
+        '--format',
+        '{{json .}}',
+      ], timeout: const Duration(seconds: 5));
       final serverRows = _cli.parseJsonLines(result.stdout);
       final server = serverRows.isNotEmpty ? serverRows.last['Server'] : null;
       final version = server is Map
@@ -167,9 +166,7 @@ class DockerCliBackend implements ContainerBackend {
 
   @override
   Future<List<ContainerInfo>> listContainers() async {
-    final result = await _cli.run(
-      ['ps', '-a', '--format', '{{json .}}'],
-    );
+    final result = await _cli.run(['ps', '-a', '--format', '{{json .}}']);
     return _cli.parseJsonLines(result.stdout).map(_containerFromJson).toList();
   }
 
@@ -327,10 +324,13 @@ class DockerCliBackend implements ContainerBackend {
   @override
   Future<ContainerStats?> containerStats(String idOrName) async {
     try {
-      final result = await _cli.run(
-        ['stats', '--no-stream', '--format', '{{json .}}', idOrName],
-        timeout: const Duration(seconds: 10),
-      );
+      final result = await _cli.run([
+        'stats',
+        '--no-stream',
+        '--format',
+        '{{json .}}',
+        idOrName,
+      ], timeout: const Duration(seconds: 10));
       final rows = _cli.parseJsonLines(result.stdout);
       if (rows.isEmpty) return null;
       final row = rows.first;
@@ -377,7 +377,11 @@ class DockerCliBackend implements ContainerBackend {
   }
 
   @override
-  Future<BuildJob> buildImage(String dockerfile, String name, String tag) async {
+  Future<BuildJob> buildImage(
+    String dockerfile,
+    String name,
+    String tag,
+  ) async {
     final jobId =
         'build-${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}';
     final task = _LocalBuildTask();
@@ -420,7 +424,10 @@ class DockerCliBackend implements ContainerBackend {
     }
   }
 
-  Future<void> _collectLines(Stream<List<int>> stream, List<String> target) async {
+  Future<void> _collectLines(
+    Stream<List<int>> stream,
+    List<String> target,
+  ) async {
     await for (final chunk in stream.transform(utf8.decoder)) {
       for (final line in LineSplitter.split(chunk)) {
         if (line.trim().isNotEmpty) {
@@ -510,9 +517,7 @@ class DockerCliBackend implements ContainerBackend {
     String? release,
     bool force = false,
   }) {
-    throw ContainerBackendException(
-      'Docker 不支持容器归档导入，可改用镜像导入（docker load）',
-    );
+    throw ContainerBackendException('Docker 不支持容器归档导入，可改用镜像导入（docker load）');
   }
 
   // ==================== 解析工具 ====================

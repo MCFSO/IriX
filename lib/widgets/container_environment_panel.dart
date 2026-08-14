@@ -176,7 +176,9 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
 
   void _showSuccess(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   /// 执行容器操作后刷新列表。
@@ -299,10 +301,7 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
                 ),
                 child: SelectableText(
                   path,
-                  style: const TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 13,
-                  ),
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
                 ),
               ),
             ],
@@ -405,10 +404,7 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
                 child: Text(
                   _error!,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[500],
-                  ),
+                  style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                 ),
               ),
             ],
@@ -418,9 +414,9 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
               child: Text(
                 isBastille
                     ? 'Bastille 运行在 FreeBSD 节点上：请在「节点管理」中添加在线 '
-                        'FreeBSD 节点（irix-node）后，从节点详情页的「容器」Tab 管理 jail。'
+                          'FreeBSD 节点（irix-node）后，从节点详情页的「容器」Tab 管理 jail。'
                     : '本机使用 Docker 环境：安装并启动 Docker Desktop（或安装 docker '
-                        'CLI）后点击「重新检测」即可使用全部容器功能。',
+                          'CLI）后点击「重新检测」即可使用全部容器功能。',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12, color: Colors.grey[500]),
               ),
@@ -558,41 +554,39 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
           child: _containersLoading
               ? const Center(child: CircularProgressIndicator())
               : _containers.isEmpty
-                  ? Center(child: Text(_isBastille ? '暂无 Jail' : '暂无容器'))
-                  : ListView.builder(
-                      itemCount: _containers.length,
-                      itemBuilder: (context, index) {
-                        final c = _containers[index];
-                        return _ContainerTile(
-                          container: c,
-                          onStart: () => _runContainerAction(
-                            c,
-                            () => widget.backend.startContainer(c.name),
-                          ),
-                          onStop: () => _runContainerAction(
-                            c,
-                            () => widget.backend.stopContainer(c.name),
-                          ),
-                          onRestart: () => _runContainerAction(
-                            c,
-                            () => widget.backend.restartContainer(c.name),
-                          ),
-                          onClone: () => _openCloneDialog(c),
-                          onLimits: () => _openLimitsDialog(c),
-                          onExport: _isBastille ? () => _exportContainer(c) : null,
-                          onRemove: () => _runContainerAction(
-                            c,
-                            () => widget.backend.removeContainer(
-                              c.name,
-                              force: true,
-                            ),
-                            confirmText:
-                                '确定删除${_isBastille ? ' Jail' : '容器'} ${c.name} 吗？'
-                                '${_isBastille ? '\n（运行中的 Jail 将以 -a 强制摧毁）' : ''}',
-                          ),
-                        );
-                      },
-                    ),
+              ? Center(child: Text(_isBastille ? '暂无 Jail' : '暂无容器'))
+              : ListView.builder(
+                  itemCount: _containers.length,
+                  itemBuilder: (context, index) {
+                    final c = _containers[index];
+                    return _ContainerTile(
+                      container: c,
+                      onStart: () => _runContainerAction(
+                        c,
+                        () => widget.backend.startContainer(c.name),
+                      ),
+                      onStop: () => _runContainerAction(
+                        c,
+                        () => widget.backend.stopContainer(c.name),
+                      ),
+                      onRestart: () => _runContainerAction(
+                        c,
+                        () => widget.backend.restartContainer(c.name),
+                      ),
+                      onClone: () => _openCloneDialog(c),
+                      onLimits: () => _openLimitsDialog(c),
+                      onExport: _isBastille ? () => _exportContainer(c) : null,
+                      onRemove: () => _runContainerAction(
+                        c,
+                        () =>
+                            widget.backend.removeContainer(c.name, force: true),
+                        confirmText:
+                            '确定删除${_isBastille ? ' Jail' : '容器'} ${c.name} 吗？'
+                            '${_isBastille ? '\n（运行中的 Jail 将以 -a 强制摧毁）' : ''}',
+                      ),
+                    );
+                  },
+                ),
         ),
       ],
     );
@@ -639,70 +633,70 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
           child: _imagesLoading
               ? const Center(child: CircularProgressIndicator())
               : _images.isEmpty
-                  ? Center(
-                      child: Text(
-                        isBastille
-                            ? '暂无发行版，点击 Bootstrap 拉取（如 14.2-RELEASE）'
-                            : '暂无镜像',
+              ? Center(
+                  child: Text(
+                    isBastille
+                        ? '暂无发行版，点击 Bootstrap 拉取（如 14.2-RELEASE）'
+                        : '暂无镜像',
+                  ),
+                )
+              : ListView.builder(
+                  itemCount: _images.length,
+                  itemBuilder: (context, index) {
+                    final image = _images[index];
+                    return ListTile(
+                      leading: const Icon(Icons.image),
+                      title: Text(image.displayTag),
+                      subtitle: Text(
+                        '${_formatBytes(image.sizeBytes)}'
+                        '${image.createdAt != null ? ' · ${image.createdAt!.toLocal().toString().split('.').first}' : ''}',
                       ),
-                    )
-                  : ListView.builder(
-                      itemCount: _images.length,
-                      itemBuilder: (context, index) {
-                        final image = _images[index];
-                        return ListTile(
-                          leading: const Icon(Icons.image),
-                          title: Text(image.displayTag),
-                          subtitle: Text(
-                            '${_formatBytes(image.sizeBytes)}'
-                            '${image.createdAt != null ? ' · ${image.createdAt!.toLocal().toString().split('.').first}' : ''}',
-                          ),
-                          trailing: isBastille
-                              ? null
-                              : IconButton(
-                                  icon: const Icon(Icons.delete_outline),
-                                  tooltip: '删除镜像',
-                                  onPressed: () async {
-                                    final ok = await showAppDialog<bool>(
-                                      context,
-                                      (_) => AlertDialog(
-                                        title: const Text('删除镜像'),
-                                        content: Text(
-                                          '确定删除镜像 ${image.displayTag} 吗？',
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () =>
-                                                Navigator.pop(context, false),
-                                            child: const Text('取消'),
-                                          ),
-                                          FilledButton.tonal(
-                                            style: FilledButton.styleFrom(
-                                              foregroundColor: Theme.of(
-                                                context,
-                                              ).colorScheme.error,
-                                            ),
-                                            onPressed: () =>
-                                                Navigator.pop(context, true),
-                                            child: const Text('删除'),
-                                          ),
-                                        ],
+                      trailing: isBastille
+                          ? null
+                          : IconButton(
+                              icon: const Icon(Icons.delete_outline),
+                              tooltip: '删除镜像',
+                              onPressed: () async {
+                                final ok = await showAppDialog<bool>(
+                                  context,
+                                  (_) => AlertDialog(
+                                    title: const Text('删除镜像'),
+                                    content: Text(
+                                      '确定删除镜像 ${image.displayTag} 吗？',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(context, false),
+                                        child: const Text('取消'),
                                       ),
-                                    );
-                                    if (ok != true || !mounted) return;
-                                    try {
-                                      await widget.backend.removeImage(
-                                        image.displayTag,
-                                      );
-                                      await _refreshImages();
-                                    } on ContainerBackendException catch (e) {
-                                      _showError(e.message);
-                                    }
-                                  },
-                                ),
-                        );
-                      },
-                    ),
+                                      FilledButton.tonal(
+                                        style: FilledButton.styleFrom(
+                                          foregroundColor: Theme.of(
+                                            context,
+                                          ).colorScheme.error,
+                                        ),
+                                        onPressed: () =>
+                                            Navigator.pop(context, true),
+                                        child: const Text('删除'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (ok != true || !mounted) return;
+                                try {
+                                  await widget.backend.removeImage(
+                                    image.displayTag,
+                                  );
+                                  await _refreshImages();
+                                } on ContainerBackendException catch (e) {
+                                  _showError(e.message);
+                                }
+                              },
+                            ),
+                    );
+                  },
+                ),
         ),
       ],
     );
@@ -764,71 +758,67 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
           child: _rdrLoading
               ? const Center(child: CircularProgressIndicator())
               : _rdrMappings.isEmpty
-                  ? const Center(child: Text('暂无转发规则'))
-                  : ListView.builder(
-                      itemCount: _rdrMappings.length,
-                      itemBuilder: (context, index) {
-                        final mapping = _rdrMappings[index];
-                        return ListTile(
-                          leading: const Icon(
-                            Icons.swap_horiz,
-                            color: Colors.grey,
-                          ),
-                          title: Text(mapping.container),
-                          subtitle: Text(
-                            '${mapping.proto}  宿主机 ${mapping.hostPort} → jail ${mapping.containerPort}',
-                          ),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.delete_outline),
-                            tooltip: '删除转发',
-                            onPressed: () async {
-                              final ok = await showAppDialog<bool>(
-                                context,
-                                (_) => AlertDialog(
-                                  title: const Text('删除转发'),
-                                  content: Text(
-                                    '确定删除 ${mapping.container} 的 '
-                                    '${mapping.proto} ${mapping.hostPort}→${mapping.containerPort} 吗？',
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.pop(context, false),
-                                      child: const Text('取消'),
-                                    ),
-                                    FilledButton.tonal(
-                                      style: FilledButton.styleFrom(
-                                        foregroundColor: Theme.of(
-                                          context,
-                                        ).colorScheme.error,
-                                      ),
-                                      onPressed: () =>
-                                          Navigator.pop(context, true),
-                                      child: const Text('删除'),
-                                    ),
-                                  ],
+              ? const Center(child: Text('暂无转发规则'))
+              : ListView.builder(
+                  itemCount: _rdrMappings.length,
+                  itemBuilder: (context, index) {
+                    final mapping = _rdrMappings[index];
+                    return ListTile(
+                      leading: const Icon(Icons.swap_horiz, color: Colors.grey),
+                      title: Text(mapping.container),
+                      subtitle: Text(
+                        '${mapping.proto}  宿主机 ${mapping.hostPort} → jail ${mapping.containerPort}',
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        tooltip: '删除转发',
+                        onPressed: () async {
+                          final ok = await showAppDialog<bool>(
+                            context,
+                            (_) => AlertDialog(
+                              title: const Text('删除转发'),
+                              content: Text(
+                                '确定删除 ${mapping.container} 的 '
+                                '${mapping.proto} ${mapping.hostPort}→${mapping.containerPort} 吗？',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.pop(context, false),
+                                  child: const Text('取消'),
                                 ),
-                              );
-                              if (ok != true || !mounted) return;
-                              try {
-                                await widget.backend.removePortMapping(
-                                  PortMappingRequest(
-                                    container: mapping.container,
-                                    proto: mapping.proto,
-                                    hostPort: mapping.hostPort,
-                                    containerPort: mapping.containerPort,
+                                FilledButton.tonal(
+                                  style: FilledButton.styleFrom(
+                                    foregroundColor: Theme.of(
+                                      context,
+                                    ).colorScheme.error,
                                   ),
-                                );
-                                _showSuccess('转发规则已删除');
-                                await _refreshRdr();
-                              } on ContainerBackendException catch (e) {
-                                _showError(e.message);
-                              }
-                            },
-                          ),
-                        );
-                      },
-                    ),
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: const Text('删除'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (ok != true || !mounted) return;
+                          try {
+                            await widget.backend.removePortMapping(
+                              PortMappingRequest(
+                                container: mapping.container,
+                                proto: mapping.proto,
+                                hostPort: mapping.hostPort,
+                                containerPort: mapping.containerPort,
+                              ),
+                            );
+                            _showSuccess('转发规则已删除');
+                            await _refreshRdr();
+                          } on ContainerBackendException catch (e) {
+                            _showError(e.message);
+                          }
+                        },
+                      ),
+                    );
+                  },
+                ),
         ),
       ],
     );
@@ -867,7 +857,8 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
           mode: 'default',
           icon: Icons.auto_awesome_outlined,
           title: '一键默认初始化',
-          description: '不带选项执行 bastille setup：自动配置 loopback（bastille0）、'
+          description:
+              '不带选项执行 bastille setup：自动配置 loopback（bastille0）、'
               'firewall 与 storage。多数场景足够使用。',
           fields: const [],
           runLabel: '执行 bastille setup',
@@ -878,11 +869,10 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
           mode: 'firewall',
           icon: Icons.shield_outlined,
           title: '防火墙（firewall）',
-          description: '配置 PF 防火墙：启用服务并生成默认 pf.conf —— '
+          description:
+              '配置 PF 防火墙：启用服务并生成默认 pf.conf —— '
               '端口转发（bastille rdr）的前提。',
-          fields: const [
-            ('extIf', '外网网卡', '如 em0', ''),
-          ],
+          fields: const [('extIf', '外网网卡', '如 em0', '')],
           runLabel: '执行 bastille setup firewall',
         ),
         const SizedBox(height: 12),
@@ -891,7 +881,8 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
           mode: 'vnet',
           icon: Icons.lan_outlined,
           title: 'VNET 网络（vnet）',
-          description: '为 VNET jail（-V）配置宿主网络。'
+          description:
+              '为 VNET jail（-V）配置宿主网络。'
               '参数为可选项（部分版本为交互式，由服务端注入）。',
           fields: const [
             ('extIf', '外网网卡', '如 em0', ''),
@@ -906,7 +897,8 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
           mode: 'bridge',
           icon: Icons.hub_outlined,
           title: '桥接网络（bridge）',
-          description: '配置桥接网卡 —— 桥接 VNET jail（-B）的前提。'
+          description:
+              '配置桥接网卡 —— 桥接 VNET jail（-B）的前提。'
               '需先在系统上创建 bridge 接口（如 ifconfig bridge create）。',
           fields: const [],
           runLabel: '执行 bastille setup bridge',
@@ -917,11 +909,10 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
           mode: 'shared',
           icon: Icons.cell_tower,
           title: '共享网卡（shared）',
-          description: '将指定网卡设为共享接口：create 未指定 INTERFACE 时默认使用。'
+          description:
+              '将指定网卡设为共享接口：create 未指定 INTERFACE 时默认使用。'
               '与 loopback 互斥（配置其一将禁用另一项）。',
-          fields: const [
-            ('extIf', '网卡', '如 em0', ''),
-          ],
+          fields: const [('extIf', '网卡', '如 em0', '')],
           runLabel: '执行 bastille setup shared',
         ),
         const SizedBox(height: 12),
@@ -930,7 +921,8 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
           mode: 'linux',
           icon: Icons.terminal,
           title: 'Linux Jail（linux）',
-          description: '初始化 Linuxulator —— 创建 Linux jail（-L）的前提：'
+          description:
+              '初始化 Linuxulator —— 创建 Linux jail（-L）的前提：'
               '加载所需内核模块并安装 debootstrap 包。',
           fields: const [],
           runLabel: '执行 bastille setup linux',
@@ -963,57 +955,54 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
           child: _volumesLoading
               ? const Center(child: CircularProgressIndicator())
               : _volumes.isEmpty
-                  ? const Center(child: Text('暂无卷'))
-                  : ListView.builder(
-                      itemCount: _volumes.length,
-                      itemBuilder: (context, index) {
-                        final volume = _volumes[index];
-                        return ListTile(
-                          leading: const Icon(Icons.storage),
-                          title: Text(volume.name),
-                          subtitle: Text(
-                            volume.mountpoint ?? volume.driver ?? '',
-                          ),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.delete_outline),
-                            tooltip: '删除卷',
-                            onPressed: () async {
-                              final ok = await showAppDialog<bool>(
-                                context,
-                                (_) => AlertDialog(
-                                  title: const Text('删除卷'),
-                                  content: Text('确定删除卷 ${volume.name} 吗？'),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.pop(context, false),
-                                      child: const Text('取消'),
-                                    ),
-                                    FilledButton.tonal(
-                                      style: FilledButton.styleFrom(
-                                        foregroundColor: Theme.of(
-                                          context,
-                                        ).colorScheme.error,
-                                      ),
-                                      onPressed: () =>
-                                          Navigator.pop(context, true),
-                                      child: const Text('删除'),
-                                    ),
-                                  ],
+              ? const Center(child: Text('暂无卷'))
+              : ListView.builder(
+                  itemCount: _volumes.length,
+                  itemBuilder: (context, index) {
+                    final volume = _volumes[index];
+                    return ListTile(
+                      leading: const Icon(Icons.storage),
+                      title: Text(volume.name),
+                      subtitle: Text(volume.mountpoint ?? volume.driver ?? ''),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        tooltip: '删除卷',
+                        onPressed: () async {
+                          final ok = await showAppDialog<bool>(
+                            context,
+                            (_) => AlertDialog(
+                              title: const Text('删除卷'),
+                              content: Text('确定删除卷 ${volume.name} 吗？'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.pop(context, false),
+                                  child: const Text('取消'),
                                 ),
-                              );
-                              if (ok != true || !mounted) return;
-                              try {
-                                await widget.backend.removeVolume(volume.name);
-                                await _refreshVolumes();
-                              } on ContainerBackendException catch (e) {
-                                _showError(e.message);
-                              }
-                            },
-                          ),
-                        );
-                      },
-                    ),
+                                FilledButton.tonal(
+                                  style: FilledButton.styleFrom(
+                                    foregroundColor: Theme.of(
+                                      context,
+                                    ).colorScheme.error,
+                                  ),
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: const Text('删除'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (ok != true || !mounted) return;
+                          try {
+                            await widget.backend.removeVolume(volume.name);
+                            await _refreshVolumes();
+                          } on ContainerBackendException catch (e) {
+                            _showError(e.message);
+                          }
+                        },
+                      ),
+                    );
+                  },
+                ),
         ),
       ],
     );
@@ -1041,22 +1030,23 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
           child: _networksLoading
               ? const Center(child: CircularProgressIndicator())
               : _networks.isEmpty
-                  ? const Center(child: Text('暂无网络'))
-                  : ListView.builder(
-                      itemCount: _networks.length,
-                      itemBuilder: (context, index) {
-                        final network = _networks[index];
-                        return ListTile(
-                          leading: const Icon(Icons.hub),
-                          title: Text(network.name),
-                          subtitle: Text(
-                            [network.driver, network.subnet]
-                                .whereType<String>()
-                                .join(' · '),
-                          ),
-                        );
-                      },
-                    ),
+              ? const Center(child: Text('暂无网络'))
+              : ListView.builder(
+                  itemCount: _networks.length,
+                  itemBuilder: (context, index) {
+                    final network = _networks[index];
+                    return ListTile(
+                      leading: const Icon(Icons.hub),
+                      title: Text(network.name),
+                      subtitle: Text(
+                        [
+                          network.driver,
+                          network.subnet,
+                        ].whereType<String>().join(' · '),
+                      ),
+                    );
+                  },
+                ),
         ),
       ],
     );
@@ -1103,7 +1093,10 @@ class _ContainerTile extends StatelessWidget {
     final theme = Theme.of(context);
     final running = container.isRunning;
     return ListTile(
-      leading: Icon(Icons.inventory_2, color: running ? Colors.green : Colors.grey),
+      leading: Icon(
+        Icons.inventory_2,
+        color: running ? Colors.green : Colors.grey,
+      ),
       title: Text(container.name),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1172,11 +1165,7 @@ class _ContainerTile extends StatelessWidget {
                 if (container.createdAt != null)
                   _kv(
                     '创建时间',
-                    container.createdAt!
-                        .toLocal()
-                        .toString()
-                        .split('.')
-                        .first,
+                    container.createdAt!.toLocal().toString().split('.').first,
                   ),
               ],
             ),
@@ -1205,9 +1194,7 @@ class _ContainerTile extends StatelessWidget {
               style: TextStyle(color: Colors.grey[500], fontSize: 13),
             ),
           ),
-          Expanded(
-            child: Text(value, style: const TextStyle(fontSize: 13)),
-          ),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 13))),
         ],
       ),
     );
@@ -1262,8 +1249,9 @@ class _HighlightContainerCard extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: (running ? Colors.green : Colors.grey)
-                        .withValues(alpha: 0.15),
+                    color: (running ? Colors.green : Colors.grey).withValues(
+                      alpha: 0.15,
+                    ),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -1377,22 +1365,22 @@ class _CreateInput {
   final String? command;
 
   CreateContainerRequest toRequest() => CreateContainerRequest(
-        name: name,
-        image: image,
-        command: command,
-        ports: ports,
-        volumes: volumes,
-        env: env,
-        restartPolicy: isBastille ? null : restartPolicy,
-        memoryLimitMb: memoryLimitMb,
-        cpus: cpus,
-        diskLimitMb: diskLimitMb,
-        workdir: workdir,
-        ip: ip,
-        jailType: isBastille ? jailType : null,
-        vnetMode: isBastille ? vnetMode : null,
-        vnetInterface: isBastille ? vnetInterface : null,
-      );
+    name: name,
+    image: image,
+    command: command,
+    ports: ports,
+    volumes: volumes,
+    env: env,
+    restartPolicy: isBastille ? null : restartPolicy,
+    memoryLimitMb: memoryLimitMb,
+    cpus: cpus,
+    diskLimitMb: diskLimitMb,
+    workdir: workdir,
+    ip: ip,
+    jailType: isBastille ? jailType : null,
+    vnetMode: isBastille ? vnetMode : null,
+    vnetInterface: isBastille ? vnetInterface : null,
+  );
 }
 
 /// 创建容器 / jail 对话框（按运行时裁切字段）。
@@ -1470,13 +1458,9 @@ class _CreateContainerDialogState extends State<_CreateContainerDialog> {
     // empty 类型仅需 NAME（bastille create -E NAME）。
     final isEmptyJail = widget.isBastille && _jailType == 'empty';
     if (name.isEmpty || (!isEmptyJail && image.isEmpty)) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(isEmptyJail
-              ? '请填写 Jail 名称'
-              : '名称与镜像 / 发行版不能为空'),
+          content: Text(isEmptyJail ? '请填写 Jail 名称' : '名称与镜像 / 发行版不能为空'),
         ),
       );
       return;
@@ -1485,29 +1469,21 @@ class _CreateContainerDialogState extends State<_CreateContainerDialog> {
       // Bastille 的 jail 名不允许含点号与斜杠等字符，且不能为纯数字
       // （纯数字会被 jail(8) 当作 jid 解析）。
       if (!RegExp(r'^(?=.*[a-zA-Z])[a-zA-Z0-9_-]+$').hasMatch(name)) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(
-          const SnackBar(
-            content: Text('Jail 名仅允许字母、数字、- 和 _，且不能为纯数字'),
-          ),
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Jail 名仅允许字母、数字、- 和 _，且不能为纯数字')),
         );
         return;
       }
       // Bastille 的 NAME / RELEASE / IP 需显式声明（empty 仅 NAME；VNET 另有 --no-ip）。
       if (!isEmptyJail && _ipController.text.trim().isEmpty) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Bastille 创建 Jail 必须显式声明 IP 地址')),
         );
         return;
       }
       // Linux Jail 与任何 VNET 模式互斥。
       if (_jailType == 'linux' && _vnetMode != 'none') {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Linux Jail（-L）不能与 VNET（-V/-B）同时使用')),
         );
         return;
@@ -1515,22 +1491,18 @@ class _CreateContainerDialogState extends State<_CreateContainerDialog> {
       if (_vnetMode != 'none') {
         // VNET 需要网卡参数（-V 物理网卡 / -B 桥接网卡），且 IP 须含子网掩码。
         if (_interfaceController.text.trim().isEmpty) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(
+          ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(
-                _vnetMode == 'bridge' ? '请填写桥接网卡名称' : '请填写物理网卡名称',
-              ),
+              content: Text(_vnetMode == 'bridge' ? '请填写桥接网卡名称' : '请填写物理网卡名称'),
             ),
           );
           return;
         }
         if (!_ipController.text.contains('/')) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(
-            const SnackBar(content: Text('VNET Jail 的 IP 必须含子网掩码，如 192.168.1.50/24')),
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('VNET Jail 的 IP 必须含子网掩码，如 192.168.1.50/24'),
+            ),
           );
           return;
         }
@@ -1541,9 +1513,7 @@ class _CreateContainerDialogState extends State<_CreateContainerDialog> {
       if (!RegExp(r'^\d+:\d+$').hasMatch(port)) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(
-          SnackBar(content: Text('端口格式错误：$port（应为 宿主机:容器端口）')),
-        );
+        ).showSnackBar(SnackBar(content: Text('端口格式错误：$port（应为 宿主机:容器端口）')));
         return;
       }
     }
@@ -1632,10 +1602,7 @@ class _CreateContainerDialogState extends State<_CreateContainerDialog> {
                   children: [
                     for (final tag in widget.images)
                       ActionChip(
-                        label: Text(
-                          tag,
-                          style: const TextStyle(fontSize: 11),
-                        ),
+                        label: Text(tag, style: const TextStyle(fontSize: 11)),
                         visualDensity: VisualDensity.compact,
                         onPressed: () =>
                             setState(() => _imageController.text = tag),
@@ -1737,7 +1704,9 @@ class _CreateContainerDialogState extends State<_CreateContainerDialog> {
                           controller: _interfaceController,
                           decoration: InputDecoration(
                             labelText: _vnetMode == 'bridge' ? '桥接网卡' : '物理网卡',
-                            hintText: _vnetMode == 'bridge' ? '如 bridge0' : '如 em0',
+                            hintText: _vnetMode == 'bridge'
+                                ? '如 bridge0'
+                                : '如 em0',
                             isDense: true,
                             border: const OutlineInputBorder(),
                           ),
@@ -1807,8 +1776,7 @@ class _CreateContainerDialogState extends State<_CreateContainerDialog> {
                       child: Text('on-failure — 异常退出时重启'),
                     ),
                   ],
-                  onChanged: (value) =>
-                      setState(() => _restartPolicy = value),
+                  onChanged: (value) => setState(() => _restartPolicy = value),
                 ),
                 const SizedBox(height: 12),
                 TextField(
@@ -1864,9 +1832,7 @@ class _CreateContainerDialogState extends State<_CreateContainerDialog> {
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
                   labelText: '磁盘上限（MB，留空不限）',
-                  helperText: isBastille
-                      ? 'ZFS 数据集配额'
-                      : '依赖存储驱动支持 size 配额',
+                  helperText: isBastille ? 'ZFS 数据集配额' : '依赖存储驱动支持 size 配额',
                   isDense: true,
                   border: const OutlineInputBorder(),
                 ),
@@ -1878,7 +1844,10 @@ class _CreateContainerDialogState extends State<_CreateContainerDialog> {
                     '提示：thin（默认）/ thick（-T）/ clone（-C）/ empty（-E，仅需名称）/ linux（-L）'
                     '为互斥的创建方式；Linux Jail 不能与 VNET（-V/-B）同时使用；'
                     'VNET 需先完成「设置」页的网络初始化，IP 必须含子网掩码。',
-                    style: TextStyle(fontSize: 11, color: theme.colorScheme.outline),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: theme.colorScheme.outline,
+                    ),
                   ),
                 ),
             ],
@@ -1990,9 +1959,7 @@ class _CloneDialogState extends State<_CloneDialog> {
             if (widget.isBastille &&
                 !RegExp(r'^(?=.*[a-zA-Z])[a-zA-Z0-9_-]+$').hasMatch(name)) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Jail 名仅允许字母、数字、- 和 _，且不能为纯数字'),
-                ),
+                const SnackBar(content: Text('Jail 名仅允许字母、数字、- 和 _，且不能为纯数字')),
               );
               return;
             }
@@ -2018,11 +1985,7 @@ class _CloneDialogState extends State<_CloneDialog> {
 // ==================== 资源限制对话框 ====================
 
 class _LimitsInput {
-  const _LimitsInput({
-    this.memoryLimitMb,
-    this.cpus,
-    this.diskLimitMb,
-  });
+  const _LimitsInput({this.memoryLimitMb, this.cpus, this.diskLimitMb});
 
   final int? memoryLimitMb;
   final int? cpus;
@@ -2236,7 +2199,10 @@ class _RdrDialogState extends State<_RdrDialog> {
             final jail = _jail;
             final hostPort = int.tryParse(_hostPortController.text.trim());
             final jailPort = int.tryParse(_jailPortController.text.trim());
-            if (jail == null || jail.isEmpty || hostPort == null || jailPort == null) {
+            if (jail == null ||
+                jail.isEmpty ||
+                hostPort == null ||
+                jailPort == null) {
               return;
             }
             Navigator.pop(
@@ -2259,11 +2225,7 @@ class _RdrDialogState extends State<_RdrDialog> {
 // ==================== 导入对话框 ====================
 
 class _ImportInput {
-  const _ImportInput({
-    required this.file,
-    this.release,
-    this.force = false,
-  });
+  const _ImportInput({required this.file, this.release, this.force = false});
 
   final String file;
 
@@ -2512,8 +2474,9 @@ class _SetupCardState extends State<_SetupCard> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: (_resultOk ? Colors.green : Colors.red)
-                      .withValues(alpha: 0.12),
+                  color: (_resultOk ? Colors.green : Colors.red).withValues(
+                    alpha: 0.12,
+                  ),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: SelectableText(
@@ -2567,7 +2530,8 @@ class _BuildImageDialog extends StatefulWidget {
 
 class _BuildImageDialogState extends State<_BuildImageDialog> {
   final _dockerfileController = TextEditingController(
-    text: 'FROM eclipse-temurin:21-jre\n'
+    text:
+        'FROM eclipse-temurin:21-jre\n'
         'WORKDIR /data\n'
         'CMD ["java", "-Xmx2G", "-jar", "server.jar", "nogui"]',
   );
@@ -2751,8 +2715,8 @@ class _BuildProgressDialogState extends State<_BuildProgressDialog> {
                   done
                       ? '构建完成'
                       : failed
-                          ? '构建失败'
-                          : '构建中...',
+                      ? '构建失败'
+                      : '构建中...',
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
               ],

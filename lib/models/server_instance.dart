@@ -77,17 +77,17 @@ class ContainerConfig {
 
   /// 序列化为 JSON 字符串。
   String toJson() => jsonEncode({
-        'image': image,
-        'containerName': containerName,
-        'ports': ports,
-        'volumes': volumes,
-        'env': env,
-        'restartPolicy': restartPolicy,
-        'memoryLimitMb': memoryLimitMb,
-        'cpus': cpus,
-        'diskLimitMb': diskLimitMb,
-        'workdir': workdir,
-      });
+    'image': image,
+    'containerName': containerName,
+    'ports': ports,
+    'volumes': volumes,
+    'env': env,
+    'restartPolicy': restartPolicy,
+    'memoryLimitMb': memoryLimitMb,
+    'cpus': cpus,
+    'diskLimitMb': diskLimitMb,
+    'workdir': workdir,
+  });
 
   /// 从 JSON 反序列化；字段缺失时使用默认值，保证旧数据兼容。
   ///
@@ -104,8 +104,9 @@ class ContainerConfig {
       volumes: (map['volumes'] as List<dynamic>? ?? [])
           .whereType<String>()
           .toList(),
-      env: (map['env'] as Map<String, dynamic>? ?? {})
-          .map((k, v) => MapEntry(k, v.toString())),
+      env: (map['env'] as Map<String, dynamic>? ?? {}).map(
+        (k, v) => MapEntry(k, v.toString()),
+      ),
       restartPolicy: map['restartPolicy'] as String?,
       memoryLimitMb: (map['memoryLimitMb'] as num?)?.toInt(),
       cpus: (map['cpus'] as num?)?.toInt(),
@@ -135,11 +136,15 @@ class ContainerConfig {
   }) {
     return ContainerConfig(
       image: image ?? this.image,
-      containerName: clearContainerName ? null : (containerName ?? this.containerName),
+      containerName: clearContainerName
+          ? null
+          : (containerName ?? this.containerName),
       ports: ports ?? this.ports,
       volumes: volumes ?? this.volumes,
       env: env ?? this.env,
-      restartPolicy: clearRestartPolicy ? null : (restartPolicy ?? this.restartPolicy),
+      restartPolicy: clearRestartPolicy
+          ? null
+          : (restartPolicy ?? this.restartPolicy),
       memoryLimitMb: clearMemory ? null : (memoryLimitMb ?? this.memoryLimitMb),
       cpus: clearCpus ? null : (cpus ?? this.cpus),
       diskLimitMb: clearDiskLimit ? null : (diskLimitMb ?? this.diskLimitMb),
@@ -151,7 +156,9 @@ class ContainerConfig {
   String? validate() {
     if (image.trim().isEmpty) return '镜像不能为空';
     for (final port in ports) {
-      if (!RegExp(r'^(\d+(-\d+)?)(:(\d+(-\d+)?))?(/(tcp|udp))?$').hasMatch(port)) {
+      if (!RegExp(
+        r'^(\d+(-\d+)?)(:(\d+(-\d+)?))?(/(tcp|udp))?$',
+      ).hasMatch(port)) {
         return '端口映射格式错误：$port（应为 宿主机:容器端口）';
       }
     }

@@ -562,11 +562,10 @@ class DatabaseManager {
           whereArgs: [instanceId],
         );
         for (final row in rows) {
-          await txn.insert(
-            'cluster_sync_manifest',
-            {'instance_id': instanceId, ...row},
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
+          await txn.insert('cluster_sync_manifest', {
+            'instance_id': instanceId,
+            ...row,
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
         }
       });
     } catch (e) {

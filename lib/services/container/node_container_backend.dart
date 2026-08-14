@@ -127,7 +127,9 @@ class NodeDockerBackend extends NodeContainerBackend {
       image: json['image'] as String? ?? '',
       status: json['status'] as String? ?? '',
       state: json['state'] as String?,
-      ports: (json['ports'] as List<dynamic>? ?? []).whereType<String>().toList(),
+      ports: (json['ports'] as List<dynamic>? ?? [])
+          .whereType<String>()
+          .toList(),
       createdAt: DateTime.tryParse(json['createdAt'] as String? ?? ''),
       restartPolicy: json['restartPolicy'] as String?,
     );
@@ -225,9 +227,7 @@ class NodeDockerBackend extends NodeContainerBackend {
       throw const ContainerBackendException('MCSM 受限模式不支持资源限制');
     }
     if (diskLimitMb != null && diskLimitMb > 0) {
-      throw const ContainerBackendException(
-        'Docker 磁盘上限需在创建容器时指定，不支持热更新',
-      );
+      throw const ContainerBackendException('Docker 磁盘上限需在创建容器时指定，不支持热更新');
     }
     await client.containerUpdateLimits(
       idOrName,
@@ -307,7 +307,11 @@ class NodeDockerBackend extends NodeContainerBackend {
   }
 
   @override
-  Future<BuildJob> buildImage(String dockerfile, String name, String tag) async {
+  Future<BuildJob> buildImage(
+    String dockerfile,
+    String name,
+    String tag,
+  ) async {
     final String jobId;
     if (restricted) {
       // MCSM 构建为同步发起，进度按镜像名查询。
@@ -319,7 +323,11 @@ class NodeDockerBackend extends NodeContainerBackend {
       );
       jobId = name;
     } else {
-      jobId = await client.imageBuild(dockerfile: dockerfile, name: name, tag: tag);
+      jobId = await client.imageBuild(
+        dockerfile: dockerfile,
+        name: name,
+        tag: tag,
+      );
     }
     return BuildJob(jobId: jobId.isEmpty ? name : jobId);
   }
@@ -406,9 +414,7 @@ class NodeDockerBackend extends NodeContainerBackend {
 
   @override
   Future<List<PortMappingInfo>> listPortMappings() {
-    throw const ContainerBackendException(
-      'Docker 端口映射不可热管理，请查看容器列表的端口列',
-    );
+    throw const ContainerBackendException('Docker 端口映射不可热管理，请查看容器列表的端口列');
   }
 
   @override
@@ -420,9 +426,7 @@ class NodeDockerBackend extends NodeContainerBackend {
 
   @override
   Future<String> exportContainer(String idOrName) {
-    throw const ContainerBackendException(
-      'Docker 不支持容器归档导出，可改用镜像保存',
-    );
+    throw const ContainerBackendException('Docker 不支持容器归档导出，可改用镜像保存');
   }
 
   @override
@@ -431,9 +435,7 @@ class NodeDockerBackend extends NodeContainerBackend {
     String? release,
     bool force = false,
   }) {
-    throw const ContainerBackendException(
-      'Docker 不支持容器归档导入，可改用镜像导入',
-    );
+    throw const ContainerBackendException('Docker 不支持容器归档导入，可改用镜像导入');
   }
 }
 
@@ -599,9 +601,7 @@ class NodeBastilleBackend extends NodeContainerBackend {
     return rows.map((json) {
       return ImageInfo(
         id: json['name'] as String? ?? '',
-        tags: [
-          '${json['name']}:${json['version'] ?? 'RELEASE'}',
-        ],
+        tags: ['${json['name']}:${json['version'] ?? 'RELEASE'}'],
         sizeBytes: (json['sizeBytes'] as num?)?.toInt() ?? 0,
         createdAt: DateTime.tryParse(json['createdAt'] as String? ?? ''),
       );
@@ -619,9 +619,11 @@ class NodeBastilleBackend extends NodeContainerBackend {
         await Future<void>.delayed(const Duration(seconds: 1));
         try {
           final releases = await client.bastilleReleases();
-          if (releases.any((r) =>
-              (r['name']?.toString() ?? '').contains(name) ||
-              (r['version']?.toString() ?? '').contains(name))) {
+          if (releases.any(
+            (r) =>
+                (r['name']?.toString() ?? '').contains(name) ||
+                (r['version']?.toString() ?? '').contains(name),
+          )) {
             return;
           }
         } catch (_) {
@@ -666,13 +668,12 @@ class NodeBastilleBackend extends NodeContainerBackend {
   }
 
   @override
-  Future<void> addPortMapping(PortMappingRequest request) =>
-      client.bastilleRdr(
-        jail: request.container,
-        proto: request.proto,
-        hostPort: request.hostPort,
-        jailPort: request.containerPort,
-      );
+  Future<void> addPortMapping(PortMappingRequest request) => client.bastilleRdr(
+    jail: request.container,
+    proto: request.proto,
+    hostPort: request.hostPort,
+    jailPort: request.containerPort,
+  );
 
   @override
   Future<void> removePortMapping(PortMappingRequest request) =>

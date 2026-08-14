@@ -106,7 +106,10 @@ class ClusterState extends ChangeNotifier {
       NetworkSample(DateTime.now(), download: download, upload: upload),
     );
     if (_networkHistory.length > maxNetworkSamples) {
-      _networkHistory.removeRange(0, _networkHistory.length - maxNetworkSamples);
+      _networkHistory.removeRange(
+        0,
+        _networkHistory.length - maxNetworkSamples,
+      );
     }
     notifyListeners();
   }
@@ -236,7 +239,11 @@ class NetworkSample {
   /// 上传速率（字节/秒）。
   final double upload;
 
-  const NetworkSample(this.time, {required this.download, required this.upload});
+  const NetworkSample(
+    this.time, {
+    required this.download,
+    required this.upload,
+  });
 
   /// 总吞吐（下载 + 上传）。
   double get total => download + upload;

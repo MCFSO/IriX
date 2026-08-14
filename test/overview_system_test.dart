@@ -38,17 +38,12 @@ void main() {
   });
 
   test('systemVersion 回退 release', () {
-    final sys = OverviewSystem.fromJson({
-      'release': '5.15.0',
-    });
+    final sys = OverviewSystem.fromJson({'release': '5.15.0'});
     expect(sys.systemVersion, '5.15.0');
   });
 
   test('mergedWith 用其它实例填充缺失磁盘/网络', () {
-    final panel = OverviewSystem.fromJson({
-      'cpuUsage': 0.2,
-      'memUsage': 0.4,
-    });
+    final panel = OverviewSystem.fromJson({'cpuUsage': 0.2, 'memUsage': 0.4});
     final daemon = OverviewSystem.fromJson({
       'diskusage': 0.7,
       'disktotal': 1000,

@@ -107,8 +107,7 @@ class ClusterMigrator {
       instance.id,
     );
     final oldByPath = {
-      for (final row in manifestRows)
-        row['rel_path'] as String: row,
+      for (final row in manifestRows) row['rel_path'] as String: row,
     };
 
     final newManifest = <Map<String, dynamic>>[];
@@ -135,7 +134,10 @@ class ClusterMigrator {
       });
     }
 
-    await DatabaseManager.instance.replaceSyncManifest(instance.id, newManifest);
+    await DatabaseManager.instance.replaceSyncManifest(
+      instance.id,
+      newManifest,
+    );
     await clusterState.markSynced(instance.id, DateTime.now());
   }
 

@@ -759,7 +759,11 @@ class NodeApiClient {
 
   /// 容器内执行命令（POST /api/container/{id}/exec）。
   Future<void> containerExec(String id, String command) async {
-    await _request('POST', '/api/container/$id/exec', body: {'command': command});
+    await _request(
+      'POST',
+      '/api/container/$id/exec',
+      body: {'command': command},
+    );
   }
 
   /// 容器统计（GET /api/container/{id}/stats）。
@@ -785,11 +789,11 @@ class NodeApiClient {
     required String name,
     required String tag,
   }) async {
-    final data = await _request('POST', '/api/image/build', body: {
-      'dockerfile': dockerfile,
-      'name': name,
-      'tag': tag,
-    });
+    final data = await _request(
+      'POST',
+      '/api/image/build',
+      body: {'dockerfile': dockerfile, 'name': name, 'tag': tag},
+    );
     return (data is Map ? data['jobId'] : null) as String? ?? '';
   }
 
@@ -902,11 +906,11 @@ class NodeApiClient {
     required String template,
     Map<String, String> args = const {},
   }) async {
-    await _request('POST', '/api/bastille/templates/apply', body: {
-      'jail': jail,
-      'template': template,
-      'args': args,
-    });
+    await _request(
+      'POST',
+      '/api/bastille/templates/apply',
+      body: {'jail': jail, 'template': template, 'args': args},
+    );
   }
 
   /// 端口转发（POST /api/bastille/rdr）。
@@ -916,12 +920,16 @@ class NodeApiClient {
     required int hostPort,
     required int jailPort,
   }) async {
-    await _request('POST', '/api/bastille/rdr', body: {
-      'jail': jail,
-      'proto': proto,
-      'hostPort': hostPort,
-      'jailPort': jailPort,
-    });
+    await _request(
+      'POST',
+      '/api/bastille/rdr',
+      body: {
+        'jail': jail,
+        'proto': proto,
+        'hostPort': hostPort,
+        'jailPort': jailPort,
+      },
+    );
   }
 
   /// 删除端口转发（DELETE /api/bastille/rdr）。
@@ -931,12 +939,16 @@ class NodeApiClient {
     required int hostPort,
     required int jailPort,
   }) async {
-    await _request('DELETE', '/api/bastille/rdr', body: {
-      'jail': jail,
-      'proto': proto,
-      'hostPort': hostPort,
-      'jailPort': jailPort,
-    });
+    await _request(
+      'DELETE',
+      '/api/bastille/rdr',
+      body: {
+        'jail': jail,
+        'proto': proto,
+        'hostPort': hostPort,
+        'jailPort': jailPort,
+      },
+    );
   }
 
   /// 端口转发规则列表（GET /api/bastille/rdr）。
@@ -953,7 +965,9 @@ class NodeApiClient {
   /// 环境初始化（POST /api/bastille/setup，`bastille setup`）。
   ///
   /// 返回 `{ok, detail?, checked?}`；[config] 见 BastilleSetupRequest.toJson。
-  Future<Map<String, dynamic>?> bastilleSetup(Map<String, dynamic> config) async {
+  Future<Map<String, dynamic>?> bastilleSetup(
+    Map<String, dynamic> config,
+  ) async {
     final data = await _request('POST', '/api/bastille/setup', body: config);
     return data is Map<String, dynamic> ? data : null;
   }
@@ -964,10 +978,11 @@ class NodeApiClient {
     required String newName,
     String? ip,
   }) async {
-    await _request('POST', '/api/bastille/jails/$jail/clone', body: {
-      'newName': newName,
-      if (ip != null && ip.isNotEmpty) 'ip': ip,
-    });
+    await _request(
+      'POST',
+      '/api/bastille/jails/$jail/clone',
+      body: {'newName': newName, if (ip != null && ip.isNotEmpty) 'ip': ip},
+    );
   }
 
   /// 导出 jail 为归档（POST /api/bastille/jails/{name}/export，`bastille export`）。
@@ -988,11 +1003,15 @@ class NodeApiClient {
     String? release,
     bool force = false,
   }) async {
-    final data = await _request('POST', '/api/bastille/jails/import', body: {
-      'file': file,
-      if (release != null && release.isNotEmpty) 'release': release,
-      if (force) 'force': true,
-    });
+    final data = await _request(
+      'POST',
+      '/api/bastille/jails/import',
+      body: {
+        'file': file,
+        if (release != null && release.isNotEmpty) 'release': release,
+        if (force) 'force': true,
+      },
+    );
     return (data is Map ? data['name'] : null) as String? ?? '';
   }
 
@@ -1006,11 +1025,11 @@ class NodeApiClient {
     int? cpus,
     int? diskMb,
   }) async {
-    await _request('POST', '/api/bastille/jails/$name/limits', body: {
-      'memoryMb': ?memoryMb,
-      'cpus': ?cpus,
-      'diskMb': ?diskMb,
-    });
+    await _request(
+      'POST',
+      '/api/bastille/jails/$name/limits',
+      body: {'memoryMb': ?memoryMb, 'cpus': ?cpus, 'diskMb': ?diskMb},
+    );
   }
 
   /// 克隆容器（POST /api/container/{id}/clone）。
@@ -1024,10 +1043,11 @@ class NodeApiClient {
     int? memoryMb,
     int? cpus,
   }) async {
-    await _request('POST', '/api/container/$id/limits', body: {
-      'memoryMb': ?memoryMb,
-      'cpus': ?cpus,
-    });
+    await _request(
+      'POST',
+      '/api/container/$id/limits',
+      body: {'memoryMb': ?memoryMb, 'cpus': ?cpus},
+    );
   }
 }
 

@@ -1259,7 +1259,6 @@ class _CreateUserDialogState extends State<_CreateUserDialog> {
   }
 }
 
-
 /// 新建远程实例的结果。
 class _CreateInstanceResult {
   final String nickname;

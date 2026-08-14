@@ -50,9 +50,7 @@ class FakeDockerRunner {
             'Ports': '',
             'CreatedAt': '2026-08-12 10:00:00',
           },
-        ]
-            .map((e) => jsonEncode(e))
-            .join('\n'),
+        ].map((e) => jsonEncode(e)).join('\n'),
         stderr: '',
       );
     }
@@ -142,11 +140,8 @@ void main() {
     test('命令失败时标记不可用', () async {
       final broken = DockerCliBackend(
         cli: DockerCli(
-          runner: (args, {stdin, timeout}) async => (
-            exitCode: 1,
-            stdout: '',
-            stderr: 'docker: command not found',
-          ),
+          runner: (args, {stdin, timeout}) async =>
+              (exitCode: 1, stdout: '', stderr: 'docker: command not found'),
         ),
       );
       final env = await broken.environment();
@@ -204,10 +199,13 @@ void main() {
       );
       final args = runner.calls.last;
       expect(args, contains('java:21'));
-      expect(
-        args.sublist(args.length - 5),
-        ['java', '-Xmx2G', '-jar', 'server.jar', 'nogui'],
-      );
+      expect(args.sublist(args.length - 5), [
+        'java',
+        '-Xmx2G',
+        '-jar',
+        'server.jar',
+        'nogui',
+      ]);
     });
   });
 

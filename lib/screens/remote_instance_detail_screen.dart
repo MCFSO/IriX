@@ -282,10 +282,7 @@ class _RemoteInstanceDetailScreenState
                   TabBar(
                     tabs: const [
                       Tab(icon: Icon(Icons.terminal), text: '控制台'),
-                      Tab(
-                        icon: Icon(Icons.settings_outlined),
-                        text: '配置',
-                      ),
+                      Tab(icon: Icon(Icons.settings_outlined), text: '配置'),
                       Tab(icon: Icon(Icons.inventory_2), text: '容器'),
                     ],
                   ),
@@ -316,7 +313,8 @@ class _RemoteInstanceDetailScreenState
     );
     // 实例以 Docker 方式运行时高亮其容器。
     final docker = _instance.config.docker;
-    final highlightName = _instance.config.processType == 'docker' &&
+    final highlightName =
+        _instance.config.processType == 'docker' &&
             docker.containerName.isNotEmpty
         ? docker.containerName
         : null;

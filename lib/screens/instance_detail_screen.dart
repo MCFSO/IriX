@@ -981,16 +981,16 @@ class _RunModeCardState extends State<_RunModeCard> {
         .firstOrNull;
     if (instance == null) return;
     if (instance.status.isActive) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先停止服务器再切换运行方式')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请先停止服务器再切换运行方式')));
       return;
     }
     await state.updateRunMode(widget.instanceId, mode, instance.container);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('已切换为「${mode.label}」运行')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('已切换为「${mode.label}」运行')));
   }
 
   @override
@@ -1016,10 +1016,7 @@ class _RunModeCardState extends State<_RunModeCard> {
                 const Icon(Icons.layers_outlined),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: Text(
-                    '运行方式',
-                    style: theme.textTheme.titleMedium,
-                  ),
+                  child: Text('运行方式', style: theme.textTheme.titleMedium),
                 ),
               ],
             ),
@@ -1119,14 +1116,14 @@ class _ContainerConfigCardState extends State<_ContainerConfigCard> {
     _portsController = TextEditingController(text: config.ports.join(', '));
     _volumesController = TextEditingController(text: config.volumes.join(', '));
     _envController = TextEditingController(
-      text: config.env.entries
-          .map((e) => '${e.key}=${e.value}')
-          .join('\n'),
+      text: config.env.entries.map((e) => '${e.key}=${e.value}').join('\n'),
     );
     _memoryController = TextEditingController(
       text: config.memoryLimitMb?.toString() ?? '',
     );
-    _cpusController = TextEditingController(text: config.cpus?.toString() ?? '');
+    _cpusController = TextEditingController(
+      text: config.cpus?.toString() ?? '',
+    );
     _diskController = TextEditingController(
       text: config.diskLimitMb?.toString() ?? '',
     );
@@ -1187,9 +1184,11 @@ class _ContainerConfigCardState extends State<_ContainerConfigCard> {
       ).showSnackBar(SnackBar(content: Text(error)));
       return;
     }
-    await context
-        .read<AppState>()
-        .updateRunMode(widget.instanceId, RunMode.docker, config);
+    await context.read<AppState>().updateRunMode(
+      widget.instanceId,
+      RunMode.docker,
+      config,
+    );
     if (!mounted) return;
     setState(() => _dirty = false);
     ScaffoldMessenger.of(
@@ -1227,9 +1226,7 @@ class _ContainerConfigCardState extends State<_ContainerConfigCard> {
           children: [
             const Icon(Icons.tune),
             const SizedBox(width: 16),
-            Expanded(
-              child: Text('容器配置', style: theme.textTheme.titleSmall),
-            ),
+            Expanded(child: Text('容器配置', style: theme.textTheme.titleSmall)),
           ],
         ),
         const SizedBox(height: 12),

@@ -255,7 +255,10 @@ class AppState extends ChangeNotifier {
     // Docker 实例：尽力删除对应容器（容器不可达时忽略）。
     if (instance != null && instance.runMode == RunMode.docker) {
       try {
-        await dockerCli.removeContainer(containerNameFor(instance), force: true);
+        await dockerCli.removeContainer(
+          containerNameFor(instance),
+          force: true,
+        );
       } catch (_) {}
     }
     await _store.removeInstance(id);
@@ -517,36 +520,37 @@ class AppState extends ChangeNotifier {
     final name = containerNameFor(instance);
     var first = true;
     var watermark = '';
-    return Stream.periodic(const Duration(seconds: 2), (_) => name)
-        .asyncExpand((n) async* {
-      try {
-        final log = await dockerCli.containerLogs(n, tail: 200);
-        final lines = log
-            .split('\n')
-            .map((e) => e.trimRight())
-            .where((e) => e.isNotEmpty)
-            .toList();
-        if (lines.isEmpty) return;
-        if (first) {
-          first = false;
-          watermark = lines.last;
-          for (final line in lines) {
-            yield line;
+    return Stream.periodic(const Duration(seconds: 2), (_) => name).asyncExpand(
+      (n) async* {
+        try {
+          final log = await dockerCli.containerLogs(n, tail: 200);
+          final lines = log
+              .split('\n')
+              .map((e) => e.trimRight())
+              .where((e) => e.isNotEmpty)
+              .toList();
+          if (lines.isEmpty) return;
+          if (first) {
+            first = false;
+            watermark = lines.last;
+            for (final line in lines) {
+              yield line;
+            }
+            return;
           }
-          return;
-        }
-        final idx = lines.indexOf(watermark);
-        final start = idx >= 0 ? idx + 1 : 0;
-        if (start < lines.length) {
-          watermark = lines.last;
-          for (final line in lines.sublist(start)) {
-            yield line;
+          final idx = lines.indexOf(watermark);
+          final start = idx >= 0 ? idx + 1 : 0;
+          if (start < lines.length) {
+            watermark = lines.last;
+            for (final line in lines.sublist(start)) {
+              yield line;
+            }
           }
+        } catch (_) {
+          // 容器不可达（未创建/已删除）时静默等待
         }
-      } catch (_) {
-        // 容器不可达（未创建/已删除）时静默等待
-      }
-    });
+      },
+    );
   }
 
   /// 释放所有管理器资源。
@@ -573,8 +577,8 @@ class AppState extends ChangeNotifier {
         dockerCli
             .execInContainer(containerNameFor(instance), command)
             .catchError((_) {
-          // 容器不可达时忽略
-        }),
+              // 容器不可达时忽略
+            }),
       );
       return;
     }

@@ -101,8 +101,8 @@ class ContainerInfo {
   final String? restartPolicy;
 
   /// 是否处于运行状态。
-  bool get isRunning => status.toLowerCase().contains('up') ||
-      status.toLowerCase() == 'running';
+  bool get isRunning =>
+      status.toLowerCase().contains('up') || status.toLowerCase() == 'running';
 
   /// 是否处于重启状态。
   bool get isRestarting => status.toLowerCase().contains('restarting');
@@ -135,11 +135,7 @@ class ImageInfo {
 
 /// 卷信息。
 class VolumeInfo {
-  const VolumeInfo({
-    required this.name,
-    this.driver,
-    this.mountpoint,
-  });
+  const VolumeInfo({required this.name, this.driver, this.mountpoint});
 
   final String name;
   final String? driver;
@@ -176,7 +172,9 @@ class ContainerStats {
 
   /// 内存使用百分比（0~1），无法计算时为 null。
   double? get memoryPercent {
-    if (memoryBytes == null || memoryLimitBytes == null || memoryLimitBytes == 0) {
+    if (memoryBytes == null ||
+        memoryLimitBytes == null ||
+        memoryLimitBytes == 0) {
       return null;
     }
     return memoryBytes! / memoryLimitBytes!;
@@ -361,19 +359,16 @@ class BastilleSetupRequest {
 
   /// 转为节点 API 请求体。
   Map<String, dynamic> toJson() => {
-        'mode': mode,
-        if (extIf != null && extIf!.isNotEmpty) 'extIf': extIf,
-        if (tunIf != null && tunIf!.isNotEmpty) 'tunIf': tunIf,
-        if (addr != null && addr!.isNotEmpty) 'addr': addr,
-      };
+    'mode': mode,
+    if (extIf != null && extIf!.isNotEmpty) 'extIf': extIf,
+    if (tunIf != null && tunIf!.isNotEmpty) 'tunIf': tunIf,
+    if (addr != null && addr!.isNotEmpty) 'addr': addr,
+  };
 }
 
 /// Bastille 初始化结果。
 class BastilleSetupResult {
-  const BastilleSetupResult({
-    required this.ok,
-    this.detail,
-  });
+  const BastilleSetupResult({required this.ok, this.detail});
 
   final bool ok;
 

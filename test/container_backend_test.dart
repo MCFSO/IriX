@@ -134,7 +134,14 @@ void main() {
   group('DockerCliBackend.updateContainerLimits', () {
     test('同时设置内存与 CPU', () async {
       await backend.updateContainerLimits('mc', memoryLimitMb: 4096, cpus: 4);
-      expect(fake.calls.single.$1, ['update', '-m', '4096m', '--cpus', '4', 'mc']);
+      expect(fake.calls.single.$1, [
+        'update',
+        '-m',
+        '4096m',
+        '--cpus',
+        '4',
+        'mc',
+      ]);
     });
 
     test('磁盘上限热更新抛异常', () async {

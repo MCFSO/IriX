@@ -65,7 +65,10 @@ class ClusterMonitor {
   Future<void> start(NodeState nodeState, ClusterState clusterState) async {
     _nodeState = nodeState;
     _clusterState = clusterState;
-    _migrator = ClusterMigrator(nodeState: nodeState, clusterState: clusterState);
+    _migrator = ClusterMigrator(
+      nodeState: nodeState,
+      clusterState: clusterState,
+    );
     clusterState.setMonitorActive(true);
     _applyMonitorRole();
     _timer ??= Timer.periodic(pollInterval, (_) => _tick());
@@ -97,7 +100,8 @@ class ClusterMonitor {
     } else {
       // 监控节点必须是仍然存在的 irix-node（MCSM 不能充当监控节点）。
       final current = cluster.monitorNodeId;
-      final valid = current != null &&
+      final valid =
+          current != null &&
           nodes.any((n) => n.id == current && n.type == NodeType.node);
       if (!valid) {
         cluster.setMonitorNode(role.monitorNodeId);
@@ -128,7 +132,10 @@ class ClusterMonitor {
   }
 
   /// 刷新全部节点资源快照，并聚合网络吞吐推入历史。
-  Future<void> _refreshResources(NodeState nodeState, ClusterState cluster) async {
+  Future<void> _refreshResources(
+    NodeState nodeState,
+    ClusterState cluster,
+  ) async {
     var totalDownload = 0.0;
     var totalUpload = 0.0;
     for (final node in nodeState.nodes) {
@@ -170,7 +177,10 @@ class ClusterMonitor {
       try {
         remote = await nodeState
             .clientFor(node)
-            .getInstance(uuid: instance.remoteUuid, daemonId: instance.daemonId);
+            .getInstance(
+              uuid: instance.remoteUuid,
+              daemonId: instance.daemonId,
+            );
       } catch (_) {
         continue;
       }
@@ -179,8 +189,8 @@ class ClusterMonitor {
       final current = remote.status;
       _lastStatus[instance.id] = current;
 
-      final wasActive = prev == RemoteStatus.running ||
-          prev == RemoteStatus.starting;
+      final wasActive =
+          prev == RemoteStatus.running || prev == RemoteStatus.starting;
       final nowStopped = current == RemoteStatus.stopped;
 
       if (wasActive && nowStopped) {
@@ -312,11 +322,13 @@ class ClusterMonitor {
   Future<void> startInstance(ClusterInstance instance) async {
     final node = _nodeById(instance.nodeId);
     if (node == null) return;
-    await _nodeState!.clientFor(node).instanceAction(
-      uuid: instance.remoteUuid,
-      daemonId: instance.daemonId,
-      action: RemoteAction.start,
-    );
+    await _nodeState!
+        .clientFor(node)
+        .instanceAction(
+          uuid: instance.remoteUuid,
+          daemonId: instance.daemonId,
+          action: RemoteAction.start,
+        );
   }
 
   /// 优雅停止 + 增量同步（人为正常关闭）。
@@ -325,11 +337,13 @@ class ClusterMonitor {
     if (node == null) return;
     _expectedStops.add(instance.id);
     try {
-      await _nodeState!.clientFor(node).instanceAction(
-        uuid: instance.remoteUuid,
-        daemonId: instance.daemonId,
-        action: RemoteAction.stop,
-      );
+      await _nodeState!
+          .clientFor(node)
+          .instanceAction(
+            uuid: instance.remoteUuid,
+            daemonId: instance.daemonId,
+            action: RemoteAction.stop,
+          );
       await _migrator?.waitStopped(
         _nodeState!.clientFor(node),
         instance.daemonId,
