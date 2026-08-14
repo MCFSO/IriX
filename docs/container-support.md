@@ -265,6 +265,13 @@ String? containerId;    // 容器名 / jail 名,与 remoteUuid 的对应关系
 
 - 新增「容器环境」概览卡:运行时类型、版本、可用性;点击进入对应的容器资源管理(与实例页共用同一套页面组件)。
 
+### 5.4 集群容器管理页(cluster_container_screen.dart,多机模式独立导航页)
+
+- 多机模式导航新增 **「容器」** 项(位于「实例」之后),进入独立的 `ClusterContainerScreen`:
+  - 左侧节点列表:在线状态 + 运行时徽章(Docker 蓝 / Bastille 红,按节点 platform);
+  - 右侧复用 `ContainerEnvironmentPanel`:按节点平台选择 `NodeDockerBackend`(Linux)或 `NodeBastilleBackend`(FreeBSD),对节点容器环境进行全功能管理;
+  - 节点离线 / overview 拉取失败时展示原因与重试;面板能力与节点详情页「容器」tab 完全一致。
+
 ---
 
 ## 6. 实施计划
@@ -275,13 +282,14 @@ String? containerId;    // 容器名 / jail 名,与 remoteUuid 的对应关系
 | **P0** | `ServerInstance` 模型扩展(`RunMode`/`ContainerConfig`)+ 数据库 v6 迁移 + 本地实例详情页容器化(运行方式表单 + 容器 tab + `ContainerEnvironmentPanel`) | 本地可容器化运行 MC | ✅ 已完成 |
 | **P1** | `NodeApiClient` 容器/Bastille 端点 + `NodeDockerBackend`/`NodeBastilleBackend`(含 MCSM 受限回退) | `NODE_API.md` §6.1 已发布,服务端按契约实现 | ✅ 客户端已完成,服务端待对接 |
 | **P1** | 多机实例详情页「容器」tab + 节点详情页「容器」tab(按节点平台选 Docker/Bastille 后端,替换旧 `_DockerEnvScreen`) | 复用 `ContainerEnvironmentPanel` | ✅ 已完成(服务端就绪后即生效) |
+| **P2** | 多机模式独立「容器」导航页(`ClusterContainerScreen`):节点列表(运行时徽章)+ 按平台复用容器面板 | Docker/Bastille 集群容器管理入口 | ✅ 已完成 |
 | **P2** | 多机 Bastille 专属能力(Bastillefile 模板、rdr 编辑、bootstrap 任务进度 UI) | 面板按后端能力裁切 | ✅ 已完成:rdr 增删查、bootstrap、运行时感知 Tab |
 | **P2** | Bastille 全功能扩展:bastille setup 初始化(pf/vnet/linux)、创建 jail(类型/VNET/桥接/IP)、clone、destroy -a、import/export、资源限制(内存/CPU/磁盘)、数据目录挂载 + 强制工作目录 | 后端接口 + `ContainerEnvironmentPanel` 设置/转发 Tab + 各对话框 | ✅ 已完成(客户端契约,服务端待按 §3.3 对接) |
 | **P2** | 集群实例容器化运行 + 迁移时的容器重建 | 容器实例可迁移 | 待做 |
 
 ## 7. 边界与回退
 
-- 本地无 docker CLI → 容器 UI 整体隐藏,实例保持原生运行。
+- 本地无 docker CLI → 「容器」tab 仍展示,面板呈现不可用状态与安装提示,实例保持原生运行。
 - MCSM 节点永远只有受限容器功能(现有 4 端点),不承诺全功能。
-- Bastille 的 `linux` jail 类型(Linuxulator)第一版仅列表展示,创建流程放 P2 之后的增强。
+- Bastille 的 `linux` jail 类型(Linuxulator)为实验特性,官方标注 experimental,创建流程已支持(-L),与 VNET 互斥。
 - 容器实例的备份 / 文件管理走挂载目录,不实现 `docker cp` / `bastille cp` 穿透(卷已覆盖 99% 场景)。
