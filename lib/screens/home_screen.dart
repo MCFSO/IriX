@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../models/server_instance.dart';
 import '../services/cluster_monitor.dart';
+import '../services/database_manager.dart';
 import '../services/db_page_settings.dart';
 import '../services/download_settings.dart';
 import '../services/management_mode_settings.dart';
@@ -16,6 +17,7 @@ import '../state/app_state.dart';
 import '../state/cluster_state.dart';
 import '../state/node_state.dart';
 import '../utils/apple_widgets.dart';
+import '../widgets/first_run_wizard.dart';
 import 'ai_screen.dart';
 import 'cluster_home_screen.dart';
 import 'cluster_instances_screen.dart';
@@ -42,12 +44,19 @@ class _HomeScreenState extends State<HomeScreen> {
   /// 是否已弹出 MCP 权限对话框（防止重复弹窗）。
   bool _mcpDialogOpen = false;
 
+  /// 首次启动引导向导是否展示。
+  bool _wizardVisible = false;
+
   @override
   void initState() {
     super.initState();
     McpServer.instance.attachState(context.read<AppState>());
     McpServer.instance.currentRequest.addListener(_onMcpRequest);
     _startMcpServer();
+    // 首次启动：无实例且未完成/跳过过引导时，展示线性引导向导。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _maybeShowFirstRunWizard();
+    });
     // 若已处于多机模式，启动集群监控循环。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -115,29 +124,66 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final multi = context.watch<ClusterState>().mode == ManagementMode.multi;
-    // 单机模式 6 项、多机模式 7 项（多出「容器」）：
+    // 单机模式 6 项、多机模式 8 项（多出「容器」「编排」）：
     // 从多机切回单机时把越界的选中索引收敛，避免 NavigationRail 越界。
     final index = multi ? _selectedIndex : _selectedIndex.clamp(0, 5);
     return Scaffold(
-      body: Row(
+      body: Stack(
         children: [
-          // 左侧导航栏
-          NavigationRail(
-            selectedIndex: index,
-            onDestinationSelected: (value) {
-              setState(() => _selectedIndex = value);
-            },
-            labelType: NavigationRailLabelType.all,
-            destinations: multi ? _multiDestinations() : _singleDestinations(),
+          Row(
+            children: [
+              // 左侧导航栏
+              NavigationRail(
+                selectedIndex: index,
+                onDestinationSelected: (value) {
+                  setState(() => _selectedIndex = value);
+                },
+                labelType: NavigationRailLabelType.all,
+                destinations: multi
+                    ? _multiDestinations()
+                    : _singleDestinations(),
+              ),
+              const VerticalDivider(thickness: 1, width: 1),
+              // 右侧内容区
+              Expanded(
+                child: multi ? _buildMultiContent(index) : _buildContent(index),
+              ),
+            ],
           ),
-          const VerticalDivider(thickness: 1, width: 1),
-          // 右侧内容区
-          Expanded(
-            child: multi ? _buildMultiContent(index) : _buildContent(index),
-          ),
+          // 首次启动引导（变暗 30% + 阻断点击）
+          if (_wizardVisible)
+            FirstRunWizardOverlay(
+              onSkip: () => _dismissWizard('skipped'),
+              onFinish: (goFrp) => _dismissWizard('done', goFrp: goFrp),
+            ),
         ],
       ),
     );
+  }
+
+  /// 首次启动判定：设置未记录且无实例 → 展示向导。
+  Future<void> _maybeShowFirstRunWizard() async {
+    final done = await DatabaseManager.instance.getSetting('first_run_wizard');
+    if (done != null || !mounted) return;
+    if (context.read<AppState>().instances.isNotEmpty) {
+      // 已有实例（老用户升级）：直接标记完成，不打扰
+      await DatabaseManager.instance.setSetting('first_run_wizard', 'done');
+      return;
+    }
+    setState(() => _wizardVisible = true);
+  }
+
+  /// 关闭向导并持久化状态；[goFrp] 为 true 时跳转 FRP 页面。
+  Future<void> _dismissWizard(String value, {bool goFrp = false}) async {
+    await DatabaseManager.instance.setSetting('first_run_wizard', value);
+    if (!mounted) return;
+    setState(() {
+      _wizardVisible = false;
+      if (goFrp) {
+        final multi = context.read<ClusterState>().mode == ManagementMode.multi;
+        _selectedIndex = multi ? 7 : 5;
+      }
+    });
   }
 
   /// 单机模式导航（默认 6 个标签）。
