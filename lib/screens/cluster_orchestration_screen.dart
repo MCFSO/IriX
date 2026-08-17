@@ -236,14 +236,18 @@ class _ClusterOrchestrationScreenState
             children: [
               Text('编排服务', style: theme.textTheme.titleSmall),
               const SizedBox(width: 8),
-              Text(
-                'K8s 风格：自动修复崩溃 · 按在线人数弹性开服 · 跨物理机迁移存档',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: theme.colorScheme.outline,
+              // 长说明文案用 Expanded + 省略号，避免窄窗口下 RenderFlex overflow
+              Expanded(
+                child: Text(
+                  'K8s 风格：自动修复崩溃 · 按在线人数弹性开服 · 跨物理机迁移存档',
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: theme.colorScheme.outline,
+                  ),
                 ),
               ),
-              const Spacer(),
               if (service.lastError != null)
                 Icon(
                   Icons.warning_amber_outlined,
@@ -412,12 +416,17 @@ class _ServiceCard extends StatelessWidget {
                   tooltip: '缩容',
                   onPressed: () => onScale(-1),
                 ),
-                Text(
-                  '${status.replicas.length}/${service.desiredReplicas} 副本'
-                  ' · 在线 ${status.totalPlayers}（均 ${status.avgPlayers.toStringAsFixed(1)}）',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: theme.colorScheme.outline,
+                // 副本/在线统计用 Flexible + 省略号，窄窗口不溢出
+                Flexible(
+                  child: Text(
+                    '${status.replicas.length}/${service.desiredReplicas} 副本'
+                    ' · 在线 ${status.totalPlayers}（均 ${status.avgPlayers.toStringAsFixed(1)}）',
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: theme.colorScheme.outline,
+                    ),
                   ),
                 ),
                 IconButton(
@@ -456,9 +465,13 @@ class _ServiceCard extends StatelessWidget {
                 const Text('弹性开服', style: TextStyle(fontSize: 13)),
                 if (service.autoscale) ...[
                   const SizedBox(width: 8),
-                  Text(
-                    '目标 ${service.targetPlayers}/副本 · 阈值 ${service.scaleDownPlayers}~${service.scaleUpPlayers}',
-                    style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                  Flexible(
+                    child: Text(
+                      '目标 ${service.targetPlayers}/副本 · 阈值 ${service.scaleDownPlayers}~${service.scaleUpPlayers}',
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                      style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                    ),
                   ),
                 ],
               ],

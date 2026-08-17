@@ -125,7 +125,21 @@ class _HangarDetailScreenState extends State<HangarDetailScreen> {
     if (instance == null) return;
 
     final targetDir = p.join(instance.rootPath, 'plugins');
-    final filename = '${project.slug}-${version.name}-${pd.platform}.jar';
+    // M-2：文件名由远端 API 的 slug/version.name 拼接而来，落盘前净化，
+    // 拒绝含路径分隔符/../ 的名称，防止越出实例目录写任意路径。
+    final rawName = '${project.slug}-${version.name}-${pd.platform}.jar';
+    final filename = p.basename(rawName);
+    if (filename.isEmpty ||
+        filename.contains('..') ||
+        filename.contains('/') ||
+        filename.contains(r'\')) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('下载被拒绝：文件名包含非法路径字符')),
+        );
+      }
+      return;
+    }
     final targetPath = p.join(targetDir, filename);
     final progressKey = '${version.name}:${pd.platform}';
 

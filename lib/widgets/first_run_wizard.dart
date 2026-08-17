@@ -165,7 +165,9 @@ class _FirstRunWizardOverlayState extends State<FirstRunWizardOverlay> {
             child: ColoredBox(color: Colors.black.withValues(alpha: 0.3)),
           ),
         ),
-        // 左上角「跳过」（50% 不透明度）
+        // 中央向导卡片
+        Center(child: _buildCard(context)),
+        // 左上角「跳过」（50% 不透明度；置于卡片之上，任何窗口尺寸都可点击）
         Positioned(
           left: 16,
           top: 12,
@@ -178,35 +180,47 @@ class _FirstRunWizardOverlayState extends State<FirstRunWizardOverlay> {
             ),
           ),
         ),
-        // 中央向导卡片
-        Center(child: _buildCard(context)),
       ],
     );
   }
 
   Widget _buildCard(BuildContext context) {
     final theme = Theme.of(context);
-    return Card(
-      elevation: 8,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 860, maxHeight: 560),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: switch (_phase) {
-            'natDetecting' => const _Centered(
-              icon: Icons.network_check,
-              title: '正在检测 NAT 类型...',
+    // 小窗口适配：按可用空间限制卡片尺寸，内容可滚动，避免纵向溢出
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxHeight =
+            (constraints.maxHeight - 64).clamp(0.0, double.infinity);
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: 860,
+              maxHeight: maxHeight > 0 ? maxHeight : double.infinity,
+            ),
+            child: Card(
+              elevation: 8,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
               child: Padding(
-                padding: EdgeInsets.only(top: 16),
-                child: CircularProgressIndicator(),
+                padding: const EdgeInsets.all(24),
+                child: switch (_phase) {
+                  'natDetecting' => const _Centered(
+                    icon: Icons.network_check,
+                    title: '正在检测 NAT 类型...',
+                    child: Padding(
+                      padding: EdgeInsets.only(top: 16),
+                      child: CircularProgressIndicator(),
+                    ),
+                  ),
+                  'natResult' => _buildNatResult(theme),
+                  _ => _buildWizard(theme),
+                },
               ),
             ),
-            'natResult' => _buildNatResult(theme),
-            _ => _buildWizard(theme),
-          },
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -218,42 +232,48 @@ class _FirstRunWizardOverlayState extends State<FirstRunWizardOverlay> {
         // 左侧线性步骤列表
         SizedBox(
           width: 230,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('首次配置引导', style: theme.textTheme.titleMedium),
-              const SizedBox(height: 4),
-              Text(
-                '共 ${_jdkSteps.length + 1} 步，按顺序完成',
-                style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-              ),
-              const SizedBox(height: 16),
-              for (var i = 0; i < _jdkSteps.length + 1; i++)
-                _StepRow(
-                  index: i,
-                  title: i < _jdkSteps.length
-                      ? '安装 ${_jdkSteps[i].title}'
-                      : '创建第一个实例',
-                  state: i < _jdkSteps.length
-                      ? switch (_statuses[_jdkSteps[i].version]) {
-                          _JdkStatus.installed => _StepState.done,
-                          _JdkStatus.installing => _StepState.active,
-                          _JdkStatus.failed => _StepState.failed,
-                          _JdkStatus.pending => _StepState.pending,
-                          null => _StepState.pending,
-                        }
-                      : (_step > _jdkSteps.length
-                            ? _StepState.done
-                            : _step == _jdkSteps.length
-                            ? _StepState.active
-                            : _StepState.pending),
+          // 小窗口时可滚动，避免纵向溢出
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('首次配置引导', style: theme.textTheme.titleMedium),
+                const SizedBox(height: 4),
+                Text(
+                  '共 ${_jdkSteps.length + 1} 步，按顺序完成',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                 ),
-            ],
+                const SizedBox(height: 16),
+                for (var i = 0; i < _jdkSteps.length + 1; i++)
+                  _StepRow(
+                    index: i,
+                    title: i < _jdkSteps.length
+                        ? '安装 ${_jdkSteps[i].title}'
+                        : '创建第一个实例',
+                    state: i < _jdkSteps.length
+                        ? switch (_statuses[_jdkSteps[i].version]) {
+                            _JdkStatus.installed => _StepState.done,
+                            _JdkStatus.installing => _StepState.active,
+                            _JdkStatus.failed => _StepState.failed,
+                            _JdkStatus.pending => _StepState.pending,
+                            null => _StepState.pending,
+                          }
+                        : (_step > _jdkSteps.length
+                              ? _StepState.done
+                              : _step == _jdkSteps.length
+                                  ? _StepState.active
+                                  : _StepState.pending),
+                  ),
+              ],
+            ),
           ),
         ),
         const VerticalDivider(width: 32),
         // 右侧步骤内容
-        Expanded(child: _buildStepContent(theme)),
+        // 步骤内容可纵向滚动，小窗口/长错误信息时不溢出
+        Expanded(
+          child: SingleChildScrollView(child: _buildStepContent(theme)),
+        ),
       ],
     );
   }

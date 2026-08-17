@@ -15,6 +15,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../services/ai_assistant_service.dart';
 import '../services/ai_settings.dart';
@@ -570,16 +571,14 @@ class _AiChatPanelState extends State<AiChatPanel> {
   }
 
   /// 打开外部链接（系统浏览器）。
+  ///
+  /// 安全说明：使用 url_launcher 而非 `cmd /c start`，避免 URL 中的
+  /// cmd 元字符（`&|<>^%` 等）被 shell 解释执行（H-4）。
   Future<void> _openExternal(Uri uri) async {
     try {
       if (uri.scheme == 'http' || uri.scheme == 'https') {
-        await Process.start(
-          Platform.isWindows ? 'cmd' : 'xdg-open',
-          Platform.isWindows
-              ? ['/c', 'start', uri.toString()]
-              : [uri.toString()],
-          mode: ProcessStartMode.detached,
-        );
+        final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+        if (!ok) debugPrint('打开链接失败: $uri');
       }
     } catch (e) {
       debugPrint('打开链接失败: $e');
@@ -1021,10 +1020,15 @@ class _ModelsDialogState extends State<_ModelsDialog> {
 
   void _copyEndpoint() {
     final endpoint = McpServer.instance.endpoint;
-    Clipboard.setData(ClipboardData(text: endpoint));
+    final token = McpServer.instance.token;
+    // 复制含 Authorization 头完整配置，方便直接粘贴到 Claude Desktop / Cursor。
+    final config =
+        '{"mcpServers": {"IriX": {"url": "$endpoint", '
+        '"headers": {"Authorization": "Bearer $token"}}}}';
+    Clipboard.setData(ClipboardData(text: config));
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text('已复制 $endpoint')));
+    ).showSnackBar(const SnackBar(content: Text('已复制 MCP 完整配置（含鉴权 token）')));
   }
 
   @override
@@ -1314,9 +1318,12 @@ class _ModelsDialogState extends State<_ModelsDialog> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '在 Claude Desktop / Cursor 等工具中配置：\n'
+                  '在 Claude Desktop / Cursor 等工具中配置（已启用鉴权，'
+                  'token 每次启动随机生成）：\n'
                   '{"mcpServers": {"IriX": {"url": '
-                  '"http://127.0.0.1:${_mcpPortController.text}/mcp"}}}',
+                  '"http://127.0.0.1:${_mcpPortController.text}/mcp", '
+                  '"headers": {"Authorization": "Bearer <token>"}}}}\n'
+                  '点击复制按钮可直接复制完整配置。',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.outline,
                     fontFamily: 'monospace',
@@ -1536,6 +1543,9 @@ class _ModelEditDialogState extends State<_ModelEditDialog> {
   String? _baseUrlError;
   String? _contextError;
 
+  /// API 密钥是否隐藏（默认隐藏，眼睛按钮切换显示）。
+  bool _obscureKey = true;
+
   bool get _isEdit => widget.model != null;
 
   @override
@@ -1631,13 +1641,23 @@ class _ModelEditDialogState extends State<_ModelEditDialog> {
               const SizedBox(height: 12),
               TextField(
                 controller: _apiKeyController,
-                obscureText: true,
+                obscureText: _obscureKey,
+                enableSuggestions: false,
+                autocorrect: false,
                 style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'API 密钥',
                   hintText: '本地 Ollama 可留空',
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
                   isDense: true,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureKey ? Icons.visibility : Icons.visibility_off,
+                      size: 18,
+                    ),
+                    tooltip: _obscureKey ? '显示' : '隐藏',
+                    onPressed: () => setState(() => _obscureKey = !_obscureKey),
+                  ),
                 ),
               ),
               const SizedBox(height: 12),

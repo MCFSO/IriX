@@ -165,12 +165,15 @@ pub extern "C" fn orchestrator_free_string(s: *mut libc::c_char) {
 pub extern "C" fn orchestrator_last_error() -> *mut libc::c_char {
     LAST_ERROR.with(|cell| match cell.borrow().as_ref() {
         Some(msg) => {
-            let mut buf = Vec::with_capacity(msg.as_bytes().len() + 1);
-            buf.extend_from_slice(msg.as_bytes());
-            buf.push(0);
-            let ptr = buf.as_mut_ptr() as *mut libc::c_char;
-            std::mem::forget(buf);
-            ptr
+            // L-6：改用 CString::into_raw，与 free 侧 CString::from_raw 严格配对，
+            // 不再依赖 Vec + mem::forget 的分配器实现细节。
+            match msg.to_str() {
+                Ok(s) => match CString::new(s) {
+                    Ok(cstr) => cstr.into_raw(),
+                    Err(_) => std::ptr::null_mut(),
+                },
+                Err(_) => std::ptr::null_mut(),
+            }
         }
         None => std::ptr::null_mut(),
     })

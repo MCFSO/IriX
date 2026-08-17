@@ -335,9 +335,14 @@ class _ClusterContainerScreenState extends State<ClusterContainerScreen> {
           padding: const EdgeInsets.fromLTRB(16, 10, 8, 0),
           child: Row(
             children: [
-              Text(
-                node.name,
-                style: Theme.of(context).textTheme.titleSmall,
+              // 长节点名省略，窄窗口不溢出
+              Flexible(
+                child: Text(
+                  node.name,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
               ),
               const SizedBox(width: 8),
               if (runtime != null) _RuntimeBadge(runtime: runtime),

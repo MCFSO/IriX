@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::ffi::{CStr, CString};
 use std::fs;
 use std::io::{BufReader, BufWriter, Read, Write};
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -24,6 +25,16 @@ fn set_last_error(msg: impl AsRef<str>) {
             Err(_) => CString::new("错误消息包含 nul 字节").ok(),
         };
     });
+}
+
+/// L-6：捕获 FFI 函数体中的 panic，避免跨 FFI unwind（UB/进程终止）。
+///
+/// 返回码约定：panic 时按通用 IO 错误码 2 处理。
+fn ffi_guard(f: impl FnOnce() -> libc::c_int) -> libc::c_int {
+    catch_unwind(AssertUnwindSafe(f)).unwrap_or_else(|_| {
+        set_last_error("Rust 侧 panic，已捕获（L-6）");
+        2
+    })
 }
 
 #[no_mangle]
@@ -443,6 +454,7 @@ pub extern "C" fn delete_to_trash(
     root_path: *const libc::c_char,
     file_path: *const libc::c_char,
 ) -> libc::c_int {
+    ffi_guard(|| {
     if root_path.is_null() || file_path.is_null() {
         set_last_error("路径为空指针");
         return 2;
@@ -526,10 +538,12 @@ pub extern "C" fn delete_to_trash(
     }
 
     0
+    })
 }
 
 #[no_mangle]
 pub extern "C" fn delete_permanently(path: *const libc::c_char) -> libc::c_int {
+    ffi_guard(|| {
     if path.is_null() {
         set_last_error("路径为空指针");
         return 2;
@@ -556,6 +570,7 @@ pub extern "C" fn delete_permanently(path: *const libc::c_char) -> libc::c_int {
             2
         }
     }
+    })
 }
 
 #[no_mangle]
@@ -661,6 +676,7 @@ pub extern "C" fn restore_from_trash(
     root_path: *const libc::c_char,
     entry_id: *const libc::c_char,
 ) -> libc::c_int {
+    ffi_guard(|| {
     if root_path.is_null() || entry_id.is_null() {
         set_last_error("路径为空指针");
         return 1;
@@ -713,6 +729,25 @@ pub extern "C" fn restore_from_trash(
         .unwrap_or("")
         .to_string();
 
+    // L-3：trash_meta.json 可被篡改，恢复前校验——
+    // 1) original_path 必须位于 root 之下（拒绝指向任意路径）；
+    // 2) file_name 不得含路径分隔符（防止越出回收站目录）。
+    let root_norm = Path::new(root_str)
+        .canonicalize()
+        .unwrap_or_else(|_| Path::new(root_str).to_path_buf());
+    if file_name.contains('/') || file_name.contains('\\') || file_name.contains("..") {
+        set_last_error("回收站元数据 file_name 含非法字符，已拒绝恢复（L-3）");
+        return 4;
+    }
+    if original_path.is_empty() {
+        set_last_error("回收站元数据 original_path 为空，已拒绝恢复（L-3）");
+        return 4;
+    }
+    if !Path::new(&original_path).starts_with(&root_norm) {
+        set_last_error("回收站元数据 original_path 越出根目录，已拒绝恢复（L-3）");
+        return 4;
+    }
+
     let trash_file_path = trash_dir.join(format!("{}_{}", id_str, file_name));
     let original = Path::new(&original_path);
 
@@ -738,6 +773,7 @@ pub extern "C" fn restore_from_trash(
     }
 
     0
+    })
 }
 
 #[no_mangle]
@@ -772,6 +808,7 @@ pub extern "C" fn purge_trash_entry(
     root_path: *const libc::c_char,
     entry_id: *const libc::c_char,
 ) -> libc::c_int {
+    ffi_guard(|| {
     if root_path.is_null() || entry_id.is_null() {
         set_last_error("路径为空指针");
         return 1;
@@ -820,6 +857,12 @@ pub extern "C" fn purge_trash_entry(
         .unwrap_or("")
         .to_string();
 
+    // L-3：元数据可被篡改，拒绝含路径分隔符的 file_name。
+    if file_name.contains('/') || file_name.contains('\\') || file_name.contains("..") {
+        set_last_error("回收站元数据 file_name 含非法字符，已拒绝清理（L-3）");
+        return 4;
+    }
+
     let trash_file_path = trash_dir.join(format!("{}_{}", id_str, file_name));
     if trash_file_path.exists() {
         let result = if trash_file_path.is_dir() {
@@ -849,6 +892,7 @@ pub extern "C" fn purge_trash_entry(
     }
 
     0
+    })
 }
 
 #[no_mangle]

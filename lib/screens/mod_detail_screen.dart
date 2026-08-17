@@ -147,18 +147,39 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
 
     final subdir = _targetSubdir(project.projectType);
     final targetDir = p.join(instance.rootPath, subdir);
-    final targetPath = p.join(targetDir, file.filename);
+    // M-2：文件名来自远端 API（Modrinth），落盘前净化——只取 basename，
+    // 拒绝含路径分隔符/../ 的文件名，防止越出实例目录写任意路径。
+    final safeName = p.basename(file.filename);
+    if (safeName.isEmpty ||
+        safeName.contains('..') ||
+        safeName.contains('/') ||
+        safeName.contains(r'\')) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('下载被拒绝：文件名为空或包含非法路径字符')),
+        );
+      }
+      return;
+    }
+    final targetPath = p.join(targetDir, safeName);
 
     setState(() => _downloadProgress[version.id] = 0.0);
 
     try {
-      await _downloader.downloadFile(file.url, targetPath, (progress) {
-        if (mounted) {
-          setState(() {
-            _downloadProgress[version.id] = progress.percent;
-          });
-        }
-      }, threads: threads);
+      await _downloader.downloadFile(
+        file.url,
+        targetPath,
+        (progress) {
+          if (mounted) {
+            setState(() {
+              _downloadProgress[version.id] = progress.percent;
+            });
+          }
+        },
+        threads: threads,
+        // H-1：Modrinth 提供 sha1/sha512 哈希，下载后校验完整性。
+        sha512: file.hashes?['sha512'],
+      );
       if (mounted) {
         setState(() => _downloadProgress.remove(version.id));
         ScaffoldMessenger.of(context).showSnackBar(

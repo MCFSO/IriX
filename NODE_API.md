@@ -15,8 +15,8 @@
 
 | 项 | 约定 |
 |----|------|
-| 基础地址 | `http://<host>:<port>`（如 `http://127.0.0.1:12346` / `http://192.168.1.5:23333`） |
-| 认证 | `apikey` 查询参数（本地节点可为空）；请求头 `X-Requested-With: XMLHttpRequest`（MCSM 必需，irix-node 建议兼容） |
+| 基础地址 | `http://<host>:<port>`（如 `http://127.0.0.1:12346` / `http://192.168.1.5:23333`）；远程节点应启用 HTTPS |
+| 认证 | 请求头 `X-Api-Key: <key>`（**首选**，H-6：密钥不进 URL，避免进入代理/访问日志）；`apikey` 查询参数仅为 MCSM 面板兼容保留；请求头 `X-Requested-With: XMLHttpRequest`（MCSM 必需，irix-node 建议兼容） |
 | 请求体 | `application/json; charset=utf-8` |
 | 响应体 | 统一 `{ "status": 200, "data": <payload>, "time": <unix_ms> }`；`status != 200` 时 `data` 为错误消息字符串 |
 | 超时 | 应用侧默认 15s；连接失败 / 超时视为节点离线 |

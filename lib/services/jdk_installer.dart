@@ -57,8 +57,11 @@ class JdkInstaller {
     return (await _versionDir(featureVersion)).path;
   }
 
-  /// 查询 Adoptium 获取该版本当前平台的下载链接。
-  Future<String> _resolveDownloadUrl(String featureVersion) async {
+  /// 查询 Adoptium 获取该版本当前平台的下载链接与 sha256 校验值。
+  ///
+  /// Adoptium API 的 `package.checksum` 形如 `sha256:<hex>`，
+  /// 下载完成后用其校验归档完整性（H-1）。
+  Future<({String url, String? sha256})> _resolveDownload(String featureVersion) async {
     final os = switch (Platform.operatingSystem) {
       'windows' => 'windows',
       'macos' => 'mac',
@@ -84,7 +87,18 @@ class JdkInstaller {
       final package = binary['package'];
       if (package is! Map<String, dynamic>) continue;
       final link = package['link'];
-      if (link is String && link.isNotEmpty) return link;
+      if (link is! String || link.isEmpty) continue;
+      // checksum 格式："sha256:<hex>"，只提取 hex 部分。
+      String? sha256;
+      final checksum = package['checksum']?.toString().trim() ?? '';
+      final sep = checksum.indexOf(':');
+      final algo = sep > 0 ? checksum.substring(0, sep).toLowerCase() : '';
+      final hex = sep > 0 ? checksum.substring(sep + 1) : checksum;
+      if (algo == 'sha256' &&
+          RegExp(r'^[0-9a-fA-F]{64}$').hasMatch(hex)) {
+        sha256 = hex;
+      }
+      return (url: link, sha256: sha256);
     }
     throw Exception('未找到 JDK $featureVersion 的下载链接');
   }
@@ -100,7 +114,9 @@ class JdkInstaller {
     final existing = await javaHome(featureVersion);
     if (existing != null) return existing;
 
-    final url = await _resolveDownloadUrl(featureVersion);
+    final info = await _resolveDownload(featureVersion);
+    final url = info.url;
+    final sha256 = info.sha256;
     final tmpDir = await Directory.systemTemp.createTemp('irix-jdk-');
     final archivePath = p.join(tmpDir.path, 'jdk-archive');
     try {
@@ -108,7 +124,7 @@ class JdkInstaller {
         final total = progress.totalBytes;
         final ratio = total > 0 ? progress.downloadedBytes / total : 0.0;
         onProgress?.call(ratio.clamp(0.0, 1.0));
-      });
+      }, sha256: sha256);
       final target = await _versionDir(featureVersion);
       if (target.existsSync()) target.deleteSync(recursive: true);
       target.createSync(recursive: true);
@@ -127,11 +143,15 @@ class JdkInstaller {
   }
 
   /// 解压归档到目标目录（后台 isolate 内同步执行），剥离顶层目录。
+  ///
+  /// 安全：解压前校验每个条目归一化后仍位于 target 之内，拒绝
+  /// `../`、绝对路径与盘符条目（Zip-Slip 防护，M-1）。
   static void _extract(String archivePath, String targetPath, String url) {
     final bytes = File(archivePath).readAsBytesSync();
     final archive = (url.endsWith('.tar.gz') || url.endsWith('.tgz'))
         ? TarDecoder().decodeBytes(GZipDecoder().decodeBytes(bytes))
         : ZipDecoder().decodeBytes(bytes);
+    final targetNorm = p.normalize(p.absolute(targetPath));
     for (final file in archive) {
       if (!file.isFile) continue;
       // 剥离顶层目录（如 jdk-17.0.13+11/...）
@@ -139,7 +159,11 @@ class JdkInstaller {
       final slash = name.indexOf('/');
       if (slash > 0) name = name.substring(slash + 1);
       if (name.isEmpty) continue;
-      final outPath = p.join(targetPath, name);
+      // Zip-Slip 防护：拒绝绝对路径、盘符与越界条目。
+      final outPath = p.normalize(p.join(targetNorm, name));
+      if (!p.isWithin(targetNorm, outPath)) {
+        throw Exception('解压条目越界，已中止: ${file.name}');
+      }
       final outDir = Directory(p.dirname(outPath));
       if (!outDir.existsSync()) outDir.createSync(recursive: true);
       File(outPath).writeAsBytesSync(file.content as List<int>);

@@ -11,6 +11,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
@@ -50,6 +51,12 @@ class McpServer {
   int _port = 0;
   String _clientName = '未知客户端';
 
+  /// 每次启动时随机生成的 bearer token（H-3 鉴权）。
+  ///
+  /// 所有 /mcp 请求必须携带 `Authorization: Bearer <token>`，
+  /// 防止同机恶意进程/网页滥用工具（读取实例文件、触发授权弹窗钓鱼等）。
+  String _token = '';
+
   /// 待授权的请求队列。
   final List<McpPermissionRequest> _queue = [];
 
@@ -68,8 +75,17 @@ class McpServer {
   /// 实际监听的端口。
   int get port => _port;
 
+  /// 当前会话的鉴权 token（未启动时为空字符串）。
+  String get token => _token;
+
   /// 外部 AI 工具配置使用的端点地址。
   String get endpoint => 'http://127.0.0.1:$_port/mcp';
+
+  /// 端点地址（含 bearer token 查询参数形式，便于不支持 header 的客户端）。
+  ///
+  /// 注意：token 出现在 URL 中会被进程列表/日志记录，仅作兼容备选；
+  /// 推荐使用 [endpoint] + `Authorization` 请求头。
+  String get endpointWithToken => 'http://127.0.0.1:$_port/mcp?token=$_token';
 
   /// 若已在设置中启用则启动，否则不启动。
   Future<bool> startIfEnabled() async {
@@ -92,6 +108,8 @@ class McpServer {
     if (server == null) {
       throw Exception('无法绑定 MCP 端口 $port-$port+20');
     }
+    // 每次启动生成新的随机 token（H-3）。
+    _token = _generateToken();
     _server = server;
     server.listen(
       _handleRequest,
@@ -102,11 +120,19 @@ class McpServer {
     debugPrint('MCP server listening on $_port');
   }
 
+  /// 生成 32 字节随机 token（十六进制，64 字符）。
+  static String _generateToken() {
+    final rng = Random.secure();
+    final bytes = List<int>.generate(32, (_) => rng.nextInt(256));
+    return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+  }
+
   /// 停止服务器，所有未决授权按拒绝处理。
   Future<void> stop() async {
     final server = _server;
     _server = null;
     _port = 0;
+    _token = '';
     for (final request in _queue) {
       request.resolve(false);
     }
@@ -121,6 +147,20 @@ class McpServer {
 
   Future<void> _handleRequest(HttpRequest req) async {
     try {
+      // 鉴权：所有请求（含信息页）必须携带正确的 bearer token（H-3）。
+      if (!_authorized(req)) {
+        req.response.statusCode = HttpStatus.unauthorized;
+        req.response.headers.contentType = ContentType.json;
+        req.response.write(
+          jsonEncode({
+            'jsonrpc': '2.0',
+            'id': null,
+            'error': {'code': -32001, 'message': '未授权：缺少或错误的 Authorization 头'},
+          }),
+        );
+        await req.response.close();
+        return;
+      }
       if (req.method == 'GET' && req.uri.path == '/') {
         await _serveInfoPage(req);
         return;
@@ -140,17 +180,43 @@ class McpServer {
     }
   }
 
+  /// 校验请求鉴权与来源（H-3）。
+  ///
+  /// - 必须携带 `Authorization: Bearer <token>`（或等价的 ?token= 查询参数）；
+  /// - 带 `Origin` 头的浏览器跨源请求仅接受本机来源，其余一律拒绝，
+  ///   防止恶意网页触发授权弹窗钓鱼或发起工具调用。
+  bool _authorized(HttpRequest req) {
+    if (_token.isEmpty) return false;
+    final auth = req.headers.value('authorization');
+    final tokenOk =
+        auth == 'Bearer $_token' ||
+        req.uri.queryParameters['token'] == _token;
+    if (!tokenOk) return false;
+    final origin = req.headers.value('origin');
+    if (origin != null && origin.isNotEmpty) {
+      final uri = Uri.tryParse(origin);
+      if (uri == null) return false;
+      final host = uri.host.toLowerCase();
+      if (host != '127.0.0.1' &&
+          host != 'localhost' &&
+          host != '::1' &&
+          host != '[::1]') {
+        return false;
+      }
+    }
+    return true;
+  }
+
   Future<void> _serveInfoPage(HttpRequest req) async {
-    final tools = AiAssistantService.instance.tools;
+    // 信息页不再枚举工具清单，避免向未授权访问者泄露能力面（H-3）。
     req.response.headers.contentType = ContentType.html;
     req.response.write(
       '<html><head><meta charset="utf-8"><title>IriX MCP Server</title></head>'
       '<body style="font-family:sans-serif">'
       '<h1>IriX MCP Server</h1>'
       '<p>端点: <code>$endpoint</code></p>'
-      '<p>${tools.length} 个工具: ${tools.map((t) => t.name).join(', ')}</p>'
-      '<p>在 Claude Desktop / Cursor 等工具中配置:<br>'
-      '<code>{"mcpServers": {"IriX": {"url": "$endpoint"}}}</code></p>'
+      '<p>该服务需要 Authorization bearer token，'
+      '请在 IriX 的「AI 设置」中查看完整配置。</p>'
       '</body></html>',
     );
     await req.response.close();

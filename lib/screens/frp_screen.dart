@@ -1175,11 +1175,13 @@ class _ChmlFrpLoginDialogState extends State<_ChmlFrpLoginDialog> {
     });
     try {
       await _callback.start();
+      // H-5：携带一次性随机 state，回调时校验，防止本机进程抢答伪造 token。
+      final state = _callback.state ?? '';
       final returnUrl = Uri.encodeComponent(
-        'http://127.0.0.1:${_callback.port}/callback',
+        'http://127.0.0.1:${_callback.port}/callback?state=$state',
       );
       final authorizeUrl =
-          '$chmlFrpApiBase/sso/authorize?return_url=$returnUrl';
+          '$chmlFrpApiBase/sso/authorize?return_url=$returnUrl&state=$state';
       final launched = await launchUrl(
         Uri.parse(authorizeUrl),
         mode: LaunchMode.externalApplication,
@@ -1317,6 +1319,9 @@ class _SakuraFrpLoginDialogState extends State<_SakuraFrpLoginDialog> {
   bool _loading = false;
   String? _error;
 
+  /// 访问密钥是否隐藏（默认隐藏，眼睛按钮切换显示）。
+  bool _obscureToken = true;
+
   @override
   void dispose() {
     _tokenController.dispose();
@@ -1361,6 +1366,9 @@ class _SakuraFrpLoginDialogState extends State<_SakuraFrpLoginDialog> {
               TextField(
                 controller: _tokenController,
                 maxLines: 2,
+                obscureText: _obscureToken,
+                enableSuggestions: false,
+                autocorrect: false,
                 style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
                 decoration: InputDecoration(
                   labelText: '访问密钥 (Access Token)',
@@ -1368,6 +1376,15 @@ class _SakuraFrpLoginDialogState extends State<_SakuraFrpLoginDialog> {
                   border: const OutlineInputBorder(),
                   isDense: true,
                   errorText: _error,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureToken ? Icons.visibility : Icons.visibility_off,
+                      size: 18,
+                    ),
+                    tooltip: _obscureToken ? '显示' : '隐藏',
+                    onPressed: () =>
+                        setState(() => _obscureToken = !_obscureToken),
+                  ),
                 ),
               ),
               const SizedBox(height: 12),

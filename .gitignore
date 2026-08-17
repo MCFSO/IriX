@@ -51,6 +51,11 @@ macos/libxmc_*.dylib
 # Fastforge output
 /dist/
 
+# 发行安装包目录（M-7：曾因未覆盖导致 138MB 二进制险些入库，禁止跟踪）
+/1.0.0+*/
+/2.0.0+*/
+/[0-9]*.[0-9]*.[0-9]*+*/
+
 # Android Studio will place build artifacts here
 /android/app/debug
 /android/app/profile
@@ -61,4 +66,7 @@ node/irix-node
 node/irix-node.exe
 node/bin/
 node/data/
+
+# Mimosa 安全扫描本地 hook 状态（生成的缓存，有独立 seal 产物，不入库）
+.mimosa/
 

@@ -524,10 +524,13 @@ class AiAssistantService {
   // === 工具实现 ===
 
   /// 将相对路径解析到实例根目录内，越界时抛异常。
+  ///
+  /// 安全（L-1）：使用 `p.isWithin` 做目录边界判断，避免 `startsWith`
+  /// 前缀匹配放行同前缀兄弟目录（如 `C:\inst` 放行 `C:\instance2\...`）。
   static String _resolvePath(ServerInstance instance, String relative) {
     final root = p.normalize(p.absolute(instance.rootPath));
     final target = p.normalize(p.join(root, relative));
-    if (!target.startsWith(root)) {
+    if (!p.isWithin(root, target)) {
       throw Exception('路径越界，不允许访问根目录之外: $relative');
     }
     return target;

@@ -15,7 +15,10 @@ import '../services/frpc_manager.dart';
 import '../services/http_ffi.dart';
 
 /// ChmlFrp 面板 API 基础地址。
-const chmlFrpApiBase = 'http://cf-v2.uapis.cn';
+///
+/// 安全说明（H-5）：必须使用 HTTPS——access_token / refresh_token 等
+/// 长期凭据经明文 HTTP 传输可被同网段嗅探窃取。
+const chmlFrpApiBase = 'https://cf-v2.uapis.cn';
 
 /// 注册跳转地址（IriX 不提供注册，引导用户前往官网注册）。
 const chmlFrpRegisterUrl = 'https://account.qzhua.net/register';

@@ -170,6 +170,28 @@ fn esc_pg_str(s: &str) -> String {
     s.replace('\'', "''")
 }
 
+/// 校验 MySQL/PostgreSQL 用户名与主机名（白名单，M-4 根治）。
+///
+/// MySQL 用户名允许字母、数字、`_`、`$`；host 允许 `%`、`.`、`-`、
+/// 字母数字与通配。拒绝含引号/反引号/空白等可能改变语句语义的字符。
+fn validate_user_ident(s: &str, allow_percent: bool) -> Result<(), String> {
+    let ok = !s.is_empty()
+        && s.bytes().all(|b| {
+            b.is_ascii_alphanumeric()
+                || b == b'_'
+                || b == b'$'
+                || (allow_percent && b == b'%')
+                || b == b'-'
+                || b == b'.'
+        });
+    if ok {
+        Ok(())
+    } else {
+        Err(format!("无效的用户名/主机名: {s:?}（仅允许字母、数字、_、$、-、.{}）",
+            if allow_percent { "、%" } else { "" }))
+    }
+}
+
 /// 值 → SQL 字面量：null → NULL，空字符串 → NULL，其余转义为字符串
 fn sql_value(v: &Json, esc: fn(&str) -> String) -> String {
     match v {
@@ -779,7 +801,11 @@ fn op_create_database_with_user(conn: &ConnInfo, args: &Json) -> Result<Json, St
         use mysql::prelude::Queryable;
         let mut c = mysql_connect(conn, None)?;
         let db = esc_mysql_ident(&database);
-        let user = esc_mysql_ident(&username);
+        validate_user_ident(&username, false)?;
+        validate_user_ident(&database, false)?;
+        // M-4：username 出现在单引号字符串字面量中，必须用字符串转义器；
+        // 白名单校验（validate_user_ident）保证其只含安全字符。
+        let user = esc_mysql_str(&username);
         let pwd = esc_mysql_str(&password);
         let statements = [
             format!("CREATE DATABASE `{db}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"),
@@ -795,6 +821,8 @@ fn op_create_database_with_user(conn: &ConnInfo, args: &Json) -> Result<Json, St
     if conn.is_postgres() {
         let mut client = pg_connect(conn, None)?;
         let db = esc_pg_ident(&database);
+        validate_user_ident(&username, false)?;
+        validate_user_ident(&database, false)?;
         let user = esc_pg_ident(&username);
         let pwd = esc_pg_str(&password);
         let statements = [
@@ -877,7 +905,11 @@ fn op_create_user(conn: &ConnInfo, args: &Json) -> Result<Json, String> {
     if conn.is_mysql() {
         use mysql::prelude::Queryable;
         let mut c = mysql_connect(conn, None)?;
-        let user = esc_mysql_ident(&username);
+        // M-4：username/host 出现在单引号字符串字面量中，用字符串转义器
+        // + 白名单校验（CREATE USER 的 'user'@'host' 均为字符串字面量）。
+        validate_user_ident(&username, false)?;
+        validate_user_ident(&host, true)?;
+        let user = esc_mysql_str(&username);
         let pwd = esc_mysql_str(&password);
         let h = esc_mysql_str(&host);
         c.query_drop(format!("CREATE USER '{user}'@'{h}' IDENTIFIED BY '{pwd}'"))
@@ -887,6 +919,7 @@ fn op_create_user(conn: &ConnInfo, args: &Json) -> Result<Json, String> {
     }
     if conn.is_postgres() {
         let mut client = pg_connect(conn, None)?;
+        validate_user_ident(&username, false)?;
         let user = esc_pg_ident(&username);
         let pwd = esc_pg_str(&password);
         let sql = format!("CREATE USER \"{user}\" WITH PASSWORD '{pwd}'");
@@ -905,7 +938,10 @@ fn op_drop_user(conn: &ConnInfo, args: &Json) -> Result<Json, String> {
     if conn.is_mysql() {
         use mysql::prelude::Queryable;
         let mut c = mysql_connect(conn, None)?;
-        let user = esc_mysql_ident(&username);
+        // M-4：DROP USER 的 'user'@'host' 为字符串字面量，需白名单 + 字符串转义。
+        validate_user_ident(&username, false)?;
+        validate_user_ident(&host, true)?;
+        let user = esc_mysql_str(&username);
         let h = esc_mysql_str(&host);
         c.query_drop(format!("DROP USER '{user}'@'{h}'"))
             .map_err(|e| format!("删除用户失败: {e}"))?;
@@ -914,6 +950,7 @@ fn op_drop_user(conn: &ConnInfo, args: &Json) -> Result<Json, String> {
     }
     if conn.is_postgres() {
         let mut client = pg_connect(conn, None)?;
+        validate_user_ident(&username, false)?;
         let user = esc_pg_ident(&username);
         let sql = format!("DROP USER \"{user}\"");
         client.execute(&sql, &[]).map_err(|e| format!("删除用户失败: {e}"))?;

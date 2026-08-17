@@ -1,10 +1,12 @@
 // 节点 API 客户端
 // 同时服务于 MCSManager 面板节点与 IriX 本地节点（Go 守护进程）：
-// 两者提供同一风格的 HTTP API（见 apis/ 目录），因此共用一套客户端。
+// 两者提供同一风格的 HTTP API（见 NODE_API.md），因此共用一套客户端。
 //
 // 约定：
 // - 请求头携带 X-Requested-With: XMLHttpRequest（MCSM 必需）
-// - API 密钥通过 apikey 查询参数传递（MCSM 与本地节点均支持）
+// - API 密钥通过 X-Api-Key 请求头传递（H-6：避免密钥进入 URL 而被
+//   代理/访问日志记录）；MCSM 面板兼容旧式 apikey 查询参数时
+//   （[NodeApiClient] 构造的 [apiKeyInQuery]），会额外附带查询参数
 // - 统一响应体 {status, data, time}；status != 200 时抛出 NodeApiException
 
 import 'dart:async';
@@ -73,6 +75,7 @@ class NodeApiClient {
     required this.baseUrl,
     this.apiKey = '',
     this.timeout = const Duration(seconds: 15),
+    this.apiKeyInQuery = false,
   });
 
   /// API 基地址，例如 http://127.0.0.1:12346。
@@ -84,22 +87,40 @@ class NodeApiClient {
   /// 请求超时。
   final Duration timeout;
 
+  /// 是否同时以 `apikey` 查询参数附带密钥。
+  ///
+  /// 默认 false（密钥只走 X-Api-Key 请求头，H-6）；MCSM 面板等仅支持
+  /// 查询参数的服务端需置 true，代价是密钥会进入访问日志。
+  final bool apiKeyInQuery;
+
   /// 便捷构造：由节点信息创建客户端。
-  factory NodeApiClient.of(NodeInfo node) =>
-      NodeApiClient(baseUrl: node.address, apiKey: node.apiKey);
+  ///
+  /// MCSM 面板仅认查询参数形式的 apikey，因此该类节点保留查询参数
+  /// 兼容；IriX 本地节点走请求头（H-6）。
+  factory NodeApiClient.of(NodeInfo node) => NodeApiClient(
+    baseUrl: node.address,
+    apiKey: node.apiKey,
+    apiKeyInQuery: node.type == NodeType.mcsm,
+  );
 
   static const Map<String, String> _headers = {
     'X-Requested-With': 'XMLHttpRequest',
     'Content-Type': 'application/json; charset=utf-8',
   };
 
-  /// 拼接带 apikey 的请求 URI。
+  /// 拼接请求 URI；仅当 [apiKeyInQuery] 时才附带 apikey 查询参数。
   Uri _uri(String path, [Map<String, String>? query]) {
     final q = <String, String>{...?query};
-    if (apiKey.isNotEmpty) {
+    if (apiKeyInQuery && apiKey.isNotEmpty) {
       q['apikey'] = apiKey;
     }
     return Uri.parse('$baseUrl$path').replace(queryParameters: q);
+  }
+
+  /// 附加鉴权请求头（H-6：密钥经请求头传递，不进 URL）。
+  Map<String, String> _withAuth(Map<String, String> headers) {
+    if (apiKey.isEmpty) return headers;
+    return {...headers, 'X-Api-Key': apiKey};
   }
 
   /// 发送请求并解析统一响应体，返回 data 字段。
@@ -111,9 +132,10 @@ class NodeApiClient {
     bool retryOnce = true,
   }) async {
     final uri = _uri(path, query);
-    final headers = body != null
+    final base = body != null
         ? _headers
         : const {'X-Requested-With': 'XMLHttpRequest'};
+    final headers = _withAuth(base);
     HttpFfiResponse resp;
     try {
       resp = await HttpFfiService.instance.request(

@@ -58,6 +58,9 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
   String? _coreFilePath;
   String? _instanceRootDir;
 
+  /// MSL 源期望的 SHA-256（用于下载后完整性校验，H-1）。
+  String? _expectedSha256;
+
   late final TextEditingController _commandController;
 
   @override
@@ -89,6 +92,7 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
       _mslVersions = null;
       _mslDescription = null;
       _mslError = null;
+      _expectedSha256 = null;
     });
     if (source == 'MSL') {
       _fetchMslCores();
@@ -173,6 +177,8 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
 
         downloadUrl = info.url;
         fileName = '$core-$version.jar';
+        // 记录 MSL 返回的 sha256，下载完成后校验（H-1 完整性校验）。
+        _expectedSha256 = info.sha256;
       } catch (e) {
         setState(() {
           _downloading = false;
@@ -213,6 +219,7 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
           setState(() => _progress = progress);
         },
         threads: threads,
+        sha256: _expectedSha256,
       );
 
       _coreFilePath = savedPath;

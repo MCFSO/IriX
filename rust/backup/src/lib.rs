@@ -8,6 +8,7 @@ use std::cell::RefCell;
 use std::ffi::{CStr, CString};
 use std::fs::{self, File};
 use std::io::{self, Read, Write};
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::UNIX_EPOCH;
@@ -37,6 +38,31 @@ fn set_last_error(msg: impl AsRef<str>) {
 
 #[no_mangle]
 pub extern "C" fn backup_directory(
+    src_path: *const libc::c_char,
+    dst_path: *const libc::c_char,
+    files_to_backup: *const *const libc::c_char,
+    files_count: usize,
+    compression_level: u32,
+    progress_cb: ProgressCallback,
+) -> libc::c_int {
+    // L-6：catch_unwind 防止内部 panic 跨 FFI unwind（UB/进程终止）。
+    catch_unwind(AssertUnwindSafe(|| {
+        backup_directory_impl(
+            src_path,
+            dst_path,
+            files_to_backup,
+            files_count,
+            compression_level,
+            progress_cb,
+        )
+    }))
+    .unwrap_or_else(|_| {
+        set_last_error("Rust 侧 panic，已捕获（L-6）");
+        2
+    })
+}
+
+fn backup_directory_impl(
     src_path: *const libc::c_char,
     dst_path: *const libc::c_char,
     files_to_backup: *const *const libc::c_char,

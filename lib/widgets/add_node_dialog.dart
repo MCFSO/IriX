@@ -35,6 +35,9 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
   bool _testing = false;
   String? _testResult;
 
+  /// API Key 是否隐藏（默认隐藏，眼睛按钮切换显示）。
+  bool _obscureKey = true;
+
   @override
   void initState() {
     super.initState();
@@ -86,6 +89,14 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
     });
   }
 
+  /// 判断地址是否为本地回环（127.0.0.1 / localhost / ::1）。
+  static bool _isLoopback(String address) {
+    final uri = Uri.tryParse(address);
+    if (uri == null) return false;
+    final host = uri.host.toLowerCase();
+    return host == '127.0.0.1' || host == 'localhost' || host == '::1';
+  }
+
   Future<void> _finish() async {
     final address = _addressController.text.trim();
     if (address.isEmpty) {
@@ -93,15 +104,55 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
       return;
     }
     final name = _nameController.text.trim();
-    if (_type == NodeType.mcsm && _apiKeyController.text.trim().isEmpty) {
+    final apiKey = _apiKeyController.text.trim();
+    if (_type == NodeType.mcsm && apiKey.isEmpty) {
       setState(() => _testResult = 'MCSM 节点需要填写 API Key');
       return;
     }
-    final node = await context.read<NodeState>().addNode(
+    // H-6：远程 IriX 节点必须配置密钥，否则守护进程端口暴露即形成
+    // 未认证的远程文件读写 + 命令执行面；仅本机回环允许留空。
+    if (_type == NodeType.node && apiKey.isEmpty && !_isLoopback(address)) {
+      setState(() => _testResult = '远程 Node 节点必须填写密钥（仅本机回环地址可留空）');
+      return;
+    }
+    // H-6：远程明文 HTTP 警告（凭证与全部控制流量可被窃听篡改）。
+    final nodeState = context.read<NodeState>();
+    final uri = Uri.tryParse(address);
+    if (uri != null &&
+        uri.scheme != 'https' &&
+        !_isLoopback(address) &&
+        uri.host != '') {
+      final proceed = await showAppDialog<bool>(
+        context,
+        (ctx) => AlertDialog(
+          title: const Text('明文连接警告'),
+          content: const Text(
+            '该节点地址使用明文 HTTP（非 https），API 密钥与全部控制流量'
+            '（含文件读写、命令执行）可被同网段窃听或篡改。\n\n'
+            '建议：节点启用 HTTPS 后再连接；确属可信内网环境可继续。',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('仍然继续'),
+            ),
+          ],
+        ),
+      );
+      if (proceed != true) {
+        setState(() => _testResult = '已取消：请为节点启用 HTTPS');
+        return;
+      }
+    }
+    final node = await nodeState.addNode(
       name: name,
       type: _type,
       address: address,
-      apiKey: _apiKeyController.text.trim(),
+      apiKey: apiKey,
     );
     if (!mounted) return;
     Navigator.of(context).pop(node);
@@ -247,7 +298,7 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
               child: _TypeCard(
                 icon: Icons.terminal,
                 title: 'Node',
-                subtitle: 'IriX 本地 Go 语言节点\n默认无需密钥',
+                subtitle: 'IriX 本地 Go 语言节点\n本机回环可免密钥，远程必须配置密钥',
                 selected: _type == NodeType.node,
                 onTap: () => setState(() {
                   _type = NodeType.node;
@@ -288,7 +339,7 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
                 : 'http://127.0.0.1:12346',
             border: const OutlineInputBorder(),
             helperText: _type == NodeType.mcsm
-                ? 'MCSManager 面板地址（含端口，如 23333）'
+                ? 'MCSManager 面板地址（含端口，如 23333）；远程建议使用 https'
                 : '本地节点守护进程地址（默认 12346 端口）',
           ),
           onChanged: (_) => setState(() {}),
@@ -307,22 +358,42 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
         const SizedBox(height: 8),
         TextField(
           controller: _apiKeyController,
-          obscureText: true,
+          obscureText: _obscureKey,
+          enableSuggestions: false,
+          autocorrect: false,
           decoration: InputDecoration(
             hintText: _type == NodeType.mcsm
                 ? 'MCSManager 用户 API Key'
-                : '本地节点密钥（可留空）',
+                : '本地节点密钥（本机回环可留空）',
             border: const OutlineInputBorder(),
-            suffixIcon: IconButton(
-              icon: const Icon(Icons.visibility),
-              tooltip: '显示',
-              onPressed: () => Clipboard.setData(
-                ClipboardData(text: _apiKeyController.text),
-              ),
+            suffixIcon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.copy, size: 18),
+                  tooltip: '复制',
+                  onPressed: () {
+                    Clipboard.setData(
+                      ClipboardData(text: _apiKeyController.text),
+                    );
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('已复制 API Key')),
+                    );
+                  },
+                ),
+                IconButton(
+                  icon: Icon(
+                    _obscureKey ? Icons.visibility : Icons.visibility_off,
+                    size: 18,
+                  ),
+                  tooltip: _obscureKey ? '显示' : '隐藏',
+                  onPressed: () => setState(() => _obscureKey = !_obscureKey),
+                ),
+              ],
             ),
             helperText: _type == NodeType.mcsm
                 ? '在 MCSManager 面板「用户信息」中生成并复制'
-                : 'Node 类型为 IriX 本地节点，默认无需密钥',
+                : '远程节点必须填写密钥；仅 127.0.0.1 本机回环可留空',
           ),
           onChanged: (_) => setState(() {}),
         ),

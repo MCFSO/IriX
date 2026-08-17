@@ -57,6 +57,29 @@ fn error_json(message: String) -> String {
     json!({ "ok": false, "error": message }).to_string()
 }
 
+/// 脱敏错误消息中的 URL 凭据（L-7）。
+///
+/// ureq 错误 Display 含完整 URL；当 token 等凭据放在 query/userinfo 时，
+/// 直接回显会让凭据随错误进入 UI/日志。此函数去掉 userinfo 与 query 部分。
+fn redact_url_credentials(msg: &str) -> String {
+    let mut out = msg.to_string();
+    if let Some(scheme_end) = out.find("://") {
+        let rest_start = scheme_end + 3;
+        let special = out[rest_start..]
+            .find(|c| c == '/' || c == '?' || c == '#')
+            .map(|i| rest_start + i)
+            .unwrap_or(out.len());
+        if let Some(at_rel) = out[rest_start..special].find('@') {
+            let at = rest_start + at_rel;
+            out.replace_range(rest_start..=at, "***@");
+        }
+    }
+    if let Some(q) = out.find('?') {
+        out.truncate(q);
+    }
+    out
+}
+
 /// 发送 HTTP 请求并返回完整响应。
 ///
 /// # 参数
@@ -209,7 +232,8 @@ fn do_request(
         Ok(r) => r,
         Err(ureq::Error::Status(_, resp)) => resp,
         Err(e) => {
-            return Err(format!("网络错误: {e}"));
+            // L-7：剥离错误消息中 URL 携带的 query/userinfo 凭据。
+            return Err(format!("网络错误: {}", redact_url_credentials(&e.to_string())));
         }
     };
 

@@ -26,16 +26,21 @@ void main() {
 
   Uri uri(String path) => Uri.parse('http://127.0.0.1:${server.port}$path');
 
+  /// 携带 H-3 鉴权头的 POST。
   Future<TestHttpResponse> post(Map<String, dynamic> body) async {
     final request = await client.postUrl(uri('/mcp'))
       ..headers.set('Content-Type', 'application/json')
+      ..headers.set('Authorization', 'Bearer ${server.token}')
       ..add(utf8.encode(jsonEncode(body)));
     final response = await request.close();
     return TestHttpResponse.read(response);
   }
 
-  Future<TestHttpResponse> get(Uri u) async {
+  Future<TestHttpResponse> get(Uri u, {bool withAuth = true}) async {
     final request = await client.getUrl(u);
+    if (withAuth) {
+      request.headers.set('Authorization', 'Bearer ${server.token}');
+    }
     final response = await request.close();
     return TestHttpResponse.read(response);
   }
@@ -166,11 +171,59 @@ void main() {
     expect(error['code'], -32602);
   });
 
-  test('GET / 返回信息页', () async {
+  test('无鉴权请求被拒绝（H-3）', () async {
+    final request = await client.postUrl(uri('/mcp'))
+      ..headers.set('Content-Type', 'application/json')
+      ..add(utf8.encode(jsonEncode({'jsonrpc': '2.0', 'id': 1, 'method': 'ping'})));
+    final response = await request.close();
+    final body = await utf8.decodeStream(response);
+    expect(response.statusCode, HttpStatus.unauthorized);
+    expect(body, contains('未授权'));
+  });
+
+  test('错误 token 被拒绝（H-3）', () async {
+    final request = await client.postUrl(uri('/mcp'))
+      ..headers.set('Content-Type', 'application/json')
+      ..headers.set('Authorization', 'Bearer wrong-token')
+      ..add(utf8.encode(jsonEncode({'jsonrpc': '2.0', 'id': 1, 'method': 'ping'})));
+    final response = await request.close();
+    expect(response.statusCode, HttpStatus.unauthorized);
+  });
+
+  test('跨源浏览器请求被拒绝（H-3）', () async {
+    final request = await client.postUrl(uri('/mcp'))
+      ..headers.set('Content-Type', 'application/json')
+      ..headers.set('Authorization', 'Bearer ${server.token}')
+      ..headers.set('Origin', 'https://evil.example.com')
+      ..add(utf8.encode(jsonEncode({'jsonrpc': '2.0', 'id': 1, 'method': 'ping'})));
+    final response = await request.close();
+    expect(response.statusCode, HttpStatus.unauthorized);
+  });
+
+  test('本机 Origin 请求放行（H-3）', () async {
+    final request = await client.postUrl(uri('/mcp'))
+      ..headers.set('Content-Type', 'application/json')
+      ..headers.set('Authorization', 'Bearer ${server.token}')
+      ..headers.set('Origin', 'http://127.0.0.1:8080')
+      ..add(utf8.encode(jsonEncode({'jsonrpc': '2.0', 'id': 1, 'method': 'ping'})));
+    final response = await request.close();
+    expect(response.statusCode, 200);
+  });
+
+  test('每次启动生成不同 token（H-3）', () async {
+    final first = server.token;
+    expect(first.length, 64);
+    await server.start(0);
+    expect(server.token, isNot(first));
+  });
+
+  test('GET / 返回信息页（需鉴权，不含工具枚举）', () async {
     final res = await get(uri('/'));
     expect(res.statusCode, 200);
     expect(res.body, contains('IriX MCP Server'));
     expect(res.body, contains('/mcp'));
+    // H-3：信息页不再枚举工具清单。
+    expect(res.body, isNot(contains('list_instances')));
   });
 }
 

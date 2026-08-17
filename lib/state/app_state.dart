@@ -140,9 +140,10 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 生成实例唯一标识：微秒时间戳的 36 进制串 + 随机后缀。
+  /// 生成实例唯一标识：微秒时间戳的 36 进制串 + 安全随机后缀。
   String _generateId() {
-    final random = Random();
+    // L-9：使用 Random.secure()（密码学安全随机），避免可预测后缀。
+    final random = Random.secure();
     final suffix = random.nextInt(1 << 20).toRadixString(36).padLeft(4, '0');
     return '${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}-$suffix';
   }

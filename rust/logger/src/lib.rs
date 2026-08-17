@@ -49,6 +49,17 @@ struct LogEntry {
     timestamp: String,
 }
 
+/// 校验 instance_id 是否可安全用作文件名（L-4）。
+///
+/// 拒绝路径分隔符、`..`、空白与控制字符，防止 `../` 越界写/删 .log 文件。
+fn valid_instance_id(id: &str) -> bool {
+    !id.is_empty()
+        && !id.contains('/')
+        && !id.contains('\\')
+        && !id.contains("..")
+        && !id.chars().any(|c| c.is_whitespace() || c.is_control())
+}
+
 enum LogMsg {
     Entry(LogEntry),
     Flush(Sender<()>),
@@ -162,6 +173,10 @@ pub extern "C" fn log_write(
             return 1;
         }
     };
+    if !valid_instance_id(&id) {
+        set_last_error("instance_id 含非法字符（路径分隔符/.. 等），已拒绝（L-4）");
+        return 1;
+    }
     let line_str = match unsafe { CStr::from_ptr(line) }.to_str() {
         Ok(s) => s.to_string(),
         Err(_) => {
@@ -276,6 +291,10 @@ pub extern "C" fn log_delete(instance_id: *const libc::c_char) -> libc::c_int {
             return 1;
         }
     };
+    if !valid_instance_id(id) {
+        set_last_error("instance_id 含非法字符（路径分隔符/.. 等），已拒绝（L-4）");
+        return 1;
+    }
 
     let dir = match LOG_DIR.lock() {
         Ok(g) => match g.as_ref() {

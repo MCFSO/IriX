@@ -25,6 +25,35 @@ static DOWNLOAD_CANCELLED: AtomicBool = AtomicBool::new(false);
 
 static MULTIPART_DOWNLOADED: AtomicU64 = AtomicU64::new(0);
 
+/// 单次下载体积上限（4 GiB，L-5）。
+///
+/// 服务端 Content-Length/Content-Range 完全不可信，恶意源可无限写盘；
+/// 超过上限立即中止并清理已写入数据。
+const MAX_DOWNLOAD_BYTES: u64 = 4 * 1024 * 1024 * 1024;
+
+/// 脱敏错误消息中的 URL 凭据（L-7）。
+///
+/// ureq 错误 Display 含完整 URL；当 token 等凭据放在 query/userinfo 时，
+/// 直接回显会让凭据随错误进入 UI/日志。此函数去掉 userinfo 与 query 部分。
+fn redact_url_credentials(msg: &str) -> String {
+    let mut out = msg.to_string();
+    if let Some(scheme_end) = out.find("://") {
+        let rest_start = scheme_end + 3;
+        let special = out[rest_start..]
+            .find(|c| c == '/' || c == '?' || c == '#')
+            .map(|i| rest_start + i)
+            .unwrap_or(out.len());
+        if let Some(at_rel) = out[rest_start..special].find('@') {
+            let at = rest_start + at_rel;
+            out.replace_range(rest_start..=at, "***@");
+        }
+    }
+    if let Some(q) = out.find('?') {
+        out.truncate(q);
+    }
+    out
+}
+
 type DownloadProgressCallback = extern "C" fn(u64, u64);
 
 fn set_last_error(msg: impl AsRef<str>) {
@@ -236,7 +265,11 @@ fn do_download_multipart(
             return Err(io::Error::new(io::ErrorKind::Other, format!("HTTP 状态码 {code}")));
         }
         Err(e) => {
-            return Err(io::Error::new(io::ErrorKind::Other, e.to_string()));
+            // L-7：剥离错误消息中 URL 携带的 query/userinfo 凭据。
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                redact_url_credentials(&e.to_string()),
+            ));
         }
     };
 
@@ -253,6 +286,14 @@ fn do_download_multipart(
             probe.header("Content-Length").and_then(|s| s.parse::<u64>().ok())
         })
         .unwrap_or(0);
+
+    // L-5：服务端声明的体积超限直接拒绝。
+    if total_bytes > MAX_DOWNLOAD_BYTES {
+        return Err(io::Error::new(
+            io::ErrorKind::Other,
+            format!("下载体积超过上限（{} 字节 > {} 字节），已中止", total_bytes, MAX_DOWNLOAD_BYTES),
+        ));
+    }
 
     if !accepts_ranges || total_bytes == 0 || thread_count == 1 {
         return do_download_with_agent(url, target, &agent, total_bytes, progress_cb);
@@ -406,7 +447,8 @@ fn download_chunk(
             return Err(io::Error::new(io::ErrorKind::Other, msg));
         }
         Err(e) => {
-            let msg = e.to_string();
+            // L-7：剥离错误消息中 URL 携带的 query/userinfo 凭据。
+            let msg = redact_url_credentials(&e.to_string());
             error.set(msg.clone());
             return Err(io::Error::new(io::ErrorKind::Other, msg));
         }
@@ -464,7 +506,11 @@ fn do_download_with_agent(
             return Err(io::Error::new(io::ErrorKind::Other, format!("HTTP 状态码 {code}")));
         }
         Err(e) => {
-            return Err(io::Error::new(io::ErrorKind::Other, e.to_string()));
+            // L-7：剥离错误消息中 URL 携带的 query/userinfo 凭据。
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                redact_url_credentials(&e.to_string()),
+            ));
         }
     };
 
@@ -476,6 +522,14 @@ fn do_download_with_agent(
             .and_then(|s| s.parse::<u64>().ok())
             .unwrap_or(0)
     };
+
+    // L-5：服务端声明的体积超限直接拒绝。
+    if total > MAX_DOWNLOAD_BYTES {
+        return Err(io::Error::new(
+            io::ErrorKind::Other,
+            format!("下载体积超过上限（{} 字节 > {} 字节），已中止", total, MAX_DOWNLOAD_BYTES),
+        ));
+    }
 
     let mut reader = response.into_reader();
     let mut file = File::create(target_path)?;
@@ -494,6 +548,15 @@ fn do_download_with_agent(
         }
         file.write_all(&buf[..n])?;
         downloaded += n as u64;
+        // L-5：实际接收字节超限（服务端未声明 Content-Length 时）中止并清理。
+        if downloaded > MAX_DOWNLOAD_BYTES {
+            drop(file);
+            let _ = std::fs::remove_file(target_path);
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("下载体积超过上限（> {} 字节），已中止", MAX_DOWNLOAD_BYTES),
+            ));
+        }
         if downloaded - last_reported >= 256 * 1024 || (total > 0 && downloaded == total) {
             progress_cb(downloaded, total);
             last_reported = downloaded;

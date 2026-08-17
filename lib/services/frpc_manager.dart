@@ -317,41 +317,35 @@ class FrpcManager extends ChangeNotifier {
     return ($1: Platform.operatingSystem, $2: arch);
   }
 
-  /// GitHub 加速镜像（国内可达），依次尝试后回退直连。
-  static const List<String> _ghMirrors = [
-    'https://ghfast.top',
-    'https://ghproxy.net',
-    '',
-  ];
+  /// GitHub 官方发布基础地址（仅直连，H-2）。
+  ///
+  /// 安全说明：不再使用第三方加速镜像（ghfast.top / ghproxy.net 等）——
+  /// 镜像返回的二进制无法用官方哈希校验，一旦被入侵即可投递木马 frpc。
+  /// GitHub 直连失败时请用户自行配置系统代理后重试。
+  static const String _ghReleaseBase =
+      'https://github.com/fatedier/frp/releases/download';
 
   /// 下载 fatedier 官方 frpc（HayFrp/SakuraFrp/自建 frps 等标准 frp 服务共用）。
   ///
   /// 版本优先取自 HayFrp /version 接口的 ver_frpc（与标准 frp 服务端对齐），
-  /// 失败时回退内置默认版本。
+  /// 失败时回退内置默认版本。下载后校验 GitHub 官方发布的 sha256（H-1/H-2）。
   Future<void> _downloadFatedierFrpc(Directory frpcDir, File exe) async {
     final version = await _hayFrpFrpcVersion();
     final fileName = _fatedierFileName(version);
-    final urls = [
-      for (final mirror in _ghMirrors)
-        if (mirror.isEmpty)
-          'https://github.com/fatedier/frp/releases/download/v$version/$fileName'
-        else
-          '$mirror/https://github.com/fatedier/frp/releases/download/v$version/$fileName',
-    ];
+    // 先从 GitHub API 获取该发布资产官方 sha256（经 HTTPS 直连）。
+    final sha256 = await _githubAssetSha256(version, fileName);
+    final url = '$_ghReleaseBase/v$version/$fileName';
     var ok = false;
-    // 镜像可能返回截断文件（解压时才会暴露），最多两轮逐源重试。
+    // 直连可能超时或截断（解压时才会暴露），最多两轮重试。
     for (var pass = 0; pass < 2 && !ok; pass++) {
-      for (final url in urls) {
-        try {
-          await _downloadAndExtract(url, frpcDir);
-          ok = true;
-          break;
-        } catch (e) {
-          debugPrint('fatedier frpc download failed ($url): $e');
-        }
+      try {
+        await _downloadAndExtract(url, frpcDir, sha256: sha256);
+        ok = true;
+      } catch (e) {
+        debugPrint('fatedier frpc download failed ($url): $e');
       }
     }
-    if (!ok) throw Exception('frpc 下载失败，请检查网络后重试');
+    if (!ok) throw Exception('frpc 下载失败，请检查网络（GitHub 直连不可达时请配置系统代理）后重试');
     final frpcBin = _findFrpcBinary(frpcDir);
     if (frpcBin == null) {
       throw Exception('解压后未找到 frpc 可执行文件');
@@ -361,6 +355,38 @@ class FrpcManager extends ChangeNotifier {
     }
     if (!Platform.isWindows) {
       await Process.run('chmod', ['+x', exe.path]);
+    }
+  }
+
+  /// 从 GitHub Releases API 获取指定发布资产的官方 sha256 digest。
+  ///
+  /// 返回 null 表示无法获取（网络失败/资产不存在），此时仍继续下载但不做
+  /// 哈希校验；获取成功则强制校验，防止被篡改的二进制被执行。
+  Future<String?> _githubAssetSha256(String version, String fileName) async {
+    try {
+      final res = await HttpFfiService.instance.get(
+        'https://api.github.com/repos/fatedier/frp/releases/tags/v$version',
+        headers: {
+          'Accept': 'application/vnd.github+json',
+          'User-Agent': 'IriX/1.0.0 (https://github.com/MCFSO/IriX)',
+        },
+        timeout: const Duration(seconds: 30),
+      );
+      if (res.statusCode != 200) return null;
+      final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map;
+      for (final a in (json['assets'] as List? ?? const [])) {
+        if (a is! Map) continue;
+        if ((a['name'] ?? '').toString() == fileName) {
+          final digest = (a['digest'] ?? '').toString();
+          final hex = digest.startsWith('sha256:')
+              ? digest.substring(7)
+              : digest;
+          if (RegExp(r'^[0-9a-fA-F]{64}$').hasMatch(hex)) return hex.toLowerCase();
+        }
+      }
+      return null;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -396,20 +422,30 @@ class FrpcManager extends ChangeNotifier {
   /// 下载并解压（zip 或 tar.gz 由 URL 扩展名决定）。
   ///
   /// 二进制下载交给 Rust Downloader 流式写入临时文件（规避响应体内存上限），
-  /// 解压完成后删除临时文件。
-  Future<void> _downloadAndExtract(String url, Directory targetDir) async {
+  /// [sha256] 非空时先校验归档完整性再解压（H-1/H-2）；
+  /// 解压对每个条目做 Zip-Slip 越界校验（M-1），完成后删除临时文件。
+  Future<void> _downloadAndExtract(
+    String url,
+    Directory targetDir, {
+    String? sha256,
+  }) async {
     final tmpDir = await Directory.systemTemp.createTemp('irix-frpc-');
     final archivePath = p.join(tmpDir.path, 'archive');
     try {
-      await Downloader().downloadFile(url, archivePath, (_) {});
+      await Downloader().downloadFile(url, archivePath, (_) {}, sha256: sha256);
       if (targetDir.existsSync()) {
         targetDir.deleteSync(recursive: true);
       }
       targetDir.createSync(recursive: true);
+      final targetNorm = p.normalize(p.absolute(targetDir.path));
       final archive = _decodeArchive(url, File(archivePath).readAsBytesSync());
       for (final file in archive) {
         if (!file.isFile) continue;
-        final outPath = p.join(targetDir.path, file.name);
+        // Zip-Slip 防护：拒绝 ../、绝对路径与盘符条目（M-1）。
+        final outPath = p.normalize(p.join(targetNorm, file.name));
+        if (!p.isWithin(targetNorm, outPath)) {
+          throw Exception('解压条目越界，已中止: ${file.name}');
+        }
         Directory(p.dirname(outPath)).createSync(recursive: true);
         File(outPath).writeAsBytesSync(file.content as List<int>);
       }
