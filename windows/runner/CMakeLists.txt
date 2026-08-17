@@ -39,9 +39,9 @@ target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)
 
-# 把 Rust 备份模块 DLL 复制到 exe 输出目录 (构建后自动执行)
-# 仅在 DLL 已存在时生效 (需先运行 build_rust.bat 编译 Rust)
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/xmc_backup.dll")
+# 旧版局部 DLL 复制规则（保留兼容；完整列表见文件末尾全量同步）
+
+if(FALSE) # 旧规则已由文件末尾的全量列表取代
   add_custom_command(TARGET ${BINARY_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
       "${CMAKE_CURRENT_SOURCE_DIR}/xmc_backup.dll"
@@ -50,7 +50,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/xmc_backup.dll")
   )
 endif()
 
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/xmc_vector_store.dll")
+if(FALSE) # 旧规则已由文件末尾的全量列表取代
   add_custom_command(TARGET ${BINARY_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
       "${CMAKE_CURRENT_SOURCE_DIR}/xmc_vector_store.dll"
@@ -59,7 +59,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/xmc_vector_store.dll")
   )
 endif()
 
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/xmc_orchestrator.dll")
+if(FALSE) # 旧规则已由文件末尾的全量列表取代
   add_custom_command(TARGET ${BINARY_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
       "${CMAKE_CURRENT_SOURCE_DIR}/xmc_orchestrator.dll"
@@ -67,3 +67,27 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/xmc_orchestrator.dll")
     COMMENT "Copying xmc_orchestrator.dll to output directory"
   )
 endif()
+
+# 按 Rust workspace 成员全量同步所有 FFI DLL（新增 crate 时只需更新下方列表）
+set(XMC_RUST_DLLS
+  xmc_backup
+  xmc_downloader
+  xmc_file_ops
+  xmc_logger
+  xmc_http_client
+  xmc_db_client
+  xmc_vector_store
+  xmc_orchestrator
+)
+foreach(XMC_DLL ${XMC_RUST_DLLS})
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${XMC_DLL}.dll")
+    add_custom_command(TARGET ${BINARY_NAME} POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/${XMC_DLL}.dll"
+        "$<TARGET_FILE_DIR:${BINARY_NAME}>/${XMC_DLL}.dll"
+      COMMENT "Copying ${XMC_DLL}.dll to output directory"
+    )
+  else()
+    message(WARNING "缺少 Rust FFI DLL: ${XMC_DLL}.dll，请先运行 build_rust.bat")
+  endif()
+endforeach()
