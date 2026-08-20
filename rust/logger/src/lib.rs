@@ -46,7 +46,6 @@ pub extern "C" fn free_string(s: *mut libc::c_char) {
 struct LogEntry {
     instance_id: String,
     line: String,
-    timestamp: String,
 }
 
 /// 校验 instance_id 是否可安全用作文件名（L-4）。
@@ -122,7 +121,9 @@ pub extern "C" fn log_init(log_dir: *const libc::c_char) -> libc::c_int {
                         }
                     }
                     if let Some(writer) = writers.get_mut(&entry.instance_id) {
-                        let _ = writeln!(writer, "[{}] {}", entry.timestamp, entry.line);
+                        // 原样写入服务器输出行（服务器日志自身已含时间戳，
+                        // 不再添加 IriX 前缀）。
+                        let _ = writeln!(writer, "{}", entry.line);
                     }
                 }
                 Ok(LogMsg::Flush(resp)) => {
@@ -185,14 +186,9 @@ pub extern "C" fn log_write(
         }
     };
 
-    let timestamp = chrono::Local::now()
-        .format("%Y-%m-%d %H:%M:%S")
-        .to_string();
-
     let entry = LogEntry {
         instance_id: id,
         line: line_str,
-        timestamp,
     };
 
     let tx_guard = match LOG_TX.lock() {

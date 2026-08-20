@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../services/logger_ffi.dart';
+import '../utils/ansi_color.dart';
 
 class LogPersistence {
   static final LogPersistence instance = LogPersistence._();
@@ -43,7 +44,8 @@ class LogPersistence {
 
     _subscriptions[instanceId] = logStream.listen((line) {
       final nativeId = instanceId.toNativeUtf8();
-      final nativeLine = line.toNativeUtf8();
+      // 日志文件写入纯文本：去除 ANSI 转义序列（彩色只在控制台显示）。
+      final nativeLine = stripAnsi(line).toNativeUtf8();
       logger.logWrite(nativeId, nativeLine);
       calloc.free(nativeId);
       calloc.free(nativeLine);

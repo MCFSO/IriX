@@ -16,6 +16,7 @@ import '../services/backup_settings.dart';
 import '../services/background_tasks.dart';
 import '../services/font_settings.dart';
 import '../state/app_state.dart';
+import '../utils/ansi_color.dart';
 import '../utils/apple_widgets.dart';
 import '../widgets/container_environment_panel.dart';
 import 'ai_screen.dart';
@@ -324,6 +325,11 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
   /// 左侧日志面板：终端风格日志窗口 + 命令输入框。
   Widget _buildLogPanel() {
     final theme = Theme.of(context);
+    final logStyle = TextStyle(
+      fontFamily: FontSettings.instance.terminalFamily,
+      fontSize: 13,
+      color: theme.colorScheme.onSurface.withValues(alpha: 0.9),
+    );
     return Column(
       children: [
         Expanded(
@@ -335,13 +341,12 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
               padding: const EdgeInsets.all(8),
               itemCount: _logs.length,
               itemBuilder: (context, index) {
-                return Text(
-                  _logs[index],
-                  style: TextStyle(
-                    fontFamily: FontSettings.instance.terminalFamily,
-                    fontSize: 13,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.9),
+                // 解析 ANSI 转义序列，彩色显示服务器输出。
+                return SelectableText.rich(
+                  TextSpan(
+                    children: ansiSpans(_logs[index], logStyle),
                   ),
+                  style: logStyle,
                 );
               },
             ),

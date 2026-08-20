@@ -18,7 +18,8 @@ import '../models/server_instance.dart';
 /// - [forceStop]：强制终止进程；
 /// - [restart]：停止后重新启动。
 ///
-/// 通过 [logs] 获取合并 stdout/stderr 的带时间戳日志流；
+/// 通过 [logs] 获取合并 stdout/stderr 的原始日志流（不含 IriX 添加的
+/// 时间戳前缀，保留 ANSI 转义序列供控制台彩色渲染）；
 /// 通过 [onExit] 获取进程退出码。
 class ServerProcessManager {
   /// 被管理的服务器实例。
@@ -52,7 +53,7 @@ class ServerProcessManager {
 
   /// 合并 stdout 与 stderr 的日志流。
   ///
-  /// 每行日志前缀格式为 `[HH:mm:ss] `。
+  /// 原始输出，无额外前缀。
   Stream<String> get logs => _logController.stream;
 
   /// 进程退出 Future，完成时携带退出码。
@@ -95,19 +96,13 @@ class ServerProcessManager {
     return tokens;
   }
 
-  /// 为日志行添加 `[HH:mm:ss] ` 时间戳前缀。
-  String _formatLog(String line) {
-    final now = DateTime.now();
-    final hh = now.hour.toString().padLeft(2, '0');
-    final mm = now.minute.toString().padLeft(2, '0');
-    final ss = now.second.toString().padLeft(2, '0');
-    return '[$hh:$mm:$ss] $line';
-  }
-
   /// 将一行日志推入 [logs] 流（控制器已关闭时忽略）。
+  ///
+  /// 原样推送服务器输出（不添加时间戳前缀——服务器自身的日志已含时间戳；
+  /// 保留 ANSI 转义序列，由控制台渲染层解析为彩色文本）。
   void _emitLog(String line) {
     if (!_logController.isClosed) {
-      _logController.add(_formatLog(line));
+      _logController.add(line);
     }
   }
 

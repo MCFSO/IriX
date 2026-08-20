@@ -12,8 +12,9 @@ import 'package:flutter/material.dart';
 import '../models/node.dart';
 import '../models/remote.dart';
 import '../services/container/node_container_backend.dart';
-import '../services/node_api_client.dart';
 import '../services/font_settings.dart';
+import '../services/node_api_client.dart';
+import '../utils/ansi_color.dart';
 import '../utils/apple_widgets.dart';
 import '../utils/docker_visibility.dart';
 import '../widgets/container_environment_panel.dart';
@@ -420,8 +421,19 @@ class _RemoteInstanceDetailScreenState
             ),
             child: SingleChildScrollView(
               controller: _scrollController,
-              child: SelectableText(
-                _log.isEmpty ? '（暂无日志输出）' : _log,
+              child: SelectableText.rich(
+                TextSpan(
+                  children: _log.isEmpty
+                      ? const [TextSpan(text: '（暂无日志输出）')]
+                      : ansiSpans(
+                          _log,
+                          TextStyle(
+                            fontFamily: FontSettings.instance.terminalFamily,
+                            fontSize: 12,
+                            color: Colors.greenAccent,
+                          ),
+                        ),
+                ),
                 style: TextStyle(
                   fontFamily: FontSettings.instance.terminalFamily,
                   fontSize: 12,
