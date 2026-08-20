@@ -366,6 +366,8 @@ class _ClusterContainerScreenState extends State<ClusterContainerScreen> {
           child: ContainerEnvironmentPanel(
             key: ValueKey('container-panel-${node.id}'),
             backend: _backendFor(node, overview),
+            nodeClient: NodeApiClient.of(node),
+            daemonId: _daemonIdFor(overview),
           ),
         ),
       ],

@@ -186,4 +186,103 @@ void main() {
       );
     });
   });
+
+  group('DockerCliBackend Bastille 专属能力（jail 运行/软件包/挂载/设置）', () {
+    test('execOutput 抛异常', () {
+      expect(
+        () => backend.execOutput('mc', 'java -version'),
+        throwsA(isA<ContainerBackendException>()),
+      );
+    });
+
+    test('runPkg 抛异常', () {
+      expect(
+        () => backend.runPkg('mc', 'install', ['openjdk17-jre']),
+        throwsA(isA<ContainerBackendException>()),
+      );
+    });
+
+    test('listJailMounts 抛异常', () {
+      expect(
+        () => backend.listJailMounts('mc'),
+        throwsA(isA<ContainerBackendException>()),
+      );
+    });
+
+    test('addJailMount 抛异常', () {
+      expect(
+        () => backend.addJailMount('mc', src: '/x', dst: '/data', fstype: 'nullfs'),
+        throwsA(isA<ContainerBackendException>()),
+      );
+    });
+
+    test('removeJailMount 抛异常', () {
+      expect(
+        () => backend.removeJailMount('mc', '/data'),
+        throwsA(isA<ContainerBackendException>()),
+      );
+    });
+
+    test('getJailConfig / setJailConfig / removeJailConfig 抛异常', () {
+      expect(
+        () => backend.getJailConfig('mc'),
+        throwsA(isA<ContainerBackendException>()),
+      );
+      expect(
+        () => backend.setJailConfig('mc', 'ip4.addr', '1.2.3.4'),
+        throwsA(isA<ContainerBackendException>()),
+      );
+      expect(
+        () => backend.removeJailConfig('mc', 'ip4.addr'),
+        throwsA(isA<ContainerBackendException>()),
+      );
+    });
+
+    test('startJailRun 抛异常', () {
+      expect(
+        () => backend.startJailRun('mc', command: 'java -jar s.jar'),
+        throwsA(isA<ContainerBackendException>()),
+      );
+    });
+
+    test('jailRunStatus / jailRunStdin / stopJailRun / cleanupJailRun 抛异常', () {
+      expect(
+        () => backend.jailRunStatus('mc', 's1'),
+        throwsA(isA<ContainerBackendException>()),
+      );
+      expect(
+        () => backend.jailRunStdin('mc', 's1', 'say hi'),
+        throwsA(isA<ContainerBackendException>()),
+      );
+      expect(
+        () => backend.stopJailRun('mc', 's1'),
+        throwsA(isA<ContainerBackendException>()),
+      );
+      expect(
+        () => backend.cleanupJailRun('mc', 's1'),
+        throwsA(isA<ContainerBackendException>()),
+      );
+    });
+  });
+
+  group('JailMount', () {
+    test('nullfs display 格式', () {
+      const mount = JailMount(src: '/data/mc', dst: '/data');
+      expect(mount.display, 'nullfs /data/mc -> /data');
+    });
+
+    test('procfs display 无 src', () {
+      const mount = JailMount(dst: '/proc', fstype: 'procfs');
+      expect(mount.display, 'procfs -> /proc');
+    });
+
+    test('fstab 持久化标记', () {
+      const mount = JailMount(
+        src: '/data/mc',
+        dst: '/data',
+        permanent: true,
+      );
+      expect(mount.display, 'nullfs /data/mc -> /data（fstab）');
+    });
+  });
 }

@@ -149,6 +149,8 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
             daemonId: daemonId ?? '',
             platformHint: overview.system.platform,
           ),
+          nodeClient: client,
+          daemonId: daemonId ?? '',
         ),
       ));
     }

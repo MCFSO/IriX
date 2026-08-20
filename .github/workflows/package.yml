@@ -43,6 +43,12 @@ jobs:
           Copy-Item rust/target/release/xmc_vector_store.dll windows/runner/ -Force
           Copy-Item rust/target/release/xmc_orchestrator.dll windows/runner/ -Force
 
+      - name: Build xmc_simd (C)
+        run: |
+          cd c/simd
+          .\build.bat
+          Copy-Item build/xmc_simd.dll ../../windows/runner/ -Force
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -66,6 +72,7 @@ jobs:
           Copy-Item windows/runner/xmc_db_client.dll build/windows/x64/runner/Release/ -Force
           Copy-Item windows/runner/xmc_vector_store.dll build/windows/x64/runner/Release/ -Force
           Copy-Item windows/runner/xmc_orchestrator.dll build/windows/x64/runner/Release/ -Force
+          Copy-Item windows/runner/xmc_simd.dll build/windows/x64/runner/Release/ -Force
 
       - name: Install Fastforge
         run: dart pub global activate fastforge
@@ -129,6 +136,12 @@ jobs:
           cp rust/target/release/libxmc_db_client.so linux/
           cp rust/target/release/libxmc_vector_store.so linux/
           cp rust/target/release/libxmc_orchestrator.so linux/
+
+      - name: Build xmc_simd (C)
+        run: |
+          cd c/simd
+          ./build.sh
+          cp build/libxmc_simd.so ../../linux/
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -249,6 +262,12 @@ jobs:
             rust/target/aarch64-apple-darwin/release/libxmc_orchestrator.dylib \
             -output macos/libxmc_orchestrator.dylib
 
+      - name: Build xmc_simd (C)
+        run: |
+          cd c/simd
+          ./build_macos.sh
+          cp build/libxmc_simd.dylib ../../macos/
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -273,6 +292,7 @@ jobs:
           cp macos/libxmc_db_client.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
           cp macos/libxmc_vector_store.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
           cp macos/libxmc_orchestrator.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
+          cp macos/libxmc_simd.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
 
       - name: Install Fastforge
         run: dart pub global activate fastforge

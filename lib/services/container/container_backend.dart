@@ -376,6 +376,61 @@ class BastilleSetupResult {
   final String? detail;
 }
 
+/// Jail 挂载条目（bastille mount / fstab）。
+class JailMount {
+  const JailMount({
+    required this.dst,
+    this.src,
+    this.fstype = 'nullfs',
+    this.options,
+    this.permanent = false,
+  });
+
+  /// jail 内目标路径（如 /data、/proc）。
+  final String dst;
+
+  /// 宿主机源路径（nullfs 时有效；procfs/devfs 为 null）。
+  final String? src;
+
+  /// 文件系统类型：nullfs | procfs | devfs。
+  final String fstype;
+
+  /// 挂载选项（如 rw）。
+  final String? options;
+
+  /// 是否写入 fstab（jail 启动时自动挂载）。
+  final bool permanent;
+
+  /// 展示名，如 `nullfs /data/mc -> /data`。
+  String get display {
+    final fs = fstype.isEmpty ? 'nullfs' : fstype;
+    final srcPart = src == null || src!.isEmpty ? fs : '$fs $src';
+    return '$srcPart -> $dst${permanent ? '（fstab）' : ''}';
+  }
+}
+
+/// Jail 内运行会话状态（bastille run 会话）。
+class JailRunStatus {
+  const JailRunStatus({
+    required this.running,
+    this.exitCode,
+    this.offset = 0,
+    this.log = '',
+  });
+
+  /// 进程是否仍在运行。
+  final bool running;
+
+  /// 进程退出码（已退出时）。
+  final int? exitCode;
+
+  /// 日志字节偏移（增量拉取游标）。
+  final int offset;
+
+  /// 本次返回的日志文本（自 [offset] 游标起的新增内容或 tail 尾部）。
+  final String log;
+}
+
 /// 容器后端统一接口。
 abstract class ContainerBackend {
   /// 运行时类型。
@@ -512,4 +567,81 @@ abstract class ContainerBackend {
   ///
   /// Docker 无等效命令，抛 [ContainerBackendException]。
   Future<BastilleSetupResult> setupEnvironment(BastilleSetupRequest request);
+
+  // ==================== Bastille 专属（Docker 抛异常）====================
+
+  /// 在容器内执行命令并返回输出（Bastille：`bastille cmd`）。
+  ///
+  /// 用于 `java -version`、`pgrep` 等需要查看结果的命令；
+  /// 命令以 shell 语义执行（服务端经 `sh -c` 包装）。
+  Future<String> execOutput(String idOrName, String command);
+
+  /// 容器内软件包管理（Bastille：`bastille pkg <jail> <action> [pkgs...]`）。
+  ///
+  /// [action] 为 pkg 子命令（install / delete / update / upgrade / autoremove），
+  /// [packages] 为包名列表。返回命令输出（尾部）。
+  Future<String> runPkg(
+    String idOrName,
+    String action,
+    List<String> packages,
+  );
+
+  /// 挂载列表（Bastille：`bastille mount` / fstab）。
+  Future<List<JailMount>> listJailMounts(String idOrName);
+
+  /// 添加挂载（Bastille）。
+  ///
+  /// [fstype] 为 `nullfs`（`bastille mount <jail> <src> <dst>`）或 `procfs`
+  /// （写 fstab + 挂载，Java 运行环境需要 /proc 时使用）。
+  Future<void> addJailMount(
+    String idOrName, {
+    String? src,
+    required String dst,
+    required String fstype,
+    String? options,
+  });
+
+  /// 卸载（Bastille：`bastille umount` + 移除 fstab 条目）。
+  Future<void> removeJailMount(String idOrName, String dst);
+
+  /// 读取 jail 配置（Bastille：jail.conf 属性，`bastille config`）。
+  Future<Map<String, String>> getJailConfig(String idOrName);
+
+  /// 设置 jail 配置项（Bastille：`bastille config <jail> <key> <value>`）。
+  Future<void> setJailConfig(String idOrName, String key, String value);
+
+  /// 删除 jail 配置项（Bastille：从 jail.conf 移除该参数）。
+  Future<void> removeJailConfig(String idOrName, String key);
+
+  /// 在容器内启动运行会话（Bastille：`bastille cmd` 后台执行）。
+  ///
+  /// 用于运行 MC 服务端等长任务进程：[command] 以 shell 语义执行，
+  /// [cwd] 为容器内工作目录（如 /data）；[watch] 为 true 时进程退出后
+  /// 自动停止容器（「进程退出即停止 Jail」开关）。返回会话 id。
+  Future<String> startJailRun(
+    String idOrName, {
+    required String command,
+    String? cwd,
+    bool watch = false,
+  });
+
+  /// 运行会话状态（增量轮询）。
+  ///
+  /// [tail] 指定返回最后 N 行（首次拉取用）；[since] 为字节偏移游标，
+  /// 只返回该偏移之后的新增输出。
+  Future<JailRunStatus> jailRunStatus(
+    String idOrName,
+    String sessionId, {
+    int? tail,
+    int? since,
+  });
+
+  /// 向运行会话写 stdin（控制台命令下发）。
+  Future<void> jailRunStdin(String idOrName, String sessionId, String input);
+
+  /// 终止运行会话中的进程。
+  Future<void> stopJailRun(String idOrName, String sessionId);
+
+  /// 清理运行会话（释放节点端缓冲）。
+  Future<void> cleanupJailRun(String idOrName, String sessionId);
 }

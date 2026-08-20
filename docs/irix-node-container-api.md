@@ -232,9 +232,9 @@ POST /api/bastille/jails/{name}/destroy?force=1
 POST /api/bastille/jails/{name}/clone     body: { "newName": "...", "ip": "192.168.1.51/24" }
     → bastille clone <name> <newName> [ip]
 GET  /api/bastille/jails/{name}/console?tail=N   → data 为纯文本日志尾部
-POST /api/bastille/jails/{name}/cmd       body: { "command": "..." }  → bastille cmd / jexec
-GET  /api/bastille/jails/{name}/config    → jail.conf 属性（客户端预留）
-GET  /api/bastille/jails/{name}/mounts    → 挂载列表（客户端预留）
+POST /api/bastille/jails/{name}/cmd       body: { "command": "..." }  → bastille cmd / jexec（data 为输出文本，见 §4.13）
+GET  /api/bastille/jails/{name}/config    → jail.conf 属性（见 §4.12）
+GET  /api/bastille/jails/{name}/mounts    → 挂载列表（见 §4.10）
 ```
 
 jail 列表 `GET /api/bastille/jails` 条目字段（客户端解析键名）：
@@ -321,6 +321,158 @@ POST /api/container/archive/restore  body: { "file": "<归档名>", "destPath": 
 
 实现提示：压缩/解压可用系统 `zip`/`tar`（FreeBSD 自带），或复用 zip 库；
 `GET archive` 与 `POST upload` 为原始字节传输，不走统一 JSON 信封。
+
+---
+
+## 4.9 软件包管理（bastille pkg）
+
+> 用途：为 jail 安装 Java 运行环境等软件包（客户端「Jail 详情 → 软件包」Tab）。
+
+```
+POST /api/bastille/jails/{name}/pkg
+```
+
+body：
+
+```json
+{ "action": "install", "packages": ["openjdk17-jre", "ca_root_nss"] }
+```
+
+| 字段 | 类型 | 取值 |
+|------|------|------|
+| `action` | string | `install` / `delete` / `update` / `upgrade` / `autoremove`（其他 pkg 子命令亦可透传） |
+| `packages` | string[] | 包名列表（install/delete 必填，update/upgrade/autoremove 可空） |
+
+服务端命令映射：`bastille pkg <name> <action> [-y] [pkgs...]`（**必须附加 `-y`**）。
+响应 `data` 为命令输出文本（可为字符串，也可为 `{ "output": "..." }`；
+pkg 安装耗时较长，客户端超时已放大到 10 分钟）。
+
+---
+
+## 4.10 挂载管理（bastille mount / fstab）
+
+> 用途：将节点上的实例目录挂载进 jail（默认 `/data`），以及挂载 procfs
+> （部分 Java 版本 / JVM 特性需要 `/proc`）。客户端「Jail 详情 → 挂载」Tab。
+
+```
+GET    /api/bastille/jails/{name}/mounts
+POST   /api/bastille/jails/{name}/mounts
+DELETE /api/bastille/jails/{name}/mounts?dst=<jail内路径>
+```
+
+`GET` 响应 `data` 数组，条目：
+
+```json
+{ "src": "/data/mc-survival", "dst": "/data", "fstype": "nullfs", "options": "rw", "permanent": true }
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `src` | string? | 宿主机源路径（procfs/devfs 为 null） |
+| `dst` | string | jail 内目标路径 |
+| `fstype` | string | `nullfs` \| `procfs` \| `devfs` |
+| `options` | string? | 挂载选项（如 `rw`） |
+| `permanent` | bool | 是否写入 fstab（jail 启动时自动挂载） |
+
+`POST` body：
+
+```json
+{ "src": "/data/mc-survival", "dst": "/data", "fstype": "nullfs", "options": "rw" }
+```
+
+服务端映射：
+
+- `fstype=nullfs`：`bastille mount <name> <src> <dst>`；
+- `fstype=procfs`：向 fstab（`/usr/local/bastille/jails/<name>/fstab`）追加
+  `proc <dst> procfs <options> 0 0`（`<dst>` 为 jail 内路径，如 `/proc`），
+  并立即挂载（thin jail 下为宿主 `<jailroot>/<dst>`）；
+- `fstype=devfs` 同理追加 fstab 并挂载。
+
+`DELETE`：`bastille umount <name> <dst>` 并从 fstab 移除对应条目（找不到条目时
+仅卸载，不报错）。
+
+> 注：官方 `bastille mount` 仅支持 nullfs；procfs/devfs 走 fstab 方案
+> （fstab 条目会在 `bastille start` 时自动挂载）。`GET` 列表应合并
+> fstab 条目与当前 `mount` 输出，`permanent` 表示条目来自 fstab。
+
+---
+
+## 4.11 运行会话（在 jail 内运行长任务进程，如 MC 服务端）
+
+> 用途：客户端「Jail 详情 → 运行」Tab —— 将实例挂载进 jail（默认 `/data`）后，
+> 在 jail 内启动服务端进程并轮询输出 / 下发 stdin；「进程退出即停止 Jail」
+> 看门狗开关经 `watch` 下发。
+
+```
+POST   /api/bastille/jails/{name}/run                 body: { "command", "cwd"?, "watch"? }
+GET    /api/bastille/jails/{name}/run/{session}?tail=N&since=<字节偏移>
+POST   /api/bastille/jails/{name}/run/{session}/stdin body: { "input" }
+POST   /api/bastille/jails/{name}/run/{session}/stop
+DELETE /api/bastille/jails/{name}/run/{session}
+```
+
+`POST run` body 与命令映射：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `command` | string | 以 shell 语义执行（服务端 `sh -c` 包装），如 `java -Xmx2G -jar server.jar nogui` |
+| `cwd` | string? | 容器内工作目录（默认 jail 根），服务端执行 `sh -c "cd <cwd> && exec <command>"` |
+| `watch` | bool? | **看门狗**：进程退出后服务端自动执行 `bastille stop <name>`（客户端也会自行兜底检测） |
+
+响应 `data`：`{ "sessionId": "s-1" }`。
+
+**服务端要求**：会话进程必须在**后台**运行（不得阻塞 HTTP 请求），stdout/stderr
+写入会话环形缓冲（建议同时落盘 `<bastille>/run/<name>/<session>.log` 便于重启恢复）。
+进程退出后会话保留一段时间（如 30 分钟）供客户端读取最终状态，之后可清理。
+
+`GET run/{session}` 响应 `data`：
+
+```json
+{ "running": false, "exitCode": 0, "offset": 12345, "log": "…新增内容…" }
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `running` | bool | 进程是否仍在运行 |
+| `exitCode` | int? | 已退出时的退出码 |
+| `offset` | int | 本次返回末尾的日志字节偏移（客户端增量游标） |
+| `log` | string | 自 `since` 偏移之后的**新增**内容（`since` 缺省时返回最后 `tail` 行，默认 200） |
+
+`POST stdin`：`input` 原样写入进程 stdin（客户端会自带换行）。
+`POST stop`：终止进程（SIGTERM → 超时 SIGKILL）。
+`DELETE`：清理会话缓冲 / 日志文件。
+
+---
+
+## 4.12 配置编辑（bastille config / jail.conf）
+
+> 用途：客户端「Jail 详情 → 设置」Tab —— 编辑已创建 jail 的设置
+> （IP、hostname、exec.start、autostart、allow.mount 等）。
+
+```
+GET    /api/bastille/jails/{name}/config
+POST   /api/bastille/jails/{name}/config        body: { "key": "ip4.addr", "value": "192.168.1.51/24" }
+DELETE /api/bastille/jails/{name}/config?key=<key>
+```
+
+- `GET` 响应 `data` 为扁平对象：`{ "ip4.addr": "192.168.1.50/24", "hostname": "…", … }`
+  （解析 jail.conf 的 `key = value;` 参数；无法解析的整段保持原样可省略）。
+- `POST`：`bastille config <name> <key> <value>`（非运行中参数可同时写 jail.conf）。
+- `DELETE`：从 jail.conf 移除该参数（`bastille config <name> <key>` 无值形式或
+  直接改写 jail.conf，实现自选）；不存在的 key 返回 200 即可。
+
+> 客户端预置常用键提示：`ip4.addr` / `ip6.addr` / `hostname` / `exec.start` /
+> `exec.stop` / `exec.consolelog` / `autostart` / `allow.mount` /
+> `allow.mount.procfs` / `vnet` / `interface` / `securelevel`。
+
+---
+
+## 4.13 命令输出（cmd 返回文本）
+
+> 现有 `POST /api/bastille/jails/{name}/cmd`（§4.3）的返回契约补充：`data`
+> 应返回命令输出文本（可为字符串，或 `{ "output": "..." }`），供客户端
+> 「检测 Java」（`java -version`）与「控制台」Tab 一键命令使用。
+> 命令以 shell 语义执行（服务端 `sh -c` 包装）。
 
 ---
 

@@ -33,5 +33,17 @@ copy /Y target\release\xmc_db_client.dll ..\
 copy /Y target\release\xmc_vector_store.dll ..\
 copy /Y target\release\xmc_orchestrator.dll ..\
 
+cd ..
+
+REM 编译 SIMD C 库 (c\simd) 并复制
+echo Building xmc_simd (C)...
+call c\simd\build.bat
+if %ERRORLEVEL% NEQ 0 (
+    echo xmc_simd build failed!
+    exit /b 1
+)
+copy /Y c\simd\build\xmc_simd.dll windows\runner\
+copy /Y c\simd\build\xmc_simd.dll .
+
 echo Done! DLLs copied to windows\runner\
 pause

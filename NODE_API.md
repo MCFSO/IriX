@@ -176,7 +176,19 @@ GET /api/container/info
 | `POST` | `/api/bastille/jails/create` | body: `{name, release, ip?, type: thin\|thick\|clone\|empty\|linux, vnet?, bridge?, mac?}` | 创建 jail |
 | `POST` | `/api/bastille/jails/{name}/start` `stop` `restart` `destroy` | | jail 操作 |
 | `GET` | `/api/bastille/jails/{name}/console` | `tail=N` | 日志尾部 |
-| `POST` | `/api/bastille/jails/{name}/cmd` | body: `{command}` | jail 内执行命令 |
+| `POST` | `/api/bastille/jails/{name}/cmd` | body: `{command}` | jail 内执行命令（data 为输出文本） |
+| `POST` | `/api/bastille/jails/{name}/pkg` | body: `{action, packages}` | 软件包管理（`bastille pkg`，安装 Java 环境等） |
+| `GET` | `/api/bastille/jails/{name}/mounts` | | 挂载列表（nullfs/procfs，见对接文档 §4.10） |
+| `POST` | `/api/bastille/jails/{name}/mounts` | body: `{src?, dst, fstype, options?}` | 添加挂载（nullfs→`bastille mount`；procfs→fstab+挂载） |
+| `DELETE` | `/api/bastille/jails/{name}/mounts` | `dst=` | 卸载并移除 fstab 条目 |
+| `POST` | `/api/bastille/jails/{name}/run` | body: `{command, cwd?, watch?}` | 后台运行会话（MC 服务端等长任务；`watch` 进程退出即停 jail）→ `{sessionId}` |
+| `GET` | `/api/bastille/jails/{name}/run/{session}` | `tail=N&since=<偏移>` | 会话状态 `{running, exitCode, offset, log}` |
+| `POST` | `/api/bastille/jails/{name}/run/{session}/stdin` | body: `{input}` | 会话 stdin（控制台命令） |
+| `POST` | `/api/bastille/jails/{name}/run/{session}/stop` | | 终止会话进程 |
+| `DELETE` | `/api/bastille/jails/{name}/run/{session}` | | 清理会话 |
+| `GET` | `/api/bastille/jails/{name}/config` | | jail.conf 配置（`bastille config`） |
+| `POST` | `/api/bastille/jails/{name}/config` | body: `{key, value}` | 设置配置项 |
+| `DELETE` | `/api/bastille/jails/{name}/config` | `key=` | 删除配置项 |
 | `GET` | `/api/bastille/templates` | | 模板列表（project/template 格式） |
 | `POST` | `/api/bastille/templates/apply` | body: `{jail, template, args: {KEY=VALUE}}` | 应用模板 |
 | `POST` / `DELETE` | `/api/bastille/rdr` | body: `{jail, proto, hostPort, jailPort}` | 端口转发 / 删除转发 |

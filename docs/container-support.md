@@ -170,7 +170,25 @@ POST   /api/bastille/jails/{name}/limits body: {memoryMb?, cpus?, diskMb?}
                                                    diskMb:   zfs set quota=<N>M（jail 数据集）
 GET    /api/bastille/jails/{name}/console?tail=N     → 日志尾部
 POST   /api/bastille/jails/{name}/cmd    body: {command}
-GET    /api/bastille/jails/{name}/config             → jail.conf 属性
+                                                 → 命令输出文本（data 为字符串或 {output}，sh -c 语义）
+POST   /api/bastille/jails/{name}/pkg    body: {action, packages}
+                                                 → bastille pkg JAIL <action> [-y] [pkgs...]（安装 Java 环境等）
+GET    /api/bastille/jails/{name}/mounts             → 挂载列表（nullfs/procfs，合并 fstab 与当前挂载）
+POST   /api/bastille/jails/{name}/mounts body: {src?, dst, fstype: nullfs|procfs, options?}
+                                                 → nullfs: bastille mount JAIL SRC DST
+                                                   procfs: fstab 追加 + 挂载（Java 运行需要 /proc）
+DELETE /api/bastille/jails/{name}/mounts?dst=        → bastille umount + 移除 fstab 条目
+POST   /api/bastille/jails/{name}/run    body: {command, cwd?, watch?}
+                                                 → 后台运行会话（jexec sh -c "cd <cwd> && exec <cmd>"）
+                                                   → {sessionId}；watch=true 进程退出后自动 bastille stop
+GET    /api/bastille/jails/{name}/run/{session}?tail=N&since=偏移
+                                                 → {running, exitCode?, offset, log（增量）}
+POST   /api/bastille/jails/{name}/run/{session}/stdin  body: {input}   → 会话 stdin
+POST   /api/bastille/jails/{name}/run/{session}/stop                    → 终止会话进程
+DELETE /api/bastille/jails/{name}/run/{session}                         → 清理会话
+GET    /api/bastille/jails/{name}/config             → jail.conf 属性（bastille config）
+POST   /api/bastille/jails/{name}/config body: {key, value}  → bastille config JAIL KEY VALUE
+DELETE /api/bastille/jails/{name}/config?key=        → 从 jail.conf 移除参数
 GET    /api/bastille/templates                       → 已 bootstrap 的模板列表(project/template)
 POST   /api/bastille/templates/apply     body: {jail, template, args: {KEY=VALUE}}
 POST   /api/bastille/rdr                 body: {jail, proto, hostPort, jailPort}
@@ -285,6 +303,7 @@ String? containerId;    // 容器名 / jail 名,与 remoteUuid 的对应关系
 | **P2** | 多机模式独立「容器」导航页(`ClusterContainerScreen`):节点列表(运行时徽章)+ 按平台复用容器面板 | Docker/Bastille 集群容器管理入口 | ✅ 已完成 |
 | **P2** | 多机 Bastille 专属能力(Bastillefile 模板、rdr 编辑、bootstrap 任务进度 UI) | 面板按后端能力裁切 | ✅ 已完成:rdr 增删查、bootstrap、运行时感知 Tab |
 | **P2** | Bastille 全功能扩展:bastille setup 初始化(pf/vnet/linux)、创建 jail(类型/VNET/桥接/IP)、clone、destroy -a、import/export、资源限制(内存/CPU/磁盘)、数据目录挂载 + 强制工作目录 | 后端接口 + `ContainerEnvironmentPanel` 设置/转发 Tab + 各对话框 | ✅ 已完成(客户端契约,服务端待按 §3.3 对接) |
+| **P2** | Jail 详情页(单 jail 深度管理):软件包管理(`bastille pkg`,Java 快捷安装 + 检测)、procfs 挂载、实例目录挂载(默认 `/data`)+ jail 内运行实例(`bastille run` 会话,运行目录 `/data`)、实时会话控制台 + stdin、`bastille console` 日志查看、「进程退出即停止 Jail」看门狗开关、jail.conf 设置编辑(`bastille config`) | `JailDetailScreen` + `/api/bastille/jails/{name}/pkg|mounts|run|config` 新端点(见 `irix-node-container-api.md` §4.9–4.13) | ✅ 客户端已完成,服务端待对接 |
 | **P2** | 集群实例容器化运行 + 迁移时的容器重建 | 容器实例可迁移 | 待做 |
 
 ## 7. 边界与回退

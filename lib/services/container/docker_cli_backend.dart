@@ -505,6 +505,113 @@ class DockerCliBackend implements ContainerBackend {
   }
 
   @override
+  Future<String> execOutput(String idOrName, String command) {
+    throw ContainerBackendException(
+      'execOutput 仅适用于 Bastille（bastille cmd）',
+    );
+  }
+
+  @override
+  Future<String> runPkg(String idOrName, String action, List<String> packages) {
+    throw ContainerBackendException(
+      '软件包管理仅适用于 Bastille（bastille pkg）',
+    );
+  }
+
+  @override
+  Future<List<JailMount>> listJailMounts(String idOrName) {
+    throw ContainerBackendException(
+      '挂载管理仅适用于 Bastille（bastille mount）',
+    );
+  }
+
+  @override
+  Future<void> addJailMount(
+    String idOrName, {
+    String? src,
+    required String dst,
+    required String fstype,
+    String? options,
+  }) {
+    throw ContainerBackendException(
+      '挂载管理仅适用于 Bastille（bastille mount）',
+    );
+  }
+
+  @override
+  Future<void> removeJailMount(String idOrName, String dst) {
+    throw ContainerBackendException(
+      '挂载管理仅适用于 Bastille（bastille umount）',
+    );
+  }
+
+  @override
+  Future<Map<String, String>> getJailConfig(String idOrName) {
+    throw ContainerBackendException(
+      'jail 设置编辑仅适用于 Bastille（bastille config）',
+    );
+  }
+
+  @override
+  Future<void> setJailConfig(String idOrName, String key, String value) {
+    throw ContainerBackendException(
+      'jail 设置编辑仅适用于 Bastille（bastille config）',
+    );
+  }
+
+  @override
+  Future<void> removeJailConfig(String idOrName, String key) {
+    throw ContainerBackendException(
+      'jail 设置编辑仅适用于 Bastille（bastille config）',
+    );
+  }
+
+  @override
+  Future<String> startJailRun(
+    String idOrName, {
+    required String command,
+    String? cwd,
+    bool watch = false,
+  }) {
+    throw ContainerBackendException(
+      '容器内运行仅适用于 Bastille（bastille cmd）',
+    );
+  }
+
+  @override
+  Future<JailRunStatus> jailRunStatus(
+    String idOrName,
+    String sessionId, {
+    int? tail,
+    int? since,
+  }) {
+    throw ContainerBackendException(
+      '容器内运行仅适用于 Bastille（bastille cmd）',
+    );
+  }
+
+  @override
+  Future<void> jailRunStdin(String idOrName, String sessionId, String input) {
+    throw ContainerBackendException(
+      '容器内运行仅适用于 Bastille（bastille cmd）',
+    );
+  }
+
+  @override
+  Future<void> stopJailRun(String idOrName, String sessionId) {
+    throw ContainerBackendException(
+      '容器内运行仅适用于 Bastille（bastille cmd）',
+    );
+  }
+
+  @override
+  Future<void> cleanupJailRun(String idOrName, String sessionId) {
+    throw ContainerBackendException(
+      '容器内运行仅适用于 Bastille（bastille cmd）',
+    );
+  }
+
+  @override
   Future<String> exportContainer(String idOrName) {
     throw ContainerBackendException(
       'Docker 不支持容器归档导出，可改用镜像保存（docker commit/push）',

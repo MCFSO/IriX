@@ -424,6 +424,89 @@ class NodeDockerBackend extends NodeContainerBackend {
     );
   }
 
+  // ==================== Bastille 专属（Docker 无等效能力）====================
+
+  @override
+  Future<String> execOutput(String idOrName, String command) {
+    throw const ContainerBackendException('execOutput 仅适用于 Bastille（bastille cmd）');
+  }
+
+  @override
+  Future<String> runPkg(String idOrName, String action, List<String> packages) {
+    throw const ContainerBackendException('软件包管理仅适用于 Bastille（bastille pkg）');
+  }
+
+  @override
+  Future<List<JailMount>> listJailMounts(String idOrName) {
+    throw const ContainerBackendException('挂载管理仅适用于 Bastille（bastille mount）');
+  }
+
+  @override
+  Future<void> addJailMount(
+    String idOrName, {
+    String? src,
+    required String dst,
+    required String fstype,
+    String? options,
+  }) {
+    throw const ContainerBackendException('挂载管理仅适用于 Bastille（bastille mount）');
+  }
+
+  @override
+  Future<void> removeJailMount(String idOrName, String dst) {
+    throw const ContainerBackendException('挂载管理仅适用于 Bastille（bastille umount）');
+  }
+
+  @override
+  Future<Map<String, String>> getJailConfig(String idOrName) {
+    throw const ContainerBackendException('jail 设置编辑仅适用于 Bastille（bastille config）');
+  }
+
+  @override
+  Future<void> setJailConfig(String idOrName, String key, String value) {
+    throw const ContainerBackendException('jail 设置编辑仅适用于 Bastille（bastille config）');
+  }
+
+  @override
+  Future<void> removeJailConfig(String idOrName, String key) {
+    throw const ContainerBackendException('jail 设置编辑仅适用于 Bastille（bastille config）');
+  }
+
+  @override
+  Future<String> startJailRun(
+    String idOrName, {
+    required String command,
+    String? cwd,
+    bool watch = false,
+  }) {
+    throw const ContainerBackendException('容器内运行仅适用于 Bastille（bastille cmd）');
+  }
+
+  @override
+  Future<JailRunStatus> jailRunStatus(
+    String idOrName,
+    String sessionId, {
+    int? tail,
+    int? since,
+  }) {
+    throw const ContainerBackendException('容器内运行仅适用于 Bastille（bastille cmd）');
+  }
+
+  @override
+  Future<void> jailRunStdin(String idOrName, String sessionId, String input) {
+    throw const ContainerBackendException('容器内运行仅适用于 Bastille（bastille cmd）');
+  }
+
+  @override
+  Future<void> stopJailRun(String idOrName, String sessionId) {
+    throw const ContainerBackendException('容器内运行仅适用于 Bastille（bastille cmd）');
+  }
+
+  @override
+  Future<void> cleanupJailRun(String idOrName, String sessionId) {
+    throw const ContainerBackendException('容器内运行仅适用于 Bastille（bastille cmd）');
+  }
+
   @override
   Future<String> exportContainer(String idOrName) {
     throw const ContainerBackendException('Docker 不支持容器归档导出，可改用镜像保存');
@@ -735,4 +818,120 @@ class NodeBastilleBackend extends NodeContainerBackend {
       detail: result?['detail'] as String?,
     );
   }
+
+  // ==================== Bastille 专属（jail 内运行 / 软件包 / 挂载 / 设置）====================
+
+  @override
+  Future<String> execOutput(String idOrName, String command) =>
+      client.bastilleJailCmdOutput(idOrName, command);
+
+  @override
+  Future<String> runPkg(
+    String idOrName,
+    String action,
+    List<String> packages,
+  ) =>
+      client.bastilleJailPkg(idOrName, action: action, packages: packages);
+
+  @override
+  Future<List<JailMount>> listJailMounts(String idOrName) async {
+    final rows = await client.bastilleJailMounts(idOrName);
+    return rows.map((json) {
+      return JailMount(
+        dst: json['dst']?.toString() ?? '',
+        src: json['src']?.toString(),
+        fstype: json['fstype']?.toString() ?? 'nullfs',
+        options: json['options']?.toString(),
+        permanent: json['permanent'] as bool? ?? false,
+      );
+    }).toList();
+  }
+
+  @override
+  Future<void> addJailMount(
+    String idOrName, {
+    String? src,
+    required String dst,
+    required String fstype,
+    String? options,
+  }) =>
+      client.bastilleJailMountAdd(
+        idOrName,
+        src: src,
+        dst: dst,
+        fstype: fstype,
+        options: options,
+      );
+
+  @override
+  Future<void> removeJailMount(String idOrName, String dst) =>
+      client.bastilleJailMountRemove(idOrName, dst);
+
+  @override
+  Future<Map<String, String>> getJailConfig(String idOrName) async {
+    final config = await client.bastilleJailConfig(idOrName);
+    return config.map((k, v) => MapEntry(k, v?.toString() ?? ''));
+  }
+
+  @override
+  Future<void> setJailConfig(String idOrName, String key, String value) =>
+      client.bastilleJailConfigSet(idOrName, key, value);
+
+  @override
+  Future<void> removeJailConfig(String idOrName, String key) =>
+      client.bastilleJailConfigRemove(idOrName, key);
+
+  @override
+  Future<String> startJailRun(
+    String idOrName, {
+    required String command,
+    String? cwd,
+    bool watch = false,
+  }) =>
+      client.bastilleJailRun(
+        idOrName,
+        command: command,
+        cwd: cwd,
+        watch: watch,
+      );
+
+  @override
+  Future<JailRunStatus> jailRunStatus(
+    String idOrName,
+    String sessionId, {
+    int? tail,
+    int? since,
+  }) async {
+    final status = await client.bastilleJailRunStatus(
+      idOrName,
+      sessionId,
+      tail: tail,
+      since: since,
+    );
+    if (status == null) {
+      return JailRunStatus(running: false, exitCode: null, log: '');
+    }
+    return JailRunStatus(
+      running: status['running'] as bool? ?? false,
+      exitCode: (status['exitCode'] as num?)?.toInt(),
+      offset: (status['offset'] as num?)?.toInt() ?? 0,
+      log: status['log']?.toString() ?? '',
+    );
+  }
+
+  @override
+  Future<void> jailRunStdin(
+    String idOrName,
+    String sessionId,
+    String input,
+  ) =>
+      client.bastilleJailRunStdin(idOrName, sessionId, input);
+
+  @override
+  Future<void> stopJailRun(String idOrName, String sessionId) =>
+      client.bastilleJailRunStop(idOrName, sessionId);
+
+  @override
+  Future<void> cleanupJailRun(String idOrName, String sessionId) =>
+      client.bastilleJailRunCleanup(idOrName, sessionId);
 }

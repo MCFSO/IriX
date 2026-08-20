@@ -332,6 +332,8 @@ class _RemoteInstanceDetailScreenState
     return ContainerEnvironmentPanel(
       backend: backend,
       highlightName: highlightName,
+      nodeClient: widget.client,
+      daemonId: widget.daemonId,
     );
   }
 

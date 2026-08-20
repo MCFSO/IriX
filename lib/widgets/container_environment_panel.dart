@@ -12,8 +12,10 @@ import 'dart:async';
 import 'package:flutter/material.dart' hide ImageInfo;
 import 'package:flutter/services.dart';
 
+import '../screens/bastille_jail_detail_screen.dart';
 import '../services/container/container_backend.dart';
 import '../services/font_settings.dart';
+import '../services/node_api_client.dart';
 import '../utils/apple_widgets.dart';
 
 /// 容器环境面板。
@@ -22,6 +24,8 @@ class ContainerEnvironmentPanel extends StatefulWidget {
     super.key,
     required this.backend,
     this.highlightName,
+    this.nodeClient,
+    this.daemonId,
   });
 
   /// 容器后端（本地 Docker / 远程节点）。
@@ -29,6 +33,12 @@ class ContainerEnvironmentPanel extends StatefulWidget {
 
   /// 需要高亮的容器名（实例自身的容器）。
   final String? highlightName;
+
+  /// 节点 API 客户端（Bastille Jail 详情页的实例选择用）。
+  final NodeApiClient? nodeClient;
+
+  /// 守护进程 id（配合 [nodeClient] 使用）。
+  final String? daemonId;
 
   @override
   State<ContainerEnvironmentPanel> createState() =>
@@ -215,6 +225,21 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
     } on ContainerBackendException catch (e) {
       _showError(e.message);
     }
+  }
+
+  /// 打开 Jail 详情页（Bastille 深度管理：运行/控制台/软件包/挂载/设置）。
+  Future<void> _openJailDetail(ContainerInfo container) async {
+    await pushPage<void>(
+      context,
+      (_) => JailDetailScreen(
+        backend: widget.backend,
+        jailName: container.name,
+        nodeClient: widget.nodeClient,
+        daemonId: widget.daemonId,
+        initialContainer: container,
+      ),
+    );
+    await _refreshContainers();
   }
 
   // ==================== 创建容器 / jail ====================
@@ -576,6 +601,7 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
                       ),
                       onClone: () => _openCloneDialog(c),
                       onLimits: () => _openLimitsDialog(c),
+                      onManage: _isBastille ? () => _openJailDetail(c) : null,
                       onExport: _isBastille ? () => _exportContainer(c) : null,
                       onRemove: () => _runContainerAction(
                         c,
@@ -1075,6 +1101,7 @@ class _ContainerTile extends StatelessWidget {
     required this.onClone,
     required this.onLimits,
     required this.onRemove,
+    this.onManage,
     this.onExport,
   });
 
@@ -1085,6 +1112,9 @@ class _ContainerTile extends StatelessWidget {
   final VoidCallback onClone;
   final VoidCallback onLimits;
   final VoidCallback onRemove;
+
+  /// Bastille：打开 Jail 详情页（运行/控制台/软件包/挂载/设置）。
+  final VoidCallback? onManage;
 
   /// Bastille：导出为归档。
   final VoidCallback? onExport;
@@ -1123,6 +1153,12 @@ class _ContainerTile extends StatelessWidget {
             tooltip: '停止',
             onPressed: running ? onStop : null,
           ),
+          if (onManage != null)
+            IconButton(
+              icon: const Icon(Icons.tune),
+              tooltip: '管理（详情）',
+              onPressed: onManage,
+            ),
           PopupMenuButton<String>(
             tooltip: '更多操作',
             onSelected: (value) {
@@ -1133,6 +1169,8 @@ class _ContainerTile extends StatelessWidget {
                   onClone();
                 case 'limits':
                   onLimits();
+                case 'manage':
+                  onManage?.call();
                 case 'export':
                   onExport?.call();
                 case 'remove':
@@ -1143,6 +1181,8 @@ class _ContainerTile extends StatelessWidget {
               const PopupMenuItem(value: 'restart', child: Text('重启')),
               const PopupMenuItem(value: 'clone', child: Text('克隆')),
               const PopupMenuItem(value: 'limits', child: Text('资源限制')),
+              if (onManage != null)
+                const PopupMenuItem(value: 'manage', child: Text('管理（详情）')),
               if (onExport != null)
                 const PopupMenuItem(value: 'export', child: Text('导出归档')),
               const PopupMenuItem(value: 'remove', child: Text('删除')),

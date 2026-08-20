@@ -1094,6 +1094,187 @@ class NodeApiClient {
     );
   }
 
+  /// jail 内软件包管理（POST /api/bastille/jails/{name}/pkg，`bastille pkg`）。
+  ///
+  /// [action] 为 pkg 子命令（install / delete / update / upgrade / autoremove 等），
+  /// [packages] 为包名列表（install/delete 时必填）。返回命令输出（尾部）。
+  Future<String> bastilleJailPkg(
+    String name, {
+    required String action,
+    List<String> packages = const [],
+  }) async {
+    final data = await _request(
+      'POST',
+      '/api/bastille/jails/$name/pkg',
+      body: {'action': action, 'packages': packages},
+      timeout: const Duration(minutes: 10), // pkg 安装可能较慢
+    );
+    if (data is Map<String, dynamic>) {
+      return data['output'] as String? ?? '';
+    }
+    return data?.toString() ?? '';
+  }
+
+  /// jail 内执行命令并返回输出（POST /api/bastille/jails/{name}/cmd）。
+  ///
+  /// 与 [bastilleJailCmd] 同一端点，区别是本方法把 `data` 解析为输出文本返回
+  /// （用于 `java -version`、`pgrep` 等需要看结果的命令）。
+  Future<String> bastilleJailCmdOutput(String name, String command) async {
+    final data = await _request(
+      'POST',
+      '/api/bastille/jails/$name/cmd',
+      body: {'command': command},
+      timeout: const Duration(minutes: 2),
+    );
+    if (data is Map<String, dynamic>) {
+      return data['output'] as String? ?? '';
+    }
+    return data?.toString() ?? '';
+  }
+
+  /// jail 挂载列表（GET /api/bastille/jails/{name}/mounts）。
+  ///
+  /// 条目：`{src?, dst, fstype: nullfs|procfs|devfs, options?, permanent}`。
+  Future<List<Map<String, dynamic>>> bastilleJailMounts(String name) async {
+    final data = await _request('GET', '/api/bastille/jails/$name/mounts');
+    return _listOfMaps(data);
+  }
+
+  /// 添加挂载（POST /api/bastille/jails/{name}/mounts）。
+  ///
+  /// [fstype] 为 `nullfs`（宿主机路径挂载，`bastille mount`）或 `procfs`
+  /// （写 fstab + 挂载，Java 运行环境需要 /proc 时使用）。
+  Future<void> bastilleJailMountAdd(
+    String name, {
+    String? src,
+    required String dst,
+    required String fstype,
+    String? options,
+  }) async {
+    await _request(
+      'POST',
+      '/api/bastille/jails/$name/mounts',
+      body: {
+        if (src != null && src.isNotEmpty) 'src': src,
+        'dst': dst,
+        'fstype': fstype,
+        if (options != null && options.isNotEmpty) 'options': options,
+      },
+    );
+  }
+
+  /// 卸载（DELETE /api/bastille/jails/{name}/mounts?dst=...）。
+  Future<void> bastilleJailMountRemove(String name, String dst) async {
+    await _request(
+      'DELETE',
+      '/api/bastille/jails/$name/mounts',
+      query: {'dst': dst},
+    );
+  }
+
+  /// 读取 jail 配置（GET /api/bastille/jails/{name}/config，jail.conf 属性）。
+  ///
+  /// 返回 `{key: value, ...}`，如 `ip4.addr` / `hostname` / `exec.start`。
+  Future<Map<String, dynamic>> bastilleJailConfig(String name) async {
+    final data = await _request('GET', '/api/bastille/jails/$name/config');
+    if (data is Map<String, dynamic>) return data;
+    return {};
+  }
+
+  /// 设置 jail 配置项（POST /api/bastille/jails/{name}/config，
+  /// `bastille config <jail> <key> <value>`）。
+  Future<void> bastilleJailConfigSet(
+    String name,
+    String key,
+    String value,
+  ) async {
+    await _request(
+      'POST',
+      '/api/bastille/jails/$name/config',
+      body: {'key': key, 'value': value},
+    );
+  }
+
+  /// 删除 jail 配置项（DELETE /api/bastille/jails/{name}/config?key=...）。
+  Future<void> bastilleJailConfigRemove(String name, String key) async {
+    await _request(
+      'DELETE',
+      '/api/bastille/jails/$name/config',
+      query: {'key': key},
+    );
+  }
+
+  /// 在 jail 内启动运行会话（POST /api/bastille/jails/{name}/run）。
+  ///
+  /// 后台执行 `jexec <name> sh -c "cd <cwd> && exec <command>"`，输出保留在
+  /// 节点上的会话缓冲/日志文件；[watch] 为 true 时进程退出后节点自动停止 jail
+  /// （「容器内进程退出即停止容器」开关）。返回会话 id。
+  Future<String> bastilleJailRun(
+    String name, {
+    required String command,
+    String? cwd,
+    bool watch = false,
+  }) async {
+    final data = await _request(
+      'POST',
+      '/api/bastille/jails/$name/run',
+      body: {
+        'command': command,
+        if (cwd != null && cwd.isNotEmpty) 'cwd': cwd,
+        if (watch) 'watch': true,
+      },
+    );
+    if (data is Map<String, dynamic>) {
+      return data['sessionId'] as String? ?? '';
+    }
+    return data?.toString() ?? '';
+  }
+
+  /// 运行会话状态（GET /api/bastille/jails/{name}/run/{session}）。
+  ///
+  /// [tail] 指定返回最后 N 行（首次拉取用）；[since] 为字节偏移，只返回该
+  /// 偏移之后的新增输出（增量轮询用）。返回
+  /// `{running, exitCode?, offset, log}`。
+  Future<Map<String, dynamic>?> bastilleJailRunStatus(
+    String name,
+    String sessionId, {
+    int? tail,
+    int? since,
+  }) async {
+    final data = await _request(
+      'GET',
+      '/api/bastille/jails/$name/run/$sessionId',
+      query: {
+        if (tail != null) 'tail': '$tail',
+        if (since != null) 'since': '$since',
+      },
+    );
+    return data is Map<String, dynamic> ? data : null;
+  }
+
+  /// 向运行会话写 stdin（POST /api/bastille/jails/{name}/run/{session}/stdin）。
+  Future<void> bastilleJailRunStdin(
+    String name,
+    String sessionId,
+    String input,
+  ) async {
+    await _request(
+      'POST',
+      '/api/bastille/jails/$name/run/$sessionId/stdin',
+      body: {'input': input},
+    );
+  }
+
+  /// 终止运行会话中的进程（POST /api/bastille/jails/{name}/run/{session}/stop）。
+  Future<void> bastilleJailRunStop(String name, String sessionId) async {
+    await _request('POST', '/api/bastille/jails/$name/run/$sessionId/stop');
+  }
+
+  /// 清理运行会话（DELETE /api/bastille/jails/{name}/run/{session}）。
+  Future<void> bastilleJailRunCleanup(String name, String sessionId) async {
+    await _request('DELETE', '/api/bastille/jails/$name/run/$sessionId');
+  }
+
   /// 克隆容器（POST /api/container/{id}/clone）。
   Future<void> containerClone(String id, String newName) async {
     await _request('POST', '/api/container/$id/clone', body: {'name': newName});
