@@ -4,7 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../lib/utils/ansi_color.dart';
+import 'package:irix/utils/ansi_color.dart';
 
 void main() {
   const base = TextStyle(fontSize: 12, color: Colors.white);
