@@ -146,13 +146,20 @@ class _HangarDetailScreenState extends State<HangarDetailScreen> {
     setState(() => _downloadProgress[progressKey] = 0.0);
 
     try {
-      await _downloader.downloadFile(pd.downloadUrl, targetPath, (progress) {
-        if (mounted) {
-          setState(() {
-            _downloadProgress[progressKey] = progress.percent;
-          });
-        }
-      }, threads: threads);
+      await _downloader.downloadFile(
+        pd.downloadUrl,
+        targetPath,
+        (progress) {
+          if (mounted) {
+            setState(() {
+              _downloadProgress[progressKey] = progress.percent;
+            });
+          }
+        },
+        threads: threads,
+        // H-1：Hangar 官方响应含 fileInfo.sha256Hash，下载后校验完整性。
+        sha256: pd.sha256,
+      );
       if (mounted) {
         setState(() => _downloadProgress.remove(progressKey));
         ScaffoldMessenger.of(context).showSnackBar(

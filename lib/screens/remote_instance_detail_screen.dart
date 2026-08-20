@@ -240,20 +240,6 @@ class _RemoteInstanceDetailScreenState
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.folder_outlined),
-            tooltip: '文件管理',
-            onPressed: () => pushPage<void>(
-              context,
-              (_) => RemoteFileManagerScreen(
-                nodeId: widget.node.id,
-                client: widget.client,
-                daemonId: widget.daemonId,
-                initialUuid: widget.initialInstance.uuid,
-                allowInstanceSwitch: false,
-              ),
-            ),
-          ),
-          IconButton(
             icon: const Icon(Icons.delete_outline),
             tooltip: '删除实例',
             onPressed: _busy ? null : _delete,
@@ -276,13 +262,14 @@ class _RemoteInstanceDetailScreenState
             ),
           Expanded(
             child: DefaultTabController(
-              length: 3,
+              length: 4,
               child: Column(
                 children: [
                   TabBar(
                     tabs: const [
                       Tab(icon: Icon(Icons.terminal), text: '控制台'),
                       Tab(icon: Icon(Icons.settings_outlined), text: '配置'),
+                      Tab(icon: Icon(Icons.folder), text: '文件'),
                       Tab(icon: Icon(Icons.inventory_2), text: '容器'),
                     ],
                   ),
@@ -291,6 +278,12 @@ class _RemoteInstanceDetailScreenState
                       children: [
                         _buildConsole(theme),
                         _buildConfig(theme),
+                        RemoteFileManagerScreen(
+                          client: widget.client,
+                          daemonId: widget.daemonId,
+                          initialUuid: widget.initialInstance.uuid,
+                          embedded: true,
+                        ),
                         _buildContainerTab(),
                       ],
                     ),

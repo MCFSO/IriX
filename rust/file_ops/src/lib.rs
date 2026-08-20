@@ -729,9 +729,11 @@ pub extern "C" fn restore_from_trash(
         .unwrap_or("")
         .to_string();
 
-    // L-3：trash_meta.json 可被篡改，恢复前校验——
-    // 1) original_path 必须位于 root 之下（拒绝指向任意路径）；
-    // 2) file_name 不得含路径分隔符（防止越出回收站目录）。
+    // L-3：trash_meta.json 可被篡改，恢复前严格校验——
+    // 1) file_name 不得含路径分隔符 / `..`（防止越出回收站目录）；
+    // 2) original_path 不得含 `..` 组件（防止 `C:\inst\..\..\Windows` 词法
+    //    前缀绕过 `starts_with(root)` 后实际落到任意路径），且归一化后必须
+    //    位于 root 之下。
     let root_norm = Path::new(root_str)
         .canonicalize()
         .unwrap_or_else(|_| Path::new(root_str).to_path_buf());
@@ -743,7 +745,21 @@ pub extern "C" fn restore_from_trash(
         set_last_error("回收站元数据 original_path 为空，已拒绝恢复（L-3）");
         return 4;
     }
-    if !Path::new(&original_path).starts_with(&root_norm) {
+    // 拒绝 original_path 中的 `..` 组件（ParentDir），与 file_name 同等严格。
+    // 仅靠 `starts_with(root_norm)` 会被 `root\..\..\elsewhere` 词法绕过。
+    let original_path_buf = Path::new(&original_path);
+    if original_path_buf
+        .components()
+        .any(|c| c == std::path::Component::ParentDir)
+    {
+        set_last_error("回收站元数据 original_path 含 `..` 组件，已拒绝恢复（L-3）");
+        return 4;
+    }
+    // 归一化后再做前缀校验，确保最终落点位于 root 之下。
+    let original_norm = original_path_buf
+        .canonicalize()
+        .unwrap_or_else(|_| original_path_buf.to_path_buf());
+    if !original_norm.starts_with(&root_norm) {
         set_last_error("回收站元数据 original_path 越出根目录，已拒绝恢复（L-3）");
         return 4;
     }

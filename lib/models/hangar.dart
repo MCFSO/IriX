@@ -148,28 +148,31 @@ class HangarPlatformDownload {
   final List<String> gameVersions;
   final String downloadUrl;
 
+  /// 官方发布资产的 SHA-256（来自 fileInfo.sha256Hash），用于下载后完整性校验（H-1）。
+  final String? sha256;
+
   const HangarPlatformDownload({
     required this.platform,
     required this.gameVersions,
     required this.downloadUrl,
+    this.sha256,
   });
 
+  /// 从 `downloads[PLATFORM]` 条目解析。
+  ///
+  /// [platformKey] 为平台大写名（如 `PAPER`）；[gameVersions] 取自版本级
+  /// `platformDependencies[platformKey]`；[sha256] 取自 `fileInfo.sha256Hash`。
   factory HangarPlatformDownload.fromJson(
     Map<String, dynamic> json,
-    String projectSlug,
-    String versionName,
+    String platformKey,
+    List<String> gameVersions,
   ) {
-    final platform = json['platform'] as String? ?? 'paper';
-    final versions =
-        (json['versions'] as List<dynamic>?)
-            ?.map((e) => e.toString())
-            .toList() ??
-        const [];
+    final fileInfo = json['fileInfo'] as Map<String, dynamic>? ?? const {};
     return HangarPlatformDownload(
-      platform: platform,
-      gameVersions: versions,
-      downloadUrl:
-          'https://hangar.papermc.io/api/v1/projects/$projectSlug/versions/$versionName/$platform/download',
+      platform: platformKey.toLowerCase(),
+      gameVersions: gameVersions,
+      downloadUrl: json['downloadUrl'] as String? ?? '',
+      sha256: fileInfo['sha256Hash'] as String?,
     );
   }
 }
@@ -194,23 +197,32 @@ class HangarVersion {
     Map<String, dynamic> json,
     String projectSlug,
   ) {
+    // downloads 是按平台大写名（PAPER/VELOCITY/...）索引的 map，
+    // 每项含 fileInfo.sha256Hash 与 downloadUrl（H-1 完整性校验所需）。
     final downloads = json['downloads'] as Map<String, dynamic>? ?? const {};
-    final platformEntries =
-        downloads['platforms'] as List<dynamic>? ?? const [];
+    // 平台对应的游戏版本取自版本级 platformDependencies（按平台大写名索引）。
+    final platformDeps =
+        json['platformDependencies'] as Map<String, dynamic>? ?? const {};
+    final stats = json['stats'] as Map<String, dynamic>? ?? const {};
+    final platformDownloads = <HangarPlatformDownload>[];
+    for (final entry in downloads.entries) {
+      final platformKey = entry.key; // 如 "PAPER"
+      final platformJson = entry.value as Map<String, dynamic>? ?? const {};
+      final gameVersions =
+          (platformDeps[platformKey] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const <String>[];
+      platformDownloads.add(
+        HangarPlatformDownload.fromJson(platformJson, platformKey, gameVersions),
+      );
+    }
     return HangarVersion(
       name: json['name'] as String? ?? '',
-      createdAt: json['created_at'] as String?,
-      downloads: (downloads['total'] as num?)?.toInt() ?? 0,
+      createdAt: json['createdAt'] as String?,
+      downloads: (stats['totalDownloads'] as num?)?.toInt() ?? 0,
       description: json['description'] as String?,
-      downloadsPerPlatform: platformEntries
-          .map(
-            (e) => HangarPlatformDownload.fromJson(
-              e as Map<String, dynamic>,
-              projectSlug,
-              json['name'] as String? ?? '',
-            ),
-          )
-          .toList(),
+      downloadsPerPlatform: platformDownloads,
     );
   }
 }

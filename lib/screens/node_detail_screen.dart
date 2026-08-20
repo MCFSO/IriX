@@ -2,9 +2,9 @@
 // 点击节点卡片后进入的页面，按节点类型展示功能标签页：
 // - 概览：主机信息 / 资源占用 / 实例统计（两类型均有 API）
 // - 实例：实例列表与启动/停止/重启/强制终止（两类型均有 API）
-// - 文件：实例文件管理器（两类型均有 API）
 // - 容器：Docker / Bastille 容器环境全功能管理（irix-node 全功能，MCSM 受限回退）
 // - 用户：用户管理（仅 MCSM 面板提供 API）
+// 文件管理已收归实例详情页（RemoteInstanceDetailScreen「文件」Tab），此处不再提供。
 // "只显示 API 有的功能"：MCSM 侧仅展示文档中带 API 的能力。
 
 import 'package:flutter/material.dart';
@@ -19,7 +19,6 @@ import '../state/node_state.dart';
 import '../utils/apple_widgets.dart';
 import '../utils/docker_visibility.dart';
 import '../widgets/container_environment_panel.dart';
-import 'remote_file_manager_screen.dart';
 import 'remote_instance_detail_screen.dart';
 
 /// 节点管理界面。
@@ -135,17 +134,6 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
           client: client,
           overview: overview,
           initialDaemonId: daemonId,
-        ),
-      ),
-      (
-        label: '文件',
-        icon: Icons.folder_outlined,
-        child: RemoteFileManagerScreen(
-          nodeId: node.id,
-          client: client,
-          overview: overview,
-          daemonId: daemonId,
-          allowInstanceSwitch: true,
         ),
       ),
     ];

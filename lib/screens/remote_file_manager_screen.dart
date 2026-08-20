@@ -1,8 +1,9 @@
 // 远程文件管理器
 // 浏览节点上某个实例的工作目录（MCSM / 本地节点同一套 API）：
-// - 实例切换（多守护进程或从实例详情进入时锁定单个实例）
 // - 目录浏览（面包屑导航）
 // - 上传 / 下载 / 新建文件 / 新建目录 / 编辑 / 重命名 / 删除 / 压缩 / 解压
+// 文件管理已收归实例详情页（RemoteInstanceDetailScreen「文件」Tab），
+// 以嵌入模式渲染并锁定单个实例（initialUuid）。
 
 import 'dart:io';
 
@@ -18,20 +19,20 @@ import '../utils/apple_widgets.dart';
 class RemoteFileManagerScreen extends StatefulWidget {
   const RemoteFileManagerScreen({
     super.key,
-    required this.nodeId,
     required this.client,
     required this.daemonId,
     this.overview,
     this.initialUuid,
-    this.allowInstanceSwitch = true,
+    this.embedded = false,
   });
 
-  final String nodeId;
   final NodeApiClient client;
   final String? daemonId;
   final OverviewData? overview;
   final String? initialUuid;
-  final bool allowInstanceSwitch;
+
+  /// 以嵌入模式渲染（不含 Scaffold/AppBar），用于实例详情页的「文件」Tab。
+  final bool embedded;
 
   @override
   State<RemoteFileManagerScreen> createState() =>
@@ -39,7 +40,6 @@ class RemoteFileManagerScreen extends StatefulWidget {
 }
 
 class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
-  List<RemoteInstance>? _instances;
   String? _uuid;
   String _path = '/';
   List<RemoteFileEntry>? _entries;
@@ -64,13 +64,16 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
       return;
     }
     try {
-      final instances = await widget.client.listInstances(daemonId: daemonId);
-      if (!mounted) return;
-      setState(() {
-        _instances = instances;
-        _uuid ??= instances.isNotEmpty ? instances.first.uuid : null;
-        _loading = false;
-      });
+      // 已锁定实例（实例详情传入 initialUuid）时无需拉取实例列表；
+      // 未指定时回退到守护进程的第一个实例。
+      if (_uuid == null) {
+        final instances = await widget.client.listInstances(daemonId: daemonId);
+        if (!mounted) return;
+        setState(() {
+          _uuid = instances.isNotEmpty ? instances.first.uuid : null;
+        });
+      }
+      setState(() => _loading = false);
       if (_uuid != null) {
         await _loadEntries();
       }
@@ -517,59 +520,33 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    if (_loading && _instances == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    // 初始加载阶段（尚未确定浏览的实例）显示全屏进度；
+    // 已锁定实例时交由 _buildBody 内的加载/错误分支处理。
+    if (_loading && _uuid == null) {
+      return const Center(child: CircularProgressIndicator());
     }
+    final body = Column(
+      children: [
+        _buildToolbar(theme),
+        const Divider(height: 1),
+        Expanded(child: _buildBody(theme)),
+      ],
+    );
+    if (widget.embedded) return body;
     return Scaffold(
       appBar: AppBar(title: const Text('文件管理')),
-      body: Column(
-        children: [
-          _buildToolbar(theme),
-          const Divider(height: 1),
-          Expanded(child: _buildBody(theme)),
-        ],
-      ),
+      body: body,
     );
   }
 
-  /// 顶部工具栏：实例切换 + 路径 + 操作。
+  /// 顶部工具栏：路径 + 操作。
   Widget _buildToolbar(ThemeData theme) {
-    final instances = _instances ?? [];
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
       child: Column(
         children: [
           Row(
             children: [
-              if (widget.allowInstanceSwitch && instances.isNotEmpty) ...[
-                Icon(Icons.storage, size: 16, color: theme.colorScheme.outline),
-                const SizedBox(width: 6),
-                DropdownButton<String>(
-                  value: _uuid,
-                  underline: const SizedBox.shrink(),
-                  isDense: true,
-                  items: [
-                    for (final inst in instances)
-                      DropdownMenuItem(
-                        value: inst.uuid,
-                        child: Text(
-                          inst.config.nickname.isEmpty
-                              ? inst.uuid
-                              : inst.config.nickname,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                  ],
-                  onChanged: (value) {
-                    setState(() {
-                      _uuid = value;
-                      _path = '/';
-                    });
-                    _loadEntries();
-                  },
-                ),
-                const SizedBox(width: 12),
-              ],
               Expanded(
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
@@ -622,11 +599,11 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
               ),
             ],
           ),
-          if (_instances == null || _instances!.isEmpty)
+          if (_uuid == null)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Text(
-                '节点上没有实例，无法进行文件管理',
+                '无法确定实例，无法进行文件管理',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.error,
                 ),

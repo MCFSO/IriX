@@ -67,12 +67,15 @@ class OAuthCallbackServer {
         }
         params.addAll(request.uri.queryParameters);
         final got = params['state'];
-        if (expected != null && got != null && got != expected) {
-          // 伪造/过期回调：拒绝并继续等待真实回调。
+        // H-5：state 校验三道闸——
+        // 1) 缺少 state（服务端未回传或攻击者构造）一律拒绝，防止同机
+        //    攻击者发不含 state 的请求注入伪造 token（token fixation）；
+        // 2) state 与本次会话不匹配一律拒绝。
+        if (expected != null && (got == null || got != expected)) {
           request.response.statusCode = HttpStatus.badRequest;
           request.response.headers.contentType = ContentType.html;
           request.response.write(
-            '<html><body><h3>回调校验失败（state 不匹配），请重试登录。</h3></body></html>',
+            '<html><body><h3>回调校验失败（state 缺失或不匹配），请重试登录。</h3></body></html>',
           );
           await request.response.close();
           continue;

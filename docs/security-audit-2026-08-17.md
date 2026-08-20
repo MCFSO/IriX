@@ -261,4 +261,78 @@ file_ops 其余 FFI 入口与 downloader 入口未逐一包裹（panic 面低，
 
 ---
 
-*本报告基于 2026-08-17 的代码快照（main @ cafea12 + 工作区未提交改动）。Mimosa 扫描产物已密封，可通过上述 scan ID 与 seal 复核。修复状态章节随 2026-08-17 的修复提交更新。*
+## 9. 二次评审（2026-08-18，针对提交 `fa5a8b3`）
+
+**评审范围**：提交 `fa5a8b3 security: fix audit findings from security-audit-2026-08-17` 的完整 diff
+（42 文件，+2481/-150），对照本报告第 3~5 节逐项核实修复是否到位、是否引入新问题。
+验证手段：完整 diff 审查 + `flutter analyze`（零问题）+ `flutter test test/mcp_server_test.dart`
+（14 用例全过，含 5 个 H-3 鉴权用例）+ 关键路径源码复核。
+
+### 9.1 已确认有效修复
+
+| 编号 | 评审结论 |
+|---|---|
+| H-2 | ✅ 彻底。`_ghMirrors` 已删除，仅 `https://github.com/fatedier/frp/releases/download` 直连；`_githubAssetSha256` 经 GitHub API 取官方 digest，正则校验 64 位 hex 后强制校验，获取失败则不校验但不阻断（合理降级）。 |
+| H-3 | ✅ 扎实。`Random.secure()` 生成 32 字节 token；`_authorized` 同时校验 `Authorization: Bearer` 与 `?token=`；非本机 `Origin`（含 `[::1]`）拒绝；信息页去工具枚举；测试覆盖无 token/错 token/恶意 Origin/本机 Origin/重启换 token 五场景。 |
+| H-4 | ✅ 彻底。`cmd /c start` 已替换为 `launchUrl(uri, mode: LaunchMode.externalApplication)`。 |
+| H-5（HTTPS 部分） | ✅ `chmlFrpApiBase` 已切 `https://cf-v2.uapis.cn`。 |
+| H-6 | ✅ 到位。`X-Api-Key` 请求头（MCSM 保留 query 兼容属协议约束）；远程 Node 强制密钥；非 https 非回环弹明文警告对话框。 |
+| M-1 | ✅ frpc 与 JDK 解压均 `p.normalize` + `p.isWithin` 双校验。 |
+| M-2 | ✅ Modrinth/Hangar 均 `p.basename` 净化并拒绝 `..`/分隔符。 |
+| M-4 | ✅ 根治。`validate_user_ident` 白名单 + MySQL `CREATE/DROP USER` 改 `esc_mysql_str`；PG 分支保持正确。 |
+| M-7 | ✅ `.gitignore` 补版本号目录模式。 |
+| L-1/L-4/L-5/L-7/L-9 | ✅ 均按描述落实。 |
+
+### 9.2 二次评审新发现的问题
+
+> **2026-08-18 二次修复**：以下三项已在二次评审当日修复并验证
+> （`flutter analyze` 零问题；Rust 已重新编译并复制 `xmc_file_ops.dll`；
+> Hangar 模型用真实 API 响应验证解析正确）。
+
+#### [High] H-1 残留：Hangar（PaperMC）下载完全无完整性校验 → ✅ 已修复
+
+- **原位置**： `lib/screens/hangar_detail_screen.dart:149`（`downloadFile` 调用无 `sha256`/`sha512` 参数）；`lib/models/hangar.dart` 无 hash 字段
+- **原情况**： H-1 修复接入 MSL/JDK/Modrinth/frpc 四类下载，但 Hangar 平台被遗漏。
+- **修复**：
+  1. `HangarPlatformDownload` 增加 `sha256` 字段，从 `fileInfo.sha256Hash` 解析；
+  2. `HangarVersion.fromJson` 修正为解析真实 API 结构——`downloads` 按平台大写名索引的 map（而非不存在的 `downloads['platforms']`），游戏版本取自 `platformDependencies`，下载量取自 `stats.totalDownloads`；
+  3. `hangar_detail_screen.dart:149` 的 `downloadFile` 调用传入 `sha256: pd.sha256`。
+- **附带修复**： 原模型解析 `downloads['platforms']`（API 中不存在该字段），导致 Hangar 平台下载项实际从未加载——本次一并修正，Hangar 下载功能现在才真正可用。
+- **验证**： 用真实 Hangar API 响应（`projects/Ciran/Luckperms-Supporter/versions`）验证模型解析，sha256/downloadUrl/platform/gameVersions 全部正确提取。
+
+#### [Medium] H-5 残留：OAuth 回调在服务端不回传 state 时放行 → ✅ 已修复
+
+- **原位置**： `lib/services/oauth_callback_server.dart:70`
+- **原情况**： state 校验在 `got == null`（回调不含 state）时直接放行，存在 token fixation 残留面。
+- **修复**： 改为 `if (expected != null && (got == null || got != expected)) reject`——state 缺失或不匹配一律拒绝并继续等待真实回调。
+- **影响**： 若 ChmlFrp SSO 不回传 state，合法回调也会被拒绝（用户需重试）；这是安全性优先的正确取舍，杜绝了同机攻击者用无 state 请求注入伪造 token 的路径。
+
+#### [Medium] L-3 残留：`original_path` 未 canonicalize，可被 `..` 组件绕过 → ✅ 已修复
+
+- **原位置**： `rust/file_ops/src/lib.rs:746`
+- **原情况**： `original_path` 仅做词法 `Path::starts_with(root)`，`C:\inst\..\..\Windows\System32\x` 可绕过。
+- **修复**： 在前缀校验前增加 `Component::ParentDir` 检查——`original_path` 含任何 `..` 组件即拒绝；随后 `canonicalize`（目标不存在则用词法归一化兜底）再做 `starts_with(root_norm)`。与 `file_name` 的严格度对齐。
+- **验证**： `cargo build --release` 成功，`xmc_file_ops.dll` 已重新编译并复制到 `windows/runner/` 与项目根目录。
+
+### 9.3 确认未修复项（与第 8 节"⏳ 待做"一致，无变化）
+
+| 编号 | 二次评审确认 |
+|---|---|
+| M-3 | 仍明文。`ai_settings.dart`/`database_manager.dart`/`node_store.dart` 仍 `setSetting` 明文写 SQLite，无 secure storage/加密。 |
+| M-5 | 仍 opt-in。`rust/db_client` `ssl` 默认 false，PG `NoTls`/Redis `redis://` 明文默认未改。 |
+| M-6 | 仍命令行。`frpc_manager.dart:447/458` 仍 `-u <token>`/`-f <token>:<id>`。 |
+| L-2 | 仍无校验。`file_ops` 的 `copy_file`/`move_file`/`create_directory`/`rename_entry`/`scan_dir`/`get_file_info` 等仍直接接受任意路径，无 canonicalize 前缀校验。 |
+| L-6（部分） | 仍不全。`file_ops` 仅 4 个入口（delete_to_trash/delete_permanently/restore_from_trash/purge_trash_entry）包 `catch_unwind`，其余 8 个导出 + `downloader` 全部 2 个导出（`download_file`/`download_file_multipart`）仍未包。 |
+| L-8 | 仍全量读。`backup` 仍 `read_to_end` 单文件全量入内存。 |
+
+### 9.4 二次评审结论
+
+- **6 个 High 全部修复**（H-1 含 Hangar 二次补遗、H-2/H-3/H-4/H-5/H-6）。
+- **7 个 Medium 中 4 个已修复**（M-1/M-2/M-4/M-7），**3 个待做**（M-3/M-5/M-6，均已在文档中记录）。
+- **9 个 Low 中 7 个已修复**（L-1/L-3/L-4/L-5/L-7/L-9 + L-6 部分），**2 个待做**（L-2/L-8 + L-6 残留：file_ops 8 个入口 + downloader 2 个入口仍未包 catch_unwind）。
+- **未发现修复引入的新漏洞**；`flutter analyze` 零问题，MCP 鉴权测试 14 用例全过，Hangar 模型用真实 API 响应验证解析正确，Rust 重新编译成功并复制 DLL。
+- **建议优先处理**：M-3 凭据加密存储 → M-5 远程数据库默认 TLS → M-6 FRP token 改配置文件 → L-2 file_ops 路径校验 → L-6 补全 catch_unwind → L-8 流式压缩。
+
+---
+
+*本报告基于 2026-08-17 的代码快照（main @ cafea12 + 工作区未提交改动）。Mimosa 扫描产物已密封，可通过上述 scan ID 与 seal 复核。修复状态章节随 2026-08-17 的修复提交更新；第 9 节为 2026-08-18 针对提交 `fa5a8b3` 的二次评审。*
