@@ -93,7 +93,8 @@ flutter:
   uses-material-design: true
 
   # 内置字体：UI 默认 MiSans（可免费商用，见 assets/fonts/LICENSE-MiSans.txt）；
-  # 终端默认 Fusion Pixel 点阵字体（SIL OFL 1.1，见 assets/fonts/LICENSE-FusionPixel.txt）。
+  # 终端默认 JetBrains Mono（SIL OFL 1.1，见 assets/fonts/LICENSE-JetBrainsMono.txt）；
+  # 另有 Fusion Pixel 点阵字体（SIL OFL 1.1，见 assets/fonts/LICENSE-FusionPixel.txt）。
   # 字体族名称与 lib/services/font_settings.dart 中的常量保持一致。
   fonts:
     - family: MiSans
@@ -103,6 +104,12 @@ flutter:
     - family: FusionPixel
       fonts:
         - asset: assets/fonts/FusionPixel12px.ttf
+    - family: JetBrainsMono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/JetBrainsMono-Bold.ttf
+          weight: 700
 
   # To add assets to your application, add an assets section, like this:
   # assets:

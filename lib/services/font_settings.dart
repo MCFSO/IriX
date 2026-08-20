@@ -1,7 +1,7 @@
 // 字体设置 - 全局持久化
 // 使用 SQLite (settings 表) 存储 UI 字体与终端字体，两者分开管理：
 // - UI 字体：默认 MiSans（内置字体资产，见 pubspec.yaml fonts）
-// - 终端字体：默认 Fusion Pixel 点阵字体（内置字体资产）
+// - 终端字体：默认 JetBrains Mono（内置字体资产）
 // 通过 ChangeNotifier 暴露响应式状态，切换后整个应用立即重建生效。
 
 import 'package:flutter/foundation.dart';
@@ -29,11 +29,14 @@ class FontSettings extends ChangeNotifier {
   /// 内置点阵字体族名称（Fusion Pixel 12px 中文等宽）。
   static const String bundledPixel = 'FusionPixel';
 
+  /// 内置 JetBrains Mono 字体族名称（终端默认）。
+  static const String bundledJetBrainsMono = 'JetBrainsMono';
+
   /// 默认 UI 字体：MiSans（内置）。
   static const String defaultUiFamily = bundledMiSans;
 
-  /// 默认终端字体：点阵字体（内置）。
-  static const String defaultTerminalFamily = bundledPixel;
+  /// 默认终端字体：JetBrains Mono（内置）。
+  static const String defaultTerminalFamily = bundledJetBrainsMono;
 
   /// 终端字体「跟随 UI 字体」的特殊值。
   static const String inheritTerminal = 'inherit';
@@ -111,11 +114,11 @@ class FontSettings extends ChangeNotifier {
 
   /// 可用终端字体选项：(存储值, 显示名)。
   static const List<(String, String)> terminalOptions = [
-    (bundledPixel, '点阵字体 Fusion Pixel（内置，推荐）'),
+    (bundledJetBrainsMono, 'JetBrains Mono（内置，推荐）'),
+    (bundledPixel, '点阵字体 Fusion Pixel（内置）'),
     ('monospace', '系统等宽字体'),
     (inheritTerminal, '跟随 UI 字体'),
     ('Consolas', 'Consolas'),
-    ('JetBrains Mono', 'JetBrains Mono'),
     ('Cascadia Mono', 'Cascadia Mono'),
   ];
 }

@@ -570,7 +570,7 @@ class SettingsDialogState extends State<SettingsDialog> {
           Text('字体', style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 4),
           Text(
-            '终端（控制台 / 日志 / 代码）与其余界面字体分开设置；其余界面默认 MiSans，终端默认点阵字体。',
+            '终端（控制台 / 日志 / 代码）与其余界面字体分开设置；其余界面默认 MiSans，终端默认 JetBrains Mono。',
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 12),

@@ -1,0 +1,20 @@
+JetBrains Mono — SIL Open Font License 1.1
+==========================================
+
+本目录下的 JetBrainsMono-Regular.ttf / JetBrainsMono-Bold.ttf
+为 JetBrains 发布的 JetBrains Mono 等宽字体，依据
+SIL Open Font License 1.1（SIL OFL-1.1）授权。
+
+Copyright 2020 The JetBrains Mono Project Authors
+(https://github.com/JetBrains/JetBrainsMono)
+
+许可要点：
+- 允许自由使用、复制、修改与再分发（含商业用途）。
+- 修改后的字体不得使用原字体名称。
+- 分发时必须附带本许可证副本。
+
+官方仓库：https://github.com/JetBrains/JetBrainsMono
+发布版本：v2.304
+
+完整许可文本（OFL 1.1）请见：
+https://openfontlicense.org/
