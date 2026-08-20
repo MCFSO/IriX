@@ -21,6 +21,7 @@ import '../services/ofrp_service.dart';
 import '../services/oauth_callback_server.dart';
 import '../services/openfrp_provider.dart';
 import '../services/sakurafrp_provider.dart';
+import '../services/font_settings.dart';
 import '../state/app_state.dart';
 import '../utils/apple_widgets.dart';
 
@@ -443,8 +444,8 @@ class _FrpScreenState extends State<FrpScreen> {
                     padding: const EdgeInsets.all(12),
                     child: SelectableText(
                       text,
-                      style: const TextStyle(
-                        fontFamily: 'monospace',
+                      style: TextStyle(
+                        fontFamily: FontSettings.instance.terminalFamily,
                         fontSize: 11.5,
                         height: 1.5,
                       ),
@@ -778,7 +779,7 @@ class _FrpScreenState extends State<FrpScreen> {
                   '连接地址 ${tunnel.remoteAddress}',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.primary,
-                    fontFamily: 'monospace',
+                    fontFamily: FontSettings.instance.terminalFamily,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1090,7 +1091,7 @@ class _CustomLoginDialogState extends State<_CustomLoginDialog> {
               TextField(
                 controller: _serverController,
                 autofocus: true,
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
                 decoration: InputDecoration(
                   labelText: '服务器地址',
                   hintText: 'frps.example.com:7000',
@@ -1103,7 +1104,7 @@ class _CustomLoginDialogState extends State<_CustomLoginDialog> {
               TextField(
                 controller: _tokenController,
                 obscureText: true,
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
                 decoration: const InputDecoration(
                   labelText: '认证 token',
                   hintText: 'frps 配置中的 auth.token（可留空）',
@@ -1369,7 +1370,7 @@ class _SakuraFrpLoginDialogState extends State<_SakuraFrpLoginDialog> {
                 obscureText: _obscureToken,
                 enableSuggestions: false,
                 autocorrect: false,
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 12),
                 decoration: InputDecoration(
                   labelText: '访问密钥 (Access Token)',
                   hintText: '粘贴 SakuraFrp 访问密钥',
@@ -1482,7 +1483,7 @@ class _HayFrpLoginDialogState extends State<_HayFrpLoginDialog> {
               TextField(
                 controller: _usernameController,
                 autofocus: true,
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
                 decoration: InputDecoration(
                   labelText: '用户名或邮箱',
                   border: const OutlineInputBorder(),
@@ -1494,7 +1495,7 @@ class _HayFrpLoginDialogState extends State<_HayFrpLoginDialog> {
               TextField(
                 controller: _passwordController,
                 obscureText: true,
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
                 onSubmitted: (_) => _login(),
                 decoration: const InputDecoration(
                   labelText: '密码',
@@ -1693,7 +1694,7 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
             children: [
               TextField(
                 controller: _nameController,
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
                 decoration: const InputDecoration(
                   labelText: '隧道名称',
                   hintText: '例如 my_server（不支持中文）',
@@ -1729,7 +1730,7 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
               const SizedBox(height: 12),
               TextField(
                 controller: _localAddrController,
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
                 decoration: const InputDecoration(
                   labelText: '本地地址',
                   border: OutlineInputBorder(),
@@ -1762,7 +1763,7 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
                   controller: _localPortController,
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                  style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
                   decoration: const InputDecoration(
                     labelText: '本地端口',
                     hintText: '例如 25565',
@@ -1775,7 +1776,7 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
                 TextField(
                   controller: _localPortController,
                   readOnly: true,
-                  style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                  style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
                   decoration: const InputDecoration(
                     labelText: '本地端口（自动读取）',
                     border: OutlineInputBorder(),
@@ -1789,7 +1790,7 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
                   controller: _remotePortController,
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                  style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
                   decoration: const InputDecoration(
                     labelText: '远程端口',
                     hintText: '开放给外部的端口',
@@ -1801,7 +1802,7 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
                 const SizedBox(height: 12),
                 TextField(
                   controller: _domainController,
-                  style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                  style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
                   decoration: const InputDecoration(
                     labelText: '绑定域名',
                     border: OutlineInputBorder(),

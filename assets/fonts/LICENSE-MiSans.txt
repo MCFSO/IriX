@@ -1,0 +1,15 @@
+MiSans 字体许可说明
+====================
+
+本目录下的 MiSans-Regular.ttf 为小米公司（Xiaomi）发布的 MiSans 字体。
+
+MiSans 官方许可（小米字体许可协议）允许个人与商业用户免费使用、
+复制、分发该字体，可用于应用程序内嵌（打包）与商业产品发布。
+
+来源：
+- 字体文件镜像：https://github.com/whjkd2005/MiSans-Fonts
+- 官方 MiSans 主页：https://hyperos.mi.com/font/
+- 官方许可说明：https://hyperos.mi.com/font/（页面底部「MiSans 字体许可协议」）
+
+使用范围：本应用仅将 MiSans 作为界面默认字体（font family: MiSans）
+随应用打包分发，未对字体文件本身进行修改。

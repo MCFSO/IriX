@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 
 import '../services/config_annotation_service.dart';
 import '../services/config_service.dart';
+import '../services/font_settings.dart';
 import '../utils/apple_widgets.dart';
 import '../utils/code_highlight.dart';
 
@@ -542,8 +543,8 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
                       padding: const EdgeInsets.only(right: 8),
                       child: Text(
                         '${index + 1}',
-                        style: const TextStyle(
-                          fontFamily: 'monospace',
+                        style: TextStyle(
+                          fontFamily: FontSettings.instance.terminalFamily,
                           fontSize: 13,
                           color: Color(0xFF6A737D),
                           height: 1.5,
@@ -567,8 +568,8 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
                 controller: _textController,
                 maxLines: null,
                 expands: true,
-                style: const TextStyle(
-                  fontFamily: 'monospace',
+                style: TextStyle(
+                  fontFamily: FontSettings.instance.terminalFamily,
                   fontSize: 13,
                   height: 1.5,
                 ),

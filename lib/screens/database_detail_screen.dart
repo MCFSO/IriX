@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 import '../services/db_page_settings.dart';
 import '../services/remote_db_service.dart';
+import '../services/font_settings.dart';
 import '../utils/apple_widgets.dart';
 
 /// 数据库连接详情页面，浏览远程数据库内容。
@@ -732,8 +733,8 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
             ),
             title: Text(
               user.username,
-              style: const TextStyle(
-                fontFamily: 'monospace',
+              style: TextStyle(
+                fontFamily: FontSettings.instance.terminalFamily,
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
               ),
@@ -746,7 +747,7 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
                     '@${user.host}',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
-                      fontFamily: 'monospace',
+                      fontFamily: FontSettings.instance.terminalFamily,
                     ),
                   ),
             trailing: IconButton(
@@ -1156,7 +1157,7 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
         leading: Icon(Icons.key, color: Theme.of(context).colorScheme.primary),
         title: Text(
           key,
-          style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+          style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1579,7 +1580,7 @@ class _SqlDialogState extends State<_SqlDialog> {
             TextField(
               controller: _sqlController,
               maxLines: 6,
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+              style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
               onChanged: (_) => setState(() {}),
               decoration: const InputDecoration(
                 hintText: 'SELECT * FROM table_name WHERE ...',
@@ -1745,7 +1746,7 @@ class _RedisValueDialogState extends State<_RedisValueDialog> {
     return AlertDialog(
       title: Text(
         widget.keyName,
-        style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
+        style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 14),
         overflow: TextOverflow.ellipsis,
       ),
       content: SizedBox(width: 480, height: 320, child: _buildContent(theme)),
@@ -1786,8 +1787,8 @@ class _RedisValueDialogState extends State<_RedisValueDialog> {
       child: SingleChildScrollView(
         child: Text(
           _value ?? '(空)',
-          style: const TextStyle(
-            fontFamily: 'monospace',
+          style: TextStyle(
+            fontFamily: FontSettings.instance.terminalFamily,
             fontSize: 13,
             height: 1.5,
           ),
@@ -1858,7 +1859,7 @@ class _RedisAddKeyDialogState extends State<_RedisAddKeyDialog> {
           TextField(
             controller: _keyController,
             autofocus: true,
-            style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+            style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
             decoration: const InputDecoration(
               labelText: 'Key 名称',
               border: OutlineInputBorder(),
@@ -1869,7 +1870,7 @@ class _RedisAddKeyDialogState extends State<_RedisAddKeyDialog> {
           TextField(
             controller: _valueController,
             maxLines: 3,
-            style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+            style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
             decoration: const InputDecoration(
               labelText: '值',
               border: OutlineInputBorder(),
@@ -1973,7 +1974,7 @@ class _CreateUserDialogState extends State<_CreateUserDialog> {
               TextField(
                 controller: _usernameController,
                 autofocus: true,
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
                 decoration: const InputDecoration(
                   labelText: '用户名',
                   border: OutlineInputBorder(),
@@ -1994,7 +1995,7 @@ class _CreateUserDialogState extends State<_CreateUserDialog> {
                 const SizedBox(height: 12),
                 TextField(
                   controller: _hostController,
-                  style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                  style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
                   decoration: const InputDecoration(
                     labelText: '登录主机',
                     hintText: '例如 % 或 localhost',
@@ -2426,8 +2427,8 @@ class _DbUserManagementDialogState extends State<_DbUserManagementDialog> {
           ),
           title: Text(
             user.username,
-            style: const TextStyle(
-              fontFamily: 'monospace',
+            style: TextStyle(
+              fontFamily: FontSettings.instance.terminalFamily,
               fontSize: 13,
               fontWeight: FontWeight.w500,
             ),
@@ -2438,7 +2439,7 @@ class _DbUserManagementDialogState extends State<_DbUserManagementDialog> {
                   '@${user.host}',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
-                    fontFamily: 'monospace',
+                    fontFamily: FontSettings.instance.terminalFamily,
                   ),
                 ),
           trailing: IconButton(

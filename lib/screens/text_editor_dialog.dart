@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
+import '../services/font_settings.dart';
 import '../utils/code_highlight.dart';
 
 class TextEditorDialog extends StatefulWidget {
@@ -147,8 +148,8 @@ class _TextEditorDialogState extends State<TextEditorDialog> {
                   padding: const EdgeInsets.only(right: 8),
                   child: Text(
                     '${i + 1}',
-                    style: const TextStyle(
-                      fontFamily: 'monospace',
+                    style: TextStyle(
+                      fontFamily: FontSettings.instance.terminalFamily,
                       fontSize: 13,
                       color: Color(0xFF6A737D),
                       height: 1.5,
@@ -172,8 +173,8 @@ class _TextEditorDialogState extends State<TextEditorDialog> {
               maxLines: null,
               expands: true,
               scrollController: _editorScroll,
-              style: const TextStyle(
-                fontFamily: 'monospace',
+              style: TextStyle(
+                fontFamily: FontSettings.instance.terminalFamily,
                 fontSize: 13,
                 height: 1.5,
               ),

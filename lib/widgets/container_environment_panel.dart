@@ -13,6 +13,7 @@ import 'package:flutter/material.dart' hide ImageInfo;
 import 'package:flutter/services.dart';
 
 import '../services/container/container_backend.dart';
+import '../services/font_settings.dart';
 import '../utils/apple_widgets.dart';
 
 /// 容器环境面板。
@@ -301,7 +302,7 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
                 ),
                 child: SelectableText(
                   path,
-                  style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                  style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
                 ),
               ),
             ],
@@ -2483,7 +2484,7 @@ class _SetupCardState extends State<_SetupCard> {
                   _result!,
                   style: TextStyle(
                     fontSize: 12,
-                    fontFamily: 'monospace',
+                    fontFamily: FontSettings.instance.terminalFamily,
                     color: _resultOk ? Colors.green : Colors.red,
                   ),
                 ),
@@ -2586,7 +2587,7 @@ class _BuildImageDialogState extends State<_BuildImageDialog> {
             TextField(
               controller: _dockerfileController,
               maxLines: 12,
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+              style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 12),
               decoration: const InputDecoration(
                 labelText: 'Dockerfile',
                 alignLabelWithHint: true,
@@ -2731,10 +2732,10 @@ class _BuildProgressDialogState extends State<_BuildProgressDialog> {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: _log.isEmpty
-                    ? const Text(
+                    ? Text(
                         '等待构建输出...',
                         style: TextStyle(
-                          fontFamily: 'monospace',
+                          fontFamily: FontSettings.instance.terminalFamily,
                           fontSize: 12,
                           color: Colors.grey,
                         ),
@@ -2743,8 +2744,8 @@ class _BuildProgressDialogState extends State<_BuildProgressDialog> {
                         itemCount: _log.length,
                         itemBuilder: (context, index) => Text(
                           _log[index],
-                          style: const TextStyle(
-                            fontFamily: 'monospace',
+                          style: TextStyle(
+                            fontFamily: FontSettings.instance.terminalFamily,
                             fontSize: 12,
                           ),
                         ),

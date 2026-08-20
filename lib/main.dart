@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'screens/home_screen.dart';
 import 'services/config_annotation_service.dart';
 import 'services/database_manager.dart';
+import 'services/font_settings.dart';
 import 'state/app_state.dart';
 import 'state/cluster_state.dart';
 import 'state/node_state.dart';
@@ -16,6 +17,8 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await DatabaseManager.instance.init();
   await ConfigAnnotationService.instance.init();
+  // 字体设置（UI / 终端分开管理）在构建 UI 前加载。
+  await FontSettings.instance.load();
   runApp(const MyApp());
 }
 
@@ -54,18 +57,25 @@ class MyApp extends StatelessWidget {
             return state;
           },
         ),
+        // 字体设置（UI / 终端分开管理）。修改后通过 Consumer 重建整个
+        // MaterialApp，使字体变更立即生效。
+        ChangeNotifierProvider(create: (_) => FontSettings.instance),
       ],
-      child: MaterialApp(
-        title: 'IriX',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.green,
-            brightness: Brightness.dark,
+      child: Consumer<FontSettings>(
+        builder: (context, fonts, _) => MaterialApp(
+          title: 'IriX',
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: Colors.green,
+              brightness: Brightness.dark,
+            ),
+            useMaterial3: true,
+            // 全局 UI 字体（默认内置 MiSans；空字符串 = 系统默认）。
+            fontFamily: fonts.uiFontFamily,
           ),
-          useMaterial3: true,
+          home: const HomeScreen(),
         ),
-        home: const HomeScreen(),
       ),
     );
   }

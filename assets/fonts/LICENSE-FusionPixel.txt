@@ -1,0 +1,19 @@
+Fusion Pixel Font — SIL Open Font License 1.1
+==============================================
+
+本目录下的 FusionPixel12px.ttf（缝合像素字体 / fusion-pixel-font，
+12px 中文等宽点阵字体）由 TakWolf 制作，依据
+SIL Open Font License 1.1（SIL OFL-1.1）授权。
+
+Copyright (c) 2022, TakWolf (https://github.com/TakWolf)
+
+许可要点：
+- 允许自由使用、复制、修改与再分发（含商业用途）。
+- 修改后的字体不得使用原字体名称。
+- 分发时必须附带本许可证副本。
+
+官方仓库：https://github.com/TakWolf/fusion-pixel-font
+发布版本：v2026.08.11（12px monospaced）
+
+完整许可文本（OFL 1.1）请见：
+https://openfontlicense.org/

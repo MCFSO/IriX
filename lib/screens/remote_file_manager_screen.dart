@@ -13,6 +13,7 @@ import 'package:path/path.dart' as p;
 
 import '../models/remote.dart';
 import '../services/node_api_client.dart';
+import '../services/font_settings.dart';
 import '../utils/apple_widgets.dart';
 
 /// 远程文件管理器。
@@ -262,7 +263,7 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
             maxLines: null,
             expands: true,
             textAlignVertical: TextAlignVertical.top,
-            style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+            style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 12),
             decoration: const InputDecoration(border: OutlineInputBorder()),
           ),
         ),

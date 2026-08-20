@@ -22,6 +22,7 @@ import '../services/ai_settings.dart';
 import '../services/knowledge_service.dart';
 import '../services/log_parser.dart';
 import '../services/mcp_server.dart';
+import '../services/font_settings.dart';
 import '../state/app_state.dart';
 import '../utils/apple_widgets.dart';
 
@@ -530,12 +531,12 @@ class _AiChatPanelState extends State<AiChatPanel> {
       code:
           base.code?.copyWith(
             backgroundColor: codeColor,
-            fontFamily: 'monospace',
+            fontFamily: FontSettings.instance.terminalFamily,
             fontSize: 12.5,
           ) ??
           TextStyle(
             backgroundColor: codeColor,
-            fontFamily: 'monospace',
+            fontFamily: FontSettings.instance.terminalFamily,
             fontSize: 12.5,
           ),
       p: base.p?.copyWith(height: 1.5) ?? const TextStyle(height: 1.5),
@@ -1098,8 +1099,8 @@ class _ModelsDialogState extends State<_ModelsDialog> {
                         ),
                         title: Text(
                           model.name,
-                          style: const TextStyle(
-                            fontFamily: 'monospace',
+                          style: TextStyle(
+                            fontFamily: FontSettings.instance.terminalFamily,
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
                           ),
@@ -1213,8 +1214,8 @@ class _ModelsDialogState extends State<_ModelsDialog> {
                         ),
                         title: Text(
                           doc.title,
-                          style: const TextStyle(
-                            fontFamily: 'monospace',
+                          style: TextStyle(
+                            fontFamily: FontSettings.instance.terminalFamily,
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
                           ),
@@ -1326,7 +1327,7 @@ class _ModelsDialogState extends State<_ModelsDialog> {
                   '点击复制按钮可直接复制完整配置。',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.outline,
-                    fontFamily: 'monospace',
+                    fontFamily: FontSettings.instance.terminalFamily,
                     fontSize: 11,
                   ),
                 ),
@@ -1488,8 +1489,8 @@ class _ServerLogPickerDialogState extends State<_ServerLogPickerDialog> {
                     ),
                     title: Text(
                       name,
-                      style: const TextStyle(
-                        fontFamily: 'monospace',
+                      style: TextStyle(
+                        fontFamily: FontSettings.instance.terminalFamily,
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
                       ),
@@ -1617,7 +1618,7 @@ class _ModelEditDialogState extends State<_ModelEditDialog> {
               TextField(
                 controller: _nameController,
                 autofocus: !_isEdit,
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
                 decoration: InputDecoration(
                   labelText: '模型名称',
                   hintText: 'deepseek-chat',
@@ -1629,7 +1630,7 @@ class _ModelEditDialogState extends State<_ModelEditDialog> {
               const SizedBox(height: 12),
               TextField(
                 controller: _baseUrlController,
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
                 decoration: InputDecoration(
                   labelText: '服务地址 (Base URL)',
                   hintText: 'https://api.deepseek.com/v1',
@@ -1644,7 +1645,7 @@ class _ModelEditDialogState extends State<_ModelEditDialog> {
                 obscureText: _obscureKey,
                 enableSuggestions: false,
                 autocorrect: false,
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
                 decoration: InputDecoration(
                   labelText: 'API 密钥',
                   hintText: '本地 Ollama 可留空',
@@ -1665,7 +1666,7 @@ class _ModelEditDialogState extends State<_ModelEditDialog> {
                 controller: _contextController,
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
                 decoration: InputDecoration(
                   labelText: '上下文窗口（token）',
                   hintText: '例如 8192 / 32768 / 65536',
@@ -1677,7 +1678,7 @@ class _ModelEditDialogState extends State<_ModelEditDialog> {
               const SizedBox(height: 12),
               TextField(
                 controller: _embeddingController,
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
                 decoration: const InputDecoration(
                   labelText: 'Embedding 模型（可选，知识库用）',
                   hintText: '如 text-embedding-3-small；留空则用模型本身',

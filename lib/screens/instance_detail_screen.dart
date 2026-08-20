@@ -14,6 +14,7 @@ import '../services/ai_assistant_service.dart';
 import '../services/backup_ffi.dart';
 import '../services/backup_settings.dart';
 import '../services/background_tasks.dart';
+import '../services/font_settings.dart';
 import '../state/app_state.dart';
 import '../utils/apple_widgets.dart';
 import '../widgets/container_environment_panel.dart';
@@ -337,7 +338,7 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
                 return Text(
                   _logs[index],
                   style: TextStyle(
-                    fontFamily: 'monospace',
+                    fontFamily: FontSettings.instance.terminalFamily,
                     fontSize: 13,
                     color: theme.colorScheme.onSurface.withValues(alpha: 0.9),
                   ),

@@ -11,6 +11,7 @@ import '../services/cluster_monitor.dart';
 import '../services/database_manager.dart';
 import '../services/db_page_settings.dart';
 import '../services/download_settings.dart';
+import '../services/font_settings.dart';
 import '../services/management_mode_settings.dart';
 import '../services/mcp_server.dart';
 import '../state/app_state.dart';
@@ -438,7 +439,7 @@ Future<void> showSettingsDialog(BuildContext context) {
   return showAppDialog<void>(context, (_) => const SettingsDialog());
 }
 
-/// 设置对话框 — 管理模式、下载线程数、数据库每页行数。
+/// 设置对话框 — 管理模式、下载线程数、数据库每页行数、字体。
 ///
 /// 修改即时生效并持久化到 SQLite `settings` 表。
 class SettingsDialog extends StatefulWidget {
@@ -452,6 +453,8 @@ class SettingsDialogState extends State<SettingsDialog> {
   late double _threads;
   late double _pageSize;
   late bool _multi;
+  late String _uiFont;
+  late String _terminalFont;
   bool _loading = true;
 
   @override
@@ -461,6 +464,9 @@ class SettingsDialogState extends State<SettingsDialog> {
     _threads = state.downloadThreads.toDouble();
     _pageSize = DbPageSettings.pageSize.toDouble();
     _multi = context.read<ClusterState>().mode == ManagementMode.multi;
+    final fonts = FontSettings.instance;
+    _uiFont = fonts.uiFamily;
+    _terminalFont = fonts.terminalFamily;
     _loading = false;
   }
 
@@ -557,6 +563,55 @@ class SettingsDialogState extends State<SettingsDialog> {
           const SizedBox(height: 4),
           Text(
             '浏览数据库表数据时每页显示的行数。',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const Divider(height: 24),
+          // 字体（UI 与终端分开管理）
+          Text('字体', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 4),
+          Text(
+            '终端（控制台 / 日志 / 代码）与其余界面字体分开设置；其余界面默认 MiSans，终端默认点阵字体。',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            initialValue: _uiFont,
+            decoration: const InputDecoration(
+              labelText: '界面字体',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            items: [
+              for (final (value, label) in FontSettings.uiOptions)
+                DropdownMenuItem(value: value, child: Text(label)),
+            ],
+            onChanged: (v) {
+              if (v == null) return;
+              setState(() => _uiFont = v);
+              FontSettings.instance.setUiFamily(v);
+            },
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            initialValue: _terminalFont,
+            decoration: const InputDecoration(
+              labelText: '终端字体',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            items: [
+              for (final (value, label) in FontSettings.terminalOptions)
+                DropdownMenuItem(value: value, child: Text(label)),
+            ],
+            onChanged: (v) {
+              if (v == null) return;
+              setState(() => _terminalFont = v);
+              FontSettings.instance.setTerminalFamily(v);
+            },
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '未安装的系统字体（如 JetBrains Mono）会自动回退到默认字体。',
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
