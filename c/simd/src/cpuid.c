@@ -2,6 +2,7 @@
  * CPU feature detection via CPUID. Compile-time portable (MSVC / GCC / Clang).
  */
 #include "simd.h"
+#include <stdio.h>   /* snprintf for caps_json */
 
 #if defined(_MSC_VER)
 #include <intrin.h>

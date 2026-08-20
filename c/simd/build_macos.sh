@@ -20,7 +20,7 @@ $CC "${common[@]}" -arch x86_64 -mavx2 -c src/base64_avx2.c     -o "$OUT/x86_64/
 $CC "${common[@]}" -arch x86_64 -c src/base64_decode_scalar.c   -o "$OUT/x86_64/base64_decode_scalar.o"
 $CC "${common[@]}" -arch x86_64 -mssse3 -c src/base64_decode_ssse3.c -o "$OUT/x86_64/base64_decode_ssse3.o"
 $CC "${common[@]}" -arch x86_64 -mavx2 -c src/base64_decode_avx2.c   -o "$OUT/x86_64/base64_decode_avx2.o"
-$CC "${common[@]}" -arch x86_64 -mpclmul -c src/crc32.c          -o "$OUT/x86_64/crc32.o"
+$CC "${common[@]}" -arch x86_64 -mssse3 -mpclmul -c src/crc32.c -o "$OUT/x86_64/crc32.o"
 $CC "${common[@]}" -arch x86_64 -msse4.2 -c src/crc32c.c         -o "$OUT/x86_64/crc32c.o"
 $CC "${common[@]}" -arch x86_64 -c src/simd_dll.c               -o "$OUT/x86_64/simd_dll.o"
 $CC -dynamiclib -arch x86_64 -o "$OUT/x86_64/libxmc_simd.dylib" \

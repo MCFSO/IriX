@@ -18,7 +18,7 @@ $CC -O2 -fPIC -mavx2 -c src/base64_avx2.c  -o "$OUT/base64_avx2.o"
 $CC -O2 -fPIC -c src/base64_decode_scalar.c -o "$OUT/base64_decode_scalar.o"
 $CC -O2 -fPIC -mssse3 -c src/base64_decode_ssse3.c -o "$OUT/base64_decode_ssse3.o"
 $CC -O2 -fPIC -mavx2 -c src/base64_decode_avx2.c   -o "$OUT/base64_decode_avx2.o"
-$CC -O2 -fPIC -mpclmul -c src/crc32.c      -o "$OUT/crc32.o"
+$CC -O2 -fPIC -mssse3 -mpclmul -c src/crc32.c -o "$OUT/crc32.o"
 $CC -O2 -fPIC -msse4.2 -c src/crc32c.c     -o "$OUT/crc32c.o"
 $CC -O2 -fPIC -c src/simd_dll.c            -o "$OUT/simd_dll.o"
 
