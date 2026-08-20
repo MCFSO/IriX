@@ -13,11 +13,13 @@ import '../models/node.dart';
 import '../models/remote.dart';
 import '../services/container/node_container_backend.dart';
 import '../services/node_api_client.dart';
+import '../services/font_settings.dart';
 import '../utils/apple_widgets.dart';
 import '../utils/docker_visibility.dart';
 import '../widgets/container_environment_panel.dart';
 import 'node_detail_screen.dart' show remoteStatusChip;
 import 'remote_file_manager_screen.dart';
+import 'remote_plugins_backup_tabs.dart';
 
 /// 远程实例详情页。
 class RemoteInstanceDetailScreen extends StatefulWidget {
@@ -262,14 +264,18 @@ class _RemoteInstanceDetailScreenState
             ),
           Expanded(
             child: DefaultTabController(
-              length: 4,
+              length: 6,
               child: Column(
                 children: [
                   TabBar(
+                    isScrollable: true,
+                    tabAlignment: TabAlignment.start,
                     tabs: const [
                       Tab(icon: Icon(Icons.terminal), text: '控制台'),
                       Tab(icon: Icon(Icons.settings_outlined), text: '配置'),
                       Tab(icon: Icon(Icons.folder), text: '文件'),
+                      Tab(icon: Icon(Icons.extension), text: '插件/Mod'),
+                      Tab(icon: Icon(Icons.backup), text: '备份'),
                       Tab(icon: Icon(Icons.inventory_2), text: '容器'),
                     ],
                   ),
@@ -283,6 +289,17 @@ class _RemoteInstanceDetailScreenState
                           daemonId: widget.daemonId,
                           initialUuid: widget.initialInstance.uuid,
                           embedded: true,
+                        ),
+                        RemotePluginsTab(
+                          client: widget.client,
+                          daemonId: widget.daemonId,
+                          uuid: widget.initialInstance.uuid,
+                        ),
+                        RemoteBackupTab(
+                          client: widget.client,
+                          daemonId: widget.daemonId,
+                          uuid: widget.initialInstance.uuid,
+                          nickname: _instance.config.nickname,
                         ),
                         _buildContainerTab(),
                       ],
@@ -405,8 +422,8 @@ class _RemoteInstanceDetailScreenState
               controller: _scrollController,
               child: SelectableText(
                 _log.isEmpty ? '（暂无日志输出）' : _log,
-                style: const TextStyle(
-                  fontFamily: 'monospace',
+                style: TextStyle(
+                  fontFamily: FontSettings.instance.terminalFamily,
                   fontSize: 12,
                   color: Colors.greenAccent,
                 ),

@@ -18,6 +18,7 @@ import 'package:path/path.dart' as p;
 
 import '../models/node.dart';
 import '../models/remote.dart';
+import '../services/downloader.dart';
 import '../services/http_ffi.dart';
 
 /// 节点 API 异常。
@@ -124,12 +125,15 @@ class NodeApiClient {
   }
 
   /// 发送请求并解析统一响应体，返回 data 字段。
+  ///
+  /// [timeout] 覆盖默认请求超时（大文件压缩 / 传输等长耗时操作使用）。
   Future<dynamic> _request(
     String method,
     String path, {
     Map<String, String>? query,
     Object? body,
     bool retryOnce = true,
+    Duration? timeout,
   }) async {
     final uri = _uri(path, query);
     final base = body != null
@@ -143,7 +147,7 @@ class NodeApiClient {
         url: uri.toString(),
         headers: headers,
         body: body == null ? null : utf8.encode(jsonEncode(body)),
-        timeout: timeout,
+        timeout: timeout ?? this.timeout,
       );
     } on HttpFfiException catch (e) {
       if (e.message.contains('超时')) {
@@ -448,26 +452,34 @@ class NodeApiClient {
   }
 
   /// 压缩（POST /api/files/compress, type=1）。
+  ///
+  /// [source] 为要生成的压缩包路径（实例内绝对路径），[targets] 为被压缩
+  /// 的路径列表。压缩大目录可能耗时较长，可通过 [timeout] 放大超时。
   Future<void> compress({
     required String daemonId,
     required String uuid,
     required String source,
     required List<String> targets,
+    Duration? timeout,
   }) async {
     await _request(
       'POST',
       '/api/files/compress',
       query: {'daemonId': daemonId, 'uuid': uuid},
       body: {'type': 1, 'code': 'utf-8', 'source': source, 'targets': targets},
+      timeout: timeout ?? this.timeout,
     );
   }
 
   /// 解压（POST /api/files/compress, type=2）。
+  ///
+  /// 解压大压缩包可能耗时较长，可通过 [timeout] 放大超时。
   Future<void> unzip({
     required String daemonId,
     required String uuid,
     required String source,
     required String dest,
+    Duration? timeout,
   }) async {
     await _request(
       'POST',
@@ -479,6 +491,7 @@ class NodeApiClient {
         'source': source,
         'targets': [dest],
       },
+      timeout: timeout ?? this.timeout,
     );
   }
 
@@ -515,6 +528,7 @@ class NodeApiClient {
     required String daemonId,
     required String uuid,
     required String fileName,
+    Duration? timeout,
   }) async {
     final data =
         await _request(
@@ -525,6 +539,7 @@ class NodeApiClient {
                 'uuid': uuid,
                 'file_name': fileName,
               },
+              timeout: timeout ?? this.timeout,
             )
             as Map<String, dynamic>?;
     return DownloadTicket(
@@ -539,6 +554,7 @@ class NodeApiClient {
     required String daemonId,
     required String uuid,
     required String uploadDir,
+    Duration? timeout,
   }) async {
     final data =
         await _request(
@@ -549,6 +565,7 @@ class NodeApiClient {
                 'uuid': uuid,
                 'upload_dir': uploadDir,
               },
+              timeout: timeout ?? this.timeout,
             )
             as Map<String, dynamic>?;
     return UploadTicket(
@@ -559,15 +576,37 @@ class NodeApiClient {
   }
 
   /// 直连下载文件字节流（GET /download/{password}/...）。
-  Future<List<int>> directDownload(DownloadTicket ticket) async {
+  ///
+  /// 注意：大文件请改用 [directDownloadToFile]（Rust 下载器流式写盘）。
+  Future<List<int>> directDownload(
+    DownloadTicket ticket, {
+    Duration? timeout,
+  }) async {
     final resp = await HttpFfiService.instance.get(
       ticket.url,
-      timeout: timeout,
+      timeout: timeout ?? this.timeout,
     );
     if (resp.statusCode >= 400) {
       throw NodeApiException(resp.statusCode, '下载失败（HTTP ${resp.statusCode}）');
     }
     return resp.bodyBytes;
+  }
+
+  /// 直连下载并流式写入本地文件（复用 Rust 下载器，适合大文件）。
+  ///
+  /// [onProgress] 下载进度回调（字节）；返回本地文件路径。
+  Future<String> directDownloadToFile(
+    DownloadTicket ticket,
+    String localPath,
+    void Function(int downloaded, int total) onProgress, {
+    int? threads,
+  }) async {
+    return Downloader().downloadFile(
+      ticket.url,
+      localPath,
+      (p) => onProgress(p.downloadedBytes, p.totalBytes),
+      threads: threads,
+    );
   }
 
   /// 直连上传文件（POST /upload/{password}，multipart 字段名 file）。
@@ -577,6 +616,7 @@ class NodeApiClient {
   Future<void> directUpload({
     required UploadTicket ticket,
     required String localPath,
+    Duration? timeout,
   }) async {
     final file = File(localPath);
     if (!await file.exists()) {
@@ -599,7 +639,7 @@ class NodeApiClient {
       ticket.url,
       headers: {'Content-Type': 'multipart/form-data; boundary=$boundary'},
       body: body.takeBytes(),
-      timeout: timeout,
+      timeout: timeout ?? this.timeout,
     );
     if (resp.statusCode >= 400) {
       throw NodeApiException(resp.statusCode, '上传失败（HTTP ${resp.statusCode}）');
