@@ -1,15 +1,17 @@
 // Hangar 项目详情页面
-// 展示项目图标、描述、版本列表，支持下载到选中实例的 plugins/ 目录
+// 展示项目图标、描述、版本列表，支持安装到本地实例或节点实例的
+// plugins/ 目录
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
 import '../models/hangar.dart';
-import '../models/server_instance.dart';
 import '../services/downloader.dart';
 import '../services/hangar_api_service.dart';
 import '../state/app_state.dart';
-import '../utils/apple_widgets.dart';
+import '../utils/install_target_picker.dart';
 
 /// Hangar 项目详情页面。
 class HangarDetailScreen extends StatefulWidget {
@@ -69,49 +71,8 @@ class _HangarDetailScreenState extends State<HangarDetailScreen> {
     }
   }
 
-  /// 选择一个服务器实例，返回 null 表示用户取消。
-  Future<ServerInstance?> _pickInstance() async {
-    final state = context.read<AppState>();
-    final instances = state.instances;
-    if (instances.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('请先创建一个服务器实例')));
-      }
-      return null;
-    }
-    if (state.selected != null) return state.selected;
-
-    if (!mounted) return null;
-    return showAppDialog<ServerInstance>(context, (ctx) {
-      return AlertDialog(
-        title: const Text('选择目标实例'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: instances.length,
-            itemBuilder: (context, index) {
-              final instance = instances[index];
-              return ListTile(
-                leading: const Icon(Icons.storage),
-                title: Text(instance.name),
-                subtitle: Text(instance.rootPath),
-                onTap: () => Navigator.pop(ctx, instance),
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-        ],
-      );
-    });
-  }
+  /// 选择一个安装目标（本地实例 / 节点实例），返回 null 表示用户取消。
+  Future<InstallTarget?> _pickTarget() => pickInstallTarget(context);
 
   Future<void> _downloadPlatform(
     HangarVersion version,
@@ -121,10 +82,9 @@ class _HangarDetailScreenState extends State<HangarDetailScreen> {
     if (project == null) return;
 
     final threads = context.read<AppState>().downloadThreads;
-    final instance = await _pickInstance();
-    if (instance == null) return;
+    final target = await _pickTarget();
+    if (target == null) return;
 
-    final targetDir = p.join(instance.rootPath, 'plugins');
     // M-2：文件名由远端 API 的 slug/version.name 拼接而来，落盘前净化，
     // 拒绝含路径分隔符/../ 的名称，防止越出实例目录写任意路径。
     final rawName = '${project.slug}-${version.name}-${pd.platform}.jar';
@@ -140,41 +100,83 @@ class _HangarDetailScreenState extends State<HangarDetailScreen> {
       }
       return;
     }
-    final targetPath = p.join(targetDir, filename);
     final progressKey = '${version.name}:${pd.platform}';
 
     setState(() => _downloadProgress[progressKey] = 0.0);
 
     try {
-      await _downloader.downloadFile(
-        pd.downloadUrl,
-        targetPath,
-        (progress) {
+      if (target.isRemote) {
+        // 下载到临时目录后上传到节点实例 plugins/ 目录。
+        final tempDir = await Directory.systemTemp.createTemp('irix_install_');
+        final tempPath = p.join(tempDir.path, filename);
+        try {
+          await _downloader.downloadFile(
+            pd.downloadUrl,
+            tempPath,
+            (progress) {
+              if (mounted) {
+                setState(() {
+                  _downloadProgress[progressKey] = progress.percent;
+                });
+              }
+            },
+            threads: threads,
+            // H-1：Hangar 官方响应含 fileInfo.sha256Hash，下载后校验完整性。
+            sha256: pd.sha256,
+          );
+          await installFileToRemote(
+            target: target,
+            localPath: tempPath,
+            subdir: 'plugins',
+          );
           if (mounted) {
-            setState(() {
-              _downloadProgress[progressKey] = progress.percent;
-            });
+            setState(() => _downloadProgress.remove(progressKey));
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('已安装到节点 ${target.displayName} 的 plugins/'),
+              ),
+            );
           }
-        },
-        threads: threads,
-        // H-1：Hangar 官方响应含 fileInfo.sha256Hash，下载后校验完整性。
-        sha256: pd.sha256,
-      );
-      if (mounted) {
-        setState(() => _downloadProgress.remove(progressKey));
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('已下载到 plugins/$filename'),
-            action: SnackBarAction(
-              label: '查看路径',
-              onPressed: () {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text('目录: $targetDir')));
-              },
-            ),
-          ),
+        } finally {
+          try {
+            await tempDir.delete(recursive: true);
+          } catch (_) {
+            // 忽略临时目录清理失败。
+          }
+        }
+      } else {
+        final targetDir = p.join(target.localInstance!.rootPath, 'plugins');
+        final targetPath = p.join(targetDir, filename);
+        await _downloader.downloadFile(
+          pd.downloadUrl,
+          targetPath,
+          (progress) {
+            if (mounted) {
+              setState(() {
+                _downloadProgress[progressKey] = progress.percent;
+              });
+            }
+          },
+          threads: threads,
+          // H-1：Hangar 官方响应含 fileInfo.sha256Hash，下载后校验完整性。
+          sha256: pd.sha256,
         );
+        if (mounted) {
+          setState(() => _downloadProgress.remove(progressKey));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('已下载到 plugins/$filename'),
+              action: SnackBarAction(
+                label: '查看路径',
+                onPressed: () {
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text('目录: $targetDir')));
+                },
+              ),
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {

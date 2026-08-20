@@ -1,5 +1,8 @@
 // Mod/插件详情页面
-// 展示项目图标、描述、版本列表，支持下载到选中实例的 mods/ 或 plugins/ 目录
+// 展示项目图标、描述、版本列表，支持安装到本地实例或节点实例的
+// mods/ 或 plugins/ 目录
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
@@ -9,7 +12,7 @@ import '../models/server_instance.dart';
 import '../services/downloader.dart';
 import '../services/modrinth_api_service.dart';
 import '../state/app_state.dart';
-import '../utils/apple_widgets.dart';
+import '../utils/install_target_picker.dart';
 
 /// Mod 详情页面
 class ModDetailScreen extends StatefulWidget {
@@ -83,50 +86,8 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
     };
   }
 
-  /// 选择一个服务器实例，返回 null 表示用户取消
-  Future<ServerInstance?> _pickInstance() async {
-    final state = context.read<AppState>();
-    final instances = state.instances;
-    if (instances.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('请先创建一个服务器实例')));
-      }
-      return null;
-    }
-    // 若有选中的实例直接使用，否则让用户选择
-    if (state.selected != null) return state.selected;
-
-    if (!mounted) return null;
-    return showAppDialog<ServerInstance>(context, (ctx) {
-      return AlertDialog(
-        title: const Text('选择目标实例'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: instances.length,
-            itemBuilder: (context, index) {
-              final instance = instances[index];
-              return ListTile(
-                leading: const Icon(Icons.storage),
-                title: Text(instance.name),
-                subtitle: Text(instance.rootPath),
-                onTap: () => Navigator.pop(ctx, instance),
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-        ],
-      );
-    });
-  }
+  /// 选择一个安装目标（本地实例 / 节点实例），返回 null 表示用户取消。
+  Future<InstallTarget?> _pickTarget() => pickInstallTarget(context);
 
   Future<void> _downloadVersion(ModrinthVersion version) async {
     final project = _project;
@@ -142,11 +103,10 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
       orElse: () => version.files.first,
     );
 
-    final instance = await _pickInstance();
-    if (instance == null) return;
+    final target = await _pickTarget();
+    if (target == null) return;
 
     final subdir = _targetSubdir(project.projectType);
-    final targetDir = p.join(instance.rootPath, subdir);
     // M-2：文件名来自远端 API（Modrinth），落盘前净化——只取 basename，
     // 拒绝含路径分隔符/../ 的文件名，防止越出实例目录写任意路径。
     final safeName = p.basename(file.filename);
@@ -161,35 +121,29 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
       }
       return;
     }
-    final targetPath = p.join(targetDir, safeName);
 
     setState(() => _downloadProgress[version.id] = 0.0);
 
     try {
-      await _downloader.downloadFile(
-        file.url,
-        targetPath,
-        (progress) {
-          if (mounted) {
-            setState(() {
-              _downloadProgress[version.id] = progress.percent;
-            });
-          }
-        },
-        threads: threads,
-        // H-1：Modrinth 提供 sha1/sha512 哈希，下载后校验完整性。
-        sha512: file.hashes?['sha512'],
-      );
-      if (mounted) {
-        setState(() => _downloadProgress.remove(version.id));
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('已下载到 $subdir/${file.filename}'),
-            action: SnackBarAction(
-              label: '打开目录',
-              onPressed: () => _openFolder(targetDir),
-            ),
-          ),
+      if (target.isRemote) {
+        await _downloadToRemote(
+          target: target,
+          url: file.url,
+          safeName: safeName,
+          subdir: subdir,
+          threads: threads,
+          sha512: file.hashes?['sha512'],
+          progressKey: version.id,
+        );
+      } else {
+        await _downloadToLocal(
+          instance: target.localInstance!,
+          url: file.url,
+          safeName: safeName,
+          subdir: subdir,
+          threads: threads,
+          sha512: file.hashes?['sha512'],
+          progressKey: version.id,
         );
       }
     } catch (e) {
@@ -198,6 +152,94 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('下载失败: $e')));
+      }
+    }
+  }
+
+  /// 下载到本地实例目录（校验哈希后落盘）。
+  Future<void> _downloadToLocal({
+    required ServerInstance instance,
+    required String url,
+    required String safeName,
+    required String subdir,
+    required int threads,
+    String? sha512,
+    required String progressKey,
+  }) async {
+    final targetDir = p.join(instance.rootPath, subdir);
+    final targetPath = p.join(targetDir, safeName);
+    await _downloader.downloadFile(
+      url,
+      targetPath,
+      (progress) {
+        if (mounted) {
+          setState(() {
+            _downloadProgress[progressKey] = progress.percent;
+          });
+        }
+      },
+      threads: threads,
+      // H-1：Modrinth 提供 sha1/sha512 哈希，下载后校验完整性。
+      sha512: sha512,
+    );
+    if (mounted) {
+      setState(() => _downloadProgress.remove(progressKey));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('已下载到 $subdir/$safeName'),
+          action: SnackBarAction(
+            label: '打开目录',
+            onPressed: () => _openFolder(targetDir),
+          ),
+        ),
+      );
+    }
+  }
+
+  /// 下载到临时目录后上传到节点实例（校验哈希后上传）。
+  Future<void> _downloadToRemote({
+    required InstallTarget target,
+    required String url,
+    required String safeName,
+    required String subdir,
+    required int threads,
+    String? sha512,
+    required String progressKey,
+  }) async {
+    // 下载到系统临时目录，安装完成后清理。
+    final tempDir = await Directory.systemTemp.createTemp('irix_install_');
+    final tempPath = p.join(tempDir.path, safeName);
+    try {
+      await _downloader.downloadFile(
+        url,
+        tempPath,
+        (progress) {
+          if (mounted) {
+            setState(() {
+              _downloadProgress[progressKey] = progress.percent;
+            });
+          }
+        },
+        threads: threads,
+        // H-1：Modrinth 提供 sha1/sha512 哈希，下载后校验完整性。
+        sha512: sha512,
+      );
+      await installFileToRemote(
+        target: target,
+        localPath: tempPath,
+        subdir: subdir,
+      );
+      if (mounted) {
+        setState(() => _downloadProgress.remove(progressKey));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('已安装到节点 ${target.displayName} 的 $subdir/')),
+        );
+      }
+    } finally {
+      try {
+        await tempDir.delete(recursive: true);
+      } catch (_) {
+        // 忽略临时目录清理失败。
       }
     }
   }
