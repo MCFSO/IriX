@@ -78,7 +78,6 @@ set(XMC_RUST_DLLS
   xmc_db_client
   xmc_vector_store
   xmc_orchestrator
-  xmc_simd
 )
 foreach(XMC_DLL ${XMC_RUST_DLLS})
   if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${XMC_DLL}.dll")

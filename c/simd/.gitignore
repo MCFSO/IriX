@@ -1,7 +1,0 @@
-# 编译产物（本地/CI 构建生成，不入库）
-build/
-*.obj
-*.exe
-*.lib
-*.exp
-*.pdb
