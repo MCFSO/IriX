@@ -431,6 +431,76 @@ class JailRunStatus {
   final String log;
 }
 
+/// Jail 内文件条目（bastille 文件管理，见 irix-node-container-api.md §4.14）。
+class JailFileEntry {
+  const JailFileEntry({
+    required this.name,
+    required this.path,
+    this.isDir = false,
+    this.size = 0,
+    this.mtime,
+  });
+
+  /// 文件名。
+  final String name;
+
+  /// jail 内完整路径（如 /data/server.properties）。
+  final String path;
+
+  /// 是否目录。
+  final bool isDir;
+
+  /// 文件大小（字节；目录为 0）。
+  final int size;
+
+  /// 修改时间（缺失时为空）。
+  final DateTime? mtime;
+
+  factory JailFileEntry.fromJson(Map<String, dynamic> json) {
+    return JailFileEntry(
+      name: json['name'] as String? ?? '',
+      path: json['path'] as String? ?? '',
+      isDir: json['isDir'] as bool? ?? false,
+      size: (json['size'] as num?)?.toInt() ?? 0,
+      mtime: DateTime.tryParse(json['mtime'] as String? ?? ''),
+    );
+  }
+
+  /// 大小展示（B/KB/MB/GB）。
+  String get sizeDisplay {
+    if (isDir) return '';
+    if (size < 1024) return '$size B';
+    if (size < 1024 * 1024) return '${(size / 1024).toStringAsFixed(1)} KB';
+    if (size < 1024 * 1024 * 1024) {
+      return '${(size / 1024 / 1024).toStringAsFixed(1)} MB';
+    }
+    return '${(size / 1024 / 1024 / 1024).toStringAsFixed(2)} GB';
+  }
+}
+
+/// Jail 内目录列表结果。
+class JailFileList {
+  const JailFileList({required this.items, this.total = 0});
+
+  final List<JailFileEntry> items;
+
+  /// 服务端返回的总条目数（未知时为 0）。
+  final int total;
+
+  factory JailFileList.fromJson(Map<String, dynamic> json) {
+    final items = <JailFileEntry>[];
+    for (final item in (json['items'] as List<dynamic>? ?? [])) {
+      if (item is Map<String, dynamic>) {
+        items.add(JailFileEntry.fromJson(item));
+      }
+    }
+    return JailFileList(
+      items: items,
+      total: (json['total'] as num?)?.toInt() ?? items.length,
+    );
+  }
+}
+
 /// 容器后端统一接口。
 abstract class ContainerBackend {
   /// 运行时类型。
@@ -580,11 +650,7 @@ abstract class ContainerBackend {
   ///
   /// [action] 为 pkg 子命令（install / delete / update / upgrade / autoremove），
   /// [packages] 为包名列表。返回命令输出（尾部）。
-  Future<String> runPkg(
-    String idOrName,
-    String action,
-    List<String> packages,
-  );
+  Future<String> runPkg(String idOrName, String action, List<String> packages);
 
   /// 挂载列表（Bastille：`bastille mount` / fstab）。
   Future<List<JailMount>> listJailMounts(String idOrName);
@@ -593,16 +659,50 @@ abstract class ContainerBackend {
   ///
   /// [fstype] 为 `nullfs`（`bastille mount <jail> <src> <dst>`）或 `procfs`
   /// （写 fstab + 挂载，Java 运行环境需要 /proc 时使用）。
+  /// [permanent] 为 true 时同时写入 fstab（jail 启动自动挂载，
+  /// 重启不丢失）——nullfs 也适用。
   Future<void> addJailMount(
     String idOrName, {
     String? src,
     required String dst,
     required String fstype,
     String? options,
+    bool permanent = false,
   });
 
   /// 卸载（Bastille：`bastille umount` + 移除 fstab 条目）。
   Future<void> removeJailMount(String idOrName, String dst);
+
+  // ==================== Jail 文件管理（Bastille 专属，Docker 抛异常）====================
+
+  /// 列出 jail 内目录（Bastille 文件管理）。
+  Future<JailFileList> listJailFiles(
+    String idOrName, {
+    String path = '/',
+    int page = 1,
+    int pageSize = 200,
+  });
+
+  /// 读取 jail 内文本文件内容。
+  Future<String> readJailFile(String idOrName, String path);
+
+  /// 写入 jail 内文本文件。
+  Future<void> writeJailFile(String idOrName, String path, String content);
+
+  /// 删除 jail 内文件 / 目录（目录递归）。
+  Future<void> deleteJailFile(String idOrName, String path);
+
+  /// 新建目录。
+  Future<void> jailMkdir(String idOrName, String path);
+
+  /// 新建空文件。
+  Future<void> jailTouch(String idOrName, String path);
+
+  /// 上传本地文件到 jail 内目录。
+  Future<void> uploadJailFile(String idOrName, String dir, String localPath);
+
+  /// 下载 jail 内文件字节。
+  Future<List<int>> downloadJailFile(String idOrName, String path);
 
   /// 读取 jail 配置（Bastille：jail.conf 属性，`bastille config`）。
   Future<Map<String, String>> getJailConfig(String idOrName);

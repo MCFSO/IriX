@@ -428,7 +428,9 @@ class NodeDockerBackend extends NodeContainerBackend {
 
   @override
   Future<String> execOutput(String idOrName, String command) {
-    throw const ContainerBackendException('execOutput 仅适用于 Bastille（bastille cmd）');
+    throw const ContainerBackendException(
+      'execOutput 仅适用于 Bastille（bastille cmd）',
+    );
   }
 
   @override
@@ -448,6 +450,7 @@ class NodeDockerBackend extends NodeContainerBackend {
     required String dst,
     required String fstype,
     String? options,
+    bool permanent = false,
   }) {
     throw const ContainerBackendException('挂载管理仅适用于 Bastille（bastille mount）');
   }
@@ -458,18 +461,69 @@ class NodeDockerBackend extends NodeContainerBackend {
   }
 
   @override
+  Future<JailFileList> listJailFiles(
+    String idOrName, {
+    String path = '/',
+    int page = 1,
+    int pageSize = 200,
+  }) {
+    throw const ContainerBackendException('Jail 文件管理仅适用于 Bastille');
+  }
+
+  @override
+  Future<String> readJailFile(String idOrName, String path) {
+    throw const ContainerBackendException('Jail 文件管理仅适用于 Bastille');
+  }
+
+  @override
+  Future<void> writeJailFile(String idOrName, String path, String content) {
+    throw const ContainerBackendException('Jail 文件管理仅适用于 Bastille');
+  }
+
+  @override
+  Future<void> deleteJailFile(String idOrName, String path) {
+    throw const ContainerBackendException('Jail 文件管理仅适用于 Bastille');
+  }
+
+  @override
+  Future<void> jailMkdir(String idOrName, String path) {
+    throw const ContainerBackendException('Jail 文件管理仅适用于 Bastille');
+  }
+
+  @override
+  Future<void> jailTouch(String idOrName, String path) {
+    throw const ContainerBackendException('Jail 文件管理仅适用于 Bastille');
+  }
+
+  @override
+  Future<void> uploadJailFile(String idOrName, String dir, String localPath) {
+    throw const ContainerBackendException('Jail 文件管理仅适用于 Bastille');
+  }
+
+  @override
+  Future<List<int>> downloadJailFile(String idOrName, String path) {
+    throw const ContainerBackendException('Jail 文件管理仅适用于 Bastille');
+  }
+
+  @override
   Future<Map<String, String>> getJailConfig(String idOrName) {
-    throw const ContainerBackendException('jail 设置编辑仅适用于 Bastille（bastille config）');
+    throw const ContainerBackendException(
+      'jail 设置编辑仅适用于 Bastille（bastille config）',
+    );
   }
 
   @override
   Future<void> setJailConfig(String idOrName, String key, String value) {
-    throw const ContainerBackendException('jail 设置编辑仅适用于 Bastille（bastille config）');
+    throw const ContainerBackendException(
+      'jail 设置编辑仅适用于 Bastille（bastille config）',
+    );
   }
 
   @override
   Future<void> removeJailConfig(String idOrName, String key) {
-    throw const ContainerBackendException('jail 设置编辑仅适用于 Bastille（bastille config）');
+    throw const ContainerBackendException(
+      'jail 设置编辑仅适用于 Bastille（bastille config）',
+    );
   }
 
   @override
@@ -830,8 +884,7 @@ class NodeBastilleBackend extends NodeContainerBackend {
     String idOrName,
     String action,
     List<String> packages,
-  ) =>
-      client.bastilleJailPkg(idOrName, action: action, packages: packages);
+  ) => client.bastilleJailPkg(idOrName, action: action, packages: packages);
 
   @override
   Future<List<JailMount>> listJailMounts(String idOrName) async {
@@ -854,18 +907,65 @@ class NodeBastilleBackend extends NodeContainerBackend {
     required String dst,
     required String fstype,
     String? options,
-  }) =>
-      client.bastilleJailMountAdd(
-        idOrName,
-        src: src,
-        dst: dst,
-        fstype: fstype,
-        options: options,
-      );
+    bool permanent = false,
+  }) => client.bastilleJailMountAdd(
+    idOrName,
+    src: src,
+    dst: dst,
+    fstype: fstype,
+    options: options,
+    permanent: permanent,
+  );
 
   @override
   Future<void> removeJailMount(String idOrName, String dst) =>
       client.bastilleJailMountRemove(idOrName, dst);
+
+  // ==================== Jail 文件管理 ====================
+
+  @override
+  Future<JailFileList> listJailFiles(
+    String idOrName, {
+    String path = '/',
+    int page = 1,
+    int pageSize = 200,
+  }) async {
+    final data = await client.bastilleJailFiles(
+      idOrName,
+      path: path,
+      page: page,
+      pageSize: pageSize,
+    );
+    return JailFileList.fromJson(data);
+  }
+
+  @override
+  Future<String> readJailFile(String idOrName, String path) =>
+      client.bastilleJailFileContent(idOrName, path);
+
+  @override
+  Future<void> writeJailFile(String idOrName, String path, String content) =>
+      client.writeBastilleJailFile(idOrName, path, content);
+
+  @override
+  Future<void> deleteJailFile(String idOrName, String path) =>
+      client.deleteBastilleJailFile(idOrName, path);
+
+  @override
+  Future<void> jailMkdir(String idOrName, String path) =>
+      client.bastilleJailMkdir(idOrName, path);
+
+  @override
+  Future<void> jailTouch(String idOrName, String path) =>
+      client.bastilleJailTouch(idOrName, path);
+
+  @override
+  Future<void> uploadJailFile(String idOrName, String dir, String localPath) =>
+      client.bastilleJailFileUpload(idOrName, dir, localPath);
+
+  @override
+  Future<List<int>> downloadJailFile(String idOrName, String path) =>
+      client.bastilleJailFileDownload(idOrName, path);
 
   @override
   Future<Map<String, String>> getJailConfig(String idOrName) async {
@@ -887,13 +987,12 @@ class NodeBastilleBackend extends NodeContainerBackend {
     required String command,
     String? cwd,
     bool watch = false,
-  }) =>
-      client.bastilleJailRun(
-        idOrName,
-        command: command,
-        cwd: cwd,
-        watch: watch,
-      );
+  }) => client.bastilleJailRun(
+    idOrName,
+    command: command,
+    cwd: cwd,
+    watch: watch,
+  );
 
   @override
   Future<JailRunStatus> jailRunStatus(
@@ -920,11 +1019,7 @@ class NodeBastilleBackend extends NodeContainerBackend {
   }
 
   @override
-  Future<void> jailRunStdin(
-    String idOrName,
-    String sessionId,
-    String input,
-  ) =>
+  Future<void> jailRunStdin(String idOrName, String sessionId, String input) =>
       client.bastilleJailRunStdin(idOrName, sessionId, input);
 
   @override

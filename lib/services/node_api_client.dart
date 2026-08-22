@@ -18,6 +18,7 @@ import 'package:path/path.dart' as p;
 
 import '../models/node.dart';
 import '../models/remote.dart';
+import '../models/vault.dart';
 import '../services/downloader.dart';
 import '../services/http_ffi.dart';
 
@@ -94,6 +95,16 @@ class NodeApiClient {
   /// 查询参数的服务端需置 true，代价是密钥会进入访问日志。
   final bool apiKeyInQuery;
 
+  /// Vault 会话令牌（NODE_API.md §9 数据面门禁）。
+  ///
+  /// 非空时所有请求自动附带 `X-Vault-Token` 请求头（保险库锁定/未初始化/
+  /// 迁移中时服务端返回 403）。由调用方在解锁 / 恢复 / 初始化后写入；
+  /// 节点不支持保险库时保持为空，不影响其他请求。
+  ///
+  /// 注意：多数调用方每次请求新建 [NodeApiClient.of] 客户端，会话令牌
+  /// 不会跨调用点保留 —— 保险库流程请持有同一个客户端实例。
+  String vaultToken = '';
+
   /// 便捷构造：由节点信息创建客户端。
   ///
   /// MCSM 面板仅认查询参数形式的 apikey，因此该类节点保留查询参数
@@ -119,14 +130,29 @@ class NodeApiClient {
   }
 
   /// 附加鉴权请求头（H-6：密钥经请求头传递，不进 URL）。
-  Map<String, String> _withAuth(Map<String, String> headers) {
-    if (apiKey.isEmpty) return headers;
-    return {...headers, 'X-Api-Key': apiKey};
+  ///
+  /// [vaultToken] 非空时覆盖 [vaultToken] 字段（初始化 / 恢复等需要以
+  /// initToken、恢复会话令牌发请求的场景），否则使用字段当前值。
+  Map<String, String> _withAuth(
+    Map<String, String> headers, {
+    String? vaultToken,
+  }) {
+    var result = headers;
+    if (apiKey.isNotEmpty) {
+      result = {...result, 'X-Api-Key': apiKey};
+    }
+    final token = vaultToken ?? this.vaultToken;
+    if (token.isNotEmpty) {
+      result = {...result, 'X-Vault-Token': token};
+    }
+    return result;
   }
 
   /// 发送请求并解析统一响应体，返回 data 字段。
   ///
-  /// [timeout] 覆盖默认请求超时（大文件压缩 / 传输等长耗时操作使用）。
+  /// [timeout] 覆盖默认请求超时（大文件压缩 / 传输等长耗时操作使用）；
+  /// [vaultToken] 覆盖 [vaultToken] 字段（一次性场景：initToken /
+  /// 恢复会话令牌）。
   Future<dynamic> _request(
     String method,
     String path, {
@@ -134,12 +160,13 @@ class NodeApiClient {
     Object? body,
     bool retryOnce = true,
     Duration? timeout,
+    String? vaultToken,
   }) async {
     final uri = _uri(path, query);
     final base = body != null
         ? _headers
         : const {'X-Requested-With': 'XMLHttpRequest'};
-    final headers = _withAuth(base);
+    final headers = _withAuth(base, vaultToken: vaultToken);
     HttpFfiResponse resp;
     try {
       resp = await HttpFfiService.instance.request(
@@ -1144,12 +1171,15 @@ class NodeApiClient {
   ///
   /// [fstype] 为 `nullfs`（宿主机路径挂载，`bastille mount`）或 `procfs`
   /// （写 fstab + 挂载，Java 运行环境需要 /proc 时使用）。
+  /// [permanent] 为 true 时同时写入 fstab（jail 启动自动挂载，
+  /// 重启不丢失）——nullfs 也适用。
   Future<void> bastilleJailMountAdd(
     String name, {
     String? src,
     required String dst,
     required String fstype,
     String? options,
+    bool permanent = false,
   }) async {
     await _request(
       'POST',
@@ -1159,6 +1189,7 @@ class NodeApiClient {
         'dst': dst,
         'fstype': fstype,
         if (options != null && options.isNotEmpty) 'options': options,
+        if (permanent) 'permanent': true,
       },
     );
   }
@@ -1275,6 +1306,135 @@ class NodeApiClient {
     await _request('DELETE', '/api/bastille/jails/$name/run/$sessionId');
   }
 
+  // ==================== Jail 文件管理（Bastille，见 irix-node-container-api.md §4.14）====================
+
+  /// 列出 jail 内目录（GET /api/bastille/jails/{name}/files）。
+  ///
+  /// [path] 为 jail 内绝对路径（如 `/data`）；返回
+  /// `{ items: [{name, path, isDir, size, mtime}], total }`。
+  Future<Map<String, dynamic>> bastilleJailFiles(
+    String name, {
+    String path = '/',
+    int page = 1,
+    int pageSize = 200,
+  }) async {
+    final data = await _request(
+      'GET',
+      '/api/bastille/jails/$name/files',
+      query: {'path': path, 'page': '$page', 'page_size': '$pageSize'},
+    );
+    if (data is Map<String, dynamic>) return data;
+    if (data is List) return {'items': data, 'total': data.length};
+    return {};
+  }
+
+  /// 读取 jail 内文本文件（GET /api/bastille/jails/{name}/files/content）。
+  Future<String> bastilleJailFileContent(String name, String path) async {
+    final data = await _request(
+      'GET',
+      '/api/bastille/jails/$name/files/content',
+      query: {'path': path},
+    );
+    return (data as String?) ?? '';
+  }
+
+  /// 写入 jail 内文本文件（PUT /api/bastille/jails/{name}/files/content）。
+  Future<void> writeBastilleJailFile(
+    String name,
+    String path,
+    String content,
+  ) async {
+    await _request(
+      'PUT',
+      '/api/bastille/jails/$name/files/content',
+      body: {'path': path, 'content': content},
+    );
+  }
+
+  /// 删除 jail 内文件 / 目录（DELETE /api/bastille/jails/{name}/files，
+  /// 目录递归删除）。
+  Future<void> deleteBastilleJailFile(String name, String path) async {
+    await _request(
+      'DELETE',
+      '/api/bastille/jails/$name/files',
+      query: {'path': path},
+    );
+  }
+
+  /// 新建目录（POST /api/bastille/jails/{name}/files/mkdir）。
+  Future<void> bastilleJailMkdir(String name, String path) async {
+    await _request(
+      'POST',
+      '/api/bastille/jails/$name/files/mkdir',
+      body: {'path': path},
+    );
+  }
+
+  /// 新建空文件（POST /api/bastille/jails/{name}/files/touch）。
+  Future<void> bastilleJailTouch(String name, String path) async {
+    await _request(
+      'POST',
+      '/api/bastille/jails/$name/files/touch',
+      body: {'path': path},
+    );
+  }
+
+  /// 上传本地文件到 jail 内目录（POST /api/bastille/jails/{name}/files/upload，
+  /// multipart 字段名 file）。
+  ///
+  /// 与直连上传同款手工 multipart 构造，网络传输由 Rust http_client 负责。
+  Future<void> bastilleJailFileUpload(
+    String name,
+    String dir,
+    String localPath,
+  ) async {
+    final file = File(localPath);
+    if (!await file.exists()) {
+      throw NodeApiException(0, '本地文件不存在: $localPath');
+    }
+    final boundary = 'IriX${DateTime.now().microsecondsSinceEpoch}';
+    final fileName = p.basename(localPath);
+    final bytes = await file.readAsBytes();
+    final body = BytesBuilder()
+      ..add(
+        utf8.encode(
+          '--$boundary\r\n'
+          'Content-Disposition: form-data; name="file"; filename="$fileName"\r\n'
+          'Content-Type: application/octet-stream\r\n'
+          '\r\n',
+        ),
+      )
+      ..add(bytes)
+      ..add(utf8.encode('\r\n--$boundary--\r\n'));
+    final resp = await HttpFfiService.instance.post(
+      _uri('/api/bastille/jails/$name/files/upload', {'path': dir}).toString(),
+      headers: {'Content-Type': 'multipart/form-data; boundary=$boundary'},
+      body: body.takeBytes(),
+      timeout: timeout,
+    );
+    if (resp.statusCode >= 400) {
+      throw NodeApiException(resp.statusCode, '上传失败（HTTP ${resp.statusCode}）');
+    }
+  }
+
+  /// 下载 jail 内文件原始字节（GET /api/bastille/jails/{name}/files/download，
+  /// 二进制响应）。
+  ///
+  /// 注意：大文件请先落临时文件再写目标路径；本方法一次性读入内存。
+  Future<List<int>> bastilleJailFileDownload(String name, String path) async {
+    final uri = _uri('/api/bastille/jails/$name/files/download', {
+      'path': path,
+    });
+    final resp = await HttpFfiService.instance.get(
+      uri.toString(),
+      timeout: timeout,
+    );
+    if (resp.statusCode >= 400) {
+      throw NodeApiException(resp.statusCode, '下载失败（HTTP ${resp.statusCode}）');
+    }
+    return resp.bodyBytes;
+  }
+
   /// 克隆容器（POST /api/container/{id}/clone）。
   Future<void> containerClone(String id, String newName) async {
     await _request('POST', '/api/container/$id/clone', body: {'name': newName});
@@ -1366,6 +1526,258 @@ class NodeApiClient {
       '/api/container/archive/restore',
       body: {'file': file, 'destPath': destPath},
     );
+  }
+
+  // ==================== 加密保险库 Vault（irix-node，见 NODE_API.md §9）====================
+
+  /// 获取保险库状态（GET /api/vault/status）。
+  ///
+  /// 节点未启用 vault（`-vault` 未开）时返回 `enabled: false`。
+  Future<VaultStatus> vaultStatus() async {
+    final data = await _request('GET', '/api/vault/status');
+    return VaultStatus.fromJson((data as Map<String, dynamic>?) ?? {});
+  }
+
+  /// 申请签名挑战（POST /api/vault/challenge）。
+  ///
+  /// [purpose] 为 `unlock`（解锁签名）、`cert-bind`（绑定 / 换绑证书签名）
+  /// 或 `recovery`（恢复流程，docs/vault-design.md §10）；挑战一次性使用
+  /// （首次使用即作废），5 分钟有效。签名由客户端本地完成
+  /// （见 `vault_crypto.dart` 的 [VaultPrivateKey] / signChallenge，
+  /// 前缀按 purpose 区分，与 [VaultChallengePurpose] 对应）。
+  Future<VaultChallenge> vaultChallenge({required String purpose}) async {
+    final data = await _request(
+      'POST',
+      '/api/vault/challenge',
+      body: {'purpose': purpose},
+    );
+    return VaultChallenge.fromJson((data as Map<String, dynamic>?) ?? {});
+  }
+
+  /// 解锁保险库（POST /api/vault/unlock）。
+  ///
+  /// [signature] 为客户端对 `IRIX-VAULT-UNLOCK:1: + challenge` 的签名
+  /// （RSA PKCS#1 v1.5 + SHA-256 或 ECDSA ASN.1 DER，base64 无填充，
+  /// 见 vault_crypto.dart 的 [VaultChallengePurpose.unlock]），
+  /// 私钥永不上送；未绑定证书时可省略。成功后请把返回的
+  /// `sessionToken` 写入 [vaultToken] 字段，后续数据面请求自动携带。
+  /// [newPassword] 用于密码过期（status.passwordExpired / forceExpire）
+  /// 时同请求完成解锁 + 改密（rewrap，docs/vault-design.md A3/D15）。
+  Future<VaultSession> vaultUnlock({
+    required String user,
+    required String password,
+    String? totp,
+    required String challengeId,
+    String? signature,
+    String? newPassword,
+  }) async {
+    final data = await _request(
+      'POST',
+      '/api/vault/unlock',
+      body: {
+        'user': user,
+        'password': password,
+        if (totp != null && totp.isNotEmpty) 'totp': totp,
+        'challengeId': challengeId,
+        if (signature != null && signature.isNotEmpty) 'signature': signature,
+        if (newPassword != null && newPassword.isNotEmpty)
+          'newPassword': newPassword,
+      },
+    );
+    return VaultSession.fromJson((data as Map<String, dynamic>?) ?? {});
+  }
+
+  /// 立即锁定（POST /api/vault/lock，需 `X-Vault-Token`）。
+  Future<void> vaultLock({String? vaultToken}) async {
+    await _request('POST', '/api/vault/lock', vaultToken: vaultToken);
+  }
+
+  /// 恢复会话（POST /api/vault/recovery）→ 5 分钟恢复会话。
+  ///
+  /// 请求体按 docs/vault-design.md §10：`{ recoveryToken, newPassword?,
+  /// newTotp?, newCert? }` —— 可同请求完成重设密码 / 重绑 TOTP / 换绑
+  /// 证书；[user] 为 NODE_API.md §9.1 的兼容可选字段。
+  ///
+  /// 返回的 `sessionToken` 仅用于改密 / 重绑 TOTP / 换绑证书，
+  /// 数据面请求不接受恢复会话。
+  Future<VaultSession> vaultRecovery({
+    required String recoveryToken,
+    String? user,
+    String? newPassword,
+    String? newTotp,
+    String? newCert,
+  }) async {
+    final data = await _request(
+      'POST',
+      '/api/vault/recovery',
+      body: {
+        'recoveryToken': recoveryToken,
+        if (user != null && user.isNotEmpty) 'user': user,
+        if (newPassword != null && newPassword.isNotEmpty)
+          'newPassword': newPassword,
+        if (newTotp != null && newTotp.isNotEmpty) 'newTotp': newTotp,
+        if (newCert != null && newCert.isNotEmpty) 'newCert': newCert,
+      },
+    );
+    return VaultSession.fromJson((data as Map<String, dynamic>?) ?? {});
+  }
+
+  /// 初始化保险库（POST /api/vault/init，仅未初始化时可用）。
+  ///
+  /// 返回的 [VaultInitResult] 含 TOTP 密钥与恢复令牌（recoveryToken
+  /// 仅显示一次，客户端须提示用户保存）。后续 TOTP 校验 / 证书绑定
+  /// 以 `initToken` 作为 `X-Vault-Token` 发送。
+  Future<VaultInitResult> vaultInit({
+    required String user,
+    required String password,
+  }) async {
+    final data = await _request(
+      'POST',
+      '/api/vault/init',
+      body: {'user': user, 'password': password},
+    );
+    return VaultInitResult.fromJson((data as Map<String, dynamic>?) ?? {});
+  }
+
+  /// 校验 TOTP 动态码（POST /api/vault/totp/verify）。
+  ///
+  /// [vaultToken] 传 initToken（初始化流程）或恢复 / 解锁会话令牌；
+  /// 缺省使用 [vaultToken] 字段。
+  Future<void> vaultTotpVerify(String code, {String? vaultToken}) async {
+    await _request(
+      'POST',
+      '/api/vault/totp/verify',
+      body: {'code': code},
+      vaultToken: vaultToken,
+    );
+  }
+
+  /// 重绑 TOTP（POST /api/vault/totp/reset，恢复 / 解锁会话）。
+  ///
+  /// 返回新的 TOTP 密钥（Base32 / otpauth URI），客户端应提示重新录入。
+  Future<Map<String, dynamic>?> vaultTotpReset({String? vaultToken}) async {
+    final data = await _request(
+      'POST',
+      '/api/vault/totp/reset',
+      vaultToken: vaultToken,
+    );
+    return data is Map<String, dynamic> ? data : null;
+  }
+
+  /// 绑定证书（POST /api/vault/cert，SPKI 指纹绑定）。
+  ///
+  /// [certPem] 为标准 PEM 证书（P12 在客户端解析为 PEM，见
+  /// `vault_crypto.dart` 的 importPkcs12 / importPem）；[signature] 为
+  /// 对 challenge（purpose=`cert-bind`）的签名
+  /// （[VaultChallengePurpose.certBind] 前缀）。证书绑定后解锁可仅凭
+  /// 证书签名免密码 / 免 TOTP；换发证书（同钥）不破坏绑定（SPKI 指纹）。
+  Future<void> vaultCert({
+    required String certPem,
+    required String challengeId,
+    required String signature,
+    String? vaultToken,
+  }) async {
+    await _request(
+      'POST',
+      '/api/vault/cert',
+      body: {
+        'certPem': certPem,
+        'challengeId': challengeId,
+        'signature': signature,
+      },
+      vaultToken: vaultToken,
+    );
+  }
+
+  /// 修改密码（POST /api/vault/password）。
+  ///
+  /// 解锁会话需 [oldPassword]；恢复会话免旧密码。
+  Future<void> vaultPassword({
+    String? oldPassword,
+    required String newPassword,
+    String? vaultToken,
+  }) async {
+    await _request(
+      'POST',
+      '/api/vault/password',
+      body: {
+        if (oldPassword != null && oldPassword.isNotEmpty)
+          'oldPassword': oldPassword,
+        'newPassword': newPassword,
+      },
+      vaultToken: vaultToken,
+    );
+  }
+
+  /// 用户列表（GET /api/vault/users）。
+  Future<List<VaultUser>> vaultUsers({String? vaultToken}) async {
+    final data = await _request(
+      'GET',
+      '/api/vault/users',
+      vaultToken: vaultToken,
+    );
+    final list = <VaultUser>[];
+    if (data is List) {
+      for (final item in data) {
+        if (item is Map<String, dynamic>) {
+          list.add(VaultUser.fromJson(item));
+        }
+      }
+    }
+    return list;
+  }
+
+  /// 添加用户（POST /api/vault/user/add，恢复 / 解锁会话）。
+  Future<void> vaultUserAdd({
+    required String user,
+    required String password,
+    String? vaultToken,
+  }) async {
+    await _request(
+      'POST',
+      '/api/vault/user/add',
+      body: {'user': user, 'password': password},
+      vaultToken: vaultToken,
+    );
+  }
+
+  /// 删除用户（POST /api/vault/user/remove；禁止删除最后一个用户）。
+  Future<void> vaultUserRemove(String user, {String? vaultToken}) async {
+    await _request(
+      'POST',
+      '/api/vault/user/remove',
+      body: {'user': user},
+      vaultToken: vaultToken,
+    );
+  }
+
+  /// 启动两阶段迁移（POST /api/vault/migrate：instances.json +
+  /// vaultFiles 文件树；幂等续跑）。
+  Future<void> vaultMigrate({String? vaultToken}) async {
+    await _request('POST', '/api/vault/migrate', vaultToken: vaultToken);
+  }
+
+  /// 迁移状态（GET /api/vault/migrate/status）。
+  Future<VaultMigrateStatus> vaultMigrateStatus({String? vaultToken}) async {
+    final data = await _request(
+      'GET',
+      '/api/vault/migrate/status',
+      vaultToken: vaultToken,
+    );
+    return VaultMigrateStatus.fromJson((data as Map<String, dynamic>?) ?? {});
+  }
+
+  /// 生成加密备份包（POST /api/vault/backup）。
+  ///
+  /// 返回备份信息（路径 / 大小等，字段由服务端定义），下载走
+  /// downloadTicket + 直连下载。
+  Future<Map<String, dynamic>?> vaultBackup({String? vaultToken}) async {
+    final data = await _request(
+      'POST',
+      '/api/vault/backup',
+      vaultToken: vaultToken,
+    );
+    return data is Map<String, dynamic> ? data : null;
   }
 }
 

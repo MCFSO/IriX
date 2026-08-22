@@ -1,21 +1,28 @@
 // Jail 详情页（Bastille）
-// 单个 jail 的深度管理界面，覆盖五项能力：
+// 单个 jail 的深度管理界面，覆盖六项能力：
 // - 运行：将节点上的实例目录挂载进 jail（bastille mount，默认 /data），
 //   并在 jail 内运行实例（bastille cmd 后台会话，工作目录切到 /data），
-//   附带实时会话控制台（输出 + stdin）与「进程退出即停止 Jail」看门狗开关。
+//   附带实时会话控制台（输出 + stdin）与「进程退出即停止 Jail」看门狗开关；
+//   启动命令 / 运行目录 / 挂载路径会记忆到本地（下次进入自动回填）。
+// - 文件：jail 内文件管理（列表 / 上传 / 下载 / 文本编辑 / 新建 / 删除），
+//   挂载点快捷入口（挂载进 /data 的文件在这里直接可见）。
 // - 控制台：jail 系统控制台日志（bastille console 视角）+ 一键命令执行。
 // - 软件包：bastille pkg 管理（安装 Java 环境等）+ 检测 Java + 挂载 /proc。
-// - 挂载：nullfs / procfs 挂载列表与增删（fstab 持久化）。
+// - 挂载：nullfs / procfs 挂载列表与增删（fstab 持久化可选）。
 // - 设置：jail.conf 配置项查看 / 编辑 / 删除（bastille config）。
 //
 // 全部能力经远程 irix-node 的 /api/bastille/* 端点暴露（NodeBastilleBackend）。
 
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart' hide ImageInfo;
 
 import '../models/remote.dart';
 import '../services/container/container_backend.dart';
+import '../services/database_manager.dart';
 import '../services/font_settings.dart';
 import '../services/node_api_client.dart';
 import '../utils/ansi_color.dart';
@@ -90,6 +97,17 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
   final ScrollController _consoleScroll = ScrollController();
   late final TextEditingController _consoleCmd;
 
+  // ==================== 文件 Tab ====================
+
+  /// 当前浏览的 jail 内目录。
+  String _filesPath = '/data';
+  final TextEditingController _filesPathInput = TextEditingController(
+    text: '/data',
+  );
+  List<JailFileEntry> _files = [];
+  bool _filesLoading = false;
+  bool _filesBusy = false;
+
   // ==================== 软件包 Tab ====================
 
   String _pkgAction = 'install';
@@ -124,6 +142,12 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
     'securelevel': '安全级别',
   };
 
+  /// 运行记忆（settings 表）前缀；按「节点地址 + jail 名」区分。
+  static const String _runMemoryPrefix = 'bastille_run_memory_v1';
+
+  String get _runMemoryKey =>
+      '$_runMemoryPrefix:${widget.nodeClient?.baseUrl ?? 'local'}:$_name';
+
   String get _name => widget.jailName;
 
   @override
@@ -142,6 +166,8 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
     unawaited(_refreshMounts());
     unawaited(_refreshConfig());
     unawaited(_refreshConsoleLog());
+    unawaited(_loadRunMemory());
+    unawaited(_refreshFiles());
   }
 
   @override
@@ -157,6 +183,7 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
     _sessionInput.dispose();
     _consoleCmd.dispose();
     _pkgNames.dispose();
+    _filesPathInput.dispose();
     for (final c in _configControllers.values) {
       c.dispose();
     }
@@ -204,11 +231,48 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
 
   /// 统一错误提示：容器后端异常直接展示消息；其余（如旧节点 404）展示原始错误。
   void _snackError(Object error, {String prefix = '操作失败'}) {
-    _snack(error is ContainerBackendException ? error.message : '$prefix：$error');
+    _snack(
+      error is ContainerBackendException ? error.message : '$prefix：$error',
+    );
   }
 
   void _setBusy(bool value) {
     if (mounted) setState(() => _busy = value);
+  }
+
+  // ==================== 运行记忆（settings 表）====================
+
+  /// 读取上次的启动命令 / 运行目录 / 挂载路径，回填表单。
+  Future<void> _loadRunMemory() async {
+    final raw = await DatabaseManager.instance.getSetting(_runMemoryKey);
+    if (raw == null || raw.isEmpty || !mounted) return;
+    try {
+      final map = jsonDecode(raw) as Map<String, dynamic>;
+      if (!mounted) return;
+      setState(() {
+        _startCommand.text = map['command'] as String? ?? _startCommand.text;
+        _workdir.text = map['workdir'] as String? ?? _workdir.text;
+        _hostPath.text = map['hostPath'] as String? ?? _hostPath.text;
+        _jailPath.text = map['jailPath'] as String? ?? _jailPath.text;
+        _watch = map['watch'] as bool? ?? _watch;
+      });
+    } catch (_) {
+      // 记忆损坏时忽略，按默认空表单。
+    }
+  }
+
+  /// 保存启动命令 / 运行目录 / 挂载路径（下次进入自动回填）。
+  Future<void> _saveRunMemory() async {
+    await DatabaseManager.instance.setSetting(
+      _runMemoryKey,
+      jsonEncode({
+        'command': _startCommand.text.trim(),
+        'workdir': _workdir.text.trim(),
+        'hostPath': _hostPath.text.trim(),
+        'jailPath': _jailPath.text.trim(),
+        'watch': _watch,
+      }),
+    );
   }
 
   // ==================== 运行 Tab ====================
@@ -245,8 +309,9 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
         dst: jailPath,
         fstype: 'nullfs',
         options: 'rw',
+        permanent: true, // 写入 fstab：jail 重启后挂载不丢失
       );
-      _snack('已挂载 $hostPath → $jailPath');
+      _snack('已挂载 $hostPath → $jailPath（fstab 持久化，重启不丢失）');
       await _refreshMounts();
     } catch (e) {
       _snackError(e);
@@ -271,8 +336,7 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
     }
   }
 
-  bool _isMounted(String jailPath) =>
-      _mounts.any((m) => m.dst == jailPath);
+  bool _isMounted(String jailPath) => _mounts.any((m) => m.dst == jailPath);
 
   /// 启动运行会话（看门狗开关经 watch 下发；进程退出后停止 Jail）。
   Future<void> _startRun() async {
@@ -289,7 +353,9 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
     final jailPath = _jailPath.text.trim().isEmpty
         ? '/data'
         : _jailPath.text.trim();
-    final workdir = _workdir.text.trim().isEmpty ? '/data' : _workdir.text.trim();
+    final workdir = _workdir.text.trim().isEmpty
+        ? '/data'
+        : _workdir.text.trim();
 
     // 未挂载时自动挂载实例目录（默认 /data）。
     if (hostPath.isNotEmpty && !_isMounted(jailPath)) {
@@ -300,6 +366,7 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
           dst: jailPath,
           fstype: 'nullfs',
           options: 'rw',
+          permanent: true,
         );
         await _refreshMounts();
       } catch (e) {
@@ -328,6 +395,7 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
         _logOffset = 0;
       });
       _startSessionPolling();
+      unawaited(_saveRunMemory());
       _snack('已在 Jail 内启动${_watch ? '（看门狗开启：进程退出后自动停止 Jail）' : ''}');
     } catch (e) {
       _snackError(e, prefix: '启动失败');
@@ -489,8 +557,7 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
         .map((e) => e.trim())
         .where((e) => e.isNotEmpty)
         .toList();
-    if ((_pkgAction == 'install' || _pkgAction == 'delete') &&
-        names.isEmpty) {
+    if ((_pkgAction == 'install' || _pkgAction == 'delete') && names.isEmpty) {
       _snack('请填写包名（如 openjdk17-jre）');
       return;
     }
@@ -505,9 +572,8 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(
-        () => _pkgOutput = e is ContainerBackendException
-            ? e.message
-            : '执行失败：$e',
+        () =>
+            _pkgOutput = e is ContainerBackendException ? e.message : '执行失败：$e',
       );
     } finally {
       if (mounted) setState(() => _pkgBusy = false);
@@ -526,9 +592,8 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(
-        () => _pkgOutput = e is ContainerBackendException
-            ? e.message
-            : '检测失败：$e',
+        () =>
+            _pkgOutput = e is ContainerBackendException ? e.message : '检测失败：$e',
       );
     } finally {
       if (mounted) setState(() => _pkgBusy = false);
@@ -574,10 +639,16 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
   }
 
   Future<void> _openAddMountDialog() async {
-    final result = await showAppDialog<({String? src, String dst, String fstype, String options})>(
-      context,
-      (_) => const _AddMountDialog(),
-    );
+    final result =
+        await showAppDialog<
+          ({
+            String? src,
+            String dst,
+            String fstype,
+            String options,
+            bool permanent,
+          })
+        >(context, (_) => const _AddMountDialog());
     if (result == null || !mounted) return;
     _setBusy(true);
     try {
@@ -587,8 +658,11 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
         dst: result.dst,
         fstype: result.fstype,
         options: result.options,
+        permanent: result.permanent,
       );
-      _snack('挂载已添加');
+      _snack(
+        result.permanent ? '挂载已添加（fstab 持久化，重启自动挂载）' : '挂载已添加（仅当前挂载，重启后需重新挂载）',
+      );
       await _refreshMounts();
     } catch (e) {
       _snackError(e);
@@ -625,6 +699,321 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
       _snackError(e);
     } finally {
       _setBusy(false);
+    }
+  }
+
+  /// 挂载点「打开目录」：切到文件 Tab 并浏览挂载的 jail 内路径。
+  void _openMountInFiles(JailMount mount) {
+    DefaultTabController.of(context).animateTo(1);
+    _gotoFilesPath(mount.dst);
+  }
+
+  // ==================== 文件 Tab ====================
+
+  /// 刷新当前目录列表。
+  Future<void> _refreshFiles() async {
+    setState(() => _filesLoading = true);
+    try {
+      final list = await widget.backend.listJailFiles(_name, path: _filesPath);
+      if (!mounted) return;
+      setState(() => _files = list.items);
+    } catch (e) {
+      _snackError(e, prefix: '加载文件列表失败');
+    }
+    if (!mounted) return;
+    setState(() => _filesLoading = false);
+  }
+
+  /// 跳转目录（规范化路径后刷新）。
+  void _gotoFilesPath(String path) {
+    final normalized = _normalizeJailPath(path);
+    if (normalized != _filesPath) {
+      setState(() {
+        _filesPath = normalized;
+        _filesPathInput.text = normalized;
+      });
+    }
+    unawaited(_refreshFiles());
+  }
+
+  /// 规范化 jail 内路径：补前导 `/`、去掉末尾 `/`、空 → `/`。
+  static String _normalizeJailPath(String path) {
+    var p = path.trim();
+    if (p.isEmpty) return '/';
+    if (!p.startsWith('/')) p = '/$p';
+    while (p.length > 1 && p.endsWith('/')) {
+      p = p.substring(0, p.length - 1);
+    }
+    return p;
+  }
+
+  String get _parentJailPath {
+    final parts = _filesPath.split('/').where((e) => e.isNotEmpty).toList();
+    if (parts.isEmpty) return '/';
+    parts.removeLast();
+    return parts.isEmpty ? '/' : '/${parts.join('/')}';
+  }
+
+  void _enterJailDir(JailFileEntry entry) {
+    if (!entry.isDir) return;
+    _gotoFilesPath(entry.path);
+  }
+
+  Future<void> _jailMkdir() async {
+    final name = await _promptJailFileName('新建目录', '目录名称');
+    if (name == null || !mounted) return;
+    setState(() => _filesBusy = true);
+    try {
+      await widget.backend.jailMkdir(_name, _joinJailPath(name));
+      await _refreshFiles();
+    } catch (e) {
+      _snackError(e);
+    } finally {
+      if (mounted) setState(() => _filesBusy = false);
+    }
+  }
+
+  Future<void> _jailTouch() async {
+    final name = await _promptJailFileName('新建文件', '文件名称');
+    if (name == null || !mounted) return;
+    setState(() => _filesBusy = true);
+    try {
+      await widget.backend.jailTouch(_name, _joinJailPath(name));
+      await _refreshFiles();
+    } catch (e) {
+      _snackError(e);
+    } finally {
+      if (mounted) setState(() => _filesBusy = false);
+    }
+  }
+
+  String _joinJailPath(String name) {
+    final base = _filesPath == '/' ? '' : _filesPath;
+    return '$base/${name.trim().replaceAll(RegExp(r'[\\/]'), '')}';
+  }
+
+  /// 名称输入对话框（返回 null 表示取消）。
+  Future<String?> _promptJailFileName(String title, String label) {
+    final controller = TextEditingController();
+    return showAppDialog<String>(
+      context,
+      (_) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: label,
+            hintText: '位于 $_filesPath',
+            border: const OutlineInputBorder(),
+            isDense: true,
+          ),
+          onSubmitted: (v) => Navigator.pop(context, v.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _uploadJailFiles() async {
+    final result = await FilePicker.platform.pickFiles(
+      dialogTitle: '选择要上传到 $_filesPath 的文件',
+      allowMultiple: true,
+    );
+    if (result == null || !mounted) return;
+    setState(() => _filesBusy = true);
+    try {
+      for (final file in result.files) {
+        final path = file.path;
+        if (path == null) continue;
+        await widget.backend.uploadJailFile(_name, _filesPath, path);
+      }
+      _snack('已上传 ${result.files.length} 个文件到 $_filesPath');
+      await _refreshFiles();
+    } catch (e) {
+      _snackError(e, prefix: '上传失败');
+    } finally {
+      if (mounted) setState(() => _filesBusy = false);
+    }
+  }
+
+  Future<void> _downloadJailFile(JailFileEntry entry) async {
+    setState(() => _filesBusy = true);
+    try {
+      final bytes = await widget.backend.downloadJailFile(_name, entry.path);
+      final savePath = await FilePicker.platform.saveFile(
+        dialogTitle: '保存文件',
+        fileName: entry.name,
+      );
+      if (savePath != null) {
+        await File(savePath).writeAsBytes(bytes, flush: true);
+        if (mounted) _snack('已下载到 $savePath');
+      }
+    } catch (e) {
+      _snackError(e, prefix: '下载失败');
+    } finally {
+      if (mounted) setState(() => _filesBusy = false);
+    }
+  }
+
+  Future<void> _editJailFile(JailFileEntry entry) async {
+    if (entry.size > 2 * 1024 * 1024) {
+      _snack('文件过大（>2MB），请下载后编辑');
+      return;
+    }
+    setState(() => _filesBusy = true);
+    String content;
+    try {
+      content = await widget.backend.readJailFile(_name, entry.path);
+    } catch (e) {
+      _snackError(e, prefix: '读取文件失败');
+      if (mounted) setState(() => _filesBusy = false);
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _filesBusy = false);
+    final controller = TextEditingController(text: content);
+    final saved = await showAppDialog<bool>(
+      context,
+      (_) => AlertDialog(
+        title: Text('编辑 ${entry.name}'),
+        content: SizedBox(
+          width: 560,
+          height: 420,
+          child: TextField(
+            controller: controller,
+            maxLines: null,
+            expands: true,
+            style: TextStyle(
+              fontFamily: FontSettings.instance.terminalFamily,
+              fontSize: 12.5,
+            ),
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              isDense: true,
+              alignLabelWithHint: true,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    if (saved != true || !mounted) return;
+    setState(() => _filesBusy = true);
+    try {
+      await widget.backend.writeJailFile(_name, entry.path, controller.text);
+      _snack('已保存 ${entry.name}');
+      await _refreshFiles();
+    } catch (e) {
+      _snackError(e, prefix: '保存失败');
+    } finally {
+      if (mounted) setState(() => _filesBusy = false);
+    }
+  }
+
+  Future<void> _deleteJailFile(JailFileEntry entry) async {
+    final ok = await showAppDialog<bool>(
+      context,
+      (_) => AlertDialog(
+        title: Text('删除 ${entry.isDir ? '目录' : '文件'}？'),
+        content: Text(
+          '确定删除 ${entry.path} 吗？\n${entry.isDir ? '目录将递归删除，不可恢复。' : '删除后不可恢复。'}',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton.tonal(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _filesBusy = true);
+    try {
+      await widget.backend.deleteJailFile(_name, entry.path);
+      _snack('已删除 ${entry.path}');
+      await _refreshFiles();
+    } catch (e) {
+      _snackError(e, prefix: '删除失败');
+    } finally {
+      if (mounted) setState(() => _filesBusy = false);
+    }
+  }
+
+  /// 文件条目操作菜单。
+  Future<void> _showJailFileActions(JailFileEntry entry) async {
+    if (entry.isDir) {
+      _enterJailDir(entry);
+      return;
+    }
+    final action = await showAppDialog<String>(
+      context,
+      (_) => SimpleDialog(
+        title: Text(entry.name),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, 'edit'),
+            child: const Row(
+              children: [
+                Icon(Icons.edit_outlined, size: 18),
+                SizedBox(width: 10),
+                Text('编辑（文本）'),
+              ],
+            ),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, 'download'),
+            child: const Row(
+              children: [
+                Icon(Icons.download_outlined, size: 18),
+                SizedBox(width: 10),
+                Text('下载到本地'),
+              ],
+            ),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, 'delete'),
+            child: const Row(
+              children: [
+                Icon(Icons.delete_outline, size: 18),
+                SizedBox(width: 10),
+                Text('删除'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case 'edit':
+        await _editJailFile(entry);
+      case 'download':
+        await _downloadJailFile(entry);
+      case 'delete':
+        await _deleteJailFile(entry);
     }
   }
 
@@ -725,7 +1114,7 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return DefaultTabController(
-      length: 5,
+      length: 6,
       child: Scaffold(
         appBar: AppBar(
           title: Text(_name),
@@ -738,6 +1127,7 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
                 unawaited(_refreshMounts());
                 unawaited(_refreshConfig());
                 unawaited(_refreshConsoleLog());
+                unawaited(_refreshFiles());
               },
             ),
             const SizedBox(width: 4),
@@ -761,6 +1151,7 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
               tabAlignment: TabAlignment.start,
               tabs: [
                 Tab(icon: Icon(Icons.play_circle_outline), text: '运行'),
+                Tab(icon: Icon(Icons.folder_outlined), text: '文件'),
                 Tab(icon: Icon(Icons.terminal), text: '控制台'),
                 Tab(icon: Icon(Icons.inventory_outlined), text: '软件包'),
                 Tab(icon: Icon(Icons.link), text: '挂载'),
@@ -771,6 +1162,7 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
               child: TabBarView(
                 children: [
                   _buildRunTab(theme),
+                  _buildFilesTab(theme),
                   _buildConsoleTab(theme),
                   _buildPkgTab(theme),
                   _buildMountsTab(theme),
@@ -976,20 +1368,20 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
                 Chip(
                   avatar: Icon(
                     _isMounted(
-                      _jailPath.text.trim().isEmpty
-                          ? '/data'
-                          : _jailPath.text.trim(),
-                    )
+                          _jailPath.text.trim().isEmpty
+                              ? '/data'
+                              : _jailPath.text.trim(),
+                        )
                         ? Icons.check_circle
                         : Icons.circle_outlined,
                     size: 16,
                   ),
                   label: Text(
                     _isMounted(
-                      _jailPath.text.trim().isEmpty
-                          ? '/data'
-                          : _jailPath.text.trim(),
-                    )
+                          _jailPath.text.trim().isEmpty
+                              ? '/data'
+                              : _jailPath.text.trim(),
+                        )
                         ? '已挂载'
                         : '未挂载',
                     style: const TextStyle(fontSize: 12),
@@ -1051,16 +1443,15 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
             Row(
               children: [
                 FilledButton.icon(
-                  onPressed:
-                      _busy || !_jailRunning || _sessionRunning ? null : _startRun,
+                  onPressed: _busy || !_jailRunning || _sessionRunning
+                      ? null
+                      : _startRun,
                   icon: const Icon(Icons.play_arrow, size: 16),
                   label: const Text('启动运行'),
                 ),
                 const SizedBox(width: 8),
                 FilledButton.tonalIcon(
-                  onPressed: _busy || !_sessionRunning
-                      ? null
-                      : _stopSession,
+                  onPressed: _busy || !_sessionRunning ? null : _stopSession,
                   icon: const Icon(Icons.stop, size: 16),
                   label: const Text('停止进程'),
                 ),
@@ -1091,7 +1482,10 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
                 child: Text(
                   '提示：未挂载实例目录时，启动运行会自动挂载（默认 /data）。'
                   '查看输出 / 发送命令请在下方控制台进行。',
-                  style: TextStyle(fontSize: 12, color: theme.colorScheme.outline),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: theme.colorScheme.outline,
+                  ),
                 ),
               ),
           ],
@@ -1112,6 +1506,249 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
     );
   }
 
+  // ==================== 文件 Tab ====================
+
+  Widget _buildFilesTab(ThemeData theme) {
+    final mountDirs = _mounts
+        .where((m) => m.dst.isNotEmpty && m.dst != '/proc')
+        .map((m) => m.dst)
+        .toSet()
+        .toList();
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 路径栏：面包屑 + 刷新 + 上级
+              Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  ActionChip(
+                    avatar: const Icon(Icons.home, size: 14),
+                    label: const Text('/', style: TextStyle(fontSize: 12)),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => _gotoFilesPath('/'),
+                  ),
+                  for (final part
+                      in _filesPath
+                          .split('/')
+                          .where((e) => e.isNotEmpty)
+                          .toList()) ...[
+                    const Icon(
+                      Icons.chevron_right,
+                      size: 14,
+                      color: Colors.grey,
+                    ),
+                    ActionChip(
+                      label: Text(part, style: const TextStyle(fontSize: 12)),
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () {
+                        final parts = _filesPath
+                            .split('/')
+                            .where((e) => e.isNotEmpty)
+                            .toList();
+                        final idx = parts.indexOf(part);
+                        if (idx >= 0) {
+                          _gotoFilesPath(
+                            '/${parts.sublist(0, idx + 1).join('/')}',
+                          );
+                        }
+                      },
+                    ),
+                  ],
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.refresh, size: 18),
+                    tooltip: '刷新',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: _refreshFiles,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.arrow_upward, size: 18),
+                    tooltip: '返回上级',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: _filesPath == '/'
+                        ? null
+                        : () => _gotoFilesPath(_parentJailPath),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              // 路径输入 + 跳转
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _filesPathInput,
+                      decoration: const InputDecoration(
+                        labelText: 'Jail 内路径',
+                        hintText: '如 /data 或 /usr/local/bin',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      onSubmitted: (v) => _gotoFilesPath(v),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.tonalIcon(
+                    onPressed: () => _gotoFilesPath(_filesPathInput.text),
+                    icon: const Icon(Icons.arrow_forward, size: 16),
+                    label: const Text('跳转'),
+                  ),
+                ],
+              ),
+              // 挂载点快捷入口
+              if (mountDirs.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      '挂载点：',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: theme.colorScheme.outline,
+                      ),
+                    ),
+                    for (final dir in mountDirs)
+                      ActionChip(
+                        avatar: const Icon(Icons.link, size: 14),
+                        label: Text(dir, style: const TextStyle(fontSize: 12)),
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () => _gotoFilesPath(dir),
+                      ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 8),
+              // 操作行
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  FilledButton.tonalIcon(
+                    onPressed: _filesBusy ? null : _uploadJailFiles,
+                    icon: const Icon(Icons.upload_file, size: 16),
+                    label: const Text('上传'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: _filesBusy ? null : _jailMkdir,
+                    icon: const Icon(
+                      Icons.create_new_folder_outlined,
+                      size: 16,
+                    ),
+                    label: const Text('新建目录'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: _filesBusy ? null : _jailTouch,
+                    icon: const Icon(Icons.note_add_outlined, size: 16),
+                    label: const Text('新建文件'),
+                  ),
+                  if (_filesBusy)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 6),
+                      child: SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 12),
+        Expanded(
+          child: _filesLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _files.isEmpty
+              ? Center(
+                  child: Text(
+                    '$_filesPath 为空\n挂载实例目录后，文件会出现在这里',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: theme.colorScheme.outline),
+                  ),
+                )
+              : ListView.builder(
+                  itemCount: _files.length,
+                  itemBuilder: (context, index) {
+                    final entry = _files[index];
+                    return ListTile(
+                      dense: true,
+                      leading: Icon(
+                        entry.isDir
+                            ? Icons.folder
+                            : Icons.insert_drive_file_outlined,
+                        size: 20,
+                        color: entry.isDir
+                            ? Colors.amber
+                            : theme.colorScheme.onSurfaceVariant,
+                      ),
+                      title: Text(
+                        entry.name,
+                        style: const TextStyle(fontSize: 13.5),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: entry.isDir
+                          ? null
+                          : Text(
+                              '${entry.sizeDisplay}'
+                              '${entry.mtime != null ? ' · ${_formatMtime(entry.mtime!)}' : ''}',
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                      onTap: () => _showJailFileActions(entry),
+                      trailing: entry.isDir
+                          ? IconButton(
+                              icon: const Icon(Icons.chevron_right, size: 18),
+                              visualDensity: VisualDensity.compact,
+                              onPressed: () => _enterJailDir(entry),
+                            )
+                          : Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.download, size: 18),
+                                  tooltip: '下载',
+                                  visualDensity: VisualDensity.compact,
+                                  onPressed: _filesBusy
+                                      ? null
+                                      : () => _downloadJailFile(entry),
+                                ),
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    size: 18,
+                                  ),
+                                  tooltip: '删除',
+                                  visualDensity: VisualDensity.compact,
+                                  onPressed: _filesBusy
+                                      ? null
+                                      : () => _deleteJailFile(entry),
+                                ),
+                              ],
+                            ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  static String _formatMtime(DateTime t) {
+    final local = t.toLocal();
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${local.year}-${two(local.month)}-${two(local.day)} '
+        '${two(local.hour)}:${two(local.minute)}';
+  }
+
   // ==================== 控制台 Tab ====================
 
   Widget _buildConsoleTab(ThemeData theme) {
@@ -1127,7 +1764,10 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
                 child: Text(
                   'Jail 系统控制台日志（bastille console 视角）· '
                   '下方命令在 jail 内执行（sh 语义）',
-                  style: TextStyle(fontSize: 12, color: theme.colorScheme.outline),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: theme.colorScheme.outline,
+                  ),
                 ),
               ),
             ],
@@ -1147,8 +1787,7 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
                 controller: _consoleScroll,
                 child: SelectableText.rich(
                   TextSpan(
-                    children: (_consoleLog.isEmpty &&
-                            _consoleCmdOut.isEmpty)
+                    children: (_consoleLog.isEmpty && _consoleCmdOut.isEmpty)
                         ? const [TextSpan(text: '（暂无日志输出）')]
                         : ansiSpans(
                             '$_consoleLog$_consoleCmdOut',
@@ -1249,9 +1888,7 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
                     label: Text(pkg, style: const TextStyle(fontSize: 12)),
                     onPressed: () {
                       final current = _pkgNames.text.trim();
-                      _pkgNames.text = current.isEmpty
-                          ? pkg
-                          : '$current $pkg';
+                      _pkgNames.text = current.isEmpty ? pkg : '$current $pkg';
                     },
                   ),
               ],
@@ -1330,7 +1967,10 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
           child: Row(
             children: [
-              Text('挂载列表（bastille mount / fstab）', style: Theme.of(context).textTheme.titleSmall),
+              Text(
+                '挂载列表（bastille mount / fstab）',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
               const Spacer(),
               IconButton(
                 icon: const Icon(Icons.refresh),
@@ -1375,13 +2015,27 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
                           if (mount.options != null &&
                               mount.options!.isNotEmpty)
                             '选项 ${mount.options}',
-                          if (mount.permanent) 'fstab 持久化',
+                          if (mount.permanent)
+                            'fstab 持久化（重启自动挂载）'
+                          else if (!isProc)
+                            '仅当前挂载（重启后需重新挂载）',
                         ].join(' · '),
                       ),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.link_off),
-                        tooltip: '卸载',
-                        onPressed: () => _removeMount(mount),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (!isProc && mount.dst.isNotEmpty)
+                            IconButton(
+                              icon: const Icon(Icons.folder_open, size: 18),
+                              tooltip: '打开目录（文件 Tab）',
+                              onPressed: () => _openMountInFiles(mount),
+                            ),
+                          IconButton(
+                            icon: const Icon(Icons.link_off),
+                            tooltip: '卸载',
+                            onPressed: () => _removeMount(mount),
+                          ),
+                        ],
                       ),
                     );
                   },
@@ -1400,7 +2054,10 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
           child: Row(
             children: [
-              Text('Jail 配置（bastille config）', style: Theme.of(context).textTheme.titleSmall),
+              Text(
+                'Jail 配置（bastille config）',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
               const Spacer(),
               IconButton(
                 icon: const Icon(Icons.refresh),
@@ -1563,9 +2220,9 @@ class _ConsolePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       elevation: 0,
-      color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(
-        alpha: 0.6,
-      ),
+      color: Theme.of(
+        context,
+      ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -1657,8 +2314,9 @@ class _AddMountDialog extends StatefulWidget {
 
 class _AddMountDialogState extends State<_AddMountDialog> {
   String _fstype = 'nullfs';
+  bool _permanent = true; // fstab 持久化：jail 重启后挂载不丢失
   final _src = TextEditingController();
-  final _dst = TextEditingController();
+  final _dst = TextEditingController(text: '/data');
   final _options = TextEditingController(text: 'rw');
 
   @override
@@ -1688,8 +2346,14 @@ class _AddMountDialogState extends State<_AddMountDialog> {
                   isDense: true,
                 ),
                 items: const [
-                  DropdownMenuItem(value: 'nullfs', child: Text('nullfs（宿主机目录）')),
-                  DropdownMenuItem(value: 'procfs', child: Text('procfs（/proc，Java 需要）')),
+                  DropdownMenuItem(
+                    value: 'nullfs',
+                    child: Text('nullfs（宿主机目录）'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'procfs',
+                    child: Text('procfs（/proc，Java 需要）'),
+                  ),
                 ],
                 onChanged: (v) => setState(() => _fstype = v ?? 'nullfs'),
               ),
@@ -1724,6 +2388,31 @@ class _AddMountDialogState extends State<_AddMountDialog> {
                   isDense: true,
                 ),
               ),
+              if (_fstype == 'nullfs') ...[
+                const SizedBox(height: 4),
+                SwitchListTile(
+                  title: const Text(
+                    'fstab 持久化',
+                    style: TextStyle(fontSize: 13),
+                  ),
+                  subtitle: const Text(
+                    '写入 fstab：jail 启动时自动挂载，重启不丢失（推荐）',
+                    style: TextStyle(fontSize: 11),
+                  ),
+                  value: _permanent,
+                  contentPadding: EdgeInsets.zero,
+                  onChanged: (v) => setState(() => _permanent = v),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '提示：nullfs 实时挂载需要 jail 运行中；jail 未运行时'
+                  '只能写入 fstab（下次启动生效）。挂载后可在「文件」Tab 查看目录内容。',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -1738,17 +2427,15 @@ class _AddMountDialogState extends State<_AddMountDialog> {
             final dst = _dst.text.trim();
             if (dst.isEmpty) return;
             if (_fstype == 'nullfs' && _src.text.trim().isEmpty) return;
-            Navigator.pop(
-              context,
-              (
-                src: _fstype == 'nullfs' ? _src.text.trim() : null,
-                dst: dst,
-                fstype: _fstype,
-                options: _options.text.trim().isEmpty
-                    ? 'rw'
-                    : _options.text.trim(),
-              ),
-            );
+            Navigator.pop(context, (
+              src: _fstype == 'nullfs' ? _src.text.trim() : null,
+              dst: dst,
+              fstype: _fstype,
+              options: _options.text.trim().isEmpty
+                  ? 'rw'
+                  : _options.text.trim(),
+              permanent: _fstype == 'nullfs' ? _permanent : false,
+            ));
           },
           child: const Text('添加'),
         ),
@@ -1829,7 +2516,10 @@ class _AddConfigDialogState extends State<_AddConfigDialog> {
                 children: [
                   for (final entry in widget.hints.entries)
                     ActionChip(
-                      label: Text(entry.key, style: const TextStyle(fontSize: 11)),
+                      label: Text(
+                        entry.key,
+                        style: const TextStyle(fontSize: 11),
+                      ),
                       tooltip: entry.value,
                       onPressed: () => setState(() => _key = entry.key),
                     ),
@@ -1848,10 +2538,7 @@ class _AddConfigDialogState extends State<_AddConfigDialog> {
           onPressed: () {
             final key = (_key ?? _keyField?.text.trim() ?? '').trim();
             if (key.isEmpty) return;
-            Navigator.pop(
-              context,
-              (key: key, value: _value.text.trim()),
-            );
+            Navigator.pop(context, (key: key, value: _value.text.trim()));
           },
           child: const Text('添加'),
         ),

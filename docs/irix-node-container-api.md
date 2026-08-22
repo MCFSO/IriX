@@ -377,13 +377,23 @@ DELETE /api/bastille/jails/{name}/mounts?dst=<jail内路径>
 `POST` body：
 
 ```json
-{ "src": "/data/mc-survival", "dst": "/data", "fstype": "nullfs", "options": "rw" }
+{ "src": "/data/mc-survival", "dst": "/data", "fstype": "nullfs", "options": "rw", "permanent": true }
 ```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `src` | string? | 宿主机源路径（nullfs 必填；procfs/devfs 可省） |
+| `dst` | string | jail 内目标路径 |
+| `fstype` | string | `nullfs` \| `procfs` \| `devfs` |
+| `options` | string? | 挂载选项（如 `rw`） |
+| `permanent` | bool? | **是否写入 fstab（jail 启动时自动挂载，重启不丢失）**；默认 false。nullfs 也适用 |
 
 服务端映射：
 
-- `fstype=nullfs`：`bastille mount <name> <src> <dst>`；
-- `fstype=procfs`：向 fstab（`/usr/local/bastille/jails/<name>/fstab`）追加
+- `fstype=nullfs`：`bastille mount <name> <src> <dst>`；`permanent=true` 时
+  同时向 fstab（`/usr/local/bastille/jails/<name>/fstab`）追加
+  `<src> <dst> nullfs <options> 0 0`（jail 重启后自动挂载）；
+- `fstype=procfs`：向 fstab 追加
   `proc <dst> procfs <options> 0 0`（`<dst>` 为 jail 内路径，如 `/proc`），
   并立即挂载（thin jail 下为宿主 `<jailroot>/<dst>`）；
 - `fstype=devfs` 同理追加 fstab 并挂载。
@@ -394,6 +404,9 @@ DELETE /api/bastille/jails/{name}/mounts?dst=<jail内路径>
 > 注：官方 `bastille mount` 仅支持 nullfs；procfs/devfs 走 fstab 方案
 > （fstab 条目会在 `bastille start` 时自动挂载）。`GET` 列表应合并
 > fstab 条目与当前 `mount` 输出，`permanent` 表示条目来自 fstab。
+> **客户端提示**：nullfs 实时挂载需要 jail 运行中；jail 未运行时只能写
+> fstab（下次启动生效）。nullfs 挂载后 jail 内 `dst` 目录即出现源目录内容，
+> 客户端「文件」Tab（§4.14）可直接浏览。
 
 ---
 
@@ -473,6 +486,52 @@ DELETE /api/bastille/jails/{name}/config?key=<key>
 > 应返回命令输出文本（可为字符串，或 `{ "output": "..." }`），供客户端
 > 「检测 Java」（`java -version`）与「控制台」Tab 一键命令使用。
 > 命令以 shell 语义执行（服务端 `sh -c` 包装）。
+
+---
+
+## 4.14 Jail 文件管理（运行目录浏览 / 上传 / 下载 / 文本编辑）
+
+> 用途：客户端「Jail 详情 → 文件」Tab —— 浏览 jail 内目录（默认 `/data`，
+> 即挂载进 jail 的实例目录），支持上传 / 下载 / 文本编辑 / 新建 / 删除。
+> 与 §4.10 挂载配合：nullfs 挂载进 `/data` 后，源目录内容在此直接可见。
+
+```
+GET    /api/bastille/jails/{name}/files?path=<jail内路径>&page=&page_size=
+GET    /api/bastille/jails/{name}/files/content?path=<文件>
+PUT    /api/bastille/jails/{name}/files/content  body: { "path", "content" }
+DELETE /api/bastille/jails/{name}/files?path=<路径>
+POST   /api/bastille/jails/{name}/files/mkdir   body: { "path" }
+POST   /api/bastille/jails/{name}/files/touch   body: { "path" }
+POST   /api/bastille/jails/{name}/files/upload?path=<目录>  （multipart，字段名 `file`，可多文件）
+GET    /api/bastille/jails/{name}/files/download?path=<文件> （原始二进制，非 JSON 信封）
+```
+
+`GET files` 响应 `data`：
+
+```json
+{ "items": [ { "name": "server.properties", "path": "/data/server.properties", "isDir": false, "size": 4096, "mtime": "2026-01-15T10:00:00Z" } ], "total": 12 }
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `name` | string | 文件名 |
+| `path` | string | jail 内完整路径 |
+| `isDir` | bool | 是否目录 |
+| `size` | int | 文件大小（字节；目录为 0） |
+| `mtime` | string? | 修改时间（ISO 8601） |
+
+**实现建议（服务端）**：路径一律为 jail 内绝对路径；服务端映射到 jail root
+（`/usr/local/bastille/jails/<name>/root/`，thin jail 注意真实目录）——
+列表 / 文本读写 / 新建 / 删除 / 上传 / 下载均可直接在 jail root 上操作
+（不经过 `jexec`），亦可经 `jexec <name> ls -la` 等命令实现。
+
+**安全要求**：所有路径参数经 `path.Clean` 规范化后必须以 jail root 为前缀，
+拒绝 `..` 越界（`/etc`、`../` 等一律 400）；文本读写限制大小（如 ≤ 8 MiB）
+并拒绝二进制内容（含 NUL 字节）；删除目录递归。
+
+**上传 / 下载**：`download` 直接返回文件字节（`Content-Type: application/octet-stream`）；
+`upload` 接收 multipart（字段名 `file`），多个文件重复请求或支持多字段自选。
+上传目录不存在时 400。客户端按此契约经 Rust http_client 传输。
 
 ---
 
