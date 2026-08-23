@@ -180,6 +180,7 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
         // 记录 MSL 返回的 sha256，下载完成后校验（H-1 完整性校验）。
         _expectedSha256 = info.sha256;
       } catch (e) {
+        if (!mounted) return;
         setState(() {
           _downloading = false;
           _downloadError = e.toString();
@@ -216,12 +217,15 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
         downloadUrl,
         targetPath,
         (progress) {
+          // 下载线程可能在页面销毁后仍在回调，需确认挂载再刷新 UI。
+          if (!mounted) return;
           setState(() => _progress = progress);
         },
         threads: threads,
         sha256: _expectedSha256,
       );
 
+      if (!mounted) return;
       _coreFilePath = savedPath;
       _instanceRootDir = instanceRoot;
       _commandController.text = 'java -Xmx1024M -jar $fileName nogui';
@@ -231,6 +235,7 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
         _step = 2;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _downloading = false;
         _downloadError = e.toString();
