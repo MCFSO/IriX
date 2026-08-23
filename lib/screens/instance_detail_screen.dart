@@ -80,20 +80,25 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
   /// 是否正在探测 Docker 环境。
   bool _dockerProbing = true;
 
+  /// AppState 缓存引用（initState 中获取；dispose 阶段 context 已不可用，
+  /// 移除监听器必须用缓存引用而非 context.read）。
+  late final AppState _appState;
+
   @override
   void initState() {
     super.initState();
     _aiController = AiChatController(
       conversation: AiAssistantService.instance.createConversation(),
     );
+    _appState = context.read<AppState>();
     _subscribeLogs();
-    context.read<AppState>().addListener(_onAppStateChanged);
+    _appState.addListener(_onAppStateChanged);
     _probeDocker();
   }
 
   /// 探测本机 Docker 可用性（AppState 缓存了探测结果）。
   Future<void> _probeDocker() async {
-    final env = await context.read<AppState>().dockerEnvironment();
+    final env = await _appState.dockerEnvironment();
     if (!mounted) return;
     setState(() {
       _dockerAvailable = env.available;
@@ -114,7 +119,7 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
 
   @override
   void dispose() {
-    context.read<AppState>().removeListener(_onAppStateChanged);
+    _appState.removeListener(_onAppStateChanged);
     _aiController.dispose();
     _logSub?.cancel();
     _scrollController.dispose();
@@ -343,9 +348,7 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
               itemBuilder: (context, index) {
                 // 解析 ANSI 转义序列，彩色显示服务器输出。
                 return SelectableText.rich(
-                  TextSpan(
-                    children: ansiSpans(_logs[index], logStyle),
-                  ),
+                  TextSpan(children: ansiSpans(_logs[index], logStyle)),
                   style: logStyle,
                 );
               },
