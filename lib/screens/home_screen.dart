@@ -1,6 +1,7 @@
 // 实例列表主页 + 左侧导航栏
 // 左侧 NavigationRail 切换"实例列表"和"市场"
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -14,6 +15,7 @@ import '../services/download_settings.dart';
 import '../services/font_settings.dart';
 import '../services/management_mode_settings.dart';
 import '../services/mcp_server.dart';
+import '../services/vault_settings.dart';
 import '../state/app_state.dart';
 import '../state/cluster_state.dart';
 import '../state/node_state.dart';
@@ -453,6 +455,7 @@ class SettingsDialogState extends State<SettingsDialog> {
   late double _threads;
   late double _pageSize;
   late bool _multi;
+  late bool _vaultEnabled;
   late String _uiFont;
   late String _terminalFont;
   bool _loading = true;
@@ -464,10 +467,21 @@ class SettingsDialogState extends State<SettingsDialog> {
     _threads = state.downloadThreads.toDouble();
     _pageSize = DbPageSettings.pageSize.toDouble();
     _multi = context.read<ClusterState>().mode == ManagementMode.multi;
+    _vaultEnabled = VaultSettings.defaultEnabled;
     final fonts = FontSettings.instance;
     _uiFont = fonts.uiFamily;
     _terminalFont = fonts.terminalFamily;
-    _loading = false;
+    unawaited(_loadVaultEnabled());
+  }
+
+  /// 异步加载 Vault 开关状态（SQLite settings 表）。
+  Future<void> _loadVaultEnabled() async {
+    final enabled = await VaultSettings.isEnabled();
+    if (!mounted) return;
+    setState(() {
+      _vaultEnabled = enabled;
+      _loading = false;
+    });
   }
 
   /// 切换管理模式，并启停集群监控循环。
@@ -520,6 +534,38 @@ class SettingsDialogState extends State<SettingsDialog> {
           Text(
             '多机模式需至少 2 个节点，可在「主页」中添加。',
             style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const Divider(height: 24),
+          // Vault 加密保险库（客户端功能开关）
+          Row(
+            children: [
+              const Icon(Icons.shield_outlined, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Vault 加密保险库',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    Text(
+                      _vaultEnabled
+                          ? '已启用：节点详情 / 解锁 / 初始化 / 证书绑定等保险库能力可用'
+                          : '关闭：不展示保险库相关能力（节点需以 -vault 开启并配置 TLS）',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              AppleSwitch(
+                value: _vaultEnabled,
+                onChanged: (v) async {
+                  setState(() => _vaultEnabled = v);
+                  await VaultSettings.setEnabled(v);
+                },
+              ),
+            ],
           ),
           const Divider(height: 24),
           // 下载线程数
