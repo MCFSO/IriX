@@ -1521,46 +1521,57 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 路径栏：面包屑 + 刷新 + 上级
-              Wrap(
-                spacing: 4,
-                runSpacing: 4,
-                crossAxisAlignment: WrapCrossAlignment.center,
+              // 路径栏：面包屑 + 刷新 + 上级。
+              // 注意：Wrap 不支持 flex 子项（Spacer/Expanded 在 Wrap 内会
+              // 在挂载时抛 ParentDataWidget 异常，导致整个 Tab 白屏），
+              // 因此右侧按钮必须放在 Wrap 之外的 Row 中。
+              Row(
                 children: [
-                  ActionChip(
-                    avatar: const Icon(Icons.home, size: 14),
-                    label: const Text('/', style: TextStyle(fontSize: 12)),
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () => _gotoFilesPath('/'),
+                  Expanded(
+                    child: Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        ActionChip(
+                          avatar: const Icon(Icons.home, size: 14),
+                          label: const Text('/', style: TextStyle(fontSize: 12)),
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () => _gotoFilesPath('/'),
+                        ),
+                        for (final part
+                            in _filesPath
+                                .split('/')
+                                .where((e) => e.isNotEmpty)
+                                .toList()) ...[
+                          const Icon(
+                            Icons.chevron_right,
+                            size: 14,
+                            color: Colors.grey,
+                          ),
+                          ActionChip(
+                            label: Text(
+                              part,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () {
+                              final parts = _filesPath
+                                  .split('/')
+                                  .where((e) => e.isNotEmpty)
+                                  .toList();
+                              final idx = parts.indexOf(part);
+                              if (idx >= 0) {
+                                _gotoFilesPath(
+                                  '/${parts.sublist(0, idx + 1).join('/')}',
+                                );
+                              }
+                            },
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
-                  for (final part
-                      in _filesPath
-                          .split('/')
-                          .where((e) => e.isNotEmpty)
-                          .toList()) ...[
-                    const Icon(
-                      Icons.chevron_right,
-                      size: 14,
-                      color: Colors.grey,
-                    ),
-                    ActionChip(
-                      label: Text(part, style: const TextStyle(fontSize: 12)),
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () {
-                        final parts = _filesPath
-                            .split('/')
-                            .where((e) => e.isNotEmpty)
-                            .toList();
-                        final idx = parts.indexOf(part);
-                        if (idx >= 0) {
-                          _gotoFilesPath(
-                            '/${parts.sublist(0, idx + 1).join('/')}',
-                          );
-                        }
-                      },
-                    ),
-                  ],
-                  const Spacer(),
                   IconButton(
                     icon: const Icon(Icons.refresh, size: 18),
                     tooltip: '刷新',
