@@ -1003,6 +1003,21 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
               ],
             ),
           ),
+          const Divider(height: 1),
+          // 显式取消项：showAppDialog 底层 showGeneralDialog 默认
+          // barrierDismissible: false，点击遮罩无法关闭，
+          // SimpleDialog 本身也没有取消按钮，因此必须提供取消入口。
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.close, size: 18),
+                SizedBox(width: 10),
+                Text('取消'),
+              ],
+            ),
+          ),
         ],
       ),
     );
