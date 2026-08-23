@@ -85,6 +85,7 @@
 | `GET` | `/api/protected_instance/kill` | `uuid`, `daemonId` | 强制终止 |
 | `GET` | `/api/protected_instance/command` | `uuid`, `daemonId`, `command` | 向实例 stdin 发命令 |
 | `GET` | `/api/protected_instance/outputlog` | `uuid`, `daemonId`, `size?` | 读取实例输出日志 |
+| `GET` | `/api/instance/plugins` | `uuid`, `daemonId` | 插件/Mod 元数据检测：`{items: [{type, path, fileName, size, name, description, version, iconBase64, configDir}]}`（节点解析 jar 内 plugin.yml/fabric.mod.json 等；不支持时客户端回退文件列表） |
 
 ---
 

@@ -2,6 +2,8 @@
 // 解析 MCSManager / IriX 本地节点 API 返回的 JSON（概览、实例、文件、用户）。
 // 纯 Dart 模型，不依赖 Flutter；所有解析均带容错默认值。
 
+import 'dart:convert';
+
 /// 概览数据（GET /api/overview）。
 class OverviewData {
   /// 面板/守护进程版本。
@@ -444,6 +446,80 @@ class RemoteFileEntry {
       time: json['time'] as String? ?? '',
       mode: (json['mode'] as num?)?.toInt() ?? 0,
       type: (json['type'] as num?)?.toInt() ?? 1,
+    );
+  }
+}
+
+/// 远程实例插件 / Mod 元数据（GET /api/instance/plugins，见
+/// docs/irix-node-local-parity.md §4.4）。
+///
+/// 节点端解析 jar 内 plugin.yml / paper-plugin.yml / fabric.mod.json /
+/// META-INF/mods.toml 得出；客户端「远程实例 → 插件/Mod」Tab 据此展示
+/// 名称 / 描述 / 版本 / 图标，节点不支持时（MCSM / 旧版本）回退文件列表。
+class RemotePluginMeta {
+  /// 类型：`plugin` | `mod`。
+  final String type;
+
+  /// 实例内完整路径（如 /plugins/EssentialsX-2.20.1.jar）。
+  final String path;
+
+  /// 文件名。
+  final String fileName;
+
+  /// 文件大小（字节）。
+  final int size;
+
+  /// 解析出的名称（缺失时回退文件名）。
+  final String name;
+
+  /// 描述（可空）。
+  final String? description;
+
+  /// 版本（可空）。
+  final String? version;
+
+  /// 图标（base64，PNG；可空）。
+  final String? iconBase64;
+
+  /// 配置目录（实例内路径，可空）。
+  final String? configDir;
+
+  const RemotePluginMeta({
+    required this.type,
+    required this.path,
+    required this.fileName,
+    this.size = 0,
+    this.name = '',
+    this.description,
+    this.version,
+    this.iconBase64,
+    this.configDir,
+  });
+
+  bool get isPlugin => type == 'plugin';
+
+  /// 图标字节（base64 解码失败时 null）。
+  List<int>? get iconBytes {
+    final b64 = iconBase64;
+    if (b64 == null || b64.isEmpty) return null;
+    try {
+      return base64Decode(b64);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  factory RemotePluginMeta.fromJson(Map<String, dynamic> json) {
+    return RemotePluginMeta(
+      type: json['type'] as String? ?? '',
+      path: json['path'] as String? ?? '',
+      fileName: json['fileName'] as String? ?? '',
+      size: (json['size'] as num?)?.toInt() ?? 0,
+      name: json['name'] as String? ?? '',
+      description: json['description'] as String?,
+      version: json['version'] as String?,
+      iconBase64: json['iconBase64'] as String?,
+      configDir: json['configDir'] as String?,
     );
   }
 }

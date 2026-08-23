@@ -382,6 +382,38 @@ class NodeApiClient {
     return (data as String?) ?? '';
   }
 
+  /// 获取实例插件 / Mod 元数据（GET /api/instance/plugins）。
+  ///
+  /// 节点端解析 jar 内 plugin.yml / paper-plugin.yml / fabric.mod.json /
+  /// META-INF/mods.toml（见 docs/irix-node-local-parity.md §4.4）；
+  /// 节点不支持时抛 [NodeApiException]（404 等），由调用方回退到
+  /// 文件列表展示。
+  Future<List<RemotePluginMeta>> instancePlugins({
+    required String uuid,
+    required String daemonId,
+  }) async {
+    final data = await _request(
+      'GET',
+      '/api/instance/plugins',
+      query: {'uuid': uuid, 'daemonId': daemonId},
+    );
+    final list = <RemotePluginMeta>[];
+    if (data is Map<String, dynamic>) {
+      for (final item in (data['items'] as List<dynamic>? ?? [])) {
+        if (item is Map<String, dynamic>) {
+          list.add(RemotePluginMeta.fromJson(item));
+        }
+      }
+    } else if (data is List) {
+      for (final item in data) {
+        if (item is Map<String, dynamic>) {
+          list.add(RemotePluginMeta.fromJson(item));
+        }
+      }
+    }
+    return list;
+  }
+
   // ==================== 文件管理 ====================
 
   /// 获取文件列表（GET /api/files/list）。
