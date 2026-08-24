@@ -36,6 +36,11 @@ target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
 target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
 # Shell_NotifyIcon（系统托盘图标）与单实例唤醒所需。
 target_link_libraries(${BINARY_NAME} PRIVATE "shell32.lib")
+# 源文件为无 BOM 的 UTF-8（含中文宽字符串字面量，如托盘菜单/气泡提示）；
+# 显式告知 MSVC 按 UTF-8 解析，避免按系统 ANSI 代码页（GBK）解码导致乱码。
+if(MSVC)
+  target_compile_options(${BINARY_NAME} PRIVATE "/utf-8")
+endif()
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Run the Flutter tool portions of the build. This must not be removed.
