@@ -179,6 +179,10 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
       _logSub!.cancel();
       _logSub = null;
     }
+
+    // 状态 / 名称 / 接管标记等任何变更都触发重建，
+    // 保证实例名称保存后标题等位置立即更新。
+    setState(() {});
   }
 
   /// 发送命令到服务器进程。
@@ -227,6 +231,9 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
       );
     }
 
+    // 接管状态：上次启动器会话遗留的进程（stdin 已断开，无法发送指令）。
+    final adopted = state.isInstanceAdopted(widget.instanceId);
+
     // 「容器」Tab 始终展示：本机无 Docker 时面板呈现不可用状态与检测按钮，
     // 避免用户完全看不到容器管理入口。
     return DefaultTabController(
@@ -235,6 +242,19 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
         appBar: AppBar(
           title: Text(instance.name),
           actions: [
+            if (adopted)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Tooltip(
+                  message: '该进程由上次启动的 IriX 遗留，已接管其日志；'
+                      'stdin 已断开，无法发送指令，仅可强制停止',
+                  child: Chip(
+                    avatar: const Icon(Icons.link, size: 16),
+                    label: const Text('已接管'),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ),
             IconButton(
               icon: const Icon(Icons.smart_toy_outlined),
               isSelected: _showAi,
@@ -273,10 +293,13 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
                       return Row(
                         children: [
                           // 左侧：日志 + 命令输入
-                          Expanded(flex: 3, child: _buildLogPanel()),
+                          Expanded(flex: 3, child: _buildLogPanel(adopted)),
                           const VerticalDivider(width: 1),
                           // 右侧：生命周期控制
-                          Expanded(flex: 1, child: _buildControlPanel(status)),
+                          Expanded(
+                            flex: 1,
+                            child: _buildControlPanel(status, adopted),
+                          ),
                         ],
                       );
                     },
@@ -328,7 +351,9 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
   }
 
   /// 左侧日志面板：终端风格日志窗口 + 命令输入框。
-  Widget _buildLogPanel() {
+  ///
+  /// [adopted] 为 true 时进程为接管状态（stdin 已断开），禁用指令输入。
+  Widget _buildLogPanel(bool adopted) {
     final theme = Theme.of(context);
     final logStyle = TextStyle(
       fontFamily: FontSettings.instance.terminalFamily,
@@ -363,8 +388,11 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
                 child: TextField(
                   controller: _commandController,
                   focusNode: _focusNode,
+                  enabled: !adopted,
                   decoration: InputDecoration(
-                    hintText: '输入服务器指令（无需 /）后按回车',
+                    hintText: adopted
+                        ? '已接管的进程无法发送指令（请使用强制停止）'
+                        : '输入服务器指令（无需 /）后按回车',
                     border: const OutlineInputBorder(),
                     isDense: true,
                     // 半透明背景
@@ -378,7 +406,7 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
               const SizedBox(width: 8),
               IconButton.filled(
                 icon: const Icon(Icons.send),
-                onPressed: _sendCommand,
+                onPressed: adopted ? null : _sendCommand,
               ),
             ],
           ),
@@ -388,7 +416,9 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
   }
 
   /// 右侧生命周期控制面板。
-  Widget _buildControlPanel(InstanceStatus status) {
+  ///
+  /// [adopted] 为 true 时「停止」（写入 stop 指令）不可用，直接提供「强制停止」。
+  Widget _buildControlPanel(InstanceStatus status, bool adopted) {
     final theme = Theme.of(context);
     final isActive = status.isActive;
     final isStopped = status == InstanceStatus.stopped;
@@ -409,13 +439,13 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
           const SizedBox(height: 12),
           // 重启按钮：仅在「启动中」可用
           FilledButton.tonalIcon(
-            onPressed: isActive ? _restartInstance : null,
+            onPressed: isActive && !adopted ? _restartInstance : null,
             icon: const Icon(Icons.refresh),
             label: const Text('重启'),
           ),
           const SizedBox(height: 12),
           // 停止 / 强制停止 按钮
-          if (!_stopClicked)
+          if (!_stopClicked && !adopted)
             FilledButton.icon(
               onPressed: isActive
                   ? () {
@@ -449,6 +479,14 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
                   Text('当前状态', style: theme.textTheme.labelSmall),
                   const SizedBox(height: 4),
                   Text(status.label, style: theme.textTheme.bodyLarge),
+                  if (adopted) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      '该进程由上次启动的 IriX 遗留，已接管其日志；'
+                      'stdin 已断开，无法发送指令。',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
                 ],
               ),
             ),

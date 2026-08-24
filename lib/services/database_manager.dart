@@ -616,6 +616,15 @@ class DatabaseManager {
     }
   }
 
+  Future<void> deleteSetting(String key) async {
+    try {
+      final db = await _database;
+      await db.delete('settings', where: 'key = ?', whereArgs: [key]);
+    } catch (e) {
+      debugPrint('Failed to delete setting $key: $e');
+    }
+  }
+
   Future<int?> getIntSetting(String key) async {
     final value = await getSetting(key);
     if (value == null) return null;

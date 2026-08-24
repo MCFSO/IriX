@@ -1,44 +1,76 @@
 // 服务器进程管理服务
 // 为单个 ServerInstance 提供进程生命周期管理：启动、停止、强制终止、重启，
-// 以及标准输出/错误流的合并日志流。每个运行中的实例对应一个管理器实例。
-// 本文件仅负责进程层操作，不涉及 UI、状态管理或持久化（dart:io 桌面端可用）。
+// 以及日志输出流。每个运行中的实例对应一个管理器实例。
+//
+// 启动方式（按可用性降级）：
+// 1. Rust 托管启动（xmc_logger::spawn_with_log）：stdout/stderr 直接重定向到
+//    日志文件（<应用文档目录>/logs/<id>.log），stdin 保留管道。启动器退出/崩溃后
+//    服务器仍可持续写日志，重启启动器后可按 PID 接管并继续尾随该文件（终端接管）。
+// 2. dart:io Process.start 管道启动（旧 DLL 回退）：stdout/stderr 解码后转写
+//    同一日志文件，控制台经日志尾随器统一读取。
+//
+// 进程退出检测统一为 PID 存活轮询（ProcessRegistry），两条路径行为一致。
 
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
+
 import '../models/server_instance.dart';
+import 'log_persistence.dart';
+import 'log_tailer.dart';
+import 'logger_ffi.dart';
+import 'process_registry.dart';
 
 /// 服务器进程管理器。
 ///
 /// 负责单个 [ServerInstance] 的进程生命周期管理：
-/// - [start]：以 [ServerInstance.rootPath] 为工作目录启动进程；
-/// - [sendCommand]：向进程标准输入发送命令；
+/// - [start]：以 [ServerInstance.rootPath] 为工作目录启动进程（输出重定向到日志文件）；
+/// - [attach]：接管一个由上次启动器会话遗留、仍在运行的进程（按 PID）；
+/// - [sendCommand]：向进程标准输入发送命令（接管进程的 stdin 已断开，不可用）；
 /// - [stop]：向标准输入写入 `stop` 实现优雅关闭；
 /// - [forceStop]：强制终止进程；
 /// - [restart]：停止后重新启动。
 ///
-/// 通过 [logs] 获取合并 stdout/stderr 的原始日志流（不含 IriX 添加的
-/// 时间戳前缀，保留 ANSI 转义序列供控制台彩色渲染）；
+/// 通过 [logs] 获取日志流：每个监听者先收到日志文件的历史尾部回放，
+/// 再收到实时行（原始输出，保留 ANSI 转义序列供控制台彩色渲染）；
 /// 通过 [onExit] 获取进程退出码。
 class ServerProcessManager {
   /// 被管理的服务器实例。
   final ServerInstance instance;
 
-  /// 当前关联的进程，未启动或已退出时为 null。
+  /// dart:io 回退路径的进程对象。
   Process? _process;
 
-  /// 进程标准输入缓存，未启动或已退出时为 null。
+  /// dart:io 回退路径的标准输入。
   IOSink? _stdin;
 
-  /// 合并 stdout/stderr 的日志流控制器（广播，允许多个监听者）。
-  final StreamController<String> _logController =
-      StreamController<String>.broadcast();
+  /// 回退路径下向日志文件的转写流。
+  IOSink? _logSink;
 
-  /// 进程退出完成器；在 [start] 时创建，进程退出时完成。
+  /// 当前托管的服务器进程 PID（Rust 启动 / 回退 / 接管均适用）。
+  int? _pid;
+
+  /// 进程镜像名（如 `java.exe`），供存活检测防 PID 复用。
+  String? _imageName;
+
+  /// 是否为「接管」的外部进程（非本次启动器会话启动，stdin 不可用）。
+  bool _attached = false;
+
+  /// 日志文件尾随器（控制台数据源）。
+  LogFileTailer? _tailer;
+
+  /// 进程退出完成器；在 [start]/[attach] 时创建，进程退出时完成。
   Completer<int>? _exitCompleter;
 
+  /// PID 存活轮询定时器。
+  Timer? _livenessTimer;
+
   bool _disposed = false;
+
+  /// Rust 进程托管 FFI 是否可用（旧 DLL 缺失时回退管道启动）。
+  static bool get _nativeSpawnAvailable => LoggerNative.instance.spawnAvailable;
 
   /// 创建一个进程管理器。
   ///
@@ -47,14 +79,54 @@ class ServerProcessManager {
 
   /// 进程是否正在运行（已启动且尚未退出）。
   bool get isRunning =>
-      _process != null &&
-      _exitCompleter != null &&
-      !_exitCompleter!.isCompleted;
+      _exitCompleter != null && !_exitCompleter!.isCompleted;
 
-  /// 合并 stdout 与 stderr 的日志流。
+  /// 当前托管进程的 PID；未运行时为 null。
+  int? get pid => _pid;
+
+  /// 进程镜像名（如 `java.exe`）；未运行时为 null。
+  String? get imageName => _imageName;
+
+  /// 是否为接管的外部进程。
+  bool get isAttached => _attached;
+
+  /// 是否可向进程发送指令（接管进程的 stdin 已随上次会话断开）。
+  bool get canSendCommands => isRunning && !_attached;
+
+  /// 日志流：每个监听者先回放文件历史尾部，再实时尾随。
   ///
-  /// 原始输出，无额外前缀。
-  Stream<String> get logs => _logController.stream;
+  /// [historyLines] 为回放的历史行数上限（0 表示不回放）。
+  Stream<String> logs({int historyLines = 1000}) {
+    final tailer = _tailer;
+    if (tailer == null) return const Stream<String>.empty();
+    late StreamController<String> controller;
+    StreamSubscription<String>? liveSub;
+    controller = StreamController<String>(
+      onListen: () {
+        unawaited(() async {
+          if (historyLines > 0) {
+            final history = await tailer.readRecentLines(historyLines);
+            if (controller.isClosed) return;
+            for (final line in history) {
+              controller.add(line);
+            }
+          }
+          if (controller.isClosed) return;
+          liveSub = tailer.stream.listen((line) {
+            if (!controller.isClosed) {
+              controller.add(line);
+            }
+          });
+        }());
+      },
+      onCancel: () async {
+        await liveSub?.cancel();
+        liveSub = null;
+        await controller.close();
+      },
+    );
+    return controller.stream;
+  }
 
   /// 进程退出 Future，完成时携带退出码。
   ///
@@ -96,39 +168,66 @@ class ServerProcessManager {
     return tokens;
   }
 
-  /// 将一行日志推入 [logs] 流（控制器已关闭时忽略）。
-  ///
-  /// 原样推送服务器输出（不添加时间戳前缀——服务器自身的日志已含时间戳；
-  /// 保留 ANSI 转义序列，由控制台渲染层解析为彩色文本）。
-  void _emitLog(String line) {
-    if (!_logController.isClosed) {
-      _logController.add(line);
-    }
-  }
-
-  /// 进程退出后的清理：释放进程与 stdin 引用。
-  ///
-  /// 注意：不重置 [_exitCompleter]，以便 [onExit] 在退出后仍可查询到退出码。
-  void _cleanup() {
-    _stdin = null;
-    _process = null;
-  }
-
   /// 启动服务器进程。
   ///
-  /// 解析 [ServerInstance.startCommand]，以 [ServerInstance.rootPath] 为工作目录
-  /// 通过 `Process.start` 启动进程。方法在进程启动后即返回（不等待退出）。
+  /// 优先走 Rust 托管启动（输出直写日志文件）；FFI 不可用时回退
+  /// `Process.start` 管道启动并将输出转写同一日志文件。
+  /// 方法在进程启动后即返回（不等待退出）。
   ///
-  /// 若进程已在运行则抛出 [StateError]；若可执行文件不存在则由 `Process.start` 抛出。
+  /// 若进程已在运行则抛出 [StateError]；若可执行文件不存在则由底层抛出。
   Future<void> start() async {
     if (isRunning) {
       throw StateError('服务器实例 ${instance.name} 已在运行');
     }
 
-    final parts = _parseCommand(instance.startCommand);
-    final executable = parts.first;
-    final args = parts.skip(1).toList();
+    // 完成器先行创建：进程可能瞬间退出（如启动参数错误），
+    // 避免退出回调先于完成器触发导致 onExit 永久悬挂。
+    _exitCompleter = Completer<int>();
 
+    try {
+      final parts = _parseCommand(instance.startCommand);
+      final executable = parts.first;
+      final args = parts.skip(1).toList();
+      final logPath = await LogPersistence.logFilePath(instance.id);
+
+      _tailer ??= LogFileTailer(logPath);
+      await _tailer!.start();
+
+      if (_nativeSpawnAvailable) {
+        await _startNativeRedirect(executable, logPath);
+      } else {
+        await _startPipeFallback(executable, args);
+      }
+    } catch (e) {
+      _completeExit(-1);
+      rethrow;
+    }
+
+    _startLivenessPolling();
+    // 立即补查一轮，快速回收瞬间退出的进程。
+    unawaited(_checkAlive());
+  }
+
+  /// Rust 托管启动：stdout/stderr 直写日志文件，stdin 保留管道。
+  Future<void> _startNativeRedirect(String executable, String logPath) async {
+    final spawnedPid = LoggerNative.instance.spawnProcess(
+      instance.startCommand,
+      instance.rootPath,
+      logPath,
+    );
+    if (spawnedPid <= 0) {
+      final error = LoggerNative.instance.getLastErrorMessage() ?? '未知错误';
+      throw StateError('启动失败：$error');
+    }
+    _pid = spawnedPid;
+    _imageName = p.basename(executable);
+  }
+
+  /// dart:io 管道启动回退：输出解码后转写日志文件（尾随器统一读取）。
+  Future<void> _startPipeFallback(
+    String executable,
+    List<String> args,
+  ) async {
     // 启动进程，工作目录设为实例根目录；不做 shell 引号处理。
     final process = await Process.start(
       executable,
@@ -138,54 +237,161 @@ class ServerProcessManager {
 
     _process = process;
     _stdin = process.stdin;
-    _exitCompleter = Completer<int>();
+    _pid = process.pid;
+    _imageName = p.basename(executable);
 
-    // 订阅 stdout 与 stderr，统一解码并按行推入日志流。
-    process.stdout
-        .transform(utf8.decoder)
-        .transform(const LineSplitter())
-        .listen(_emitLog);
-    process.stderr
-        .transform(utf8.decoder)
-        .transform(const LineSplitter())
-        .listen(_emitLog);
+    final logSink = File(
+      await LogPersistence.logFilePath(instance.id),
+    ).openWrite(mode: FileMode.append);
+    _logSink = logSink;
 
-    // 监听进程退出，完成退出完成器并清理引用。
+    void tee(Stream<List<int>> raw) {
+      raw
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .listen((line) {
+            logSink.writeln(line);
+            // 逐行冲刷，避免 IOSink 缓冲导致控制台/日志文件滞后。
+            unawaited(logSink.flush());
+          });
+    }
+
+    tee(process.stdout);
+    tee(process.stderr);
+
+    // 退出码即时可用（存活轮询作为兜底）。
     unawaited(
       process.exitCode.then((code) {
-        _exitCompleter?.complete(code);
-        _cleanup();
+        _completeExit(code);
+      }).catchError((_) {
+        _completeExit(-1);
       }),
     );
   }
 
-  /// 向服务器标准输入发送命令。
+  /// 接管一个仍在运行的外部进程（上次启动器会话遗留）。
   ///
-  /// 写入 `command\n`，不添加前导 `/`。若进程未运行则不做任何操作。
-  void sendCommand(String command) {
-    final sink = _stdin;
-    if (sink == null || !isRunning) {
+  /// 接管后：状态视为运行中、日志继续尾随该实例的日志文件、
+  /// 支持强制停止；由于 stdin 已随上次会话断开，无法发送指令。
+  Future<void> attach(int existingPid) async {
+    if (isRunning) {
+      throw StateError('服务器实例 ${instance.name} 已在运行');
+    }
+    _exitCompleter = Completer<int>();
+    try {
+      final logPath = await LogPersistence.logFilePath(instance.id);
+      _tailer ??= LogFileTailer(logPath);
+      await _tailer!.start();
+    } catch (e) {
+      _completeExit(-1);
+      rethrow;
+    }
+
+    _attached = true;
+    _pid = existingPid;
+    _startLivenessPolling();
+    // 立即补查一轮：接管前进程可能已退出。
+    unawaited(_checkAlive());
+  }
+
+  /// 启动 PID 存活轮询（每 2 秒），进程退出时完成退出完成器。
+  void _startLivenessPolling() {
+    _livenessTimer?.cancel();
+    _livenessTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      unawaited(_checkAlive());
+    });
+  }
+
+  Future<void> _checkAlive() async {
+    final currentPid = _pid;
+    if (currentPid == null) return;
+    final alive = await ProcessRegistry.isAlive(
+      currentPid,
+      imageName: _imageName,
+    );
+    if (alive) return;
+    if (_exitCompleter == null || _exitCompleter!.isCompleted) return;
+
+    var code = -1;
+    // Rust 托管的子进程先回收句柄取得退出码（接管/回退进程返回 -1/-2）。
+    if (_nativeSpawnAvailable && !_attached) {
+      final reaped = LoggerNative.instance.spawnTryReap(currentPid);
+      if (reaped == -2) return; // 竞态：再等下一轮
+      if (reaped != -1) {
+        code = reaped;
+      }
+    }
+    _completeExit(code);
+  }
+
+  /// 进程退出后的清理：停止轮询、释放进程/stdin 引用与转写流。
+  ///
+  /// 注意：不重置 [_exitCompleter]，以便 [onExit] 在退出后仍可查询到退出码。
+  void _completeExit(int code) {
+    if (_exitCompleter == null || _exitCompleter!.isCompleted) return;
+    _livenessTimer?.cancel();
+    _livenessTimer = null;
+
+    final logSink = _logSink;
+    _logSink = null;
+    if (logSink != null) {
+      unawaited(
+        logSink.flush().then((_) => logSink.close()).catchError((_) {
+          return logSink.close();
+        }),
+      );
+    }
+
+    _process = null;
+    _stdin = null;
+    _pid = null;
+    _imageName = null;
+    _attached = false;
+    _exitCompleter!.complete(code);
+  }
+
+  /// 向服务器标准输入发送一行（不添加前导 `/`）。
+  ///
+  /// 接管的外部进程 stdin 不可用，为空操作。
+  void _writeStdin(String line) {
+    if (!isRunning || _attached) return;
+    final currentPid = _pid;
+    if (_nativeSpawnAvailable && currentPid != null) {
+      LoggerNative.instance.spawnSendStdin(currentPid, line);
       return;
     }
-    sink.writeln(command);
+    _stdin?.writeln(line);
+  }
+
+  /// 向服务器标准输入发送命令。
+  ///
+  /// 写入 `command\n`，不添加前导 `/`。若进程未运行或为接管进程则不做任何操作。
+  void sendCommand(String command) {
+    _writeStdin(command);
   }
 
   /// 优雅停止服务器：向标准输入写入 `stop\n`。
   ///
   /// 仅发送停止指令，不强制 kill 进程，依赖服务器自行处理。
+  /// 接管的外部进程 stdin 不可用，为空操作（UI 会直接提供强制停止）。
   Future<void> stop() async {
-    final sink = _stdin;
-    if (sink == null || !isRunning) {
-      return;
-    }
-    sink.writeln('stop');
+    _writeStdin('stop');
   }
 
   /// 强制终止服务器进程。
   ///
-  /// 调用进程的 `kill` 方法发送强制终止信号
-  /// （Windows 上等价于 TerminateProcess 的硬终止）。
+  /// 优先经 Rust 托管句柄终止；接管进程（非本会话启动）直接用 killPid。
+  /// Windows 上等价于 TerminateProcess 的硬终止。
   Future<void> forceStop() async {
+    final currentPid = _pid;
+    if (currentPid != null) {
+      if (_nativeSpawnAvailable && !_attached) {
+        LoggerNative.instance.spawnKill(currentPid);
+      } else {
+        Process.killPid(currentPid, ProcessSignal.sigkill);
+      }
+      return;
+    }
     _process?.kill(ProcessSignal.sigkill);
   }
 
@@ -196,12 +402,18 @@ class ServerProcessManager {
     await start();
   }
 
-  /// 释放日志流资源。
+  /// 释放日志流资源与轮询定时器。
   ///
   /// 由上层状态层在销毁该管理器时调用；不会终止正在运行的进程。
   void dispose() {
     if (_disposed) return;
     _disposed = true;
-    _logController.close();
+    _livenessTimer?.cancel();
+    _livenessTimer = null;
+    _tailer?.dispose();
+    _tailer = null;
+    final logSink = _logSink;
+    _logSink = null;
+    unawaited(logSink?.close());
   }
 }

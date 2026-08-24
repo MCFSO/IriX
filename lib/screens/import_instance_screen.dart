@@ -7,10 +7,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../state/app_state.dart';
+import '../utils/naming.dart';
 
 /// 导入实例界面。
 ///
-/// 通过 [file_picker] 选择服务器根目录，填入启动命令后创建一个
+/// 通过 [file_picker] 选择服务器根目录，填入实例名称与启动命令后创建一个
 /// 「导入目录」方式的实例。校验失败时以 SnackBar 提示。
 class ImportInstanceScreen extends StatefulWidget {
   /// 创建 [ImportInstanceScreen]。
@@ -21,6 +22,11 @@ class ImportInstanceScreen extends StatefulWidget {
 }
 
 class _ImportInstanceScreenState extends State<ImportInstanceScreen> {
+  /// 实例名称控制器，预填随机名称（导入时可修改）。
+  final TextEditingController _nameController = TextEditingController(
+    text: randomInstanceName(),
+  );
+
   /// 服务器根目录路径控制器。
   final TextEditingController _rootPathController = TextEditingController();
 
@@ -34,6 +40,7 @@ class _ImportInstanceScreenState extends State<ImportInstanceScreen> {
 
   @override
   void dispose() {
+    _nameController.dispose();
     _rootPathController.dispose();
     _startCommandController.dispose();
     super.dispose();
@@ -49,7 +56,8 @@ class _ImportInstanceScreenState extends State<ImportInstanceScreen> {
 
   /// 校验输入并创建实例。
   ///
-  /// 两个字段均不能为空（去除首尾空白后），否则通过 SnackBar 提示。
+  /// 根目录与启动命令不能为空（去除首尾空白后），否则通过 SnackBar 提示。
+  /// 实例名称留空时自动分配随机名称。
   /// 创建成功后通过 [Navigator.pop] 返回上一屏，列表会因
   /// [AppState.notifyListeners] 自动刷新。
   Future<void> _onCreate() async {
@@ -67,6 +75,7 @@ class _ImportInstanceScreenState extends State<ImportInstanceScreen> {
       await context.read<AppState>().createImportedInstance(
         rootPath: rootPath,
         startCommand: startCommand,
+        name: _nameController.text,
       );
       if (mounted) {
         Navigator.pop(context);
@@ -87,6 +96,16 @@ class _ImportInstanceScreenState extends State<ImportInstanceScreen> {
         padding: const EdgeInsets.all(16),
         child: ListView(
           children: [
+            // 实例名称（导入时可修改，留空自动分配随机名称）
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(
+                labelText: '实例名称',
+                hintText: '留空则自动分配随机名称',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
             // 服务器根目录路径：输入框 + 浏览按钮
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,

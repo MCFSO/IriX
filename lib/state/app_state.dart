@@ -15,6 +15,7 @@ import '../services/container/docker_cli_backend.dart';
 import '../services/download_settings.dart';
 import '../services/instance_store.dart';
 import '../services/log_persistence.dart';
+import '../services/process_registry.dart';
 import '../services/server_process.dart';
 import '../utils/naming.dart';
 
@@ -159,10 +160,60 @@ class AppState extends ChangeNotifier {
   /// 初始化：从持久化层加载实例列表与全局设置。
   ///
   /// 加载后实例状态均为 [InstanceStatus.stopped]（由反序列化处理）。
-  /// 不在此处创建进程管理器；管理器在 [startInstance] 时按需创建。
+  /// 随后按 PID 登记表检测上次会话遗留的服务器进程，存活则接管
+  /// （恢复运行状态、继续尾随其日志文件）。
   Future<void> init() async {
     _instances = await _store.loadInstances();
     _downloadThreads = await DownloadSettings.getThreads();
+    notifyListeners();
+    await _adoptOrphanedProcesses();
+  }
+
+  /// 接管上次启动器会话遗留、仍在运行的服务器进程。
+  ///
+  /// 对每个原生实例读取 PID 登记表（settings 表）：
+  /// - 进程已死（或登记不存在）：清除登记，实例保持已关闭；
+  /// - 进程存活：创建接管模式的管理器，恢复运行状态并挂载退出监听，
+  ///   日志继续尾随该实例的日志文件（终端接管）。
+  Future<void> _adoptOrphanedProcesses() async {
+    for (final instance in List<ServerInstance>.of(_instances)) {
+      if (instance.runMode != RunMode.native) continue;
+      if (_managers.containsKey(instance.id)) continue;
+      if (instance.status.isActive) continue;
+
+      final record = await ProcessRegistry.read(instance.id);
+      if (record == null || record.pid <= 0) continue;
+
+      final alive = await ProcessRegistry.isAlive(
+        record.pid,
+        imageName: record.imageName,
+      );
+      if (!alive) {
+        await ProcessRegistry.clear(instance.id);
+        continue;
+      }
+
+      await _adoptInstance(instance, record.pid);
+    }
+  }
+
+  /// 以接管模式恢复指定实例的运行状态（进程存活时）。
+  ///
+  /// 创建接管管理器、置为运行中并挂载退出监听；失败时清理登记保持已关闭。
+  Future<void> _adoptInstance(ServerInstance instance, int pid) async {
+    if (_managers.containsKey(instance.id)) return;
+    if (instance.status.isActive) return;
+    final manager = ServerProcessManager(instance: instance);
+    try {
+      await manager.attach(pid);
+    } catch (_) {
+      manager.dispose();
+      await ProcessRegistry.clear(instance.id);
+      return;
+    }
+    _managers[instance.id] = manager;
+    instance.status = InstanceStatus.running;
+    _watchExit(instance.id, manager);
     notifyListeners();
   }
 
@@ -183,13 +234,16 @@ class AppState extends ChangeNotifier {
   /// 创建一个通过"导入目录"方式的实例。
   ///
   /// [coreFilePath] 留空，[coreType]/[coreVersion] 为 null。
+  /// [name] 为空或纯空白时自动分配随机名称。
   Future<void> createImportedInstance({
     required String rootPath,
     required String startCommand,
+    String? name,
   }) async {
+    final trimmedName = name?.trim() ?? '';
     final instance = ServerInstance(
       id: _generateId(),
-      name: randomInstanceName(),
+      name: trimmedName.isEmpty ? randomInstanceName() : trimmedName,
       rootPath: rootPath,
       coreFilePath: '',
       startCommand: startCommand,
@@ -253,6 +307,7 @@ class AppState extends ChangeNotifier {
       await manager.forceStop();
       manager.dispose();
     }
+    await ProcessRegistry.clear(id);
     // Docker 实例：尽力删除对应容器（容器不可达时忽略）。
     if (instance != null && instance.runMode == RunMode.docker) {
       try {
@@ -305,7 +360,7 @@ class AppState extends ChangeNotifier {
   /// 为指定实例挂载进程退出监听。
   ///
   /// 当进程自然退出时，将实例状态置为 [InstanceStatus.stopped]、
-  /// 移除并释放对应管理器，然后通知监听者。
+  /// 移除并释放对应管理器、清除 PID 登记，然后通知监听者。
   /// 在重启过程中（状态为 [InstanceStatus.restarting]）跳过处理，
   /// 由 [restartInstance] 在重启结束后重新挂载监听。
   void _watchExit(String id, ServerProcessManager manager) {
@@ -322,7 +377,7 @@ class AppState extends ChangeNotifier {
           _managers.remove(id);
           captured.dispose();
         }
-        LogPersistence.instance.stopWatching(id);
+        unawaited(ProcessRegistry.clear(id));
         notifyListeners();
       }),
     );
@@ -330,8 +385,9 @@ class AppState extends ChangeNotifier {
 
   /// 启动指定实例。
   ///
-  /// 原生实例：按需创建 [ServerProcessManager]，置为启动中→启动进程→置为运行中，
-  /// 并挂载退出监听；进程启动失败（如 java 未找到）时重置状态为已关闭并清理管理器。
+  /// 原生实例：按需创建 [ServerProcessManager]，置为启动中→启动进程→记录 PID
+  /// 登记→置为运行中，并挂载退出监听；进程启动失败（如 java 未找到）时重置状态
+  /// 为已关闭并清理管理器。
   /// Docker 实例：容器不存在则先按 [ContainerConfig] 创建，再 `docker start`，
   /// 状态经 [_ensureDockerPolling] 轮询同步。
   Future<void> startInstance(String id) async {
@@ -345,6 +401,21 @@ class AppState extends ChangeNotifier {
     if (instance.runMode == RunMode.docker) {
       await _startDockerInstance(instance);
       return;
+    }
+
+    // 防重复启动：启动初期接管流程可能仍在进行，先检查 PID 登记表，
+    // 若上次会话遗留的进程仍存活则接管它，而不是再拉起一个服务器。
+    final leftover = await ProcessRegistry.read(id);
+    if (leftover != null && leftover.pid > 0) {
+      final stillAlive = await ProcessRegistry.isAlive(
+        leftover.pid,
+        imageName: leftover.imageName,
+      );
+      if (stillAlive) {
+        await _adoptInstance(instance, leftover.pid);
+        return;
+      }
+      await ProcessRegistry.clear(id);
     }
 
     var manager = _managers[id];
@@ -362,11 +433,20 @@ class AppState extends ChangeNotifier {
       instance.status = InstanceStatus.stopped;
       _managers.remove(id);
       manager.dispose();
+      await ProcessRegistry.clear(id);
       notifyListeners();
       rethrow;
     }
 
-    LogPersistence.instance.startWatching(id, manager.logs);
+    // 记录 PID，供启动器重启后检测进程并接管终端。
+    await ProcessRegistry.record(
+      id,
+      RunningProcessRecord(
+        pid: manager.pid ?? 0,
+        imageName: manager.imageName ?? '',
+        startedAt: DateTime.now().toIso8601String(),
+      ),
+    );
     _watchExit(id, manager);
 
     instance.status = InstanceStatus.running;
@@ -471,11 +551,21 @@ class AppState extends ChangeNotifier {
       instance.status = InstanceStatus.stopped;
       _managers.remove(id);
       manager.dispose();
+      await ProcessRegistry.clear(id);
       notifyListeners();
       rethrow;
     }
 
     _managers[id] = manager;
+    // 重启后进程 PID 已变化，重新登记。
+    await ProcessRegistry.record(
+      id,
+      RunningProcessRecord(
+        pid: manager.pid ?? 0,
+        imageName: manager.imageName ?? '',
+        startedAt: DateTime.now().toIso8601String(),
+      ),
+    );
     _watchExit(id, manager);
 
     instance.status = InstanceStatus.running;
@@ -504,8 +594,14 @@ class AppState extends ChangeNotifier {
   /// 获取指定实例的进程管理器（可空）。
   ServerProcessManager? managerFor(String id) => _managers[id];
 
+  /// 指定实例当前是否为「接管」状态（由上次会话遗留的进程接管而来）。
+  ///
+  /// 接管进程的 stdin 已随上次会话断开，UI 据此禁用指令输入并提示强制停止。
+  bool isInstanceAdopted(String id) => _managers[id]?.isAttached ?? false;
+
   /// 获取指定实例的日志流（可空）。
   ///
+  /// 原生实例：先回放日志文件历史尾部，再实时尾随（含接管进程）。
   /// Docker 实例返回基于 `docker logs` 轮询的流（每 2 秒取尾部增量）。
   Stream<String>? logsFor(String id) {
     final instance = _instanceById(id);
@@ -513,7 +609,7 @@ class AppState extends ChangeNotifier {
     if (instance.runMode == RunMode.docker) {
       return _dockerLogsStream(instance);
     }
-    return _managers[id]?.logs;
+    return _managers[id]?.logs();
   }
 
   /// Docker 日志轮询流：每 2 秒拉取容器日志尾部，只发出增量行。
