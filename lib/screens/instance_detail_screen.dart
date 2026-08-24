@@ -15,6 +15,8 @@ import '../services/backup_ffi.dart';
 import '../services/backup_settings.dart';
 import '../services/background_tasks.dart';
 import '../services/font_settings.dart';
+import '../services/log_persistence.dart';
+import '../services/log_tailer.dart';
 import '../state/app_state.dart';
 import '../utils/ansi_color.dart';
 import '../utils/apple_widgets.dart';
@@ -156,6 +158,28 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
         }
       });
     });
+    // 回放日志文件历史尾部：打开终端即可看到此前输出
+    // （含启动器关闭期间服务器持续写入的日志）。
+    unawaited(_seedHistory());
+  }
+
+  /// 从日志文件回放历史尾部到终端。
+  Future<void> _seedHistory() async {
+    // 捕获实例 id，防止页面切换实例后过期回放污染新实例的终端。
+    final id = widget.instanceId;
+    try {
+      final logPath = await LogPersistence.logFilePath(id);
+      final lines = await LogFileTailer.readRecentLinesFrom(logPath, 1000);
+      if (!mounted || widget.instanceId != id || lines.isEmpty) return;
+      setState(() {
+        _logs.addAll(lines);
+        if (_logs.length > 2000) {
+          _logs.removeRange(0, _logs.length - 2000);
+        }
+      });
+    } catch (_) {
+      // 历史回放失败不影响实时日志。
+    }
   }
 
   void _onAppStateChanged() {

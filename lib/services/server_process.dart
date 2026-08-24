@@ -58,8 +58,19 @@ class ServerProcessManager {
   /// 是否为「接管」的外部进程（非本次启动器会话启动，stdin 不可用）。
   bool _attached = false;
 
+  /// 日志广播控制器：管理器创建即存在，订阅者可跨启动阶段接入
+  /// （启动中订阅也能收到后续日志），由日志文件尾随器桥接喂入。
+  final StreamController<String> _logController =
+      StreamController<String>.broadcast();
+
   /// 日志文件尾随器（控制台数据源）。
   LogFileTailer? _tailer;
+
+  /// 尾随器 → 日志广播的桥接订阅。
+  StreamSubscription<String>? _tailerSubscription;
+
+  /// 尾随器是否正在初始化（防并发重复创建）。
+  bool _tailerStarting = false;
 
   /// 进程退出完成器；在 [start]/[attach] 时创建，进程退出时完成。
   Completer<int>? _exitCompleter;
@@ -93,39 +104,39 @@ class ServerProcessManager {
   /// 是否可向进程发送指令（接管进程的 stdin 已随上次会话断开）。
   bool get canSendCommands => isRunning && !_attached;
 
-  /// 日志流：每个监听者先回放文件历史尾部，再实时尾随。
+  /// 日志流（稳定广播流）。
   ///
-  /// [historyLines] 为回放的历史行数上限（0 表示不回放）。
-  Stream<String> logs({int historyLines = 1000}) {
-    final tailer = _tailer;
-    if (tailer == null) return const Stream<String>.empty();
-    late StreamController<String> controller;
-    StreamSubscription<String>? liveSub;
-    controller = StreamController<String>(
-      onListen: () {
-        unawaited(() async {
-          if (historyLines > 0) {
-            final history = await tailer.readRecentLines(historyLines);
-            if (controller.isClosed) return;
-            for (final line in history) {
-              controller.add(line);
-            }
-          }
-          if (controller.isClosed) return;
-          liveSub = tailer.stream.listen((line) {
-            if (!controller.isClosed) {
-              controller.add(line);
-            }
-          });
-        }());
-      },
-      onCancel: () async {
-        await liveSub?.cancel();
-        liveSub = null;
-        await controller.close();
-      },
-    );
-    return controller.stream;
+  /// 管理器创建即存在：即使在进程启动完成前订阅（如「启动中」状态），
+  /// 也能收到日志。尾随器就绪时会先推入日志文件的历史尾部，
+  /// 之后实时推送（原始输出，保留 ANSI 转义序列供控制台彩色渲染）。
+  Stream<String> get logs => _logController.stream;
+
+  /// 确保日志文件尾随器就绪并桥接到日志广播。
+  ///
+  /// 首次调用时创建尾随器（从文件当前末尾开始实时尾随）并桥接其流；
+  /// 历史内容由 UI 层在订阅时自行回放（见 InstanceDetailScreen._seedHistory）。
+  Future<void> _ensureTailer() async {
+    if (_tailer != null || _tailerStarting) return;
+    _tailerStarting = true;
+    try {
+      final logPath = await LogPersistence.logFilePath(instance.id);
+      final tailer = LogFileTailer(logPath);
+      await tailer.start();
+      if (_disposed || _logController.isClosed) {
+        tailer.dispose();
+        return;
+      }
+      _tailer = tailer;
+      _tailerSubscription = tailer.stream.listen((line) {
+        if (!_logController.isClosed) {
+          _logController.add(line);
+        }
+      });
+    } catch (_) {
+      // 日志文件暂不可用时保持空流，进程本身不受影响。
+    } finally {
+      _tailerStarting = false;
+    }
   }
 
   /// 进程退出 Future，完成时携带退出码。
@@ -190,8 +201,7 @@ class ServerProcessManager {
       final args = parts.skip(1).toList();
       final logPath = await LogPersistence.logFilePath(instance.id);
 
-      _tailer ??= LogFileTailer(logPath);
-      await _tailer!.start();
+      await _ensureTailer();
 
       if (_nativeSpawnAvailable) {
         await _startNativeRedirect(executable, logPath);
@@ -279,9 +289,7 @@ class ServerProcessManager {
     }
     _exitCompleter = Completer<int>();
     try {
-      final logPath = await LogPersistence.logFilePath(instance.id);
-      _tailer ??= LogFileTailer(logPath);
-      await _tailer!.start();
+      await _ensureTailer();
     } catch (e) {
       _completeExit(-1);
       rethrow;
@@ -410,8 +418,11 @@ class ServerProcessManager {
     _disposed = true;
     _livenessTimer?.cancel();
     _livenessTimer = null;
+    unawaited(_tailerSubscription?.cancel());
+    _tailerSubscription = null;
     _tailer?.dispose();
     _tailer = null;
+    _logController.close();
     final logSink = _logSink;
     _logSink = null;
     unawaited(logSink?.close());

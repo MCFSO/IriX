@@ -601,7 +601,7 @@ class AppState extends ChangeNotifier {
 
   /// 获取指定实例的日志流（可空）。
   ///
-  /// 原生实例：先回放日志文件历史尾部，再实时尾随（含接管进程）。
+  /// 原生实例：管理器日志广播流（含启动前的历史回放与接管进程的日志）。
   /// Docker 实例返回基于 `docker logs` 轮询的流（每 2 秒取尾部增量）。
   Stream<String>? logsFor(String id) {
     final instance = _instanceById(id);
@@ -609,7 +609,7 @@ class AppState extends ChangeNotifier {
     if (instance.runMode == RunMode.docker) {
       return _dockerLogsStream(instance);
     }
-    return _managers[id]?.logs();
+    return _managers[id]?.logs;
   }
 
   /// Docker 日志轮询流：每 2 秒拉取容器日志尾部，只发出增量行。

@@ -417,6 +417,15 @@ pub extern "C" fn spawn_with_log(
         .stdout(Stdio::from(log_file))
         .stderr(Stdio::from(log_clone));
 
+    // 隐藏子进程控制台窗口：IriX 本身是 GUI 程序，服务器输出已重定向到日志文件，
+    // 无需为控制台子系统的子进程（java.exe 等）弹出可见终端窗口。
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        builder.creation_flags(CREATE_NO_WINDOW);
+    }
+
     match builder.spawn() {
         Ok(mut child) => {
             let pid = child.id();

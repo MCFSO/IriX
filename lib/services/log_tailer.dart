@@ -81,7 +81,16 @@ class LogFileTailer {
   }
 
   /// 读取文件尾部最近 [maxLines] 行（用于终端打开时的历史回放）。
-  Future<List<String>> readRecentLines(int maxLines) async {
+  Future<List<String>> readRecentLines(int maxLines) =>
+      readRecentLinesFrom(filePath, maxLines);
+
+  /// 静态版本：从任意日志文件路径读取尾部最近 [maxLines] 行（原始输出，不去 ANSI）。
+  ///
+  /// 只读取文件末尾至多 [_maxHistoryBytes] 字节，避免大文件全量加载。
+  static Future<List<String>> readRecentLinesFrom(
+    String filePath,
+    int maxLines,
+  ) async {
     try {
       final file = File(filePath);
       if (!await file.exists()) return const <String>[];
