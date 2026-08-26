@@ -142,8 +142,8 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
 msix_config:
-  display_name: X Minecraft Server Launcher
-  publisher_display_name: MCFSO
+  display_name: Irix
+  publisher_display_name: Zachary_QwQ
   identity_name: org.mcfso.lrix
   msix_version: 1.0.0.0
   logo_path: windows/runner/resources/app_icon.ico
