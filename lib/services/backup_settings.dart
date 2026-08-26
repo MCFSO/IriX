@@ -1,7 +1,7 @@
 // 备份压缩设置 - 每实例独立存储
 // 使用 SQLite (settings 表) 持久化 Deflate 压缩级别 (0-9)
 
-import '../services/database_manager.dart';
+import 'settings_repository.dart';
 
 /// 备份压缩级别标签
 const _compressionLabels = <int, String>{
@@ -23,17 +23,18 @@ class BackupSettings {
 
   /// 获取实例的压缩级别
   static Future<int> getLevel(String instanceId) async {
-    final v = await DatabaseManager.instance.getIntSetting(
+    final v = await SettingsRepository.instance.getIntOrNull(
       'backup_compression_level_$instanceId',
+      label: 'backup compression level',
     );
     return v ?? _defaultLevel;
   }
 
   /// 设置实例的压缩级别
-  static Future<void> setLevel(String instanceId, int level) async {
-    await DatabaseManager.instance.setIntSetting(
-      'backup_compression_level_$instanceId',
-      level,
-    );
-  }
+  static Future<void> setLevel(String instanceId, int level) =>
+      SettingsRepository.instance.setInt(
+        'backup_compression_level_$instanceId',
+        level,
+        label: 'backup compression level',
+      );
 }

@@ -17,6 +17,7 @@ import 'dart:typed_data';
 import 'package:path/path.dart' as p;
 
 import '../models/node.dart';
+import '../models/node_ops.dart';
 import '../models/remote.dart';
 import '../models/vault.dart';
 import '../services/downloader.dart';
@@ -105,6 +106,13 @@ class NodeApiClient {
   /// 不会跨调用点保留 —— 保险库流程请持有同一个客户端实例。
   String vaultToken = '';
 
+  /// 账户会话令牌（账户认证接口，见 accounts_handlers.go）。
+  ///
+  /// 非空时所有请求自动附带 `X-Auth-Token` 请求头。与 [apiKey] 通道并存：
+  /// apikey 直通 root 管理员，账户会话令牌走按端点开关鉴权的普通账户。
+  /// [accountLogin] 成功后由调用方写入；未启用账户系统的节点保持为空。
+  String authToken = '';
+
   /// 便捷构造：由节点信息创建客户端。
   ///
   /// MCSM 面板仅认查询参数形式的 apikey，因此该类节点保留查询参数
@@ -140,6 +148,9 @@ class NodeApiClient {
     var result = headers;
     if (apiKey.isNotEmpty) {
       result = {...result, 'X-Api-Key': apiKey};
+    }
+    if (authToken.isNotEmpty) {
+      result = {...result, 'X-Auth-Token': authToken};
     }
     final token = vaultToken ?? this.vaultToken;
     if (token.isNotEmpty) {
@@ -1811,6 +1822,920 @@ class NodeApiClient {
     );
     return data is Map<String, dynamic> ? data : null;
   }
+
+  // ==================== 实例日志 / 指标（irix-node）====================
+
+  /// 读取实例历史日志（GET /api/instance/logs，见 instance_logs.go）。
+  ///
+  /// [tail] 返回最后 N 行（默认 1000；显式 0 表示全部）；
+  /// [since] 为 unix 毫秒，返回该时间点后追加的行（断线补发用）。
+  Future<String> instanceLogs({
+    required String uuid,
+    required String daemonId,
+    int? tail,
+    int? since,
+  }) async {
+    final data = await _request(
+      'GET',
+      '/api/instance/logs',
+      query: {
+        'uuid': uuid,
+        'daemonId': daemonId,
+        if (tail != null) 'tail': '$tail',
+        if (since != null) 'since': '$since',
+      },
+    );
+    return (data as String?) ?? '';
+  }
+
+  /// 清空实例日志（DELETE /api/instance/logs，见 instance_logs.go）。
+  Future<void> clearInstanceLogs({
+    required String uuid,
+    required String daemonId,
+  }) async {
+    await _request(
+      'DELETE',
+      '/api/instance/logs',
+      query: {'uuid': uuid, 'daemonId': daemonId},
+    );
+  }
+
+  /// 实例实时运行指标（GET /api/instance/stats，见 instance_stats.go）。
+  ///
+  /// 返回 pid / CPU / 内存 / 网络 / 运行时长，以及解析出的 players /
+  /// maxPlayers / tps（未解析时字段为 -1）。
+  Future<InstanceStatsData> instanceStats({
+    required String uuid,
+    required String daemonId,
+  }) async {
+    final data = await _request(
+      'GET',
+      '/api/instance/stats',
+      query: {'uuid': uuid, 'daemonId': daemonId},
+    );
+    return InstanceStatsData.fromJson((data as Map<String, dynamic>?) ?? {});
+  }
+
+  /// 实例监控历史采样（GET /api/instance/metrics，见 instance_metrics.go）。
+  ///
+  /// 节点每 15s 采样一次运行中实例，环形保留 60 条（15 分钟）。
+  /// [minutes] 默认 15，最大 60。返回采样列表。
+  Future<List<MetricSample>> instanceMetrics({
+    required String uuid,
+    required String daemonId,
+    int minutes = 15,
+  }) async {
+    final data = await _request(
+      'GET',
+      '/api/instance/metrics',
+      query: {
+        'uuid': uuid,
+        'daemonId': daemonId,
+        'minutes': '$minutes',
+      },
+    );
+    final samples = <MetricSample>[];
+    if (data is Map<String, dynamic>) {
+      for (final item in (data['samples'] as List<dynamic>? ?? [])) {
+        if (item is Map<String, dynamic>) {
+          samples.add(MetricSample.fromJson(item));
+        }
+      }
+    }
+    return samples;
+  }
+
+  /// AI 结构化日志查询（GET /api/instance/logs/query，见 instance_metrics.go）。
+  ///
+  /// 退化实现：tail 全文 + 关键词过滤。[keyword] 为空时返回最近 [maxLines] 行。
+  /// 返回匹配行列表与总数。
+  Future<Map<String, dynamic>> logsQuery({
+    required String uuid,
+    required String daemonId,
+    String? keyword,
+    int? maxLines,
+  }) async {
+    final data = await _request(
+      'GET',
+      '/api/instance/logs/query',
+      query: {
+        'uuid': uuid,
+        'daemonId': daemonId,
+        if (keyword != null && keyword.isNotEmpty) 'keyword': keyword,
+        if (maxLines != null) 'maxLines': '$maxLines',
+      },
+    );
+    return data is Map<String, dynamic> ? data : {};
+  }
+
+  // ==================== 实例导入（irix-node）====================
+
+  /// 从节点侧目录导入创建实例（POST /api/instance/import，见 instance_import.go）。
+  ///
+  /// 节点校验目录存在 → 扫描服务端特征（*.jar / eula.txt / server.properties
+  /// 等）→ 自动创建实例（cwd=该目录）。返回新实例 UUID。
+  Future<String> importInstance({
+    required String daemonId,
+    required String path,
+    String? nickname,
+  }) async {
+    final data = await _request(
+      'POST',
+      '/api/instance/import',
+      body: {
+        'daemonId': daemonId,
+        'path': path,
+        if (nickname != null && nickname.isNotEmpty) 'nickname': nickname,
+      },
+    );
+    return (data is Map ? data['instanceUuid'] : null) as String? ?? '';
+  }
+
+  // ==================== 实例快照 / 备份（irix-node）====================
+
+  /// 创建实例快照（POST /api/instance/snapshot，见 backup.go）。
+  ///
+  /// 实例 cwd 打成 zip 存入节点备份区，任务化（[snapshotProgress] 轮询）。
+  /// 返回任务 id。
+  Future<String> instanceSnapshot({
+    required String uuid,
+    required String daemonId,
+  }) async {
+    final data = await _request(
+      'POST',
+      '/api/instance/snapshot',
+      body: {'uuid': uuid, 'daemonId': daemonId},
+    );
+    return (data is Map ? data['jobId'] : null) as String? ?? '';
+  }
+
+  /// 快照 / 恢复任务进度（GET /api/instance/snapshot-progress，见 backup.go）。
+  ///
+  /// 字段对齐文档 §4.5：`status` / `percent` / `message` / `archivePath`。
+  Future<NodeTaskProgress> snapshotProgress(String jobId) async {
+    final data = await _request(
+      'GET',
+      '/api/instance/snapshot-progress',
+      query: {'jobId': jobId},
+    );
+    return NodeTaskProgress.fromJson((data as Map<String, dynamic>?) ?? {});
+  }
+
+  /// 恢复实例快照（POST /api/instance/restore，见 backup.go）。
+  ///
+  /// 先自动停止实例 → 解压覆盖 cwd → 保持停止，任务化。返回任务 id。
+  Future<String> instanceRestore({
+    required String uuid,
+    required String daemonId,
+    required String archivePath,
+  }) async {
+    final data = await _request(
+      'POST',
+      '/api/instance/restore',
+      body: {'uuid': uuid, 'daemonId': daemonId, 'archivePath': archivePath},
+    );
+    return (data is Map ? data['jobId'] : null) as String? ?? '';
+  }
+
+  /// 列出实例备份（GET /api/instance/backups，见 backup.go）。
+  Future<List<BackupItem>> listBackups({
+    required String uuid,
+    required String daemonId,
+  }) async {
+    final data = await _request(
+      'GET',
+      '/api/instance/backups',
+      query: {'uuid': uuid, 'daemonId': daemonId},
+    );
+    final list = <BackupItem>[];
+    if (data is Map<String, dynamic>) {
+      for (final item in (data['items'] as List<dynamic>? ?? [])) {
+        if (item is Map<String, dynamic>) {
+          list.add(BackupItem.fromJson(item));
+        }
+      }
+    }
+    return list;
+  }
+
+  /// 删除指定备份（DELETE /api/instance/backups，见 backup.go）。
+  ///
+  /// [paths] 为备份文件绝对路径列表（须位于实例备份区内）。
+  Future<void> deleteBackups({
+    required String uuid,
+    required String daemonId,
+    required List<String> paths,
+  }) async {
+    await _request(
+      'DELETE',
+      '/api/instance/backups',
+      query: {'uuid': uuid, 'daemonId': daemonId},
+      body: {'paths': paths},
+    );
+  }
+
+  /// 申请备份下载票据（POST /api/instance/backups/download，见 backup.go）。
+  ///
+  /// 票据绑定单个备份文件，直连下载走 [DownloadTicket]。
+  Future<DownloadTicket> backupDownloadTicket({
+    required String uuid,
+    required String path,
+    Duration? timeout,
+  }) async {
+    final data = await _request(
+      'POST',
+      '/api/instance/backups/download',
+      query: {'uuid': uuid},
+      body: {'path': path},
+      timeout: timeout ?? this.timeout,
+    );
+    final map = data is Map<String, dynamic> ? data : {};
+    return DownloadTicket(
+      password: map['password'] as String? ?? '',
+      addr: map['addr'] as String? ?? '',
+      fileName: path.split('/').last,
+    );
+  }
+
+  // ==================== 实例核心下载（irix-node）====================
+
+  /// 下载服务端核心到实例根目录（POST /api/instance/download-core，见 core_download.go）。
+  ///
+  /// 节点直连下载核心 jar（客户端不中转字节），可选 [sha512] 流式校验，
+  /// 完成后 rename 就位。任务化（[snapshotProgress] 同款进度轮询复用，
+  /// 字段为 `status` / `percent` / `message` / `path`）。
+  Future<String> downloadCore({
+    required String uuid,
+    required String url,
+    required String fileName,
+    String? sha512,
+  }) async {
+    final data = await _request(
+      'POST',
+      '/api/instance/download-core',
+      body: {
+        'uuid': uuid,
+        'url': url,
+        'fileName': fileName,
+        if (sha512 != null && sha512.isNotEmpty) 'sha512': sha512,
+      },
+    );
+    return (data is Map ? data['jobId'] : null) as String? ?? '';
+  }
+
+  /// 核心下载任务进度（GET /api/instance/download-core-progress，见 core_download.go）。
+  ///
+  /// 字段对齐 snapshotProgress：`status` / `percent` / `message` / `path`。
+  Future<NodeTaskProgress> coreDownloadProgress(String jobId) async {
+    final data = await _request(
+      'GET',
+      '/api/instance/download-core-progress',
+      query: {'jobId': jobId},
+    );
+    return NodeTaskProgress.fromJson((data as Map<String, dynamic>?) ?? {});
+  }
+
+  // ==================== Java 运行时（irix-node）====================
+
+  /// 检测节点上的全部 Java 运行时（GET /api/runtime/java，见 runtime.go）。
+  ///
+  /// [default] 为可用版本号最高的运行时（无可用时为 null）。
+  Future<({JavaRuntime? defaultRuntime, List<JavaRuntime> all})>
+      javaRuntimes() async {
+    final data = await _request('GET', '/api/runtime/java');
+    final all = <JavaRuntime>[];
+    if (data is Map<String, dynamic>) {
+      for (final item in (data['all'] as List<dynamic>? ?? [])) {
+        if (item is Map<String, dynamic>) {
+          all.add(JavaRuntime.fromJson(item));
+        }
+      }
+      final def = data['default'];
+      final defaultRuntime =
+          def is Map<String, dynamic> ? JavaRuntime.fromJson(def) : null;
+      return (defaultRuntime: defaultRuntime, all: all);
+    }
+    return (defaultRuntime: null, all: all);
+  }
+
+  /// 安装指定大版本 JDK（POST /api/runtime/java/install，见 jdk_install.go）。
+  ///
+  /// 节点直连 Adoptium 下载并解压到 `{data}/jdk/jdk-<major>/`。返回任务 id。
+  Future<String> installJava(int major) async {
+    final data = await _request(
+      'POST',
+      '/api/runtime/java/install',
+      body: {'major': major},
+    );
+    return (data is Map ? data['jobId'] : null) as String? ?? '';
+  }
+
+  /// JDK 安装进度（GET /api/runtime/java/install-progress，见 jdk_install.go）。
+  Future<NodeTaskProgress> javaInstallProgress(String jobId) async {
+    final data = await _request(
+      'GET',
+      '/api/runtime/java/install-progress',
+      query: {'jobId': jobId},
+    );
+    return NodeTaskProgress.fromJson((data as Map<String, dynamic>?) ?? {});
+  }
+
+  /// 卸载指定版本 JDK（DELETE /api/runtime/java?major=，见 jdk_install.go）。
+  Future<void> uninstallJava(int major) async {
+    await _request(
+      'DELETE',
+      '/api/runtime/java',
+      query: {'major': '$major'},
+    );
+  }
+
+  // ==================== 实例级回收站（irix-node）====================
+
+  /// 删除文件到回收站（POST /api/files/trash，见 trash.go）。
+  ///
+  /// [targets] 为实例内路径列表（相对 cwd）；节点不支持时调用方回退硬删除。
+  Future<void> trashFiles({
+    required String daemonId,
+    required String uuid,
+    required List<String> targets,
+  }) async {
+    await _request(
+      'POST',
+      '/api/files/trash',
+      query: {'daemonId': daemonId},
+      body: {'uuid': uuid, 'targets': targets},
+    );
+  }
+
+  /// 列出回收站内容（GET /api/files/trash/list，见 trash.go）。
+  Future<List<TrashItem>> trashList({
+    required String daemonId,
+    required String uuid,
+  }) async {
+    final data = await _request(
+      'GET',
+      '/api/files/trash/list',
+      query: {'daemonId': daemonId, 'uuid': uuid},
+    );
+    final list = <TrashItem>[];
+    if (data is Map<String, dynamic>) {
+      for (final item in (data['items'] as List<dynamic>? ?? [])) {
+        if (item is Map<String, dynamic>) {
+          list.add(TrashItem.fromJson(item));
+        }
+      }
+    }
+    return list;
+  }
+
+  /// 恢复回收站条目（POST /api/files/trash/restore，见 trash.go）。
+  ///
+  /// 返回 `{id: 实际恢复路径}`；目标冲突时节点自动改名。
+  Future<Map<String, String>> trashRestore({
+    required String daemonId,
+    required String uuid,
+    required List<String> ids,
+  }) async {
+    final data = await _request(
+      'POST',
+      '/api/files/trash/restore',
+      query: {'daemonId': daemonId},
+      body: {'uuid': uuid, 'ids': ids},
+    );
+    final map = <String, String>{};
+    if (data is Map) {
+      for (final key in data.keys) {
+        map[key] = (data[key] as String?) ?? '';
+      }
+    }
+    return map;
+  }
+
+  /// 永久删除回收站内容（POST /api/files/trash/empty，见 trash.go）。
+  ///
+  /// [ids] 为空（null 或不传）时清空全部。
+  Future<void> trashEmpty({
+    required String daemonId,
+    required String uuid,
+    List<String>? ids,
+  }) async {
+    await _request(
+      'POST',
+      '/api/files/trash/empty',
+      query: {'daemonId': daemonId},
+      body: {
+        'uuid': uuid,
+        if (ids != null) 'ids': ids,
+      },
+    );
+  }
+
+  // ==================== 节点端内网穿透 FRP（irix-node）====================
+
+  /// frpc 二进制状态与隧道列表（GET /api/frp/status，见 frp.go）。
+  Future<({FrpcBinaryInfo binary, List<FrpTunnelInfo> tunnels})> frpStatus()
+      async {
+    final data = await _request('GET', '/api/frp/status');
+    final tunnels = <FrpTunnelInfo>[];
+    if (data is Map<String, dynamic>) {
+      for (final item in (data['tunnels'] as List<dynamic>? ?? [])) {
+        if (item is Map<String, dynamic>) {
+          tunnels.add(FrpTunnelInfo.fromJson(item));
+        }
+      }
+      final bin = data['binary'];
+      final binary =
+          bin is Map<String, dynamic> ? FrpcBinaryInfo.fromJson(bin) : null;
+      return (
+        binary: binary ?? const FrpcBinaryInfo(),
+        tunnels: tunnels,
+      );
+    }
+    return (binary: const FrpcBinaryInfo(), tunnels: tunnels);
+  }
+
+  /// 创建并启动隧道（POST /api/frp/tunnels，见 frp.go）。
+  ///
+  /// [config] 字段随 [provider]（self：完整 toml；openfrp/sakura：node/port 等）。
+  /// 返回隧道 id。
+  Future<String> frpCreateTunnel({
+    required String name,
+    required String provider,
+    required Map<String, dynamic> config,
+  }) async {
+    final data = await _request(
+      'POST',
+      '/api/frp/tunnels',
+      body: {'name': name, 'provider': provider, 'config': config},
+    );
+    return (data is Map ? data['tunnelId'] : null) as String? ?? '';
+  }
+
+  /// 启停单隧道（POST /api/frp/tunnels/{id}/start|stop，见 frp.go）。
+  Future<void> frpTunnelAction(String id, String action) async {
+    await _request('POST', '/api/frp/tunnels/$id/$action');
+  }
+
+  /// 删除隧道（DELETE /api/frp/tunnels/{id}，见 frp.go）。
+  Future<void> frpDeleteTunnel(String id) async {
+    await _request('DELETE', '/api/frp/tunnels/$id');
+  }
+
+  /// 隧道运行日志（GET /api/frp/tunnels/{id}/logs，见 frp.go）。
+  ///
+  /// [tailKb] 返回最后 N KB（默认 100）。
+  Future<String> frpTunnelLogs(String id, {int tailKb = 100}) async {
+    final data = await _request(
+      'GET',
+      '/api/frp/tunnels/$id/logs',
+      query: {'tail': '$tailKb'},
+    );
+    return (data as String?) ?? '';
+  }
+
+  /// 上传 frpc 二进制（POST /api/frp/binary，multipart 字段 file）。
+  ///
+  /// 与直连上传同款手工 multipart 构造，网络传输由 Rust http_client 负责。
+  Future<Map<String, dynamic>?> frpUploadBinary(String localPath) async {
+    final file = File(localPath);
+    if (!await file.exists()) {
+      throw NodeApiException(0, '本地文件不存在: $localPath');
+    }
+    final boundary = 'IriX${DateTime.now().microsecondsSinceEpoch}';
+    final fileName = p.basename(localPath);
+    final bytes = await file.readAsBytes();
+    final body = BytesBuilder()
+      ..add(
+        utf8.encode(
+          '--$boundary\r\n'
+          'Content-Disposition: form-data; name="file"; filename="$fileName"\r\n'
+          'Content-Type: application/octet-stream\r\n'
+          '\r\n',
+        ),
+      )
+      ..add(bytes)
+      ..add(utf8.encode('\r\n--$boundary--\r\n'));
+    final resp = await HttpFfiService.instance.post(
+      _uri('/api/frp/binary').toString(),
+      headers: {'Content-Type': 'multipart/form-data; boundary=$boundary'},
+      body: body.takeBytes(),
+      timeout: timeout,
+    );
+    if (resp.statusCode >= 400) {
+      throw NodeApiException(resp.statusCode, '上传失败（HTTP ${resp.statusCode}）');
+    }
+    final decoded = _decode(resp);
+    final status = (decoded['status'] as num?)?.toInt() ?? 500;
+    if (status != 200) {
+      final d = decoded['data'];
+      throw NodeApiException(
+        status,
+        d is String ? d : '节点返回错误（status $status）',
+      );
+    }
+    final data = decoded['data'];
+    return data is Map<String, dynamic> ? data : null;
+  }
+
+  // ==================== 负载调谐 / 审计日志（irix-node）====================
+
+  /// 节点负载调谐状态（GET /api/load，见 loadtuner.go）。
+  ///
+  /// 返回 state（idle/normal/busy）、gomaxprocs、gcPercent、cpuBusy 等。
+  Future<Map<String, dynamic>> nodeLoad() async {
+    final data = await _request('GET', '/api/load');
+    return data is Map<String, dynamic> ? data : {};
+  }
+
+  /// 读取审计日志（GET /api/audit/log，见 audit.go）。
+  ///
+  /// [tail] 返回最后 N 行（默认 500；0 表示全部，上限 20000）；
+  /// [since] 为 unix 毫秒，返回该时间点后新增内容（增量轮询）。
+  Future<String> auditLog({int? tail, int? since}) async {
+    final data = await _request(
+      'GET',
+      '/api/audit/log',
+      query: {
+        if (tail != null) 'tail': '$tail',
+        if (since != null) 'since': '$since',
+      },
+    );
+    return (data as String?) ?? '';
+  }
+
+  // ==================== 账户认证（irix-node，见 accounts_handlers.go）====================
+
+  /// 登录并写入会话令牌（POST /api/auth/login）。
+  ///
+  /// 成功后把返回的 token 写入 [authToken] 字段，后续请求自动附带；
+  /// root 首次登录（尚未设独立密码）[mustChangePassword] 为 true。
+  Future<Map<String, dynamic>> accountLogin({
+    required String username,
+    required String password,
+  }) async {
+    final data = await _request(
+      'POST',
+      '/api/auth/login',
+      body: {'username': username, 'password': password},
+    );
+    if (data is Map<String, dynamic>) {
+      final token = data['token'] as String? ?? '';
+      if (token.isNotEmpty) authToken = token;
+      return data;
+    }
+    return {};
+  }
+
+  /// 退出登录（POST /api/auth/logout，删除当前会话）。
+  Future<void> accountLogout() async {
+    await _request('POST', '/api/auth/logout');
+    authToken = '';
+  }
+
+  /// 当前账户信息（GET /api/accounts/me）。
+  Future<Map<String, dynamic>> accountMe() async {
+    final data = await _request('GET', '/api/accounts/me');
+    return data is Map<String, dynamic> ? data : {};
+  }
+
+  /// 权限目录（GET /api/accounts/catalog，分组 + 端点 + 描述）。
+  Future<List<PermissionGroup>> permissionCatalog() async {
+    final data = await _request('GET', '/api/accounts/catalog');
+    final list = <PermissionGroup>[];
+    if (data is List) {
+      for (final item in data) {
+        if (item is Map<String, dynamic>) {
+          list.add(PermissionGroup.fromJson(item));
+        }
+      }
+    }
+    return list;
+  }
+
+  /// 修改密码（PUT /api/accounts/password，两种模式）：
+  /// - 自己改密：[oldPassword] + [newPassword]（root 首次改密 oldPassword=配对码）；
+  /// - 管理员重置：[username] + [newPassword]（无需旧密码，需管理员会话）。
+  Future<void> changeAccountPassword({
+    String? oldPassword,
+    String? newPassword,
+    String? username,
+  }) async {
+    await _request(
+      'PUT',
+      '/api/accounts/password',
+      body: {
+        if (oldPassword != null && oldPassword.isNotEmpty)
+          'oldPassword': oldPassword,
+        if (newPassword != null && newPassword.isNotEmpty)
+          'newPassword': newPassword,
+        if (username != null && username.isNotEmpty) 'username': username,
+      },
+    );
+  }
+
+  /// 账户列表（GET /api/accounts，管理员）。
+  Future<List<AccountInfo>> accountsList() async {
+    final data = await _request('GET', '/api/accounts');
+    final list = <AccountInfo>[];
+    if (data is List) {
+      for (final item in data) {
+        if (item is Map<String, dynamic>) {
+          list.add(AccountInfo.fromJson(item));
+        }
+      }
+    }
+    return list;
+  }
+
+  /// 创建账户（POST /api/accounts，管理员）。
+  Future<void> createAccount({
+    required String username,
+    required String password,
+    bool isAdmin = false,
+  }) async {
+    await _request(
+      'POST',
+      '/api/accounts',
+      body: {'username': username, 'password': password, 'isAdmin': isAdmin},
+    );
+  }
+
+  /// 删除账户（DELETE /api/accounts?username=，管理员；root 不可删）。
+  Future<void> deleteAccount(String username) async {
+    await _request(
+      'DELETE',
+      '/api/accounts',
+      query: {'username': username},
+    );
+  }
+
+  /// 修改账户端点开关（PUT /api/accounts/permissions，管理员）。
+  ///
+  /// 整组开关：[group] + [enabled]；逐条开关：[permissions]（端点→bool 映射）。
+  Future<void> setAccountPermissions({
+    required String username,
+    String? group,
+    bool? enabled,
+    Map<String, bool>? permissions,
+  }) async {
+    await _request(
+      'PUT',
+      '/api/accounts/permissions',
+      body: {
+        'username': username,
+        if (group != null && group.isNotEmpty) 'group': group,
+        if (enabled != null) 'enabled': enabled,
+        if (permissions != null) 'permissions': permissions,
+      },
+    );
+  }
+
+  // ==================== 集群节点 API（irix-node，见 cluster.go）====================
+
+  /// 集群状态（GET /api/cluster/status）。
+  Future<ClusterStatusData> clusterStatus() async {
+    final data = await _request('GET', '/api/cluster/status');
+    return ClusterStatusData.fromJson((data as Map<String, dynamic>?) ?? {});
+  }
+
+  /// 已登记的对等节点列表（GET /api/cluster/peers）。
+  Future<List<Map<String, dynamic>>> clusterPeers() async {
+    final data = await _request('GET', '/api/cluster/peers');
+    final list = <Map<String, dynamic>>[];
+    if (data is List) {
+      for (final item in data) {
+        if (item is Map<String, dynamic>) list.add(item);
+      }
+    }
+    return list;
+  }
+
+  /// 递归枚举同步区目录（GET /api/cluster/sync/list，单次返回整树）。
+  Future<Map<String, dynamic>> clusterSyncList({String? path}) async {
+    final data = await _request(
+      'GET',
+      '/api/cluster/sync/list',
+      query: {if (path != null && path.isNotEmpty) 'path': path},
+    );
+    return data is Map<String, dynamic> ? data : {};
+  }
+
+  /// 递归枚举实例工作目录（GET /api/instance/sync/list，单次返回整树）。
+  Future<Map<String, dynamic>> instanceSyncList(String uuid) async {
+    final data = await _request(
+      'GET',
+      '/api/instance/sync/list',
+      query: {'uuid': uuid},
+    );
+    return data is Map<String, dynamic> ? data : {};
+  }
+
+  /// 同步区文件列表（GET /api/cluster/files/list）。
+  Future<Map<String, dynamic>> clusterFileList(
+    String path, {
+    int page = 1,
+    int pageSize = 100,
+  }) async {
+    final data = await _request(
+      'GET',
+      '/api/cluster/files/list',
+      query: {
+        'path': path,
+        'page': '$page',
+        'page_size': '$pageSize',
+      },
+    );
+    return data is Map<String, dynamic> ? data : {};
+  }
+
+  /// 同步区创建目录（POST /api/cluster/files/mkdir）。
+  Future<void> clusterMkdir(String path) async {
+    await _request('POST', '/api/cluster/files/mkdir', body: {'path': path});
+  }
+
+  /// 同步区删除文件 / 目录（DELETE /api/cluster/files）。
+  Future<void> clusterDelete(List<String> targets) async {
+    await _request(
+      'DELETE',
+      '/api/cluster/files',
+      body: {'targets': targets},
+    );
+  }
+
+  /// 同步区下载票据（POST /api/cluster/files/download，目录范围票据）。
+  Future<DownloadTicket> clusterDownloadTicket(String path) async {
+    final data = await _request(
+      'POST',
+      '/api/cluster/files/download',
+      body: {'path': path},
+    );
+    final map = data is Map<String, dynamic> ? data : {};
+    return DownloadTicket(
+      password: map['password'] as String? ?? '',
+      addr: map['addr'] as String? ?? '',
+      fileName: path.split('/').last,
+    );
+  }
+
+  /// 同步区上传票据（POST /api/cluster/files/upload）。
+  Future<UploadTicket> clusterUploadTicket(String uploadDir) async {
+    final data = await _request(
+      'POST',
+      '/api/cluster/files/upload',
+      body: {'upload_dir': uploadDir},
+    );
+    final map = data is Map<String, dynamic> ? data : {};
+    return UploadTicket(
+      password: map['password'] as String? ?? '',
+      addr: map['addr'] as String? ?? '',
+      uploadDir: uploadDir,
+    );
+  }
+
+  // ==================== 控制台 WebSocket（irix-node，见 console_ws.go）====================
+
+  /// 建立实时控制台 WebSocket 连接（GET /api/instance/console/ws）。
+  ///
+  /// 返回 [NodeConsoleConnection]：服务端逐行推文本帧（保留 ANSI），
+  /// [send] 发送命令，[events] 流暴露输出行与进程退出通知。内置 30s 心跳。
+  ///
+  /// 旧节点 / MCSM 面板不支持升级（非 101）时抛出 [NodeConsoleUpgradeException]，
+  /// 调用方捕获后回退 outputlog 轮询 + command。
+  ///
+  /// 鉴权：WebSocket 握手无法自定义请求头，节点侧 `authOK` 同时接受查询参数
+  /// 的 apikey，故此处把 [apiKey] 拼到查询参数（MCSM apiKeyInQuery 不在此使用，
+  /// 升级即便成功也不应漏掉 apikey）。
+  Future<NodeConsoleConnection> connectConsoleWs({
+    required String uuid,
+    required String daemonId,
+    String? since,
+  }) async {
+    final q = <String, String>{
+      'uuid': uuid,
+      'daemonId': daemonId,
+      if (apiKey.isNotEmpty) 'apikey': apiKey,
+      if (since != null && since.isNotEmpty) 'since': since,
+    };
+    final uri = _uri('/api/instance/console/ws', q);
+    return NodeConsoleConnection.connect(uri.toString(), timeout: timeout);
+  }
+}
+
+/// 控制台 WebSocket 升级失败（节点不支持 / 旧 MCSM 面板）。
+class NodeConsoleUpgradeException implements Exception {
+  final String message;
+  const NodeConsoleUpgradeException(this.message);
+  @override
+  String toString() => message;
+}
+
+/// 控制台 WebSocket 事件。
+sealed class NodeConsoleEvent {
+  const NodeConsoleEvent();
+}
+
+/// 一行服务器原始输出（含 ANSI 转义）。
+class NodeConsoleLine extends NodeConsoleEvent {
+  final String line;
+  const NodeConsoleLine(this.line);
+}
+
+/// 节点通知进程已退出。
+class NodeConsoleExit extends NodeConsoleEvent {
+  const NodeConsoleExit();
+}
+
+/// 实时控制台 WebSocket 连接封装（见 console_ws.go 文本帧协议）。
+class NodeConsoleConnection {
+  NodeConsoleConnection._(this._ws)
+      : _controller = StreamController<NodeConsoleEvent>.broadcast() {
+    _startHeartbeat();
+    _listen();
+  }
+
+  /// 建立连接（含升级失败检测）。
+  static Future<NodeConsoleConnection> connect(
+    String url, {
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
+    late final WebSocket ws;
+    try {
+      ws = await WebSocket.connect(url).timeout(timeout);
+    } on WebSocketException catch (e) {
+      throw NodeConsoleUpgradeException('控制台 WebSocket 升级失败：$e');
+    } on TimeoutException {
+      throw NodeConsoleUpgradeException('控制台 WebSocket 连接超时');
+    } catch (e) {
+      // 旧节点对升级请求返回普通 HTTP（非 101）：dart:io 抛 FormatException 等。
+      throw NodeConsoleUpgradeException('控制台 WebSocket 不可用：$e');
+    }
+    return NodeConsoleConnection._(ws);
+  }
+
+  final WebSocket _ws;
+  final StreamController<NodeConsoleEvent> _controller;
+
+  /// 事件流：输出行 / 进程退出。
+  Stream<NodeConsoleEvent> get events => _controller.stream;
+
+  Timer? _heartbeat;
+
+  void _startHeartbeat() {
+    // 客户端每 30s 发送 ping 文本帧；节点 90s 无帧则断开。
+    _heartbeat = Timer.periodic(const Duration(seconds: 30), (_) {
+      try {
+        _ws.add('ping');
+      } on StateError {
+        // 连接已关闭
+      }
+    });
+  }
+
+  void _listen() {
+    _ws.listen(
+      (dynamic data) {
+        if (data is! String) return;
+        // 进程退出时节点发「[节点] 进程已退出，输出结束」并关闭。
+        if (data == '[节点] 进程已退出，输出结束') {
+          _controller.add(const NodeConsoleExit());
+        } else {
+          _controller.add(NodeConsoleLine(data));
+        }
+      },
+      onError: (Object _) => _safeClose(),
+      onDone: () => _safeClose(),
+    );
+  }
+
+  /// 发送控制台命令（文本帧；等效 POST /api/protected_instance/command）。
+  void send(String command) {
+    if (command.isEmpty) return;
+    try {
+      _ws.add(command);
+    } on StateError {
+      // 连接已关闭
+    }
+  }
+
+  bool _closed = false;
+
+  void _safeClose() {
+    if (_closed) return;
+    _closed = true;
+    _heartbeat?.cancel();
+    try {
+      _ws.close();
+    } on StateError {
+      // 已关闭
+    }
+    if (!_controller.isClosed) {
+      _controller.add(const NodeConsoleExit());
+      _controller.close();
+    }
+  }
+
+  /// 关闭连接。
+  void close() => _safeClose();
 }
 
 /// 实例操作类型。

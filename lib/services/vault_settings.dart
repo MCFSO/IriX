@@ -1,9 +1,7 @@
 // Vault 设置 - 全局持久化
 // 使用 SQLite (settings 表) 存储客户端 Vault（加密保险库）功能开关
 
-import 'package:flutter/foundation.dart';
-
-import '../services/database_manager.dart';
+import 'settings_repository.dart';
 
 /// Vault（加密保险库，docs/vault-design.md）客户端设置服务。
 ///
@@ -18,26 +16,17 @@ class VaultSettings {
   static const _keyEnabled = 'vault_enabled';
 
   /// 是否启用客户端 Vault 能力。
-  static Future<bool> isEnabled() async {
-    try {
-      final v = await DatabaseManager.instance.getSetting(_keyEnabled);
-      if (v == null) return defaultEnabled;
-      return v == '1' || v == 'true';
-    } catch (e) {
-      debugPrint('Failed to get vault enabled: $e');
-      return defaultEnabled;
-    }
-  }
+  static Future<bool> isEnabled() => SettingsRepository.instance.getBoolString(
+        _keyEnabled,
+        defaultValue: defaultEnabled,
+        label: 'vault enabled',
+      );
 
   /// 设置客户端 Vault 能力开关。
-  static Future<void> setEnabled(bool enabled) async {
-    try {
-      await DatabaseManager.instance.setSetting(
+  static Future<void> setEnabled(bool enabled) =>
+      SettingsRepository.instance.setBoolString(
         _keyEnabled,
-        enabled ? '1' : '0',
+        enabled,
+        label: 'vault enabled',
       );
-    } catch (e) {
-      debugPrint('Failed to set vault enabled: $e');
-    }
-  }
 }

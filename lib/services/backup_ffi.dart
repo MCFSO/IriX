@@ -4,11 +4,11 @@
 
 import 'dart:async';
 import 'dart:ffi';
-import 'dart:io';
 import 'dart:isolate';
 
 import 'package:ffi/ffi.dart';
-import 'package:path/path.dart' as p;
+
+import 'rust_lib.dart';
 
 /// FFI 函数签名定义
 typedef BackupDirectoryC =
@@ -32,12 +32,6 @@ typedef BackupDirectoryDart =
 
 typedef CancelBackupC = Void Function();
 typedef CancelBackupDart = void Function();
-
-typedef GetLastErrorC = Pointer<Utf8> Function();
-typedef GetLastErrorDart = Pointer<Utf8> Function();
-
-typedef FreeStringC = Void Function(Pointer<Utf8> ptr);
-typedef FreeStringDart = void Function(Pointer<Utf8> ptr);
 
 typedef ProgressCallbackC = Void Function(Uint64, Uint64);
 
@@ -106,90 +100,7 @@ class BackupService {
   static BackupService get instance => _instance ??= BackupService._();
 
   /// 打开动态库
-  static DynamicLibrary _openLibrary() {
-    final attempts = <String>[];
-
-    // 尝试多个可能的路径
-    for (final libPath in _getPossibleLibraryPaths()) {
-      try {
-        final file = File(libPath);
-        if (file.existsSync()) {
-          return DynamicLibrary.open(libPath);
-        } else {
-          attempts.add('$libPath (文件不存在)');
-        }
-      } catch (e) {
-        attempts.add('$libPath (加载失败: $e)');
-      }
-    }
-
-    // 如果都找不到，尝试使用系统默认搜索路径
-    final sysName = Platform.isWindows
-        ? 'xmc_backup.dll'
-        : Platform.isMacOS
-        ? 'libxmc_backup.dylib'
-        : 'libxmc_backup.so';
-    try {
-      return DynamicLibrary.open(sysName);
-    } catch (e) {
-      attempts.add('系统搜索路径 "$sysName" (加载失败: $e)');
-    }
-
-    throw UnsupportedError(
-      'Rust backup library not found.\n'
-      'cwd: ${Directory.current.path}\n'
-      'exe: ${Platform.resolvedExecutable}\n'
-      '尝试的路径:\n${attempts.map((a) => '  - $a').join('\n')}',
-    );
-  }
-
-  /// 获取可能的库路径列表
-  static List<String> _getPossibleLibraryPaths() {
-    final paths = <String>[];
-    final libName = Platform.isWindows
-        ? 'xmc_backup.dll'
-        : Platform.isMacOS
-        ? 'libxmc_backup.dylib'
-        : 'libxmc_backup.so';
-
-    // 当前工作目录
-    final cwd = Directory.current.path;
-    paths.add(p.join(cwd, libName));
-    paths.add(p.join(cwd, 'lib', libName));
-    if (Platform.isWindows) {
-      paths.add(p.join(cwd, 'windows', 'runner', libName));
-    } else if (Platform.isMacOS) {
-      paths.add(p.join(cwd, 'macos', libName));
-    } else {
-      paths.add(p.join(cwd, 'linux', libName));
-    }
-
-    // 从 exe 目录开始向上逐级查找
-    // (flutter run 时 exe 位于 build/windows/runner/Debug 等子目录，需向上找项目根)
-    try {
-      final exePath = Platform.resolvedExecutable;
-      var dir = p.dirname(exePath);
-      for (var i = 0; i < 10; i++) {
-        paths.add(p.join(dir, libName));
-        paths.add(p.join(dir, 'lib', libName));
-        if (Platform.isWindows) {
-          paths.add(p.join(dir, 'windows', 'runner', libName));
-        } else if (Platform.isMacOS) {
-          paths.add(p.join(dir, 'macos', libName));
-          paths.add(p.join(dir, '..', 'Frameworks', libName));
-        } else {
-          paths.add(p.join(dir, 'linux', libName));
-        }
-        final parent = p.dirname(dir);
-        if (parent == dir) break; // 到达文件系统根
-        dir = parent;
-      }
-    } catch (_) {
-      // 忽略
-    }
-
-    return paths;
-  }
+  static DynamicLibrary _openLibrary() => openRustLibrary('backup');
 
   /// 执行备份 (在后台 isolate，不阻塞 UI)
   ///

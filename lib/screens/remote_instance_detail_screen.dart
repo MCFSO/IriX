@@ -56,17 +56,27 @@ class _RemoteInstanceDetailScreenState
   final _scrollController = ScrollController();
   Timer? _pollTimer;
 
+  /// 控制台 WebSocket 连接（irix-node 实时日志流）。
+  ///
+  /// 连接失败（旧节点 / MCSM 面板）时为 null，回退到 outputlog 轮询。
+  NodeConsoleConnection? _ws;
+  StreamSubscription<NodeConsoleEvent>? _wsSub;
+  bool _wsFailed = false; // WS 不可用，已永久回退轮询
+  int? _lastLogMs; // 最后收到的输出行时间戳（WS since 补发用）
+
   @override
   void initState() {
     super.initState();
     _instance = widget.initialInstance;
     _load();
-    _startPolling();
+    _startConsole();
   }
 
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _wsSub?.cancel();
+    _ws?.close();
     _commandController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -91,7 +101,89 @@ class _RemoteInstanceDetailScreenState
     }
   }
 
-  /// 轮询输出日志（每 2 秒）。
+  /// 启动控制台：优先 WebSocket 实时流，失败回退 outputlog 轮询。
+  void _startConsole() {
+    if (_instance.status == RemoteStatus.stopped) return;
+    _connectWs();
+    // 即使 WS 异步连接中，也先起一个轮询作为兜底（WS 成功后会取消）。
+    if (_ws == null) {
+      _startPolling();
+    }
+  }
+
+  /// 建立控制台 WebSocket；升级失败则回退轮询。
+  Future<void> _connectWs() async {
+    if (_wsFailed) return;
+    try {
+      final conn = await widget.client.connectConsoleWs(
+        uuid: widget.initialInstance.uuid,
+        daemonId: widget.daemonId,
+        since: _lastLogMs == null ? null : '$_lastLogMs',
+      );
+      if (!mounted) {
+        conn.close();
+        return;
+      }
+      // 连接成功：取消轮询，改用 WS 流。
+      _pollTimer?.cancel();
+      _pollTimer = null;
+      _ws = conn;
+      _wsSub = conn.events.listen(
+        (event) {
+          if (!mounted) return;
+          if (event is NodeConsoleExit) {
+            _onInstanceExited();
+            return;
+          }
+          if (event is NodeConsoleLine) {
+            _appendLog(event.line);
+          }
+        },
+        onError: (_) => _fallbackToPolling(),
+        onDone: () => _fallbackToPolling(),
+      );
+    } on NodeConsoleUpgradeException {
+      // 旧节点 / MCSM 面板：回退轮询，且不再尝试 WS。
+      _wsFailed = true;
+      if (mounted && _pollTimer == null) _startPolling();
+    } catch (_) {
+      // 其他连接错误：本次不降级为永久失败，后续 _action 会重试连接。
+      if (mounted && _ws == null && _pollTimer == null) _startPolling();
+    }
+  }
+
+  /// WS 断开后回退到轮询模式。
+  void _fallbackToPolling() {
+    _wsSub?.cancel();
+    _wsSub = null;
+    _ws = null;
+    if (mounted && _pollTimer == null) _startPolling();
+  }
+
+  /// 实例进程退出（WS 退出通知或状态刷新检测到停止）。
+  void _onInstanceExited() {
+    if (!mounted) return;
+    _fallbackToPolling();
+    _load();
+  }
+
+  /// 追加一行日志（保留 ANSI），并在挂载后滚动到底部。
+  void _appendLog(String line) {
+    if (line.isEmpty) return;
+    _lastLogMs ??= DateTime.now().millisecondsSinceEpoch;
+    setState(() => _log = '$_log$line\n');
+    _scrollToBottom();
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      }
+    });
+  }
+
+  /// 轮询输出日志（每 2 秒，WS 不可用时的兜底）。
   void _startPolling() {
     _pollTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       if (!mounted || _instance.status == RemoteStatus.stopped) return;
@@ -108,6 +200,10 @@ class _RemoteInstanceDetailScreenState
       );
       if (!mounted) return;
       setState(() => _log = log);
+      // 保留整段轮询结果用于 since 补发（若后续升级到 WS）。
+      if (_log.isNotEmpty) {
+        _lastLogMs = DateTime.now().millisecondsSinceEpoch;
+      }
       // 保持滚动到底部
       if (_scrollController.hasClients) {
         _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
@@ -130,6 +226,15 @@ class _RemoteInstanceDetailScreenState
       );
       await _load();
       await _fetchLog();
+      // 启动 / 停止会改实例运行态：重建控制台连接（停止后 WS 会退出通知，
+      // 启动后旧连接已失效，统一重连以便新开 WS 或回退轮询）。
+      if (action == RemoteAction.start || action == RemoteAction.stop) {
+        _wsSub?.cancel();
+        _wsSub = null;
+        _ws?.close();
+        _ws = null;
+        _startConsole();
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = e.toString());
@@ -142,6 +247,11 @@ class _RemoteInstanceDetailScreenState
     final command = _commandController.text.trim();
     if (command.isEmpty) return;
     _commandController.clear();
+    // WS 可用时直接走文本帧（实时回显），否则回退命令接口 + 轮询刷新。
+    if (_ws != null) {
+      _ws!.send(command);
+      return;
+    }
     try {
       await widget.client.sendCommand(
         uuid: widget.initialInstance.uuid,

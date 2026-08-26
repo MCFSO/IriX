@@ -7,11 +7,11 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi';
-import 'dart:io';
 import 'dart:isolate';
 
 import 'package:ffi/ffi.dart';
-import 'package:path/path.dart' as p;
+
+import 'rust_lib.dart';
 
 /// FFI 函数签名定义
 typedef DbRequestC =
@@ -26,9 +26,6 @@ typedef DbRequestDart =
       Pointer<Utf8> op,
       Pointer<Utf8> argsJson,
     );
-
-typedef FreeStringC = Void Function(Pointer<Utf8> ptr);
-typedef FreeStringDart = void Function(Pointer<Utf8> ptr);
 
 /// 数据库操作异常
 class DbClientFfiException implements Exception {
@@ -68,81 +65,8 @@ class DbClientFfi {
   DbClientFfi._();
 
   /// 打开动态库（尝试多个可能的路径）。
-  static DynamicLibrary _openLibrary() {
-    final attempts = <String>[];
-    final libName = Platform.isWindows
-        ? 'xmc_db_client.dll'
-        : Platform.isMacOS
-        ? 'libxmc_db_client.dylib'
-        : 'libxmc_db_client.so';
-
-    for (final libPath in _getPossibleLibraryPaths(libName)) {
-      try {
-        final file = File(libPath);
-        if (file.existsSync()) {
-          return DynamicLibrary.open(libPath);
-        }
-        attempts.add('$libPath (文件不存在)');
-      } catch (e) {
-        attempts.add('$libPath (加载失败: $e)');
-      }
-    }
-
-    try {
-      return DynamicLibrary.open(libName);
-    } catch (e) {
-      attempts.add('系统搜索路径 "$libName" (加载失败: $e)');
-    }
-
-    throw UnsupportedError(
-      'Rust db_client library not found.\n'
-      'cwd: ${Directory.current.path}\n'
-      'exe: ${Platform.resolvedExecutable}\n'
-      '尝试的路径:\n${attempts.map((a) => '  - $a').join('\n')}',
-    );
-  }
-
-  /// 获取可能的库路径列表
-  static List<String> _getPossibleLibraryPaths(String libName) {
-    final paths = <String>[];
-
-    // 当前工作目录
-    final cwd = Directory.current.path;
-    paths.add(p.join(cwd, libName));
-    paths.add(p.join(cwd, 'lib', libName));
-    if (Platform.isWindows) {
-      paths.add(p.join(cwd, 'windows', 'runner', libName));
-    } else if (Platform.isMacOS) {
-      paths.add(p.join(cwd, 'macos', libName));
-    } else {
-      paths.add(p.join(cwd, 'linux', libName));
-    }
-
-    // 从 exe 目录开始向上逐级查找
-    try {
-      final exePath = Platform.resolvedExecutable;
-      var dir = p.dirname(exePath);
-      for (var i = 0; i < 10; i++) {
-        paths.add(p.join(dir, libName));
-        paths.add(p.join(dir, 'lib', libName));
-        if (Platform.isWindows) {
-          paths.add(p.join(dir, 'windows', 'runner', libName));
-        } else if (Platform.isMacOS) {
-          paths.add(p.join(dir, 'macos', libName));
-          paths.add(p.join(dir, '..', 'Frameworks', libName));
-        } else {
-          paths.add(p.join(dir, 'linux', libName));
-        }
-        final parent = p.dirname(dir);
-        if (parent == dir) break; // 到达文件系统根
-        dir = parent;
-      }
-    } catch (_) {
-      // 忽略
-    }
-
-    return paths;
-  }
+  static DynamicLibrary _openLibrary() =>
+      openRustLibrary('db_client');
 
   /// 执行一次数据库操作（后台 isolate，不阻塞 UI）。
   ///
@@ -251,15 +175,7 @@ class DbClientFfi {
       if (argsPtr != null) calloc.free(argsPtr);
       if (resultPtr != null) {
         // resultPtr 由 Rust 分配，需用 Rust 侧 free_string 释放
-        try {
-          final lib = _openLibrary();
-          final freeString = lib.lookupFunction<FreeStringC, FreeStringDart>(
-            'free_string',
-          );
-          freeString(resultPtr);
-        } catch (_) {
-          // 库句柄无法再次打开时忽略（指针泄漏可接受，仅调试场景）
-        }
+        freeRustString(_openLibrary(), resultPtr);
       }
     }
   }

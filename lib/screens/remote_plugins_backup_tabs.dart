@@ -12,8 +12,11 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'dart:async';
+
 import 'package:path/path.dart' as p;
 
+import '../models/node_ops.dart';
 import '../models/remote.dart';
 import '../services/node_api_client.dart';
 import '../utils/apple_widgets.dart';
@@ -631,10 +634,27 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
 
   String? _error;
 
+  // ---- 节点端快照（irix-node §4.5，仅 irix-node 支持）----
+  /// 是否支持节点端快照（首次探测；MCSM 节点为 false，隐藏整个区块）。
+  bool? _snapshotSupported;
+  List<BackupItem> _snapshots = [];
+  bool _snapshotBusy = false;
+  String? _snapshotStatus;
+  double? _snapshotProgress; // 快照 / 恢复进度（0~1）
+  String? _snapshotError;
+  Timer? _snapshotPoll; // snapshot-progress 轮询
+
   @override
   void initState() {
     super.initState();
     _load();
+    _loadSnapshots();
+  }
+
+  @override
+  void dispose() {
+    _cancelSnapshotPoll();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -936,6 +956,256 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
     }
   }
 
+  // ==================== 节点端快照（irix-node §4.5）====================
+
+  /// 探测节点是否支持快照，并加载快照列表。
+  Future<void> _loadSnapshots() async {
+    if (_snapshotSupported == false) return; // MCSM 节点已确认不支持
+    try {
+      final list = await widget.client.listBackups(
+        uuid: widget.uuid,
+        daemonId: widget.daemonId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _snapshotSupported = true;
+        _snapshots = list;
+        _snapshotError = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      // 节点不支持（MCSM / 旧版本）：隐藏整个快照区块。
+      setState(() => _snapshotSupported = false);
+    }
+  }
+
+  /// 创建快照：发起任务并轮询进度（snapshot-progress）。
+  Future<void> _createSnapshot() async {
+    if (_snapshotBusy) return;
+    _cancelSnapshotPoll();
+    setState(() {
+      _snapshotBusy = true;
+      _snapshotProgress = 0;
+      _snapshotStatus = '创建快照中…';
+      _snapshotError = null;
+    });
+    try {
+      final jobId = await widget.client.instanceSnapshot(
+        uuid: widget.uuid,
+        daemonId: widget.daemonId,
+      );
+      _snapshotPoll = Timer.periodic(const Duration(milliseconds: 800), (_) async {
+        try {
+          final p = await widget.client.snapshotProgress(jobId);
+          if (!mounted) return;
+          setState(() {
+            _snapshotProgress = p.percent;
+            _snapshotStatus = p.message.isEmpty ? p.status : p.message;
+          });
+          if (p.isDone) {
+            _cancelSnapshotPoll();
+            if (!mounted) return;
+            setState(() {
+              _snapshotBusy = false;
+              _snapshotProgress = null;
+              _snapshotStatus = null;
+            });
+            await _loadSnapshots();
+          } else if (p.isFailed) {
+            _cancelSnapshotPoll();
+            if (!mounted) return;
+            setState(() {
+              _snapshotBusy = false;
+              _snapshotProgress = null;
+              _snapshotStatus = null;
+              _snapshotError = '快照失败';
+            });
+          }
+        } catch (e) {
+          _cancelSnapshotPoll();
+          if (!mounted) return;
+          setState(() {
+            _snapshotBusy = false;
+            _snapshotProgress = null;
+            _snapshotStatus = null;
+            _snapshotError = e.toString();
+          });
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _snapshotBusy = false;
+        _snapshotProgress = null;
+        _snapshotStatus = null;
+        _snapshotError = e.toString();
+      });
+    }
+  }
+
+  /// 恢复快照：先确认，再发起任务并轮询进度。
+  Future<void> _restoreSnapshot(BackupItem item) async {
+    if (_snapshotBusy) return;
+    final confirmed = await showAppDialog<bool>(
+      context,
+      (_) => AlertDialog(
+        title: const Text('恢复快照？'),
+        content: Text(
+          '将停止实例并解压覆盖「${item.fileName}」到实例目录，恢复后实例保持停止。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('恢复'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    _cancelSnapshotPoll();
+    setState(() {
+      _snapshotBusy = true;
+      _snapshotProgress = 0;
+      _snapshotStatus = '恢复快照中…';
+      _snapshotError = null;
+    });
+    try {
+      final jobId = await widget.client.instanceRestore(
+        uuid: widget.uuid,
+        daemonId: widget.daemonId,
+        archivePath: item.path,
+      );
+      _snapshotPoll = Timer.periodic(const Duration(milliseconds: 800), (_) async {
+        try {
+          final p = await widget.client.snapshotProgress(jobId);
+          if (!mounted) return;
+          setState(() {
+            _snapshotProgress = p.percent;
+            _snapshotStatus = p.message.isEmpty ? p.status : p.message;
+          });
+          if (p.isDone) {
+            _cancelSnapshotPoll();
+            if (!mounted) return;
+            setState(() {
+              _snapshotBusy = false;
+              _snapshotProgress = null;
+              _snapshotStatus = null;
+            });
+            await _loadSnapshots();
+          } else if (p.isFailed) {
+            _cancelSnapshotPoll();
+            if (!mounted) return;
+            setState(() {
+              _snapshotBusy = false;
+              _snapshotProgress = null;
+              _snapshotStatus = null;
+              _snapshotError = '恢复失败';
+            });
+          }
+        } catch (e) {
+          _cancelSnapshotPoll();
+          if (!mounted) return;
+          setState(() {
+            _snapshotBusy = false;
+            _snapshotProgress = null;
+            _snapshotStatus = null;
+            _snapshotError = e.toString();
+          });
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _snapshotBusy = false;
+        _snapshotProgress = null;
+        _snapshotStatus = null;
+        _snapshotError = e.toString();
+      });
+    }
+  }
+
+  /// 下载快照到本地（直连票据下载）。
+  Future<void> _downloadSnapshot(BackupItem item) async {
+    if (_snapshotBusy) return;
+    setState(() => _snapshotError = null);
+    try {
+      final ticket = await widget.client.backupDownloadTicket(
+        uuid: widget.uuid,
+        path: item.path,
+        timeout: _longTimeout,
+      );
+      final savePath = await FilePicker.platform.saveFile(
+        dialogTitle: '保存快照',
+        fileName: item.fileName,
+      );
+      if (savePath == null || !mounted) return;
+      await widget.client.directDownloadToFile(ticket, savePath, (done, total) {
+        if (!mounted) return;
+        setState(() {
+          _snapshotProgress = total > 0 ? done / total : 0;
+          _snapshotStatus = '下载快照中…';
+        });
+      });
+      if (!mounted) return;
+      setState(() {
+        _snapshotProgress = null;
+        _snapshotStatus = null;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('已下载到 $savePath')));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _snapshotProgress = null;
+        _snapshotStatus = null;
+        _snapshotError = e.toString();
+      });
+    }
+  }
+
+  /// 删除快照（节点侧备份区删除，不可恢复）。
+  Future<void> _deleteSnapshot(BackupItem item) async {
+    final confirmed = await showAppDialog<bool>(
+      context,
+      (_) => AlertDialog(
+        title: Text('删除快照 ${item.fileName}？'),
+        content: const Text('将从节点快照区永久删除，不可恢复。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await widget.client.deleteBackups(
+        uuid: widget.uuid,
+        daemonId: widget.daemonId,
+        paths: [item.path],
+      );
+      await _loadSnapshots();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _snapshotError = e.toString());
+    }
+  }
+
+  void _cancelSnapshotPoll() {
+    _snapshotPoll?.cancel();
+    _snapshotPoll = null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -1023,6 +1293,162 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
           ),
         ),
         const SizedBox(height: 16),
+        if (_snapshotSupported == true) ...[
+          Card(
+            elevation: 0,
+            color: theme.colorScheme.surfaceContainerHighest.withValues(
+              alpha: 0.6,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.storage_rounded,
+                        size: 18,
+                        color: theme.colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text('节点端快照', style: theme.textTheme.titleSmall),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.refresh, size: 20),
+                        tooltip: '刷新',
+                        onPressed:
+                            _snapshotBusy ? null : () => _loadSnapshots(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '快照由节点在 {data}/backups/<实例> 保管，恢复会先停止实例再覆盖。',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    icon: const Icon(Icons.camera, size: 18),
+                    label: const Text('创建快照'),
+                    onPressed: _snapshotBusy ? null : _createSnapshot,
+                  ),
+                  if (_snapshotBusy) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            _snapshotStatus ?? '处理中…',
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_snapshotProgress != null) ...[
+                      const SizedBox(height: 8),
+                      LinearProgressIndicator(value: _snapshotProgress),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${((_snapshotProgress ?? 0) * 100).toStringAsFixed(1)}%',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
+                  const SizedBox(height: 12),
+                  if (_snapshots.isEmpty && !_snapshotBusy)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        '（暂无快照）',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    )
+                  else
+                    for (final item in _snapshots)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.camera, size: 16),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    item.fileName,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.bodySmall,
+                                  ),
+                                  if (item.mtime.isNotEmpty)
+                                    Text(
+                                      item.mtime,
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                            color:
+                                                theme.colorScheme.onSurfaceVariant,
+                                            fontSize: 11,
+                                          ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.restore, size: 18),
+                              tooltip: '恢复',
+                              visualDensity: VisualDensity.compact,
+                              onPressed:
+                                  _snapshotBusy ? null : () => _restoreSnapshot(item),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.download, size: 18),
+                              tooltip: '下载',
+                              visualDensity: VisualDensity.compact,
+                              onPressed:
+                                  _snapshotBusy ? null : () => _downloadSnapshot(item),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, size: 18),
+                              tooltip: '删除',
+                              visualDensity: VisualDensity.compact,
+                              onPressed:
+                                  _snapshotBusy ? null : () => _deleteSnapshot(item),
+                            ),
+                          ],
+                        ),
+                      ),
+                  if (_snapshotError != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      _snapshotError!,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.error,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
         Card(
           elevation: 0,
           color: theme.colorScheme.surfaceContainerHighest.withValues(

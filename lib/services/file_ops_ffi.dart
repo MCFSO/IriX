@@ -11,7 +11,8 @@ import 'dart:io';
 import 'dart:isolate';
 
 import 'package:ffi/ffi.dart';
-import 'package:path/path.dart' as p;
+
+import 'rust_lib.dart';
 
 /// 文件/目录条目信息
 class FileEntry {
@@ -103,12 +104,6 @@ typedef RenameEntryDart =
 typedef CancelOperationC = Void Function();
 typedef CancelOperationDart = void Function();
 
-typedef GetLastErrorC = Pointer<Utf8> Function();
-typedef GetLastErrorDart = Pointer<Utf8> Function();
-
-typedef FreeStringC = Void Function(Pointer<Utf8> ptr);
-typedef FreeStringDart = void Function(Pointer<Utf8> ptr);
-
 typedef ProgressCallbackC = Void Function(Uint64 current, Uint64 total);
 
 /// 文件操作结果码
@@ -154,82 +149,14 @@ class _CompletionMessage {
   const _CompletionMessage(this.code, this.error);
 }
 
-/// 动态库访问抽象
-abstract class _FileOpsLib {
+/// 动态库访问抽象（缓存句柄，失败时保留尝试路径用于诊断）。
+class _FileOpsLib {
   static DynamicLibrary? _lib;
-  static final List<String> _attempts = [];
 
   static DynamicLibrary get lib {
     if (_lib != null) return _lib!;
-    final libName = Platform.isWindows
-        ? 'xmc_file_ops.dll'
-        : Platform.isMacOS
-        ? 'libxmc_file_ops.dylib'
-        : 'libxmc_file_ops.so';
-
-    for (final libPath in _getPossibleLibraryPaths(libName)) {
-      try {
-        final file = File(libPath);
-        if (file.existsSync()) {
-          _lib = DynamicLibrary.open(libPath);
-          return _lib!;
-        } else {
-          _attempts.add('$libPath (文件不存在)');
-        }
-      } catch (e) {
-        _attempts.add('$libPath (加载失败: $e)');
-      }
-    }
-
-    try {
-      _lib = DynamicLibrary.open(libName);
-      return _lib!;
-    } catch (e) {
-      _attempts.add('系统搜索路径 "$libName" (加载失败: $e)');
-    }
-
-    throw UnsupportedError(
-      'Rust file_ops library not found.\n'
-      'cwd: ${Directory.current.path}\n'
-      'exe: ${Platform.resolvedExecutable}\n'
-      '尝试的路径:\n${_attempts.map((a) => '  - $a').join('\n')}',
-    );
-  }
-
-  static List<String> _getPossibleLibraryPaths(String libName) {
-    final paths = <String>[];
-    final cwd = Directory.current.path;
-    paths.add(p.join(cwd, libName));
-    paths.add(p.join(cwd, 'lib', libName));
-    if (Platform.isWindows) {
-      paths.add(p.join(cwd, 'windows', 'runner', libName));
-    } else if (Platform.isMacOS) {
-      paths.add(p.join(cwd, 'macos', libName));
-    } else {
-      paths.add(p.join(cwd, 'linux', libName));
-    }
-
-    try {
-      final exePath = Platform.resolvedExecutable;
-      var dir = p.dirname(exePath);
-      for (var i = 0; i < 10; i++) {
-        paths.add(p.join(dir, libName));
-        paths.add(p.join(dir, 'lib', libName));
-        if (Platform.isWindows) {
-          paths.add(p.join(dir, 'windows', 'runner', libName));
-        } else if (Platform.isMacOS) {
-          paths.add(p.join(dir, 'macos', libName));
-          paths.add(p.join(dir, '..', 'Frameworks', libName));
-        } else {
-          paths.add(p.join(dir, 'linux', libName));
-        }
-        final parent = p.dirname(dir);
-        if (parent == dir) break;
-        dir = parent;
-      }
-    } catch (_) {}
-
-    return paths;
+    _lib = openRustLibrary('file_ops');
+    return _lib!;
   }
 }
 

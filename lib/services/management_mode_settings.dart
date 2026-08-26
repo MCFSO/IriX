@@ -1,9 +1,7 @@
 // 管理模式设置 - 全局持久化
 // 使用 SQLite (settings 表) 存储单机 / 多机管理模式与多机模式的监控节点
 
-import 'package:flutter/foundation.dart';
-
-import '../services/database_manager.dart';
+import 'settings_repository.dart';
 
 /// 管理模式。
 enum ManagementMode {
@@ -39,45 +37,35 @@ class ManagementModeSettings {
 
   /// 获取当前管理模式，未设置时返回 [ManagementMode.single]。
   static Future<ManagementMode> getMode() async {
-    try {
-      final v = await DatabaseManager.instance.getSetting(_keyMode);
-      return ManagementMode.fromId(v);
-    } catch (e) {
-      debugPrint('Failed to get management mode: $e');
-      return ManagementMode.single;
-    }
+    final v = await SettingsRepository.instance.getStringOrNull(
+      _keyMode,
+      label: 'management mode',
+    );
+    return ManagementMode.fromId(v);
   }
 
   /// 设置当前管理模式。
-  static Future<void> setMode(ManagementMode mode) async {
-    try {
-      await DatabaseManager.instance.setSetting(_keyMode, mode.id);
-    } catch (e) {
-      debugPrint('Failed to set management mode: $e');
-    }
-  }
+  static Future<void> setMode(ManagementMode mode) =>
+      SettingsRepository.instance.setString(
+        _keyMode,
+        mode.id,
+        label: 'management mode',
+      );
 
   /// 获取多机模式的监控节点 id（可空）。
   static Future<String?> getMonitorNodeId() async {
-    try {
-      final v = await DatabaseManager.instance.getSetting(_keyMonitorNode);
-      return (v == null || v.isEmpty) ? null : v;
-    } catch (e) {
-      debugPrint('Failed to get monitor node id: $e');
-      return null;
-    }
+    final v = await SettingsRepository.instance.getStringOrNull(
+      _keyMonitorNode,
+      label: 'monitor node id',
+    );
+    return (v == null || v.isEmpty) ? null : v;
   }
 
   /// 设置多机模式的监控节点 id（传 null 清除）。
-  static Future<void> setMonitorNodeId(String? nodeId) async {
-    try {
-      if (nodeId == null || nodeId.isEmpty) {
-        await DatabaseManager.instance.setSetting(_keyMonitorNode, '');
-      } else {
-        await DatabaseManager.instance.setSetting(_keyMonitorNode, nodeId);
-      }
-    } catch (e) {
-      debugPrint('Failed to set monitor node id: $e');
-    }
-  }
+  static Future<void> setMonitorNodeId(String? nodeId) =>
+      SettingsRepository.instance.setString(
+        _keyMonitorNode,
+        (nodeId == null || nodeId.isEmpty) ? '' : nodeId,
+        label: 'monitor node id',
+      );
 }

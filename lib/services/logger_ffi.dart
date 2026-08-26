@@ -4,10 +4,10 @@
 // Rust 端实现位于 rust/logger/src/lib.rs
 
 import 'dart:ffi';
-import 'dart:io';
 
 import 'package:ffi/ffi.dart';
-import 'package:path/path.dart' as p;
+
+import 'rust_lib.dart';
 
 typedef LogInitNative = Int32 Function(Pointer<Utf8> logDir);
 typedef LogInitDart = int Function(Pointer<Utf8> logDir);
@@ -117,44 +117,7 @@ class LoggerNative {
 
   static LoggerNative init() {
     if (_instance != null) return _instance!;
-    final libName = Platform.isWindows
-        ? 'xmc_logger.dll'
-        : Platform.isMacOS
-        ? 'libxmc_logger.dylib'
-        : 'libxmc_logger.so';
-
-    DynamicLibrary? lib;
-    try {
-      lib = DynamicLibrary.open(libName);
-    } catch (_) {
-      final exeDir = p.dirname(Platform.resolvedExecutable);
-      final attempts = <String>[
-        p.join(exeDir, libName),
-        p.join(exeDir, 'lib', libName),
-        p.join(Directory.current.path, libName),
-      ];
-      for (final path in attempts) {
-        if (File(path).existsSync()) {
-          lib = DynamicLibrary.open(path);
-          break;
-        }
-      }
-
-      if (lib == null) {
-        var dir = Directory.current;
-        for (int i = 0; i < 10; i++) {
-          final path = p.join(dir.path, libName);
-          if (File(path).existsSync()) {
-            lib = DynamicLibrary.open(path);
-            break;
-          }
-          final parent = dir.parent;
-          if (parent.path == dir.path) break;
-          dir = parent;
-        }
-      }
-      lib ??= DynamicLibrary.open(libName);
-    }
+    final lib = openRustLibrary('logger');
     _instance = LoggerNative._(lib);
     return _instance!;
   }

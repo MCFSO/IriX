@@ -70,3 +70,9 @@ node/data/
 # Mimosa 安全扫描本地 hook 状态（生成的缓存，有独立 seal 产物，不入库）
 .mimosa/
 
+
+# Local agent workspace (ZCode) — not project source
+.zcode/
+
+# Go node daemon (IriX-Node) — kept out of this repo's tracking per user decision
+IriX-Node/

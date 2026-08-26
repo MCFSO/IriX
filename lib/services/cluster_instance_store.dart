@@ -2,18 +2,17 @@
 // 通过 DatabaseManager 将集群实例列表持久化到 SQLite 数据库（cluster_instances 表）。
 // 纯数据持久化层，状态管理由 ClusterState 负责。
 
-import 'package:flutter/foundation.dart';
-
 import '../models/cluster_instance.dart';
-import '../services/database_manager.dart';
+import 'database_manager.dart';
+import 'entity_store.dart';
 
 /// 集群实例的本地持久化服务。
-class ClusterInstanceStore {
-  /// 内存缓存：首次加载后保留，避免每次操作都重新查询数据库。
-  List<ClusterInstance>? _cache;
+class ClusterInstanceStore extends EntityStore<ClusterInstance> {
+  @override
+  String get storeLabel => 'cluster instances';
 
-  /// 将数据库行记录转换为 [ClusterInstance]。
-  ClusterInstance _fromDbRow(Map<String, dynamic> row) {
+  @override
+  ClusterInstance fromDbRow(Map<String, dynamic> row) {
     return ClusterInstance(
       id: row['id'] as String,
       name: row['name'] as String,
@@ -30,8 +29,8 @@ class ClusterInstanceStore {
     );
   }
 
-  /// 将 [ClusterInstance] 转换为数据库行记录。
-  Map<String, dynamic> _toDbRow(ClusterInstance instance) {
+  @override
+  Map<String, dynamic> toDbRow(ClusterInstance instance) {
     return {
       'id': instance.id,
       'name': instance.name,
@@ -46,58 +45,35 @@ class ClusterInstanceStore {
     };
   }
 
+  @override
+  String idOf(ClusterInstance instance) => instance.id;
+
+  @override
+  Future<List<Map<String, dynamic>>> fetchAll() =>
+      DatabaseManager.instance.getAllClusterInstances();
+
+  @override
+  Future<void> insertRow(Map<String, dynamic> row) =>
+      DatabaseManager.instance.insertClusterInstance(row);
+
+  @override
+  Future<void> deleteRow(String id) =>
+      DatabaseManager.instance.deleteClusterInstance(id);
+
+  @override
+  Future<void> updateRow(String id, Map<String, dynamic> row) =>
+      DatabaseManager.instance.updateClusterInstance(id, row);
+
   /// 加载全部集群实例。
-  Future<List<ClusterInstance>> loadInstances() async {
-    if (_cache != null) {
-      return List<ClusterInstance>.of(_cache!);
-    }
-    try {
-      final rows = await DatabaseManager.instance.getAllClusterInstances();
-      _cache = rows.map(_fromDbRow).toList();
-      return List<ClusterInstance>.of(_cache!);
-    } catch (e) {
-      debugPrint('Failed to load cluster instances: $e');
-      return _cache ?? [];
-    }
-  }
+  Future<List<ClusterInstance>> loadInstances() => loadAll();
 
   /// 添加单个集群实例并持久化。
-  Future<ClusterInstance> addInstance(ClusterInstance instance) async {
-    try {
-      await DatabaseManager.instance.insertClusterInstance(_toDbRow(instance));
-      _cache?.add(instance);
-      return instance;
-    } catch (e) {
-      debugPrint('Failed to add cluster instance: $e');
-      return instance;
-    }
-  }
+  Future<ClusterInstance> addInstance(ClusterInstance instance) =>
+      add(instance);
 
   /// 按 [id] 删除集群实例并持久化。
-  Future<void> removeInstance(String id) async {
-    try {
-      await DatabaseManager.instance.deleteClusterInstance(id);
-      _cache?.removeWhere((e) => e.id == id);
-    } catch (e) {
-      debugPrint('Failed to remove cluster instance: $e');
-    }
-  }
+  Future<void> removeInstance(String id) => remove(id);
 
   /// 更新集群实例字段并持久化。
-  Future<void> updateInstance(ClusterInstance instance) async {
-    try {
-      await DatabaseManager.instance.updateClusterInstance(
-        instance.id,
-        _toDbRow(instance),
-      );
-      if (_cache != null) {
-        final index = _cache!.indexWhere((e) => e.id == instance.id);
-        if (index >= 0) {
-          _cache![index] = instance;
-        }
-      }
-    } catch (e) {
-      debugPrint('Failed to update cluster instance ${instance.id}: $e');
-    }
-  }
+  Future<void> updateInstance(ClusterInstance instance) => update(instance);
 }

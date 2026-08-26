@@ -7,6 +7,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import '../services/database_manager.dart';
+import 'settings_repository.dart';
 
 /// 一个 AI 模型配置。
 class AiModelConfig {
@@ -83,8 +84,11 @@ class AiSettings {
   /// 读取全部已保存模型；无新格式数据时尝试迁移旧版单模型配置。
   static Future<List<AiModelConfig>> getModels() async {
     try {
-      final raw = await DatabaseManager.instance.getSetting(_keyModels);
-      if (raw != null && raw.trim().isNotEmpty) {
+      final raw = await SettingsRepository.instance.getJson(
+        _keyModels,
+        label: 'AI models',
+      );
+      if (raw != null) {
         final list = jsonDecode(raw) as List<dynamic>;
         return [
           for (final e in list)
@@ -123,19 +127,20 @@ class AiSettings {
     return [config];
   }
 
-  static Future<void> _saveModels(List<AiModelConfig> models) async {
-    await DatabaseManager.instance.setSetting(
-      _keyModels,
-      jsonEncode([for (final m in models) m.toJson()]),
-    );
-  }
+  static Future<void> _saveModels(List<AiModelConfig> models) =>
+      SettingsRepository.instance.setJson(
+        _keyModels,
+        jsonEncode([for (final m in models) m.toJson()]),
+        label: 'AI models',
+      );
 
   /// 当前使用的模型；未指定时取第一个。
   static Future<AiModelConfig?> getActiveModel() async {
     final models = await getModels();
     if (models.isEmpty) return null;
-    final activeId = await DatabaseManager.instance.getSetting(
+    final activeId = await SettingsRepository.instance.getStringOrNull(
       _keyActiveModelId,
+      label: 'active model',
     );
     for (final m in models) {
       if (m.id == activeId) return m;
@@ -144,13 +149,12 @@ class AiSettings {
   }
 
   /// 设置当前使用的模型。
-  static Future<void> setActiveModel(String id) async {
-    try {
-      await DatabaseManager.instance.setSetting(_keyActiveModelId, id);
-    } catch (e) {
-      debugPrint('Failed to set active model: $e');
-    }
-  }
+  static Future<void> setActiveModel(String id) =>
+      SettingsRepository.instance.setString(
+        _keyActiveModelId,
+        id,
+        label: 'active model',
+      );
 
   /// 添加新模型并设为当前使用。
   static Future<void> addModel(AiModelConfig model) async {
@@ -173,13 +177,15 @@ class AiSettings {
   static Future<void> removeModel(String id) async {
     final models = (await getModels()).where((m) => m.id != id).toList();
     await _saveModels(models);
-    final activeId = await DatabaseManager.instance.getSetting(
+    final activeId = await SettingsRepository.instance.getStringOrNull(
       _keyActiveModelId,
+      label: 'active model',
     );
     if (activeId == id) {
-      await DatabaseManager.instance.setSetting(
+      await SettingsRepository.instance.setString(
         _keyActiveModelId,
         models.isEmpty ? '' : models.first.id,
+        label: 'active model',
       );
     }
   }
@@ -193,48 +199,36 @@ class AiSettings {
   static const int defaultMcpPort = 39273;
 
   /// 获取 MCP 服务器是否启用。
-  static Future<bool> getMcpEnabled() async {
-    try {
-      return await DatabaseManager.instance.getIntSetting(_keyMcpEnabled) == 1;
-    } catch (e) {
-      debugPrint('Failed to get MCP enabled: $e');
-      return false;
-    }
-  }
+  static Future<bool> getMcpEnabled() => SettingsRepository.instance.getBoolInt(
+        _keyMcpEnabled,
+        defaultValue: false,
+        label: 'MCP enabled',
+      );
 
   /// 设置 MCP 服务器开关。
-  static Future<void> setMcpEnabled(bool enabled) async {
-    try {
-      await DatabaseManager.instance.setIntSetting(
+  static Future<void> setMcpEnabled(bool enabled) =>
+      SettingsRepository.instance.setBoolInt(
         _keyMcpEnabled,
-        enabled ? 1 : 0,
+        enabled,
+        label: 'MCP enabled',
       );
-    } catch (e) {
-      debugPrint('Failed to set MCP enabled: $e');
-    }
-  }
 
   /// 获取 MCP 端口，未设置时返回 [defaultMcpPort]。
-  static Future<int> getMcpPort() async {
-    try {
-      final v = await DatabaseManager.instance.getIntSetting(_keyMcpPort);
-      if (v == null) return defaultMcpPort;
-      return v.clamp(1024, 65535);
-    } catch (e) {
-      debugPrint('Failed to get MCP port: $e');
-      return defaultMcpPort;
-    }
-  }
+  static Future<int> getMcpPort() => SettingsRepository.instance.getIntClamped(
+        _keyMcpPort,
+        defaultValue: defaultMcpPort,
+        min: 1024,
+        max: 65535,
+        label: 'MCP port',
+      );
 
   /// 设置 MCP 端口，自动 clamp 到 1024-65535。
-  static Future<void> setMcpPort(int port) async {
-    try {
-      await DatabaseManager.instance.setIntSetting(
+  static Future<void> setMcpPort(int port) =>
+      SettingsRepository.instance.setIntClamped(
         _keyMcpPort,
-        port.clamp(1024, 65535),
+        port,
+        min: 1024,
+        max: 65535,
+        label: 'MCP port',
       );
-    } catch (e) {
-      debugPrint('Failed to set MCP port: $e');
-    }
-  }
 }

@@ -12,7 +12,8 @@ import 'dart:isolate';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:ffi/ffi.dart';
-import 'package:path/path.dart' as p;
+
+import 'rust_lib.dart';
 
 /// 下载进度信息。
 ///
@@ -79,12 +80,6 @@ typedef DownloadFileMultipartDart =
 
 typedef CancelDownloadC = Void Function();
 typedef CancelDownloadDart = void Function();
-
-typedef GetLastErrorC = Pointer<Utf8> Function();
-typedef GetLastErrorDart = Pointer<Utf8> Function();
-
-typedef FreeStringC = Void Function(Pointer<Utf8> ptr);
-typedef FreeStringDart = void Function(Pointer<Utf8> ptr);
 
 typedef DownloadProgressCallbackC = Void Function(Uint64, Uint64);
 
@@ -160,85 +155,7 @@ class Downloader {
       'IriX/1.0.0 (https://github.com/MCFSO/IriX)';
 
   /// 打开动态库 (xmc_downloader)
-  static DynamicLibrary _openLibrary() {
-    final attempts = <String>[];
-    for (final libPath in _getPossibleLibraryPaths()) {
-      try {
-        final file = File(libPath);
-        if (file.existsSync()) {
-          return DynamicLibrary.open(libPath);
-        } else {
-          attempts.add('$libPath (文件不存在)');
-        }
-      } catch (e) {
-        attempts.add('$libPath (加载失败: $e)');
-      }
-    }
-
-    final sysName = Platform.isWindows
-        ? 'xmc_downloader.dll'
-        : Platform.isMacOS
-        ? 'libxmc_downloader.dylib'
-        : 'libxmc_downloader.so';
-    try {
-      return DynamicLibrary.open(sysName);
-    } catch (e) {
-      attempts.add('系统搜索路径 "$sysName" (加载失败: $e)');
-    }
-
-    throw UnsupportedError(
-      'Rust downloader library not found.\n'
-      'cwd: ${Directory.current.path}\n'
-      'exe: ${Platform.resolvedExecutable}\n'
-      '尝试的路径:\n${attempts.map((a) => '  - $a').join('\n')}',
-    );
-  }
-
-  /// 获取可能的库路径列表
-  static List<String> _getPossibleLibraryPaths() {
-    final paths = <String>[];
-    final libName = Platform.isWindows
-        ? 'xmc_downloader.dll'
-        : Platform.isMacOS
-        ? 'libxmc_downloader.dylib'
-        : 'libxmc_downloader.so';
-
-    final cwd = Directory.current.path;
-    paths.add(p.join(cwd, libName));
-    paths.add(p.join(cwd, 'lib', libName));
-    if (Platform.isWindows) {
-      paths.add(p.join(cwd, 'windows', 'runner', libName));
-    } else if (Platform.isMacOS) {
-      paths.add(p.join(cwd, 'macos', libName));
-    } else {
-      paths.add(p.join(cwd, 'linux', libName));
-    }
-
-    // 从 exe 目录开始向上逐级查找
-    try {
-      final exePath = Platform.resolvedExecutable;
-      var dir = p.dirname(exePath);
-      for (var i = 0; i < 10; i++) {
-        paths.add(p.join(dir, libName));
-        paths.add(p.join(dir, 'lib', libName));
-        if (Platform.isWindows) {
-          paths.add(p.join(dir, 'windows', 'runner', libName));
-        } else if (Platform.isMacOS) {
-          paths.add(p.join(dir, 'macos', libName));
-          paths.add(p.join(dir, '..', 'Frameworks', libName));
-        } else {
-          paths.add(p.join(dir, 'linux', libName));
-        }
-        final parent = p.dirname(dir);
-        if (parent == dir) break;
-        dir = parent;
-      }
-    } catch (_) {
-      // 忽略
-    }
-
-    return paths;
-  }
+  static DynamicLibrary _openLibrary() => openRustLibrary('downloader');
 
   /// 下载指定 URL 的文件到目标路径。
   ///
@@ -384,9 +301,6 @@ class Downloader {
       final getLastError = lib.lookupFunction<GetLastErrorC, GetLastErrorDart>(
         'get_last_error',
       );
-      final freeString = lib.lookupFunction<FreeStringC, FreeStringDart>(
-        'free_string',
-      );
 
       // 由主 isolate 创建的进度回调 native 函数指针
       final progressCb =
@@ -425,7 +339,7 @@ class Downloader {
           try {
             error = errPtr.toDartString();
           } finally {
-            freeString(errPtr);
+            freeRustString(lib, errPtr);
           }
         }
       }

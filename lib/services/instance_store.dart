@@ -5,7 +5,8 @@
 import 'package:flutter/foundation.dart';
 
 import '../models/server_instance.dart';
-import '../services/database_manager.dart';
+import 'database_manager.dart';
+import 'entity_store.dart';
 
 /// 服务器实例的本地持久化服务。
 ///
@@ -14,13 +15,12 @@ import '../services/database_manager.dart';
 ///
 /// 该类仅负责读写持久化数据，不涉及运行状态管理（如 ChangeNotifier），
 /// 状态管理属于后续 Task 8 的职责。
-class InstanceStore {
-  /// 内存缓存：首次加载后保留，避免每次操作都重新查询数据库。
-  /// 为空表示尚未加载过（区别于已加载但列表为空的情况）。
-  List<ServerInstance>? _cache;
+class InstanceStore extends EntityStore<ServerInstance> {
+  @override
+  String get storeLabel => 'instances';
 
-  /// 将数据库行记录转换为 [ServerInstance]。
-  ServerInstance _fromDbRow(Map<String, dynamic> row) {
+  @override
+  ServerInstance fromDbRow(Map<String, dynamic> row) {
     final containerConfig = row['container_config'] as String?;
     return ServerInstance(
       id: row['id'] as String,
@@ -38,10 +38,8 @@ class InstanceStore {
     );
   }
 
-  /// 将 [ServerInstance] 转换为数据库行记录。
-  ///
-  /// 字段名使用 snake_case 以匹配数据库列名。
-  Map<String, dynamic> _toDbRow(ServerInstance instance) {
+  @override
+  Map<String, dynamic> toDbRow(ServerInstance instance) {
     return {
       'id': instance.id,
       'name': instance.name,
@@ -56,61 +54,51 @@ class InstanceStore {
     };
   }
 
+  @override
+  String idOf(ServerInstance instance) => instance.id;
+
+  @override
+  Future<List<Map<String, dynamic>>> fetchAll() =>
+      DatabaseManager.instance.getAllServers();
+
+  @override
+  Future<void> insertRow(Map<String, dynamic> row) =>
+      DatabaseManager.instance.insertServer(row);
+
+  @override
+  Future<void> deleteRow(String id) => DatabaseManager.instance.deleteServer(id);
+
+  @override
+  Future<void> updateRow(String id, Map<String, dynamic> row) =>
+      DatabaseManager.instance.updateServer(id, row);
+
   /// 加载全部实例。
   ///
   /// 从数据库查询所有服务器记录并转换为实例列表。
   /// - 加载时每个实例的运行状态会被重置为已关闭（由 [ServerInstance] 默认值处理）。
   ///
   /// 返回列表的副本，避免外部直接修改影响内部缓存。
-  Future<List<ServerInstance>> loadInstances() async {
-    if (_cache != null) {
-      return List<ServerInstance>.of(_cache!);
-    }
-
-    try {
-      final rows = await DatabaseManager.instance.getAllServers();
-      _cache = rows.map(_fromDbRow).toList();
-      return List<ServerInstance>.of(_cache!);
-    } catch (e) {
-      debugPrint('Failed to load instances: $e');
-      return _cache ?? [];
-    }
-  }
+  Future<List<ServerInstance>> loadInstances() => loadAll();
 
   /// 保存实例列表（更新内存缓存）。
   ///
   /// 数据库写入已由各增删改方法单独完成，此处仅同步内存缓存。
   Future<void> saveInstances(List<ServerInstance> instances) async {
-    _cache = List<ServerInstance>.of(instances);
+    cache = List<ServerInstance>.of(instances);
   }
 
   /// 添加单个实例并持久化。
   ///
   /// 将 [instance] 插入数据库，同时更新内存缓存。
   /// 返回被添加的实例，便于调用方链式使用。
-  Future<ServerInstance> addInstance(ServerInstance instance) async {
-    try {
-      await DatabaseManager.instance.insertServer(_toDbRow(instance));
-      _cache?.add(instance);
-      return instance;
-    } catch (e) {
-      debugPrint('Failed to add instance: $e');
-      return instance;
-    }
-  }
+  Future<ServerInstance> addInstance(ServerInstance instance) =>
+      add(instance);
 
   /// 按 [id] 删除实例并持久化。
   ///
   /// 从数据库删除指定记录，同时从内存缓存中移除。
   /// 若 [id] 不存在则不做任何更改。
-  Future<void> removeInstance(String id) async {
-    try {
-      await DatabaseManager.instance.deleteServer(id);
-      _cache?.removeWhere((e) => e.id == id);
-    } catch (e) {
-      debugPrint('Failed to remove instance: $e');
-    }
-  }
+  Future<void> removeInstance(String id) => remove(id);
 
   /// 重命名实例并持久化。
   ///
@@ -119,8 +107,8 @@ class InstanceStore {
   Future<void> renameInstance(String id, String newName) async {
     try {
       await DatabaseManager.instance.updateServer(id, {'name': newName});
-      if (_cache != null) {
-        for (final e in _cache!) {
+      if (cache != null) {
+        for (final e in cache!) {
           if (e.id == id) {
             e.name = newName;
           }
@@ -140,8 +128,8 @@ class InstanceStore {
       await DatabaseManager.instance.updateServer(id, {
         'start_command': newCommand,
       });
-      if (_cache != null) {
-        for (final e in _cache!) {
+      if (cache != null) {
+        for (final e in cache!) {
           if (e.id == id) {
             e.startCommand = newCommand;
           }
@@ -165,8 +153,8 @@ class InstanceStore {
         'run_mode': runMode.name,
         'container_config': container?.toJson(),
       });
-      if (_cache != null) {
-        for (final e in _cache!) {
+      if (cache != null) {
+        for (final e in cache!) {
           if (e.id == id) {
             e.runMode = runMode;
             e.container = container;
