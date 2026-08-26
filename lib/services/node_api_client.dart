@@ -2225,7 +2225,7 @@ class NodeApiClient {
       query: {'daemonId': daemonId},
       body: {
         'uuid': uuid,
-        if (ids != null) 'ids': ids,
+        ...?ids == null ? null : {'ids': ids},
       },
     );
   }
@@ -2484,8 +2484,8 @@ class NodeApiClient {
       body: {
         'username': username,
         if (group != null && group.isNotEmpty) 'group': group,
-        if (enabled != null) 'enabled': enabled,
-        if (permissions != null) 'permissions': permissions,
+        ...?enabled == null ? null : {'enabled': enabled},
+        ...?permissions == null ? null : {'permissions': permissions},
       },
     );
   }
