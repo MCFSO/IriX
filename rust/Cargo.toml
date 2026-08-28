@@ -5,3 +5,9 @@ resolver = "2"
 [profile.release]
 opt-level = 3
 lto = true
+
+# 安全补丁：把 milvus-sdk-rust 重定向到 MCFSO 维护的 fork，其将 lru 从 ^0.12
+# 升级到 ^0.16，从而引入已修复 IterMut 内存安全（Soundness）缺陷的 lru 0.16.3
+# （上游 milvus-io/milvus-sdk-rust 2.6.0 仍钉 lru ^0.12，无对应补丁版本）。
+[patch.crates-io]
+milvus-sdk-rust = { git = "https://github.com/MCFSO/milvus-sdk-rust.git", branch = "main" }
