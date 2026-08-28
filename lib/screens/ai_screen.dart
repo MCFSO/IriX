@@ -812,6 +812,13 @@ class _ModelsDialogState extends State<_ModelsDialog> {
   bool _mcpEnabled = false;
   final _mcpPortController = TextEditingController();
 
+  /// 知识库（Milvus）连接配置与保存状态。
+  MilvusConfig _milvus = MilvusConfig.empty();
+  bool _savingMilvus = false;
+  final _milvusUriController = TextEditingController();
+  final _milvusTokenController = TextEditingController();
+  final _milvusCollectionController = TextEditingController();
+
   /// 知识库文档列表与加载状态。
   List<KnowledgeDocument> _knowledgeDocs = [];
   bool _knowledgeLoading = false;
@@ -821,13 +828,83 @@ class _ModelsDialogState extends State<_ModelsDialog> {
   void initState() {
     super.initState();
     _load();
+    _loadMilvus();
     _loadKnowledge();
   }
 
   @override
   void dispose() {
     _mcpPortController.dispose();
+    _milvusUriController.dispose();
+    _milvusTokenController.dispose();
+    _milvusCollectionController.dispose();
     super.dispose();
+  }
+
+  /// 加载知识库 Milvus 连接配置到控制器。
+  Future<void> _loadMilvus() async {
+    final config = await AiSettings.getMilvusConfig();
+    if (!mounted) return;
+    setState(() {
+      _milvus = config;
+      _milvusUriController.text = config.uri;
+      _milvusTokenController.text = config.token;
+      _milvusCollectionController.text = config.collection;
+    });
+  }
+
+  /// 保存知识库 Milvus 连接配置。
+  Future<void> _saveMilvus() async {
+    if (_savingMilvus) return;
+    setState(() => _savingMilvus = true);
+    try {
+      final config = MilvusConfig(
+        uri: _milvusUriController.text.trim(),
+        token: _milvusTokenController.text.trim(),
+        collection:
+            _milvusCollectionController.text.trim().isEmpty
+                ? 'xmc_knowledge'
+                : _milvusCollectionController.text.trim(),
+      );
+      await AiSettings.setMilvusConfig(config);
+      setState(() => _milvus = config);
+      // 配置变更后刷新文档列表（可能指向不同集合）。
+      await _loadKnowledge();
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Milvus 连接已保存')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('保存失败: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _savingMilvus = false);
+    }
+  }
+
+  /// 知识库 Milvus 配置单行输入框。
+  Widget _milvusField(
+    ThemeData theme,
+    String label,
+    String hint,
+    TextEditingController controller, {
+    bool obscure = false,
+  }) {
+    return TextField(
+      controller: controller,
+      obscureText: obscure,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        isDense: true,
+        border: const OutlineInputBorder(),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      ),
+    );
   }
 
   Future<void> _loadKnowledge() async {
@@ -848,6 +925,15 @@ class _ModelsDialogState extends State<_ModelsDialog> {
 
   Future<void> _importKnowledge() async {
     if (_importing) return;
+    final milvus = await AiSettings.getMilvusConfig();
+    if (!milvus.isValid) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('请先在上方配置 Milvus 连接再导入知识库')),
+        );
+      }
+      return;
+    }
     final model = await AiSettings.getActiveModel();
     if (model == null) {
       if (mounted) {
@@ -1173,6 +1259,46 @@ class _ModelsDialogState extends State<_ModelsDialog> {
                     label: Text(_importing ? '导入中…' : '导入文档'),
                   ),
                 ],
+              ),
+              const SizedBox(height: 12),
+              // === 知识库 Milvus 连接配置 ===
+              Text(
+                '向量库（Milvus）连接',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 8),
+              _milvusField(theme, 'Milvus 地址', 'http://localhost:19530', _milvusUriController),
+              const SizedBox(height: 8),
+              _milvusField(theme, 'Token（可选）', '未启用鉴权可留空', _milvusTokenController, obscure: true),
+              const SizedBox(height: 8),
+              _milvusField(theme, '集合名称', 'xmc_knowledge', _milvusCollectionController),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton.icon(
+                  onPressed: _savingMilvus ? null : _saveMilvus,
+                  icon: _savingMilvus
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.save_outlined, size: 18),
+                  label: Text(_savingMilvus ? '保存中…' : '保存连接'),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                _milvus.isValid
+                    ? '已配置 Milvus 连接：${_milvus.uri}'
+                    : '尚未配置 Milvus 连接，导入/检索知识库前请先保存',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: _milvus.isValid
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.error,
+                ),
               ),
               const SizedBox(height: 8),
               if (_knowledgeLoading)

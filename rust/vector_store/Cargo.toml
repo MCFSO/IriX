@@ -8,8 +8,9 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 libc = "0.2"
-# SQLite（bundled 编译）用于向量存储；sqlite-vec 通过 auto_extension 注册 vec0 虚拟表。
-rusqlite = { version = "0.37", features = ["bundled"] }
-sqlite-vec = "0.1"
+# 远程向量数据库 Milvus（官方 Rust SDK，纯 rustls、无 OpenSSL）。
+# 替代原本地 SQLite + sqlite-vec 方案，所有向量存取走 Milvus 服务端。
+milvus-sdk-rust = "2.6"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-zerocopy = "0.8"

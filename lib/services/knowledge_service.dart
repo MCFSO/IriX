@@ -1,17 +1,14 @@
 // AI 知识库服务（RAG）
 //
-// 管理本地向量知识库（sqlite-vec，经 xmc_vector_store FFI）：
+// 管理远程向量知识库（Milvus，经 xmc_vector_store FFI）：
 // - 用户导入 .txt/.md 文档，自动分块后调用 AI 模型的 /embeddings 接口
-//   生成向量并写入库；
+//   生成向量并写入 Milvus 集合；
 // - AI 对话时对查询向量做余弦相似度检索，把命中片段作为上下文；
 // - embedding 复用 AI 设置中的模型（baseUrl + apiKey + embeddingModel 名），
-//   不引入额外的 embedding 服务。
+//   不引入额外的 embedding 服务；
+// - Milvus 连接配置为独立的 AI 设置项（uri / token / collection）。
 
 import 'dart:convert';
-import 'dart:io';
-
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
 import '../services/ai_settings.dart';
 import '../services/http_ffi.dart';
@@ -86,18 +83,14 @@ class KnowledgeService {
   static final KnowledgeService instance = KnowledgeService._();
   KnowledgeService._();
 
-  /// 知识库数据库文件路径（首次访问时解析）。
-  Future<String> get _dbPath async {
-    final dir = await getKnowledgeDir();
-    return p.join(dir.path, 'knowledge.db');
-  }
-
-  /// 知识库目录（文档目录/ai_knowledge）。
-  static Future<Directory> getKnowledgeDir() async {
-    final base = await getAiKnowledgeBaseDir();
-    final dir = Directory(p.join(base, 'ai_knowledge'));
-    if (!await dir.exists()) await dir.create(recursive: true);
-    return dir;
+  /// Milvus 连接配置 JSON（FFI 首参）。从 AI 设置读取。
+  Future<String> get _connJson async {
+    final config = await AiSettings.getMilvusConfig();
+    return jsonEncode({
+      'uri': config.uri,
+      'token': config.token,
+      'collection': config.collection,
+    });
   }
 
   // === 基础操作 ===
@@ -105,7 +98,7 @@ class KnowledgeService {
   /// 初始化知识库（幂等）。[dimension] 为 embedding 维度，首次创建时使用。
   Future<void> init({int? dimension}) async {
     await VectorStoreFfi.instance.request(
-      dbPath: await _dbPath,
+      connJson: await _connJson,
       op: 'init',
       args: {'dimension': ?dimension},
     );
@@ -114,7 +107,7 @@ class KnowledgeService {
   /// 状态统计。
   Future<KnowledgeStats> stats() async {
     final result = await VectorStoreFfi.instance.request(
-      dbPath: await _dbPath,
+      connJson: await _connJson,
       op: 'stats',
     );
     return KnowledgeStats.fromJson(result);
@@ -123,7 +116,7 @@ class KnowledgeService {
   /// 文档列表（按创建时间倒序）。
   Future<List<KnowledgeDocument>> listDocuments() async {
     final result = await VectorStoreFfi.instance.request(
-      dbPath: await _dbPath,
+      connJson: await _connJson,
       op: 'list_documents',
     );
     return [
@@ -135,7 +128,7 @@ class KnowledgeService {
   /// 删除文档（含全部分块与向量）。
   Future<void> deleteDocument(String docId) async {
     await VectorStoreFfi.instance.request(
-      dbPath: await _dbPath,
+      connJson: await _connJson,
       op: 'delete_document',
       args: {'doc_id': docId},
     );
@@ -224,7 +217,7 @@ class KnowledgeService {
 
     final docId = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
     await VectorStoreFfi.instance.request(
-      dbPath: await _dbPath,
+      connJson: await _connJson,
       op: 'add',
       args: {
         'doc_id': docId,
@@ -288,7 +281,7 @@ class KnowledgeService {
 
     final vectors = await embedTexts(model, [query]);
     final result = await VectorStoreFfi.instance.request(
-      dbPath: await _dbPath,
+      connJson: await _connJson,
       op: 'search',
       args: {'embedding': vectors.first, 'top_k': topK},
     );
@@ -302,10 +295,4 @@ class KnowledgeService {
     final trimmed = body.trim();
     return trimmed.length > 300 ? '${trimmed.substring(0, 300)}…' : trimmed;
   }
-}
-
-/// 知识库目录的父目录（应用文档目录）。
-Future<String> getAiKnowledgeBaseDir() async {
-  final appDir = await getApplicationDocumentsDirectory();
-  return appDir.path;
 }

@@ -66,6 +66,54 @@ class AiModelConfig {
   );
 }
 
+/// 知识库（Milvus）连接配置。作为独立的 AI 设置项持久化，不进入远程数据库
+/// 连接列表（db_connections）。
+class MilvusConfig {
+  /// Milvus 服务地址，如 http://localhost:19530 或 https://host:443。
+  final String uri;
+
+  /// 访问令牌（可选，未启用鉴权时为空）。
+  final String token;
+
+  /// 集合（collection）名称，知识库向量存储于此。
+  final String collection;
+
+  const MilvusConfig({
+    this.uri = '',
+    this.token = '',
+    this.collection = 'xmc_knowledge',
+  });
+
+  /// 连接是否完整可用（uri 与 collection 均非空）。
+  bool get isValid => uri.trim().isNotEmpty && collection.trim().isNotEmpty;
+
+  MilvusConfig copyWith({
+    String? uri,
+    String? token,
+    String? collection,
+  }) =>
+      MilvusConfig(
+        uri: uri ?? this.uri,
+        token: token ?? this.token,
+        collection: collection ?? this.collection,
+      );
+
+  Map<String, dynamic> toJson() => {
+    'uri': uri,
+    'token': token,
+    'collection': collection,
+  };
+
+  factory MilvusConfig.fromJson(Map<String, dynamic> json) => MilvusConfig(
+    uri: (json['uri'] as String?) ?? '',
+    token: (json['token'] as String?) ?? '',
+    collection: (json['collection'] as String?) ?? 'xmc_knowledge',
+  );
+
+  /// 默认配置。
+  factory MilvusConfig.empty() => const MilvusConfig();
+}
+
 /// AI 助手设置服务。
 class AiSettings {
   static const _keyModels = 'ai_models';
@@ -230,5 +278,34 @@ class AiSettings {
         min: 1024,
         max: 65535,
         label: 'MCP port',
+      );
+
+  // === 知识库（Milvus）连接配置 ===
+
+  static const _keyMilvus = 'kb_milvus_config';
+
+  /// 读取知识库 Milvus 连接配置；未配置时返回 [MilvusConfig.empty]。
+  static Future<MilvusConfig> getMilvusConfig() async {
+    try {
+      final raw = await SettingsRepository.instance.getJson(
+        _keyMilvus,
+        label: 'Milvus config',
+      );
+      if (raw == null) return MilvusConfig.empty();
+      return MilvusConfig.fromJson(
+        jsonDecode(raw) as Map<String, dynamic>,
+      );
+    } catch (e) {
+      debugPrint('Failed to get Milvus config: $e');
+      return MilvusConfig.empty();
+    }
+  }
+
+  /// 保存知识库 Milvus 连接配置。
+  static Future<void> setMilvusConfig(MilvusConfig config) =>
+      SettingsRepository.instance.setJson(
+        _keyMilvus,
+        jsonEncode(config.toJson()),
+        label: 'Milvus config',
       );
 }

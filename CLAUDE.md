@@ -63,7 +63,7 @@ Seven Rust crates compiled as separate `.dll`/`.so`/`.dylib` files. Dart FFI wra
 | `file_ops` | `file_ops_ffi.dart` | File scan, move, trash |
 | `db_client` | `db_client_ffi.dart` | MySQL/MariaDB/PostgreSQL/Redis remote DB |
 | `logger` | `logger_ffi.dart` | Rust-side logging |
-| `vector_store` | `vector_store_ffi.dart` | Vector embeddings store (sqlite-vec) |
+| `vector_store` | `knowledge_ffi.dart` | Milvus vector embeddings store (milvus-sdk-rust) |
 
 **All HTTP goes through Rust** — `HttpFfiService` for general requests, `Downloader.downloadFile` for large files. Do NOT add `package:http` in Dart. Exception: local loopback servers (OAuth callback, MCP server) use `dart:io HttpServer`.
 

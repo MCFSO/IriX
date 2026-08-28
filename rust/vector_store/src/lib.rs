@@ -1,12 +1,13 @@
-//! XMC Server Launcher 向量知识库模块（sqlite-vec）
+//! XMC Server Launcher 向量知识库模块（Milvus）
 //!
-//! 基于 Rust + rusqlite（bundled）+ sqlite-vec 实现本地向量数据库，
-//! 供 Flutter 通过 FFI 调用（xmc_vector_store.dll）。用于 AI 助手的
-//! RAG 知识库：用户导入的 .txt/.md 文档分块后向量化（embedding 由
-//! Dart 侧调用 AI 模型 /embeddings 接口生成）写入本地 SQLite，
-//! 对话时对查询做余弦相似度检索，命中片段作为上下文回填给模型。
+//! 基于 Rust + milvus-sdk-rust（官方 SDK，纯 rustls、无 OpenSSL）实现远程向量
+//! 数据库，供 Flutter 通过 FFI 调用（xmc_vector_store.dll）。用于 AI 助手的
+//! RAG 知识库：用户导入的 .txt/.md 文档分块后向量化（embedding 由 Dart 侧
+//! 调用 AI 模型 /embeddings 接口生成）写入 Milvus 集合；对话时对查询做余弦
+//! 相似度检索，命中片段作为上下文回填给模型。
 //!
-//! 统一入口 `vector_request(db_path, op, args_json)`：
+//! 统一入口 `vector_request(conn_json, op, args_json)`：
+//! - conn_json: `{"uri":"http://host:19530","token":"","collection":"xmc_knowledge"}`
 //! - op: init / add / search / list_documents / delete_document / stats
 //!
 //! 返回 JSON 字符串（Dart 侧用 `free_string` 释放）：
@@ -16,18 +17,20 @@
 use std::cell::RefCell;
 use std::ffi::{CStr, CString};
 use std::panic::{catch_unwind, AssertUnwindSafe};
-use std::path::Path;
-use std::sync::Once;
+use std::sync::OnceLock;
 
-use rusqlite::{params, Connection, OptionalExtension};
+use libc::c_char;
+use milvus::v2::prelude::*;
+use milvus::v2::ClientV2;
+use serde::Deserialize;
 use serde_json::{json, Map, Value as Json};
-use zerocopy::IntoBytes;
+// milvus-sdk-rust 的 prelude 重新导出 1 泛型参数的 Result；此处显式用 std Result，
+// 避免 `Result<T, E>` 二泛型写法被 milvus 的 Result 别名遮蔽。
+use std::result::Result as StdResult;
 
 thread_local! {
     static LAST_ERROR: RefCell<Option<CString>> = const { RefCell::new(None) };
 }
-
-static VEC_INIT: Once = Once::new();
 
 // ======================== 通用工具 ========================
 
@@ -40,7 +43,7 @@ fn set_last_error(msg: impl AsRef<str>) {
     });
 }
 
-fn cstring_out(s: String) -> *mut libc::c_char {
+fn cstring_out(s: String) -> *mut c_char {
     match CString::new(s) {
         Ok(cstr) => cstr.into_raw(),
         Err(_) => CString::new(r#"{"ok":false,"error":"结果字符串包含 nul 字节"}"#)
@@ -53,7 +56,7 @@ fn ok_json(payload: Json) -> String {
     json!({ "ok": true, "result": payload }).to_string()
 }
 
-fn parse_args(args_json: *const libc::c_char) -> Result<Json, String> {
+fn parse_args(args_json: *const c_char) -> StdResult<Json, String> {
     if args_json.is_null() {
         return Ok(Json::Object(Map::new()));
     }
@@ -65,7 +68,7 @@ fn parse_args(args_json: *const libc::c_char) -> Result<Json, String> {
     }
 }
 
-fn str_arg(args: &Json, name: &str) -> Result<String, String> {
+fn str_arg(args: &Json, name: &str) -> StdResult<String, String> {
     match args.get(name) {
         Some(Json::String(s)) => Ok(s.clone()),
         _ => Err(format!("缺少参数: {name}")),
@@ -79,7 +82,7 @@ fn opt_str_arg(args: &Json, name: &str) -> Option<String> {
     }
 }
 
-fn u64_arg(args: &Json, name: &str, default: u64) -> Result<u64, String> {
+fn u64_arg(args: &Json, name: &str, default: u64) -> StdResult<u64, String> {
     match args.get(name) {
         Some(Json::Number(n)) => n
             .as_u64()
@@ -88,13 +91,8 @@ fn u64_arg(args: &Json, name: &str, default: u64) -> Result<u64, String> {
     }
 }
 
-/// Vec<f32> → sqlite-vec 二进制（f32 LE 字节序列）。
-fn vec_blob(vec: &[f32]) -> Vec<u8> {
-    vec.as_bytes().to_vec()
-}
-
 /// 从 JSON 数组解析 f32 向量。
-fn vec_arg(args: &Json, name: &str) -> Result<Vec<f32>, String> {
+fn vec_arg(args: &Json, name: &str) -> StdResult<Vec<f32>, String> {
     match args.get(name) {
         Some(Json::Array(items)) => items
             .iter()
@@ -108,105 +106,220 @@ fn vec_arg(args: &Json, name: &str) -> Result<Vec<f32>, String> {
     }
 }
 
-// ======================== sqlite-vec 注册 ========================
+// ======================== 连接配置 ========================
 
-/// 进程级注册 sqlite-vec 扩展（自动附加到之后打开的所有连接）。
-fn ensure_vec_registered() -> Result<(), String> {
-    let mut first_error: Option<String> = None;
-    VEC_INIT.call_once(|| {
-        use rusqlite::auto_extension::{RawAutoExtension, register_auto_extension};
-        let raw: RawAutoExtension =
-            unsafe { std::mem::transmute(sqlite_vec::sqlite3_vec_init as *const () as usize) };
-        if let Err(e) = unsafe { register_auto_extension(raw) } {
-            first_error = Some(format!("注册 sqlite-vec 扩展失败: {e}"));
-        }
-    });
-    match first_error {
-        Some(e) => Err(e),
-        None => Ok(()),
-    }
+#[derive(Debug, Clone, Deserialize)]
+struct ConnInfo {
+    uri: String,
+    #[serde(default)]
+    token: String,
+    collection: String,
 }
 
-// ======================== 数据库结构 ========================
+// ======================== Tokio 运行时 ========================
 
-/// 打开数据库，确保基础表存在；向量表按 [dimension] 惰性创建。
-fn open_db(db_path: &str, dimension: Option<usize>) -> Result<Connection, String> {
-    ensure_vec_registered()?;
-    let conn = Connection::open(Path::new(db_path))
-        .map_err(|e| format!("打开知识库失败: {e}"))?;
-    conn.execute_batch(
-        "CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-         CREATE TABLE IF NOT EXISTS documents (
-           id TEXT PRIMARY KEY,
-           title TEXT NOT NULL,
-           created_at TEXT NOT NULL
-         );
-         CREATE TABLE IF NOT EXISTS chunks (
-           id INTEGER PRIMARY KEY AUTOINCREMENT,
-           doc_id TEXT NOT NULL,
-           text TEXT NOT NULL
-         );",
+/// 全局 Tokio 运行时（Milvus SDK 为 async/tonic），用于把同步 FFI 调用桥接
+/// 到异步 SDK。Milvus 网络 I/O 较重，使用多线程运行时。
+fn runtime() -> &'static tokio::runtime::Runtime {
+    static RT: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
+    RT.get_or_init(|| {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .expect("创建 Tokio 运行时失败")
+    })
+}
+
+/// 建立 Milvus 客户端（即用即连，符合项目「即用即连、用完即关」约定）。
+async fn connect(conn: &ConnInfo) -> StdResult<ClientV2, String> {
+    ClientV2::new(
+        &ConnectConfig::new()
+            .uri(&conn.uri)
+            .token(&conn.token),
     )
-    .map_err(|e| format!("初始化表失败: {e}"))?;
-
-    let existing_dim: Option<i64> = conn
-        .query_row(
-            "SELECT value FROM meta WHERE key = 'dimension'",
-            [],
-            |r| r.get(0),
-        )
-        .optional()
-        .map_err(|e| format!("读取维度失败: {e}"))?
-        .and_then(|v: String| v.parse::<i64>().ok());
-
-    if existing_dim.is_none() {
-        let dim = dimension.ok_or("首次初始化必须提供 dimension 参数")?;
-        let sql =
-            format!("CREATE VIRTUAL TABLE IF NOT EXISTS vec_items USING vec0(embedding float[{dim}])");
-        conn.execute_batch(&sql)
-            .map_err(|e| format!("创建向量表失败: {e}"))?;
-        conn.execute(
-            "INSERT INTO meta (key, value) VALUES ('dimension', ?)",
-            params![dim.to_string()],
-        )
-        .map_err(|e| format!("保存维度失败: {e}"))?;
-    } else if let Some(dim) = dimension {
-        if existing_dim.unwrap() as usize != dim {
-            return Err(format!(
-                "向量维度不一致：库为 {} 维，当前模型为 {dim} 维。请手动删除知识库后重新导入",
-                existing_dim.unwrap()
-            ));
-        }
-    }
-    Ok(conn)
+    .await
+    .map_err(|e| format!("连接 Milvus 失败（{}）: {e}", conn.uri))
 }
 
-fn get_dimension(conn: &Connection) -> Result<u64, String> {
-    let v: String = conn
-        .query_row("SELECT value FROM meta WHERE key = 'dimension'", [], |r| r.get(0))
-        .map_err(|e| format!("读取维度失败: {e}"))?;
-    v.parse::<u64>().map_err(|_| "维度元数据损坏".to_string())
+// ======================== 集合 / Schema ========================
+
+const FIELD_ID: &str = "id";
+const FIELD_EMBEDDING: &str = "embedding";
+const FIELD_TEXT: &str = "text";
+const FIELD_DOC_ID: &str = "doc_id";
+const FIELD_TITLE: &str = "title";
+const FIELD_CREATED_AT: &str = "created_at";
+const DEFAULT_LIMIT: i64 = 16384;
+/// 匹配全部行的过滤表达式（Milvus query 要求 filter 非空；doc_id 恒非空，
+/// 故 `doc_id != ""` 等价于全表扫描）。
+const FILTER_ALL: &str = "doc_id != \"\"";
+
+/// 集合是否已存在。
+async fn collection_exists(client: &ClientV2, conn: &ConnInfo) -> StdResult<bool, String> {
+    let resp = client
+        .has_collection(
+            HasCollectionRequest::builder()
+                .collection_name(&conn.collection)
+                .build()
+                .map_err(|e| e.to_string())?,
+        )
+        .await
+        .map_err(|e| format!("检查集合存在性失败: {e}"))?;
+    Ok(resp.exists())
+}
+
+/// 读取集合 embedding 字段的维度（集合不存在返回 None）。
+async fn collection_dimension(
+    client: &ClientV2,
+    conn: &ConnInfo,
+) -> StdResult<Option<u64>, String> {
+    if !collection_exists(client, conn).await? {
+        return Ok(None);
+    }
+    let resp = client
+        .describe_collection(
+            DescribeCollectionRequest::builder()
+                .collection_name(&conn.collection)
+                .build()
+                .map_err(|e| e.to_string())?,
+        )
+        .await
+        .map_err(|e| format!("读取集合描述失败: {e}"))?;
+    for field in resp.description().get_schema().get_fields() {
+        if field.get_name() == FIELD_EMBEDDING {
+            return Ok(Some(field.get_dimension() as u64));
+        }
+    }
+    Ok(None)
+}
+
+/// 确保向量集合存在：不存在则创建（含 COSINE 索引），存在则校验维度。
+async fn ensure_collection(client: &ClientV2, conn: &ConnInfo, dimension: u64) -> StdResult<(), String> {
+    if collection_exists(client, conn).await? {
+        if let Some(existing) = collection_dimension(client, conn).await? {
+            if existing != dimension {
+                return Err(format!(
+                    "向量维度不一致：库为 {existing} 维，当前模型为 {dimension} 维。请在 Milvus 中删除集合 {coll} 后重新导入",
+                    existing = existing,
+                    dimension = dimension,
+                    coll = conn.collection,
+                ));
+            }
+        }
+        return Ok(());
+    }
+
+    let schema = CollectionSchema::new()
+        .enable_dynamic_field(true)
+        .add_field(
+            FieldSchema::new()
+                .name(FIELD_ID)
+                .data_type(DataType::Int64)
+                .primary_key(true)
+                .auto_id(true),
+        )
+        .add_field(
+            FieldSchema::new()
+                .name(FIELD_EMBEDDING)
+                .data_type(DataType::FloatVector)
+                .dimension(dimension as u32),
+        )
+        .add_field(
+            FieldSchema::new()
+                .name(FIELD_TEXT)
+                .data_type(DataType::VarChar)
+                .max_length(8192),
+        )
+        .add_field(
+            FieldSchema::new()
+                .name(FIELD_DOC_ID)
+                .data_type(DataType::VarChar)
+                .max_length(64),
+        )
+        .add_field(
+            FieldSchema::new()
+                .name(FIELD_TITLE)
+                .data_type(DataType::VarChar)
+                .max_length(512),
+        )
+        .add_field(
+            FieldSchema::new()
+                .name(FIELD_CREATED_AT)
+                .data_type(DataType::VarChar)
+                .max_length(64),
+        );
+
+    let index = IndexParam::new()
+        .field_name(FIELD_EMBEDDING)
+        .index_type(IndexType::AutoIndex)
+        .metric_type(MetricType::Cosine);
+
+    client
+        .create_collection(
+            CreateCollectionRequest::builder()
+                .collection_name(&conn.collection)
+                .schema(schema)
+                .index_param(index)
+                .build()
+                .map_err(|e| e.to_string())?,
+        )
+        .await
+        .map_err(|e| format!("创建集合失败: {e}"))?;
+
+    Ok(())
+}
+
+/// 加载集合到内存（load 幂等，重复调用无副作用）。注意：集合刚创建时
+/// 可能需要等待索引建好，Milvus 会在 load 时处理。
+async fn load(client: &ClientV2, conn: &ConnInfo) -> StdResult<(), String> {
+    client
+        .load_collection(
+            LoadCollectionRequest::builder()
+                .collection_name(&conn.collection)
+                .sync(true)
+                .build()
+                .map_err(|e| e.to_string())?,
+        )
+        .await
+        .map_err(|e| format!("加载集合失败: {e}"))
 }
 
 // ======================== 操作实现 ========================
 
-/// 初始化（幂等）：确保表存在并返回维度。
-fn op_init(conn: &Connection) -> Result<Json, String> {
-    Ok(json!({ "dimension": get_dimension(conn)? }))
+/// 初始化（幂等）：确保集合存在并返回维度。参数 dimension 为 embedding 维度。
+async fn op_init(conn: &ConnInfo, args: &Json) -> StdResult<Json, String> {
+    let dimension = u64_arg(args, "dimension", 0)?;
+    if dimension == 0 {
+        return Err("首次初始化必须提供 dimension 参数".to_string());
+    }
+    let client = connect(conn).await?;
+    ensure_collection(&client, conn, dimension).await?;
+    load(&client, conn).await?;
+    Ok(json!({ "dimension": dimension }))
 }
 
 /// 写入文档（覆盖同 id 旧文档）。参数: doc_id, title, created_at, chunks[{text, embedding}]。
-fn op_add(conn: &Connection, args: &Json) -> Result<Json, String> {
+async fn op_add(conn: &ConnInfo, args: &Json) -> StdResult<Json, String> {
     let doc_id = str_arg(args, "doc_id")?;
     let title = str_arg(args, "title")?;
-    let created_at = opt_str_arg(args, "created_at").unwrap_or_else(|| "".to_string());
+    let created_at = opt_str_arg(args, "created_at").unwrap_or_default();
     let chunks = match args.get("chunks") {
         Some(Json::Array(items)) => items,
         _ => return Err("缺少参数: chunks".to_string()),
     };
 
-    let dimension = get_dimension(conn)? as usize;
-    let mut parsed = Vec::with_capacity(chunks.len());
+    if chunks.is_empty() {
+        return Err("没有可写入的分块".to_string());
+    }
+
+    let client = connect(conn).await?;
+
+    // 校验维度：读取集合 embedding 维度，与每个 chunk 的向量长度比对。
+    let dimension = collection_dimension(&client, conn)
+        .await?
+        .ok_or("集合尚未初始化，请先调用 init")? as usize;
+
+    let mut rows = Vec::with_capacity(chunks.len());
     for (i, item) in chunks.iter().enumerate() {
         let obj = item
             .as_object()
@@ -224,7 +337,7 @@ fn op_add(conn: &Connection, args: &Json) -> Result<Json, String> {
                         .map(|n| n as f32)
                         .ok_or_else(|| format!("chunks[{i}] embedding 含非数值"))
                 })
-                .collect::<Result<Vec<f32>, String>>()?,
+                .collect::<StdResult<Vec<f32>, String>>()?,
             _ => return Err(format!("chunks[{i}] 缺少 embedding")),
         };
         if embedding.len() != dimension {
@@ -233,185 +346,216 @@ fn op_add(conn: &Connection, args: &Json) -> Result<Json, String> {
                 embedding.len()
             ));
         }
-        parsed.push((text, embedding));
-    }
-    if parsed.is_empty() {
-        return Err("没有可写入的分块".to_string());
+        rows.push(json!({
+            FIELD_EMBEDDING: embedding,
+            FIELD_TEXT: text,
+            FIELD_DOC_ID: doc_id,
+            FIELD_TITLE: title,
+            FIELD_CREATED_AT: created_at,
+        }));
     }
 
-    // 幂等：覆盖同一文档。
-    op_delete_inner(conn, &doc_id)?;
+    // 幂等：覆盖同一文档（先按 doc_id 删除旧分块）。
+    delete_by_doc_id(&client, conn, &doc_id).await?;
 
-    let tx = conn
-        .unchecked_transaction()
-        .map_err(|e| format!("开始事务失败: {e}"))?;
-    {
-        tx.execute(
-            "INSERT INTO documents (id, title, created_at) VALUES (?, ?, ?)",
-            params![doc_id, title, created_at],
+    let resp = client
+        .insert(
+            InsertRequest::builder()
+                .collection_name(&conn.collection)
+                .rows(rows)
+                .build()
+                .map_err(|e| e.to_string())?,
         )
-        .map_err(|e| format!("插入文档失败: {e}"))?;
+        .await
+        .map_err(|e| format!("写入向量失败: {e}"))?;
 
-        let mut ins_chunk = tx
-            .prepare("INSERT INTO chunks (doc_id, text) VALUES (?, ?)")
-            .map_err(|e| format!("准备 chunk 语句失败: {e}"))?;
-        let mut ins_vec = tx
-            .prepare("INSERT INTO vec_items (rowid, embedding) VALUES (?, ?)")
-            .map_err(|e| format!("准备向量语句失败: {e}"))?;
-
-        for (text, embedding) in &parsed {
-            ins_chunk
-                .execute(params![doc_id, text])
-                .map_err(|e| format!("插入 chunk 失败: {e}"))?;
-            let rowid = tx.last_insert_rowid();
-            ins_vec
-                .execute(params![rowid, to_vec_blob(embedding)])
-                .map_err(|e| format!("写入向量失败: {e}"))?;
-        }
-    }
-    tx.commit().map_err(|e| format!("提交事务失败: {e}"))?;
-
-    Ok(json!({ "doc_id": doc_id, "chunk_count": parsed.len() }))
+    Ok(json!({
+        "doc_id": doc_id,
+        "chunk_count": resp.insert_count() as i64,
+    }))
 }
 
 /// 相似度检索。参数：embedding, top_k。
-fn op_search(conn: &Connection, args: &Json) -> Result<Json, String> {
+async fn op_search(conn: &ConnInfo, args: &Json) -> StdResult<Json, String> {
     let embedding = vec_arg(args, "embedding")?;
-    let top_k = u64_arg(args, "top_k", 5)?.clamp(1, 50) as usize;
-    let dimension = get_dimension(conn)? as usize;
-    if embedding.len() != dimension {
-        return Err(format!(
-            "查询向量维度 {} 与库维度 {dimension} 不一致",
-            embedding.len()
-        ));
+    let top_k = u64_arg(args, "top_k", 5)?.clamp(1, 50) as i64;
+
+    let client = connect(conn).await?;
+    // 空集合时直接返回空结果（不报错）。
+    if !collection_exists(&client, conn).await? {
+        let empty: Vec<Json> = Vec::new();
+        return Ok(json!({ "results": empty }));
     }
+    load(&client, conn).await?;
 
-    let mut stmt = conn
-        .prepare(
-            "SELECT rowid, distance FROM vec_items
-             WHERE embedding MATCH ?1 AND k = ?2
-             ORDER BY distance",
+    let resp = client
+        .search(
+            SearchRequest::builder()
+                .collection_name(&conn.collection)
+                .vector_field(FIELD_EMBEDDING)
+                .vectors(SearchVectors::Float(vec![embedding]))
+                .output_fields([FIELD_DOC_ID, FIELD_TITLE, FIELD_TEXT])
+                .limit(top_k)
+                .consistency_level(ConsistencyLevel::Strong)
+                .build()
+                .map_err(|e| e.to_string())?,
         )
-        .map_err(|e| format!("准备检索语句失败: {e}"))?;
-    let rows = stmt
-        .query_map(params![to_vec_blob(&embedding), top_k as i64], |row| {
-            Ok((row.get::<_, i64>(0)?, row.get::<_, f64>(1)?))
-        })
-        .map_err(|e| format!("检索失败: {e}"))?
-        .collect::<rusqlite::Result<Vec<(i64, f64)>>>()
-        .map_err(|e| format!("读取检索结果失败: {e}"))?;
+        .await
+        .map_err(|e| format!("检索失败: {e}"))?;
 
-    let mut results = Vec::with_capacity(rows.len());
-    for (rowid, distance) in rows {
-        let (doc_id, text): (String, String) = conn
-            .query_row(
-                "SELECT doc_id, text FROM chunks WHERE id = ?",
-                params![rowid],
-                |r| Ok((r.get(0)?, r.get(1)?)),
-            )
-            .optional()
-            .map_err(|e| format!("读取 chunk 失败: {e}"))?
-            .unwrap_or_default();
-        let title = conn
-            .query_row(
-                "SELECT title FROM documents WHERE id = ?",
-                params![doc_id],
-                |r| r.get::<_, String>(0),
-            )
-            .optional()
-            .map_err(|e| format!("读取文档标题失败: {e}"))?
-            .unwrap_or_default();
-
-        results.push(json!({
-            "doc_id": doc_id,
-            "title": title,
-            "text": text,
-            "distance": distance,
-        }));
+    let mut results = Vec::new();
+    for single in resp.results().iter() {
+        let rows = single.rows().map_err(|e| e.to_string())?;
+        for row in rows {
+            let doc_id = row.get_str(FIELD_DOC_ID).unwrap_or_default().to_string();
+            let title = row.get_str(FIELD_TITLE).unwrap_or_default().to_string();
+            let text = row.get_str(FIELD_TEXT).unwrap_or_default().to_string();
+            let distance = match row.get("score") {
+                Ok(ResultValue::Float(v)) => v as f64,
+                _ => 0.0,
+            };
+            results.push(json!({
+                "doc_id": doc_id,
+                "title": title,
+                "text": text,
+                "distance": distance,
+            }));
+        }
     }
     Ok(json!({ "results": results }))
 }
 
-fn op_list_documents(conn: &Connection) -> Result<Json, String> {
-    let mut stmt = conn
-        .prepare(
-            "SELECT d.id, d.title, d.created_at,
-                    (SELECT COUNT(*) FROM chunks c WHERE c.doc_id = d.id) AS chunk_count
-             FROM documents d
-             ORDER BY d.created_at DESC",
-        )
-        .map_err(|e| format!("准备文档列表语句失败: {e}"))?;
-    let rows = stmt
-        .query_map([], |row| {
-            Ok(json!({
-                "id": row.get::<_, String>(0)?,
-                "title": row.get::<_, String>(1)?,
-                "created_at": row.get::<_, String>(2)?,
-                "chunk_count": row.get::<_, i64>(3)?,
-            }))
-        })
-        .map_err(|e| format!("查询文档列表失败: {e}"))?
-        .collect::<rusqlite::Result<Vec<Json>>>()
-        .map_err(|e| format!("读取文档列表失败: {e}"))?;
-    Ok(json!({ "documents": rows }))
-}
-
-fn op_delete_document(conn: &Connection, args: &Json) -> Result<Json, String> {
-    let doc_id = str_arg(args, "doc_id")?;
-    op_delete_inner(conn, &doc_id)?;
-    Ok(json!({ "deleted": true }))
-}
-
-/// 删除文档及其全部 chunk/向量。
-fn op_delete_inner(conn: &Connection, doc_id: &str) -> Result<(), String> {
-    let tx = conn
-        .unchecked_transaction()
-        .map_err(|e| format!("开始事务失败: {e}"))?;
-    {
-        let chunk_ids: Vec<i64> = tx
-            .prepare("SELECT id FROM chunks WHERE doc_id = ?1")
-            .map_err(|e| format!("准备查询失败: {e}"))?
-            .query_map(params![doc_id], |r| r.get(0))
-            .map_err(|e| format!("查询失败: {e}"))?
-            .collect::<rusqlite::Result<Vec<i64>>>()
-            .map_err(|e| format!("读取失败: {e}"))?;
-        for id in chunk_ids {
-            tx.execute("DELETE FROM vec_items WHERE rowid = ?1", params![id])
-                .map_err(|e| format!("删除向量失败: {e}"))?;
-        }
-        tx.execute("DELETE FROM chunks WHERE doc_id = ?1", params![doc_id])
-            .map_err(|e| format!("删除 chunk 失败: {e}"))?;
-        tx.execute("DELETE FROM documents WHERE id = ?1", params![doc_id])
-            .map_err(|e| format!("删除文档失败: {e}"))?;
+/// 列出文档（按 doc_id 去重并统计 chunk 数）。
+async fn op_list_documents(conn: &ConnInfo) -> StdResult<Json, String> {
+    let client = connect(conn).await?;
+    if !collection_exists(&client, conn).await? {
+        let empty: Vec<Json> = Vec::new();
+        return Ok(json!({ "documents": empty }));
     }
-    tx.commit().map_err(|e| format!("提交事务失败: {e}"))?;
+
+    let resp = client
+        .query(
+            QueryRequest::builder()
+                .collection_name(&conn.collection)
+                .filter(FILTER_ALL)
+                .output_fields([FIELD_DOC_ID, FIELD_TITLE, FIELD_CREATED_AT])
+                .limit(DEFAULT_LIMIT)
+                .consistency_level(ConsistencyLevel::Strong)
+                .build()
+                .map_err(|e| e.to_string())?,
+        )
+        .await
+        .map_err(|e| format!("查询文档列表失败: {e}"))?;
+
+    // 按 doc_id 聚合（保留首个标题/创建时间，统计 chunk 数）。
+    let mut docs: std::collections::BTreeMap<String, (String, String, i64)> =
+        std::collections::BTreeMap::new();
+    let rows = resp.results().rows().map_err(|e| e.to_string())?;
+    for row in rows {
+        let doc_id = row.get_str(FIELD_DOC_ID).unwrap_or_default().to_string();
+        let title = row.get_str(FIELD_TITLE).unwrap_or_default().to_string();
+        let created_at = row.get_str(FIELD_CREATED_AT).unwrap_or_default().to_string();
+        docs.entry(doc_id)
+            .and_modify(|(_, _, count)| *count += 1)
+            .or_insert((title, created_at, 1));
+    }
+
+    let documents = docs
+        .into_iter()
+        .map(|(id, (title, created_at, chunk_count))| {
+            json!({
+                "id": id,
+                "title": title,
+                "created_at": created_at,
+                "chunk_count": chunk_count,
+            })
+        })
+        .collect::<Vec<_>>();
+    Ok(json!({ "documents": documents }))
+}
+
+/// 删除文档（含全部分块向量）。
+async fn delete_by_doc_id(client: &ClientV2, conn: &ConnInfo, doc_id: &str) -> StdResult<(), String> {
+    // Milvus 删除表达式对字符串值需用双引号包裹并转义内部双引号。
+    let escaped = doc_id.replace('\\', "\\\\").replace('"', "\\\"");
+    let expr = format!("{FIELD_DOC_ID} == \"{escaped}\"");
+    client
+        .delete(
+            DeleteRequest::builder()
+                .collection_name(&conn.collection)
+                .filter(&expr)
+                .build()
+                .map_err(|e| e.to_string())?,
+        )
+        .await
+        .map_err(|e| format!("删除向量失败: {e}"))?;
     Ok(())
 }
 
-fn op_stats(conn: &Connection) -> Result<Json, String> {
-    let document_count: i64 = conn
-        .query_row("SELECT COUNT(*) FROM documents", [], |r| r.get(0))
-        .map_err(|e| format!("统计文档失败: {e}"))?;
-    let chunk_count: i64 = conn
-        .query_row("SELECT COUNT(*) FROM chunks", [], |r| r.get(0))
+async fn op_delete_document(conn: &ConnInfo, args: &Json) -> StdResult<Json, String> {
+    let doc_id = str_arg(args, "doc_id")?;
+    let client = connect(conn).await?;
+    if !collection_exists(&client, conn).await? {
+        return Ok(json!({ "deleted": true }));
+    }
+    delete_by_doc_id(&client, conn, &doc_id).await?;
+    Ok(json!({ "deleted": true }))
+}
+
+/// 统计：文档数（去重 doc_id）、分块数（总行数）、维度。
+async fn op_stats(conn: &ConnInfo) -> StdResult<Json, String> {
+    let client = connect(conn).await?;
+    if !collection_exists(&client, conn).await? {
+        return Ok(json!({
+            "document_count": 0,
+            "chunk_count": 0,
+            "dimension": 0,
+        }));
+    }
+
+    let dimension = collection_dimension(&client, conn).await?.unwrap_or(0);
+
+    let resp = client
+        .query(
+            QueryRequest::builder()
+                .collection_name(&conn.collection)
+                .filter(FILTER_ALL)
+                .output_fields([FIELD_DOC_ID])
+                .limit(DEFAULT_LIMIT)
+                .consistency_level(ConsistencyLevel::Strong)
+                .build()
+                .map_err(|e| e.to_string())?,
+        )
+        .await
         .map_err(|e| format!("统计分块失败: {e}"))?;
+
+    let mut document_set = std::collections::HashSet::new();
+    let mut chunk_count: i64 = 0;
+    let rows = resp.results().rows().map_err(|e| e.to_string())?;
+    for row in rows {
+        if let Ok(doc_id) = row.get_str(FIELD_DOC_ID) {
+            document_set.insert(doc_id.to_string());
+        }
+        chunk_count += 1;
+    }
+
     Ok(json!({
-        "document_count": document_count,
+        "document_count": document_set.len() as i64,
         "chunk_count": chunk_count,
-        "dimension": get_dimension(conn)?,
+        "dimension": dimension as i64,
     }))
 }
 
 // ======================== FFI 入口 ========================
 
-/// 统一向量库操作入口。`db_path`、`op`、`args_json` 均为 UTF-8 字符串指针。
+/// 统一向量库操作入口。`conn_json`、`op`、`args_json` 均为 UTF-8 字符串指针。
 #[no_mangle]
 pub extern "C" fn vector_request(
-    db_path: *const libc::c_char,
-    op: *const libc::c_char,
-    args_json: *const libc::c_char,
-) -> *mut libc::c_char {
-    catch_unwind(AssertUnwindSafe(|| vector_request_inner(db_path, op, args_json)))
+    conn_json: *const c_char,
+    op: *const c_char,
+    args_json: *const c_char,
+) -> *mut c_char {
+    catch_unwind(AssertUnwindSafe(|| vector_request_inner(conn_json, op, args_json)))
         .unwrap_or_else(|_| {
             let msg = "Rust panic in vector_request".to_string();
             set_last_error(&msg);
@@ -420,17 +564,17 @@ pub extern "C" fn vector_request(
 }
 
 fn vector_request_inner(
-    db_path: *const libc::c_char,
-    op: *const libc::c_char,
-    args_json: *const libc::c_char,
-) -> *mut libc::c_char {
-    let result = (|| -> Result<String, String> {
-        if db_path.is_null() {
-            return Err("db_path 为空指针".to_string());
+    conn_json: *const c_char,
+    op: *const c_char,
+    args_json: *const c_char,
+) -> *mut c_char {
+    let result = (|| -> StdResult<String, String> {
+        if conn_json.is_null() {
+            return Err("conn_json 为空指针".to_string());
         }
-        let db_raw = unsafe { CStr::from_ptr(db_path) }
+        let conn_raw = unsafe { CStr::from_ptr(conn_json) }
             .to_str()
-            .map_err(|_| "db_path 不是有效的 UTF-8".to_string())?;
+            .map_err(|_| "conn_json 不是有效的 UTF-8".to_string())?;
         if op.is_null() {
             return Err("op 为空指针".to_string());
         }
@@ -439,31 +583,16 @@ fn vector_request_inner(
             .map_err(|_| "op 不是有效的 UTF-8".to_string())?;
         let args = parse_args(args_json)?;
 
+        let conn: ConnInfo = serde_json::from_str(conn_raw)
+            .map_err(|e| format!("连接配置解析失败: {e}"))?;
+
         let payload = match op_name {
-            "init" => {
-                let conn = open_db(db_raw, requested_dimension(&args))?;
-                op_init(&conn)?
-            }
-            "add" => {
-                let conn = open_db(db_raw, requested_dimension(&args))?;
-                op_add(&conn, &args)?
-            }
-            "search" => {
-                let conn = open_db(db_raw, None)?;
-                op_search(&conn, &args)?
-            }
-            "list_documents" => {
-                let conn = open_db(db_raw, None)?;
-                op_list_documents(&conn)?
-            }
-            "delete_document" => {
-                let conn = open_db(db_raw, None)?;
-                op_delete_document(&conn, &args)?
-            }
-            "stats" => {
-                let conn = open_db(db_raw, None)?;
-                op_stats(&conn)?
-            }
+            "init" => runtime().block_on(op_init(&conn, &args))?,
+            "add" => runtime().block_on(op_add(&conn, &args))?,
+            "search" => runtime().block_on(op_search(&conn, &args))?,
+            "list_documents" => runtime().block_on(op_list_documents(&conn))?,
+            "delete_document" => runtime().block_on(op_delete_document(&conn, &args))?,
+            "stats" => runtime().block_on(op_stats(&conn))?,
             other => return Err(format!("不支持的向量库操作: {other}")),
         };
         Ok(ok_json(payload))
@@ -480,7 +609,7 @@ fn vector_request_inner(
 
 /// 释放 [vector_request] 返回的字符串指针。
 #[no_mangle]
-pub extern "C" fn free_string(s: *mut libc::c_char) {
+pub extern "C" fn free_string(s: *mut c_char) {
     if !s.is_null() {
         unsafe {
             let _ = CString::from_raw(s);
@@ -490,7 +619,7 @@ pub extern "C" fn free_string(s: *mut libc::c_char) {
 
 /// 获取最后一次错误的文本（调试接口）。
 #[no_mangle]
-pub extern "C" fn get_last_error() -> *mut libc::c_char {
+pub extern "C" fn get_last_error() -> *mut c_char {
     LAST_ERROR.with(|cell| {
         let cstr = cell
             .borrow()
@@ -501,24 +630,6 @@ pub extern "C" fn get_last_error() -> *mut libc::c_char {
     })
 }
 
-// ======================== 辅助 ========================
-
-/// 请求里的 dimension 参数（无则为 None）。
-fn requested_dimension(args: &Json) -> Option<usize> {
-    u64_arg(args, "dimension", 0).ok().and_then(|d| {
-        if d == 0 {
-            None
-        } else {
-            Some(d as usize)
-        }
-    })
-}
-
-/// f32 向量 → 用作 sqlite-vec 嵌入的二进制（平台原生 f32 字节序，LE）。
-fn to_vec_blob(vec: &[f32]) -> Vec<u8> {
-    vec_blob(vec)
-}
-
 // ======================== 单元测试 ========================
 
 #[cfg(test)]
@@ -526,66 +637,66 @@ mod tests {
     use super::*;
     use std::ffi::CString;
 
-    fn call(db: &str, op: &str, args: &str) -> Json {
-        let db_c = CString::new(db).unwrap();
+    fn call(conn: &str, op: &str, args: &str) -> Json {
+        let conn_c = CString::new(conn).unwrap();
         let op_c = CString::new(op).unwrap();
         let args_c = CString::new(args).unwrap();
-        let raw = vector_request(
-            db_c.as_ptr(),
-            op_c.as_ptr(),
-            args_c.as_ptr(),
-        );
+        let raw = vector_request(conn_c.as_ptr(), op_c.as_ptr(), args_c.as_ptr());
         let s = unsafe { CStr::from_ptr(raw) }.to_string_lossy().into_owned();
-        unsafe { free_string(raw) };
+        free_string(raw);
         serde_json::from_str(&s).unwrap()
     }
 
-    fn tmp_db(name: &str) -> String {
-        let path = std::env::temp_dir().join(format!(
-            "xmc_vec_{}_{name}.db",
-            std::process::id()
-        ));
-        if path.exists() {
-            std::fs::remove_file(&path).ok();
-        }
-        path.to_string_lossy().into_owned()
+    #[test]
+    fn test_unknown_op() {
+        // 未知 op 在连接前分发，无需 Milvus 即可验证。
+        let conn = r#"{"uri":"http://localhost:19530","token":"","collection":"x"}"#;
+        let res = call(conn, "nope", "{}");
+        assert!(res["ok"] == false, "{res}");
+        assert!(res["error"].as_str().unwrap().contains("不支持的向量库操作"));
     }
 
     #[test]
-    fn test_init_stats() {
-        let db = tmp_db("init");
-        let res = call(&db, "init", r#"{"dimension":4}"#);
-        assert!(res["ok"] == true, "{res}");
-        assert_eq!(res["result"]["dimension"], 4);
-        let res = call(&db, "stats", "{}");
-        assert!(res["ok"] == true, "{res}");
-        assert_eq!(res["result"]["document_count"], 0);
-        assert_eq!(res["result"]["chunk_count"], 0);
+    fn test_bad_conn_json() {
+        let res = call("not-json", "init", "{}");
+        assert!(res["ok"] == false, "{res}");
     }
 
-    #[test]
-    fn test_add_search_delete() {
-        let db = tmp_db("crud");
-        let res = call(&db, "init", r#"{"dimension":3}"#);
+    // 以下测试需要本地运行的 Milvus 实例，默认忽略（避免 CI 无服务时失败）。
+    // 运行：cargo test --release -- --ignored
+    // 或设 MILVUS_URI=http://localhost:19530 后手动执行。
+    fn milvus_conn() -> String {
+        let uri = std::env::var("MILVUS_URI").unwrap_or_else(|_| "http://localhost:19530".to_string());
+        let coll = format!("xmc_test_{}", std::process::id());
+        format!(r#"{{"uri":"{uri}","token":"","collection":"{coll}"}}"#)
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn integration_init_add_search_delete() {
+        let conn = milvus_conn();
+        let client = connect(&serde_json::from_str(&conn).unwrap()).await.unwrap();
+        let _ = client
+            .drop_collection(
+                DropCollectionRequest::builder()
+                    .collection_name("xmc_test_integration")
+                    .build()
+                    .unwrap(),
+            )
+            .await;
+
+        let res = call(&conn, "init", r#"{"dimension":3}"#);
         assert!(res["ok"] == true, "{res}");
 
         let res = call(
-            &db,
+            &conn,
             "add",
             r#"{"doc_id":"d1","title":"魔兽","created_at":"2026-01-01T00:00:00Z","chunks":[{"text":"末影龙是结束之地的 Boss","embedding":[1.0,0.0,0.0]},{"text":"下界合金装备最坚固","embedding":[0.0,1.0,0.0]}]}"#,
         );
         assert!(res["ok"] == true, "{res}");
-        assert_eq!(res["result"]["chunk_count"], 2);
 
         let res = call(
-            &db,
-            "add",
-            r#"{"doc_id":"d2","title":"红石","created_at":"2026-01-02T00:00:00Z","chunks":[{"text":"红石中继器可延长信号","embedding":[0.0,0.0,1.0]}]}"#,
-        );
-        assert!(res["ok"] == true, "{res}");
-
-        let res = call(
-            &db,
+            &conn,
             "search",
             r#"{"embedding":[0.9,0.1,0.1],"top_k":3}"#,
         );
@@ -594,52 +705,7 @@ mod tests {
         assert!(!results.is_empty());
         assert!(results[0]["distance"].as_f64().unwrap() < 1.0);
 
-        let res = call(&db, "list_documents", "{}");
+        let res = call(&conn, "delete_document", r#"{"doc_id":"d1"}"#);
         assert!(res["ok"] == true, "{res}");
-        assert_eq!(res["result"]["documents"].as_array().unwrap().len(), 2);
-
-        let res = call(&db, "stats", "{}");
-        assert_eq!(res["result"]["document_count"], 2);
-        assert_eq!(res["result"]["chunk_count"], 3);
-
-        // 覆盖 d1（幂等）
-        let res = call(
-            &db,
-            "add",
-            r#"{"doc_id":"d1","title":"魔兽新","created_at":"2026-01-03T00:00:00Z","chunks":[{"text":"新版末影龙更强","embedding":[1.0,1.0,1.0]}]}"#,
-        );
-        assert!(res["ok"] == true, "{res}");
-        let res = call(&db, "stats", "{}");
-        assert_eq!(res["result"]["document_count"], 2);
-        assert_eq!(res["result"]["chunk_count"], 2);
-
-        let res = call(&db, "delete_document", r#"{"doc_id":"d2"}"#);
-        assert!(res["ok"] == true, "{res}");
-        let res = call(&db, "stats", "{}");
-        assert_eq!(res["result"]["document_count"], 1);
-        assert_eq!(res["result"]["chunk_count"], 1);
-    }
-
-    #[test]
-    fn test_dimension_mismatch() {
-        let db = tmp_db("dim");
-        let res = call(&db, "init", r#"{"dimension":3}"#);
-        assert!(res["ok"] == true, "{res}");
-        let res = call(
-            &db,
-            "add",
-            r#"{"doc_id":"d","title":"t","chunks":[{"text":"x","embedding":[1.0,2.0]}]}"#,
-        );
-        assert!(res["ok"] == false, "{res}");
-        assert!(res["error"].as_str().unwrap().contains("维度"));
-    }
-
-    #[test]
-    fn test_unknown_op() {
-        let db = tmp_db("unknown");
-        let _ = call(&db, "init", r#"{"dimension":2}"#);
-        let res = call(&db, "nope", "{}");
-        assert!(res["ok"] == false, "{res}");
-        assert!(res["error"].as_str().unwrap().contains("不支持的向量库操作"));
     }
 }

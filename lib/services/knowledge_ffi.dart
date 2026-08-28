@@ -1,6 +1,6 @@
 // Rust FFI 向量知识库绑定
 // 通过 dart:ffi 调用 Rust 动态库 (xmc_vector_store.dll / libxmc_vector_store.so/.dylib)
-// 实现基于 sqlite-vec 的本地向量数据库（RAG 知识库）：
+// 实现基于 Milvus 的远程向量数据库（RAG 知识库）：
 // 建库、写入文档分块（含向量）、余弦相似度检索、文档列表与删除。
 // 所有 FFI 调用在后台 isolate 执行，避免阻塞 UI 线程。
 
@@ -16,13 +16,13 @@ import 'rust_lib.dart';
 /// FFI 函数签名定义
 typedef VectorRequestC =
     Pointer<Utf8> Function(
-      Pointer<Utf8> dbPath,
+      Pointer<Utf8> connJson,
       Pointer<Utf8> op,
       Pointer<Utf8> argsJson,
     );
 typedef VectorRequestDart =
     Pointer<Utf8> Function(
-      Pointer<Utf8> dbPath,
+      Pointer<Utf8> connJson,
       Pointer<Utf8> op,
       Pointer<Utf8> argsJson,
     );
@@ -39,13 +39,13 @@ class VectorStoreFfiException implements Exception {
 
 /// 传递给后台 isolate 的请求
 class _VectorFfiRequest {
-  final String dbPath;
+  final String connJson;
   final String op;
   final String argsJson;
   final SendPort sendPort;
 
   const _VectorFfiRequest({
-    required this.dbPath,
+    required this.connJson,
     required this.op,
     required this.argsJson,
     required this.sendPort,
@@ -54,7 +54,7 @@ class _VectorFfiRequest {
 
 /// Rust 向量知识库 — FFI 封装
 ///
-/// 单次操作 = 一次 FFI 调用：Rust 侧打开 SQLite、执行、返回 JSON。
+/// 单次操作 = 一次 FFI 调用：Rust 侧连接 Milvus、执行、返回 JSON。
 /// 所有耗时的 FFI 调用都在后台 isolate 执行，UI 线程不会阻塞。
 class VectorStoreFfi {
   static VectorStoreFfi? _instance;
@@ -70,12 +70,12 @@ class VectorStoreFfi {
 
   /// 执行一次向量库操作（后台 isolate，不阻塞 UI）。
   ///
-  /// [dbPath] 知识库 SQLite 文件路径
+  /// [connJson] Milvus 连接配置 JSON（uri / token / collection）
   /// [op] Rust 侧操作名（init / add / search / list_documents / delete_document / stats）
   /// [args] 操作参数（值须可 JSON 序列化）
   /// [timeout] 整体超时
   Future<Map<String, dynamic>> request({
-    required String dbPath,
+    required String connJson,
     required String op,
     Map<String, dynamic> args = const {},
     Duration timeout = const Duration(seconds: 60),
@@ -97,7 +97,7 @@ class VectorStoreFfi {
       isolate = await Isolate.spawn(
         _vectorRequestIsolate,
         _VectorFfiRequest(
-          dbPath: dbPath,
+          connJson: connJson,
           op: op,
           argsJson: jsonEncode(args),
           sendPort: responsePort.sendPort,
@@ -118,7 +118,7 @@ class VectorStoreFfi {
 
   /// 后台 isolate 入口：打开库、调用 FFI、解析结果并发送回主 isolate。
   static void _vectorRequestIsolate(_VectorFfiRequest req) {
-    Pointer<Utf8>? dbPtr;
+    Pointer<Utf8>? connPtr;
     Pointer<Utf8>? opPtr;
     Pointer<Utf8>? argsPtr;
     Pointer<Utf8>? resultPtr;
@@ -128,11 +128,11 @@ class VectorStoreFfi {
       final vectorRequest = lib
           .lookupFunction<VectorRequestC, VectorRequestDart>('vector_request');
 
-      dbPtr = req.dbPath.toNativeUtf8();
+      connPtr = req.connJson.toNativeUtf8();
       opPtr = req.op.toNativeUtf8();
       argsPtr = req.argsJson.toNativeUtf8();
 
-      resultPtr = vectorRequest(dbPtr, opPtr, argsPtr);
+      resultPtr = vectorRequest(connPtr, opPtr, argsPtr);
 
       if (resultPtr == nullptr) {
         req.sendPort.send(
@@ -154,7 +154,7 @@ class VectorStoreFfi {
     } catch (e) {
       req.sendPort.send(VectorStoreFfiException('后台 isolate 异常: $e'));
     } finally {
-      if (dbPtr != null) calloc.free(dbPtr);
+      if (connPtr != null) calloc.free(connPtr);
       if (opPtr != null) calloc.free(opPtr);
       if (argsPtr != null) calloc.free(argsPtr);
       if (resultPtr != null) {

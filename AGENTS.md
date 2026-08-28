@@ -12,7 +12,7 @@ IriX（X Minecraft Server Launcher）—— Minecraft 服务器管理工具。Fl
 - **FFI**: `package:ffi` 调用 `xmc_backup.dll`、`xmc_downloader.dll`、`xmc_http_client.dll`、`xmc_file_ops.dll`、`xmc_logger.dll`、`xmc_db_client.dll`、`xmc_vector_store.dll`
 - **数据库**: 远程数据库（MySQL/MariaDB/PostgreSQL/Redis）连接与操作由 Rust 执行（`db_client` crate，mysql/postgres/redis 纯 Rust 驱动，无 OpenSSL）；本地持久化用 SQLite（sqflite_common_ffi，`DatabaseManager`）
 - **网络**: 全部 HTTP 请求由 Rust 处理（`http_client` crate 通用请求 + `downloader` crate 流式/分片下载，均为 ureq + rustls，无 OpenSSL）；Dart 侧不再使用 `package:http`（仅测试用例保留），本地回环 HTTP 服务（OAuth 回调、MCP 服务端）仍用 `dart:io HttpServer`
-- **知识库（RAG）**: `vector_store` crate（rusqlite + sqlite-vec）只负责向量存取与相似检索，不做 embedding；embedding 请求走 Rust `HttpFfiService`（http_client crate）调 AI 模型 API，`knowledge_service.dart` 组装请求并传入向量，维度需与建库时一致
+- **知识库（RAG）**: `vector_store` crate（milvus-sdk-rust 官方 SDK，纯 rustls、无 OpenSSL）只负责远程 Milvus 向量存取与相似检索，不做 embedding；embedding 请求走 Rust `HttpFfiService`（http_client crate）调 AI 模型 API，`knowledge_service.dart` 组装请求并传入向量，维度需与建库时一致；Milvus 连接配置（uri/token/collection）作为独立 AI 设置项（`AiSettings.getMilvusConfig`/`setMilvusConfig`，key=`kb_milvus_config`），不进入远程数据库连接列表
 
 ## 目录结构
 
@@ -33,7 +33,7 @@ rust/
 ├── file_ops/              # 文件扫描、移动、回收站
 ├── db_client/             # 远程数据库客户端（MySQL/MariaDB/PostgreSQL/Redis，统一 db_request 入口）
 ├── logger/                # 日志
-└── vector_store/          # 向量知识库（rusqlite + sqlite-vec，存取与相似检索）
+└── vector_store/          # 向量知识库（milvus-sdk-rust，远程 Milvus 存取与相似检索）
 test/                      # Flutter 测试（FFI 集成测试需先编译并复制 Rust 动态库）
 windows/ linux/ macos/     # 平台代码（FFI 动态库：windows/runner/、linux/、macos/）
 dist/ build/               # 打包产物，勿修改
