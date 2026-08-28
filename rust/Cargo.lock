@@ -1319,7 +1319,7 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 [[package]]
 name = "milvus-sdk-rust"
 version = "2.6.0"
-source = "git+https://github.com/MCFSO/milvus-sdk-rust.git?branch=main#b89a4221ff076f1842680341c3cb1d5ed66d18d7"
+source = "git+https://github.com/MCFSO/milvus-sdk-rust.git?branch=main#62e1ae1a80f9f30df03365bc942e91ad14a19fbf"
 dependencies = [
  "anyhow",
  "base64",
@@ -2505,7 +2505,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
