@@ -49,6 +49,7 @@ jobs:
           cp rust/target/release/libxmc_db_client.so linux/
           cp rust/target/release/libxmc_vector_store.so linux/
           cp rust/target/release/libxmc_orchestrator.so linux/
+          cp rust/target/release/libxmc_nbt.so linux/
 
       - name: Get dependencies
         run: flutter pub get
@@ -121,6 +122,7 @@ jobs:
           Copy-Item rust/target/release/xmc_db_client.dll windows/runner/ -Force
           Copy-Item rust/target/release/xmc_vector_store.dll windows/runner/ -Force
           Copy-Item rust/target/release/xmc_orchestrator.dll windows/runner/ -Force
+          Copy-Item rust/target/release/xmc_nbt.dll windows/runner/ -Force
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -161,6 +163,7 @@ jobs:
           Copy-Item windows/runner/xmc_db_client.dll build/windows/x64/runner/Release/ -Force
           Copy-Item windows/runner/xmc_vector_store.dll build/windows/x64/runner/Release/ -Force
           Copy-Item windows/runner/xmc_orchestrator.dll build/windows/x64/runner/Release/ -Force
+          Copy-Item windows/runner/xmc_nbt.dll build/windows/x64/runner/Release/ -Force
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v5
@@ -208,6 +211,7 @@ jobs:
           cp rust/target/release/libxmc_db_client.so linux/
           cp rust/target/release/libxmc_vector_store.so linux/
           cp rust/target/release/libxmc_orchestrator.so linux/
+          cp rust/target/release/libxmc_nbt.so linux/
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -254,6 +258,7 @@ jobs:
           cp linux/libxmc_db_client.so build/linux/x64/release/bundle/lib/
           cp linux/libxmc_vector_store.so build/linux/x64/release/bundle/lib/
           cp linux/libxmc_orchestrator.so build/linux/x64/release/bundle/lib/
+          cp linux/libxmc_nbt.so build/linux/x64/release/bundle/lib/
 
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v5
@@ -328,6 +333,10 @@ jobs:
             rust/target/x86_64-apple-darwin/release/libxmc_orchestrator.dylib \
             rust/target/aarch64-apple-darwin/release/libxmc_orchestrator.dylib \
             -output macos/libxmc_orchestrator.dylib
+          lipo -create \
+            rust/target/x86_64-apple-darwin/release/libxmc_nbt.dylib \
+            rust/target/aarch64-apple-darwin/release/libxmc_nbt.dylib \
+            -output macos/libxmc_nbt.dylib
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -373,6 +382,7 @@ jobs:
           cp macos/libxmc_db_client.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
           cp macos/libxmc_vector_store.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
           cp macos/libxmc_orchestrator.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
+          cp macos/libxmc_nbt.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v5

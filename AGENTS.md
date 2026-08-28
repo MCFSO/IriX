@@ -7,12 +7,13 @@ IriX（X Minecraft Server Launcher）—— Minecraft 服务器管理工具。Fl
 ## 技术栈
 
 - **UI**: Flutter 3.x (Dart SDK >= 3.12), Provider 状态管理
-- **Rust**: workspace（backup / downloader / http_client / file_ops / logger / db_client / vector_store），release profile 开启 `opt-level = 3` + `lto`
+- **Rust**: workspace（backup / downloader / http_client / file_ops / logger / db_client / vector_store / nbt），release profile 开启 `opt-level = 3` + `lto`
 - **存储**: SQLite（sqflite_common_ffi，settings 表统一存设置）
-- **FFI**: `package:ffi` 调用 `xmc_backup.dll`、`xmc_downloader.dll`、`xmc_http_client.dll`、`xmc_file_ops.dll`、`xmc_logger.dll`、`xmc_db_client.dll`、`xmc_vector_store.dll`
+- **FFI**: `package:ffi` 调用 `xmc_backup.dll`、`xmc_downloader.dll`、`xmc_http_client.dll`、`xmc_file_ops.dll`、`xmc_logger.dll`、`xmc_db_client.dll`、`xmc_vector_store.dll`、`xmc_nbt.dll`
 - **数据库**: 远程数据库（MySQL/MariaDB/PostgreSQL/Redis）连接与操作由 Rust 执行（`db_client` crate，mysql/postgres/redis 纯 Rust 驱动，无 OpenSSL）；本地持久化用 SQLite（sqflite_common_ffi，`DatabaseManager`）
 - **网络**: 全部 HTTP 请求由 Rust 处理（`http_client` crate 通用请求 + `downloader` crate 流式/分片下载，均为 ureq + rustls，无 OpenSSL）；Dart 侧不再使用 `package:http`（仅测试用例保留），本地回环 HTTP 服务（OAuth 回调、MCP 服务端）仍用 `dart:io HttpServer`
 - **知识库（RAG）**: `vector_store` crate（milvus-sdk-rust 官方 SDK，纯 rustls、无 OpenSSL）只负责远程 Milvus 向量存取与相似检索，不做 embedding；embedding 请求走 Rust `HttpFfiService`（http_client crate）调 AI 模型 API，`knowledge_service.dart` 组装请求并传入向量，维度需与建库时一致；Milvus 连接配置（uri/token/collection）作为独立 AI 设置项（`AiSettings.getMilvusConfig`/`setMilvusConfig`，key=`kb_milvus_config`），不进入远程数据库连接列表
+- **NBT 编辑器**: `nbt` crate（纯 Rust，无外部游戏运行时）实现 Minecraft NBT 的 gzip 大端二进制 ↔ SNBT 双向编解码与树路径增删改查；`nbt_ffi.dart`/`nbt_service.dart` 经 FFI 调用 `xmc_nbt` 动态库（`nbt_request(op,args)`），`nbt_editor_screen.dart` 复刻 AnkiNBT 的通用树/物品/实体/村民交易四领域双模式（高级树 + 简易字段）编辑 UI；数据来源为文件/粘贴 NBT 与连运行中服务器的 RCON（阶段 3），无 Minecraft 客户端运行时故不编辑玩家手持物品
 
 ## 目录结构
 
@@ -33,7 +34,8 @@ rust/
 ├── file_ops/              # 文件扫描、移动、回收站
 ├── db_client/             # 远程数据库客户端（MySQL/MariaDB/PostgreSQL/Redis，统一 db_request 入口）
 ├── logger/                # 日志
-└── vector_store/          # 向量知识库（milvus-sdk-rust，远程 Milvus 存取与相似检索）
+├── vector_store/          # 向量知识库（milvus-sdk-rust，远程 Milvus 存取与相似检索）
+└── nbt/                   # NBT 编解码与树编辑（gzip 大端二进制 + SNBT，复刻 AnkiNBT 编辑能力）
 test/                      # Flutter 测试（FFI 集成测试需先编译并复制 Rust 动态库）
 windows/ linux/ macos/     # 平台代码（FFI 动态库：windows/runner/、linux/、macos/）
 dist/ build/               # 打包产物，勿修改

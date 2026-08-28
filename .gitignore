@@ -47,6 +47,10 @@ rust/target/
 /xmc_*.dll
 linux/libxmc_*.so
 macos/libxmc_*.dylib
+windows/runner/xmc_*.dll
+
+# 第三方参考源码（AnkiNBT mod 反编译参考，不属于本项目）
+AnkiNBT-main/
 
 # Fastforge output
 /dist/

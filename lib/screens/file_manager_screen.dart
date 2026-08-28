@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import '../services/trash_store.dart';
 import '../utils/apple_widgets.dart';
 import 'archive_viewer_screen.dart';
+import 'nbt_editor_screen.dart';
 import 'text_editor_dialog.dart';
 import 'trash_view.dart';
 
@@ -568,6 +569,11 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
             value: 'open',
             child: _menuItem(Icons.folder_open, '打开'),
           ),
+        if (ext == '.nbt')
+          PopupMenuItem(
+            value: 'nbtEdit',
+            child: _menuItem(Icons.edit_note, '用 NBT 编辑器打开'),
+          ),
         PopupMenuItem(value: 'copy', child: _menuItem(Icons.copy, '复制')),
         PopupMenuItem(value: 'cut', child: _menuItem(Icons.cut, '剪切')),
         PopupMenuItem(
@@ -634,6 +640,24 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
           _handleRename(target.path);
         case 'editConfig':
           _openTextEditor(target.path);
+        case 'nbtEdit':
+          try {
+            final bytes = await File(target.path).readAsBytes();
+            navigator.push(
+              MaterialPageRoute(
+                builder: (_) => NbtEditorScreen(
+                  initialBytes: bytes,
+                  initialFileName: p.basename(target.path),
+                ),
+              ),
+            );
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('打开 NBT 失败：$e')),
+              );
+            }
+          }
         case 'properties':
           _showProperties(target);
       }

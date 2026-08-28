@@ -30,6 +30,7 @@ import 'database_screen.dart';
 import 'frp_screen.dart';
 import 'instance_detail_screen.dart';
 import 'marketplace_screen.dart';
+import 'nbt_editor_screen.dart';
 import 'nodes_screen.dart';
 import 'onboarding_screen.dart';
 
@@ -360,9 +361,71 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
             ),
+            const SliverToBoxAdapter(child: _ToolsRow()),
           ],
         );
       },
+    );
+  }
+}
+
+/// 主页底部工具入口（NBT 编辑器等）。
+class _ToolsRow extends StatelessWidget {
+  const _ToolsRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        children: [
+          _ToolTile(
+            icon: Icons.edit_note,
+            label: 'NBT 编辑器',
+            onTap: () => pushPage(context, (_) => const NbtEditorScreen()),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 单个工具磁贴。
+class _ToolTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _ToolTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 140,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 28),
+            const SizedBox(height: 10),
+            Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
     );
   }
 }

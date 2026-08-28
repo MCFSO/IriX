@@ -24,6 +24,7 @@ copy /Y target\release\xmc_http_client.dll ..\windows\runner\
 copy /Y target\release\xmc_db_client.dll ..\windows\runner\
 copy /Y target\release\xmc_vector_store.dll ..\windows\runner\
 copy /Y target\release\xmc_orchestrator.dll ..\windows\runner\
+copy /Y target\release\xmc_nbt.dll ..\windows\runner\
 copy /Y target\release\xmc_backup.dll ..\
 copy /Y target\release\xmc_downloader.dll ..\
 copy /Y target\release\xmc_file_ops.dll ..\
@@ -32,6 +33,7 @@ copy /Y target\release\xmc_http_client.dll ..\
 copy /Y target\release\xmc_db_client.dll ..\
 copy /Y target\release\xmc_vector_store.dll ..\
 copy /Y target\release\xmc_orchestrator.dll ..\
+copy /Y target\release\xmc_nbt.dll ..\
 
 echo Done! DLLs copied to windows\runner\
 pause
