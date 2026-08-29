@@ -480,11 +480,12 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
   Future<void> _stopSession() async {
     final session = _sessionId;
     if (session == null) return;
+    final l = AppLocalizations.of(context);
     _setBusy(true);
     try {
       await widget.backend.stopJailRun(_name, session);
     } catch (e) {
-      _snackError(e, prefix: AppLocalizations.of(context).jailDetail_stopFailed);
+      _snackError(e, prefix: l.jailDetail_stopFailed);
     } finally {
       _setBusy(false);
     }
