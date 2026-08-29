@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/hangar.dart';
 import '../services/downloader.dart';
 import '../services/hangar_api_service.dart';
@@ -81,6 +82,7 @@ class _HangarDetailScreenState extends State<HangarDetailScreen> {
     final project = _project;
     if (project == null) return;
 
+    final l = AppLocalizations.of(context);
     final threads = context.read<AppState>().downloadThreads;
     final target = await _pickTarget();
     if (target == null) return;
@@ -89,13 +91,13 @@ class _HangarDetailScreenState extends State<HangarDetailScreen> {
     // 拒绝含路径分隔符/../ 的名称，防止越出实例目录写任意路径。
     final rawName = '${project.slug}-${version.name}-${pd.platform}.jar';
     final filename = p.basename(rawName);
-    if (filename.isEmpty ||
+      if (filename.isEmpty ||
         filename.contains('..') ||
         filename.contains('/') ||
         filename.contains(r'\')) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('下载被拒绝：文件名包含非法路径字符')),
+          SnackBar(content: Text(l.hangar_downloadRejected)),
         );
       }
       return;
@@ -133,7 +135,7 @@ class _HangarDetailScreenState extends State<HangarDetailScreen> {
             setState(() => _downloadProgress.remove(progressKey));
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('已安装到节点 ${target.displayName} 的 plugins/'),
+                content: Text(l.hangar_installedToNode(target.displayName)),
               ),
             );
           }
@@ -165,13 +167,13 @@ class _HangarDetailScreenState extends State<HangarDetailScreen> {
           setState(() => _downloadProgress.remove(progressKey));
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('已下载到 plugins/$filename'),
+              content: Text(l.hangar_downloadedTo('plugins/$filename')),
               action: SnackBarAction(
-                label: '查看路径',
+                label: l.hangar_viewPath,
                 onPressed: () {
                   ScaffoldMessenger.of(
                     context,
-                  ).showSnackBar(SnackBar(content: Text('目录: $targetDir')));
+                  ).showSnackBar(SnackBar(content: Text(l.hangar_directory(targetDir))));
                 },
               ),
             ),
@@ -183,20 +185,22 @@ class _HangarDetailScreenState extends State<HangarDetailScreen> {
         setState(() => _downloadProgress.remove(progressKey));
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('下载失败: $e')));
+        ).showSnackBar(SnackBar(content: Text(l.hangar_downloadFailed(e.toString()))));
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(_project?.name ?? '加载中...')),
+      appBar: AppBar(title: Text(_project?.name ?? l.common_loading)),
       body: _buildBody(),
     );
   }
 
   Widget _buildBody() {
+    final l = AppLocalizations.of(context);
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -209,13 +213,13 @@ class _HangarDetailScreenState extends State<HangarDetailScreen> {
             const SizedBox(height: 8),
             Text(_error!, textAlign: TextAlign.center),
             const SizedBox(height: 16),
-            FilledButton(onPressed: _loadData, child: const Text('重试')),
+            FilledButton(onPressed: _loadData, child: Text(l.common_retry)),
           ],
         ),
       );
     }
     final project = _project;
-    if (project == null) return const Center(child: Text('未找到项目'));
+    if (project == null) return Center(child: Text(l.hangar_notFound));
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -224,12 +228,12 @@ class _HangarDetailScreenState extends State<HangarDetailScreen> {
         const SizedBox(height: 16),
         _buildStats(project),
         const SizedBox(height: 16),
-        Text('描述', style: Theme.of(context).textTheme.titleMedium),
+        Text(l.hangar_description, style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
         Text(project.description),
         const SizedBox(height: 24),
         Text(
-          '版本列表 (${_versions.length})',
+          l.hangar_versionList(_versions.length),
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: 8),
@@ -280,16 +284,18 @@ class _HangarDetailScreenState extends State<HangarDetailScreen> {
   }
 
   Widget _buildStats(HangarProject project) {
+    final l = AppLocalizations.of(context);
     return Row(
       children: [
-        _statItem(Icons.download, '${_formatNumber(project.downloads)} 下载'),
+        _statItem(Icons.download, '${_formatNumber(project.downloads)} ${l.hangar_downloads}'),
         const SizedBox(width: 16),
-        _statItem(Icons.star, '${_formatNumber(project.stars)} 收藏'),
+        _statItem(Icons.star, '${_formatNumber(project.stars)} ${l.hangar_stars}'),
       ],
     );
   }
 
   Widget _buildVersionTile(HangarVersion version) {
+    final l = AppLocalizations.of(context);
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ExpansionTile(
@@ -298,12 +304,12 @@ class _HangarDetailScreenState extends State<HangarDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '平台: ${version.downloadsPerPlatform.map((d) => d.platform).join(', ')}',
+              '${l.hangar_platform}: ${version.downloadsPerPlatform.map((d) => d.platform).join(', ')}',
               style: const TextStyle(fontSize: 12),
             ),
             if (version.createdAt != null)
               Text(
-                '发布于 ${version.createdAt!.substring(0, 10)}',
+                l.hangar_publishedOn(version.createdAt!.substring(0, 10)),
                 style: const TextStyle(fontSize: 11, color: Colors.grey),
               ),
           ],
@@ -335,7 +341,7 @@ class _HangarDetailScreenState extends State<HangarDetailScreen> {
                   )
                 : FilledButton(
                     onPressed: () => _downloadPlatform(version, pd),
-                    child: const Text('下载'),
+                    child: Text(l.common_download),
                   ),
           );
         }).toList(),

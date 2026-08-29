@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/hangar.dart';
 import '../models/modrinth.dart';
 import '../services/hangar_api_service.dart';
@@ -13,28 +14,27 @@ import 'mod_detail_screen.dart';
 
 /// 项目类型筛选选项
 enum _ProjectTypeFilter {
-  mod('Mod'),
-  plugin('插件');
-
-  final String label;
-  const _ProjectTypeFilter(this.label);
+  mod,
+  plugin;
 
   String? get apiValue => switch (this) {
     _ProjectTypeFilter.mod => 'mod',
     _ProjectTypeFilter.plugin => 'plugin',
   };
+
+  String label(AppLocalizations l) => switch (this) {
+    _ProjectTypeFilter.mod => 'Mod',
+    _ProjectTypeFilter.plugin => l.market_typePlugin,
+  };
 }
 
 /// 排序方式
 enum _SortIndex {
-  relevance('相关度'),
-  downloads('下载量'),
-  follows('关注数'),
-  newest('最新发布'),
-  updated('最近更新');
-
-  final String label;
-  const _SortIndex(this.label);
+  relevance,
+  downloads,
+  follows,
+  newest,
+  updated;
 
   String get apiValue => switch (this) {
     _SortIndex.relevance => 'relevance',
@@ -42,6 +42,14 @@ enum _SortIndex {
     _SortIndex.follows => 'follows',
     _SortIndex.newest => 'newest',
     _SortIndex.updated => 'updated',
+  };
+
+  String label(AppLocalizations l) => switch (this) {
+    _SortIndex.relevance => l.market_sortRelevance,
+    _SortIndex.downloads => l.market_sortDownloads,
+    _SortIndex.follows => l.market_sortFollows,
+    _SortIndex.newest => l.market_sortNewest,
+    _SortIndex.updated => l.market_sortUpdated,
   };
 }
 
@@ -385,12 +393,13 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   }
 
   Widget _buildSearchBar() {
+    final l = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: TextField(
         controller: _searchController,
         decoration: InputDecoration(
-          hintText: '搜索 Mod / 插件...',
+          hintText: l.market_searchHint,
           prefixIcon: const Icon(Icons.search),
           suffixIcon: ValueListenableBuilder<TextEditingValue>(
             valueListenable: _searchController,
@@ -432,8 +441,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   }
 
   Widget _buildTypeFilterChip() {
+    final l = AppLocalizations.of(context);
     return PopupMenuButton<_ProjectTypeFilter>(
-      child: _filterChip('类型: ${_typeFilter.label}', active: true),
+      child: _filterChip('${l.market_type}: ${_typeFilter.label(l)}', active: true),
       onSelected: (value) {
         setState(() {
           _typeFilter = value;
@@ -450,7 +460,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                     ? Theme.of(context).colorScheme.primary
                     : null,
               ),
-              child: Text(e.label),
+              child: Text(e.label(l)),
             ),
           )
           .toList(),
@@ -458,8 +468,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   }
 
   Widget _buildSortChip() {
+    final l = AppLocalizations.of(context);
     return PopupMenuButton<_SortIndex>(
-      child: _filterChip('排序: ${_sortIndex.label}', active: true),
+      child: _filterChip('${l.market_sort}: ${_sortIndex.label(l)}', active: true),
       onSelected: (value) {
         setState(() => _sortIndex = value);
         _search();
@@ -473,7 +484,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                     ? Theme.of(context).colorScheme.primary
                     : null,
               ),
-              child: Text(e.label),
+              child: Text(e.label(l)),
             ),
           )
           .toList(),
@@ -481,12 +492,13 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   }
 
   Widget _buildLoaderChip() {
+    final l = AppLocalizations.of(context);
     final relevant = _relevantLoaders;
     return PopupMenuButton<String?>(
       child: _filterChip(
         _loaderFilter == null
-            ? '核心'
-            : '核心: ${_loaderDisplayName(_loaderFilter!)}',
+            ? l.market_loader
+            : '${l.market_loader}: ${_loaderDisplayName(_loaderFilter!)}',
         active: _loaderFilter != null,
       ),
       onSelected: (value) {
@@ -494,7 +506,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         _search();
       },
       itemBuilder: (context) => [
-        const PopupMenuItem(value: null, child: Text('全部')),
+        PopupMenuItem(value: null, child: Text(l.market_all)),
         ...relevant.map(
           (name) =>
               PopupMenuItem(value: name, child: Text(_loaderDisplayName(name))),
@@ -504,9 +516,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   }
 
   Widget _buildGameVersionChip() {
+    final l = AppLocalizations.of(context);
     return PopupMenuButton<String?>(
       child: _filterChip(
-        _gameVersionFilter == null ? '游戏版本' : 'MC $_gameVersionFilter',
+        _gameVersionFilter == null ? l.market_gameVersion : 'MC $_gameVersionFilter',
         active: _gameVersionFilter != null,
       ),
       onSelected: (value) {
@@ -514,7 +527,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         _search();
       },
       itemBuilder: (context) => [
-        const PopupMenuItem(value: null, child: Text('全部')),
+        PopupMenuItem(value: null, child: Text(l.market_all)),
         ..._gameVersions.map(
           (v) => PopupMenuItem(
             value: v.version,
@@ -551,6 +564,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   }
 
   Widget _buildBody() {
+    final l = AppLocalizations.of(context);
     if (_isLoading && _hits.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -563,13 +577,13 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
             const SizedBox(height: 8),
             Text(_error!, textAlign: TextAlign.center),
             const SizedBox(height: 16),
-            FilledButton(onPressed: _search, child: const Text('重试')),
+            FilledButton(onPressed: _search, child: Text(l.common_retry)),
           ],
         ),
       );
     }
     if (_hits.isEmpty) {
-      return const Center(child: Text('未找到相关项目'));
+      return Center(child: Text(l.market_noResults));
     }
     return RefreshIndicator(
       onRefresh: _search,
@@ -617,6 +631,7 @@ class _SearchResultCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: InkWell(
@@ -663,10 +678,10 @@ class _SearchResultCard extends StatelessWidget {
                       runSpacing: 4,
                       children: [
                         _infoChip(
-                          '${_formatNumber(hit.downloads)} 下载',
+                          '${_formatNumber(hit.downloads)} ${l.market_downloads}',
                           Icons.download,
                         ),
-                        _infoChip('${_formatNumber(hit.stars)} 收藏', Icons.star),
+                        _infoChip('${_formatNumber(hit.stars)} ${l.market_stars}', Icons.star),
                         _infoChip(hit.category, Icons.category),
                         _infoChip(hit.source.label, Icons.cloud),
                       ],

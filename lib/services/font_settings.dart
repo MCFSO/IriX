@@ -7,6 +7,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../services/database_manager.dart';
+import 'locale_settings.dart';
 
 /// 字体设置服务（单例 ChangeNotifier）。
 ///
@@ -104,21 +105,34 @@ class FontSettings extends ChangeNotifier {
   ///
   /// 内置 MiSans 与系统常见中文字体；未安装的系统字体由 Flutter
   /// 自动回退到默认字体，不会报错。
-  static const List<(String, String)> uiOptions = [
-    (bundledMiSans, 'MiSans（内置，推荐）'),
-    ('', '系统默认字体'),
-    ('Microsoft YaHei', '微软雅黑'),
-    ('PingFang SC', '苹方 PingFang SC'),
-    ('Noto Sans SC', '思源黑体 Noto Sans SC'),
-  ];
+  ///
+  /// 显示名随语言设置切换（无 BuildContext，读取 LocaleSettings）。
+  static List<(String, String)> get uiOptions {
+    final en = LocaleSettings.instance.localeCode == 'en';
+    return [
+      (bundledMiSans, en ? 'MiSans (built-in, recommended)' : 'MiSans（内置，推荐）'),
+      ('', en ? 'System default font' : '系统默认字体'),
+      ('Microsoft YaHei', en ? 'Microsoft YaHei' : '微软雅黑'),
+      ('PingFang SC', en ? 'PingFang SC' : '苹方 PingFang SC'),
+      ('Noto Sans SC', en ? 'Noto Sans SC' : '思源黑体 Noto Sans SC'),
+    ];
+  }
 
   /// 可用终端字体选项：(存储值, 显示名)。
-  static const List<(String, String)> terminalOptions = [
-    (bundledJetBrainsMono, 'JetBrains Mono（内置，推荐）'),
-    (bundledPixel, '点阵字体 Fusion Pixel（内置）'),
-    ('monospace', '系统等宽字体'),
-    (inheritTerminal, '跟随 UI 字体'),
-    ('Consolas', 'Consolas'),
-    ('Cascadia Mono', 'Cascadia Mono'),
-  ];
+  ///
+  /// 显示名随语言设置切换（无 BuildContext，读取 LocaleSettings）。
+  static List<(String, String)> get terminalOptions {
+    final en = LocaleSettings.instance.localeCode == 'en';
+    return [
+      (
+        bundledJetBrainsMono,
+        en ? 'JetBrains Mono (built-in, recommended)' : 'JetBrains Mono（内置，推荐）'
+      ),
+      (bundledPixel, en ? 'Pixel font Fusion Pixel (built-in)' : '点阵字体 Fusion Pixel（内置）'),
+      ('monospace', en ? 'System monospace font' : '系统等宽字体'),
+      (inheritTerminal, en ? 'Inherit UI font' : '跟随 UI 字体'),
+      ('Consolas', 'Consolas'),
+      ('Cascadia Mono', 'Cascadia Mono'),
+    ];
+  }
 }

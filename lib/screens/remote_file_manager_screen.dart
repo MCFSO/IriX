@@ -11,6 +11,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
+import '../l10n/app_localizations.dart';
 import '../models/node_ops.dart';
 import '../models/remote.dart';
 import '../services/node_api_client.dart';
@@ -57,11 +58,12 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
   }
 
   Future<void> _init() async {
+    final l = AppLocalizations.of(context);
     final daemonId = widget.daemonId;
     if (daemonId == null || daemonId.isEmpty) {
       setState(() {
         _loading = false;
-        _error = '无法确定守护进程 ID';
+        _error = l.remoteFile_noDaemonId;
       });
       return;
     }
@@ -146,7 +148,8 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
   }
 
   Future<void> _mkdir() async {
-    final name = await _promptText('新建文件夹', '文件夹名称');
+    final l = AppLocalizations.of(context);
+    final name = await _promptText(l.remoteFile_newFolder, l.remoteFile_folderName);
     if (name == null || !mounted) return;
     try {
       await widget.client.mkdir(
@@ -161,7 +164,8 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
   }
 
   Future<void> _touch() async {
-    final name = await _promptText('新建文件', '文件名称');
+    final l = AppLocalizations.of(context);
+    final name = await _promptText(l.remoteFile_newFile, l.remoteFile_fileName);
     if (name == null || !mounted) return;
     try {
       await widget.client.touchFile(
@@ -176,8 +180,9 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
   }
 
   Future<void> _upload() async {
+    final l = AppLocalizations.of(context);
     final result = await FilePicker.platform.pickFiles(
-      dialogTitle: '选择要上传的文件',
+      dialogTitle: l.remoteFile_selectFilesToUpload,
       allowMultiple: true,
     );
     if (result == null || !mounted) return;
@@ -202,6 +207,7 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
   }
 
   Future<void> _download(RemoteFileEntry entry) async {
+    final l = AppLocalizations.of(context);
     final target = _join(entry.name);
     setState(() => _busy = true);
     try {
@@ -212,13 +218,13 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
       );
       final bytes = await widget.client.directDownload(ticket);
       final savePath = await FilePicker.platform.saveFile(
-        dialogTitle: '保存文件',
+        dialogTitle: l.remoteFile_saveFile,
         fileName: entry.name,
       );
       if (savePath != null) {
         await _writeBytes(savePath, bytes);
         if (mounted) {
-          _showSnack('已下载到 $savePath');
+          _showSnack(l.remoteFile_downloadedTo(savePath));
         }
       }
     } catch (e) {
@@ -234,8 +240,9 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
   }
 
   Future<void> _edit(RemoteFileEntry entry) async {
+    final l = AppLocalizations.of(context);
     if (entry.size > 2 * 1024 * 1024) {
-      _showError('文件过大（>2MB），请下载后编辑');
+      _showError(l.remoteFile_fileTooLarge);
       return;
     }
     final target = _join(entry.name);
@@ -255,7 +262,7 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
     final saved = await showAppDialog<bool>(
       context,
       (_) => AlertDialog(
-        title: Text('编辑 ${entry.name}'),
+        title: Text(l.remoteFile_editFile(entry.name)),
         content: SizedBox(
           width: 520,
           height: 420,
@@ -271,11 +278,11 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('取消'),
+            child: Text(l.common_cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('保存'),
+            child: Text(l.common_save),
           ),
         ],
       ),
@@ -288,16 +295,17 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
         target: target,
         text: controller.text,
       );
-      _showSnack('已保存');
+      _showSnack(l.remoteFile_saved);
     } catch (e) {
       _showError(e.toString());
     }
   }
 
   Future<void> _rename(RemoteFileEntry entry) async {
+    final l = AppLocalizations.of(context);
     final name = await _promptText(
-      '重命名 ${entry.name}',
-      '新名称',
+      l.remoteFile_rename(entry.name),
+      l.remoteFile_newName,
       initial: entry.name,
     );
     if (name == null || name.trim().isEmpty || !mounted) return;
@@ -316,9 +324,10 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
   }
 
   Future<void> _compress(RemoteFileEntry entry) async {
+    final l = AppLocalizations.of(context);
     final zipName = await _promptText(
-      '压缩 ${entry.name}',
-      '压缩包文件名',
+      l.remoteFile_compress(entry.name),
+      l.remoteFile_archiveName,
       initial: '${p.basenameWithoutExtension(entry.name)}.zip',
     );
     if (zipName == null || !mounted) return;
@@ -379,6 +388,7 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
 
   /// 文件点击后的操作菜单。
   void _showFileActions(RemoteFileEntry entry) {
+    final l = AppLocalizations.of(context);
     showModalBottomSheet<void>(
       context: context,
       builder: (ctx) => SafeArea(
@@ -392,7 +402,7 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
               title: Text(entry.name),
               subtitle: Text(
                 entry.isDirectory
-                    ? '文件夹'
+                    ? l.remoteFile_folder
                     : '${_formatBytes(entry.size)} · ${entry.time}',
               ),
             ),
@@ -400,7 +410,7 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
             if (!entry.isDirectory)
               ListTile(
                 leading: const Icon(Icons.download_outlined),
-                title: const Text('下载'),
+                title: Text(l.remoteFile_download),
                 onTap: () {
                   Navigator.of(ctx).pop();
                   _download(entry);
@@ -409,7 +419,7 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
             if (!entry.isDirectory)
               ListTile(
                 leading: const Icon(Icons.edit_outlined),
-                title: const Text('编辑'),
+                title: Text(l.remoteFile_edit),
                 onTap: () {
                   Navigator.of(ctx).pop();
                   _edit(entry);
@@ -417,7 +427,7 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
               ),
             ListTile(
               leading: const Icon(Icons.drive_file_rename_outline),
-              title: const Text('重命名'),
+              title: Text(l.remoteFile_renameAction),
               onTap: () {
                 Navigator.of(ctx).pop();
                 _rename(entry);
@@ -426,7 +436,7 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
             if (entry.name.toLowerCase().endsWith('.zip'))
               ListTile(
                 leading: const Icon(Icons.unarchive_outlined),
-                title: const Text('解压到当前目录'),
+                title: Text(l.remoteFile_unzipHere),
                 onTap: () {
                   Navigator.of(ctx).pop();
                   _unzip(entry);
@@ -434,7 +444,7 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
               ),
             ListTile(
               leading: const Icon(Icons.archive_outlined),
-              title: const Text('压缩为 ZIP'),
+              title: Text(l.remoteFile_compressZip),
               onTap: () {
                 Navigator.of(ctx).pop();
                 _compress(entry);
@@ -446,7 +456,7 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
                 color: Theme.of(ctx).colorScheme.error,
               ),
               title: Text(
-                '删除',
+                l.common_delete,
                 style: TextStyle(color: Theme.of(ctx).colorScheme.error),
               ),
               onTap: () {

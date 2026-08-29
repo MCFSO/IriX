@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/server_instance.dart';
 import '../services/ai_assistant_service.dart';
 import '../services/backup_ffi.dart';
@@ -220,38 +221,41 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
 
   /// 启动实例，失败时通过 SnackBar 提示错误。
   Future<void> _startInstance() async {
+    final l = AppLocalizations.of(context);
     try {
       await context.read<AppState>().startInstance(widget.instanceId);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('启动失败：$e')));
+      ).showSnackBar(SnackBar(content: Text(l.instanceDetail_startFailed(e.toString()))));
     }
   }
 
   /// 重启实例，失败时通过 SnackBar 提示错误。
   Future<void> _restartInstance() async {
+    final l = AppLocalizations.of(context);
     try {
       await context.read<AppState>().restartInstance(widget.instanceId);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('重启失败：$e')));
+      ).showSnackBar(SnackBar(content: Text(l.instanceDetail_restartFailed(e.toString()))));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final state = context.read<AppState>();
     final instance = state.instances
         .where((e) => e.id == widget.instanceId)
         .firstOrNull;
     if (instance == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('实例详情')),
-        body: const Center(child: Text('实例不存在')),
+        appBar: AppBar(title: Text(l.instanceDetail_title)),
+        body: Center(child: Text(l.instanceDetail_notFound)),
       );
     }
 
@@ -270,11 +274,10 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
               Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: Tooltip(
-                  message: '该进程由上次启动的 IriX 遗留，已接管其日志；'
-                      'stdin 已断开，无法发送指令，仅可强制停止',
+                  message: l.instanceDetail_adoptedTooltip,
                   child: Chip(
                     avatar: const Icon(Icons.link, size: 16),
-                    label: const Text('已接管'),
+                    label: Text(l.instanceDetail_adopted),
                     visualDensity: VisualDensity.compact,
                   ),
                 ),
@@ -282,21 +285,21 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
             IconButton(
               icon: const Icon(Icons.smart_toy_outlined),
               isSelected: _showAi,
-              tooltip: _showAi ? '关闭 AI 助手' : '打开 AI 助手',
+              tooltip: _showAi ? l.instanceDetail_closeAi : l.instanceDetail_openAi,
               onPressed: () => setState(() => _showAi = !_showAi),
             ),
             const SizedBox(width: 4),
           ],
           bottom: TabBar(
             isScrollable: true,
-            tabs: const [
-              Tab(icon: Icon(Icons.dashboard), text: '总览'),
-              Tab(icon: Icon(Icons.description), text: '配置'),
-              Tab(icon: Icon(Icons.extension), text: '插件/Mod'),
-              Tab(icon: Icon(Icons.folder), text: '文件'),
-              Tab(icon: Icon(Icons.backup), text: '备份'),
-              Tab(icon: Icon(Icons.settings), text: '设置'),
-              Tab(icon: Icon(Icons.inventory_2), text: '容器'),
+            tabs: [
+              Tab(icon: const Icon(Icons.dashboard), text: l.instanceDetail_tabOverview),
+              Tab(icon: const Icon(Icons.description), text: l.instanceDetail_tabConfig),
+              Tab(icon: const Icon(Icons.extension), text: l.instanceDetail_tabPlugins),
+              Tab(icon: const Icon(Icons.folder), text: l.instanceDetail_tabFiles),
+              Tab(icon: const Icon(Icons.backup), text: l.instanceDetail_tabBackup),
+              Tab(icon: const Icon(Icons.settings), text: l.instanceDetail_tabSettings),
+              Tab(icon: const Icon(Icons.inventory_2), text: l.container_tabContainers),
             ],
           ),
         ),
@@ -378,6 +381,7 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
   ///
   /// [adopted] 为 true 时进程为接管状态（stdin 已断开），禁用指令输入。
   Widget _buildLogPanel(bool adopted) {
+    final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final logStyle = TextStyle(
       fontFamily: FontSettings.instance.terminalFamily,
@@ -415,8 +419,8 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
                   enabled: !adopted,
                   decoration: InputDecoration(
                     hintText: adopted
-                        ? '已接管的进程无法发送指令（请使用强制停止）'
-                        : '输入服务器指令（无需 /）后按回车',
+                        ? l.instanceDetail_commandHintAdopted
+                        : l.instanceDetail_commandHint,
                     border: const OutlineInputBorder(),
                     isDense: true,
                     // 半透明背景
@@ -443,6 +447,7 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
   ///
   /// [adopted] 为 true 时「停止」（写入 stop 指令）不可用，直接提供「强制停止」。
   Widget _buildControlPanel(InstanceStatus status, bool adopted) {
+    final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final isActive = status.isActive;
     final isStopped = status == InstanceStatus.stopped;
@@ -452,20 +457,20 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('控制', style: theme.textTheme.titleMedium),
+          Text(l.instanceDetail_control, style: theme.textTheme.titleMedium),
           const SizedBox(height: 16),
           // 启动按钮：仅在「已关闭」可用
           FilledButton.icon(
             onPressed: isStopped ? _startInstance : null,
             icon: const Icon(Icons.play_arrow),
-            label: const Text('启动'),
+            label: Text(l.instanceDetail_start),
           ),
           const SizedBox(height: 12),
           // 重启按钮：仅在「启动中」可用
           FilledButton.tonalIcon(
             onPressed: isActive && !adopted ? _restartInstance : null,
             icon: const Icon(Icons.refresh),
-            label: const Text('重启'),
+            label: Text(l.instanceDetail_restart),
           ),
           const SizedBox(height: 12),
           // 停止 / 强制停止 按钮
@@ -478,7 +483,7 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
                     }
                   : null,
               icon: const Icon(Icons.stop),
-              label: const Text('停止'),
+              label: Text(l.instanceDetail_stop),
             )
           else
             FilledButton.icon(
@@ -490,7 +495,7 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
               onPressed: () =>
                   context.read<AppState>().forceStopInstance(widget.instanceId),
               icon: const Icon(Icons.dangerous),
-              label: const Text('强制停止'),
+              label: Text(l.instanceDetail_forceStop),
             ),
           const SizedBox(height: 24),
           // 状态信息
@@ -500,14 +505,13 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('当前状态', style: theme.textTheme.labelSmall),
+                  Text(l.instanceDetail_currentStatus, style: theme.textTheme.labelSmall),
                   const SizedBox(height: 4),
                   Text(status.label, style: theme.textTheme.bodyLarge),
                   if (adopted) ...[
                     const SizedBox(height: 8),
                     Text(
-                      '该进程由上次启动的 IriX 遗留，已接管其日志；'
-                      'stdin 已断开，无法发送指令。',
+                      l.instanceDetail_adoptedStatusNote,
                       style: theme.textTheme.bodySmall,
                     ),
                   ],
@@ -600,10 +604,11 @@ class _BackupTabState extends State<_BackupTab> {
   ///
   /// 弹出进度对话框，调用 FFI 压缩函数，支持取消。
   Future<void> _startBackup() async {
+    final l = AppLocalizations.of(context);
     if (_selectedIndices.isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('请至少选择一个文件或文件夹')));
+      ).showSnackBar(SnackBar(content: Text(l.instanceDetail_selectAtLeastOne)));
       return;
     }
 
@@ -650,15 +655,17 @@ class _BackupTabState extends State<_BackupTab> {
       if (result.isSuccess) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('备份已保存到 $outputPath')));
+        ).showSnackBar(SnackBar(content: Text(l.instanceDetail_backupSaved(outputPath))));
       } else if (result.isCancelled) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('备份已取消')));
+        ).showSnackBar(SnackBar(content: Text(l.instanceDetail_backupCancelled)));
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('备份失败: ${result.error ?? '错误码 ${result.code}'}'),
+            content: Text(l.instanceDetail_backupFailed(
+              result.error ?? l.instanceDetail_errorCode(result.code),
+            )),
           ),
         );
       }
@@ -667,7 +674,7 @@ class _BackupTabState extends State<_BackupTab> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('备份失败: $e')));
+        ).showSnackBar(SnackBar(content: Text(l.instanceDetail_backupFailed(e.toString()))));
       }
     } finally {
       if (mounted) {
@@ -694,6 +701,7 @@ class _BackupTabState extends State<_BackupTab> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -709,14 +717,14 @@ class _BackupTabState extends State<_BackupTab> {
           value: _selectedIndices.length == _files.length && _files.isNotEmpty,
           tristate: true,
           onChanged: _toggleSelectAll,
-          title: const Text('全选'),
-          subtitle: Text('已选择 ${_selectedIndices.length} / ${_files.length} 项'),
+          title: Text(l.instanceDetail_selectAll),
+          subtitle: Text(l.instanceDetail_selectedCount(_selectedIndices.length, _files.length)),
         ),
         const Divider(),
         // 文件列表
         Expanded(
           child: _files.isEmpty
-              ? const Center(child: Text('根目录为空'))
+              ? Center(child: Text(l.instanceDetail_emptyRoot))
               : ListView.builder(
                   itemCount: _files.length,
                   itemBuilder: (context, index) {
@@ -731,7 +739,7 @@ class _BackupTabState extends State<_BackupTab> {
                         isDir ? Icons.folder : Icons.insert_drive_file,
                       ),
                       title: Text(name),
-                      subtitle: Text(isDir ? '文件夹' : '文件'),
+                      subtitle: Text(isDir ? l.instanceDetail_folder : l.instanceDetail_file),
                     );
                   },
                 ),
@@ -744,7 +752,7 @@ class _BackupTabState extends State<_BackupTab> {
             child: FilledButton.icon(
               onPressed: _startBackup,
               icon: const Icon(Icons.archive),
-              label: const Text('开始备份'),
+              label: Text(l.instanceDetail_startBackup),
             ),
           ),
         ),
@@ -754,6 +762,7 @@ class _BackupTabState extends State<_BackupTab> {
 
   /// 备份进度对话框。
   Widget _buildProgressDialog() {
+    final l = AppLocalizations.of(context);
     return Center(
       child: Card(
         margin: const EdgeInsets.all(32),
@@ -762,7 +771,7 @@ class _BackupTabState extends State<_BackupTab> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('正在备份...', style: TextStyle(fontSize: 18)),
+              Text(l.instanceDetail_backingUp, style: const TextStyle(fontSize: 18)),
               const SizedBox(height: 24),
               LinearProgressIndicator(value: _backupProgress),
               const SizedBox(height: 12),
@@ -771,7 +780,7 @@ class _BackupTabState extends State<_BackupTab> {
                 style: const TextStyle(fontSize: 16),
               ),
               const SizedBox(height: 24),
-              OutlinedButton(onPressed: _cancelBackup, child: const Text('取消')),
+              OutlinedButton(onPressed: _cancelBackup, child: Text(l.common_cancel)),
             ],
           ),
         ),
@@ -848,17 +857,19 @@ class _StartCommandCardState extends State<_StartCommandCard> {
   }
 
   void _save() {
+    final l = AppLocalizations.of(context);
     final cmd = _controller.text.trim();
     if (cmd.isEmpty) return;
     context.read<AppState>().updateStartCommand(widget.instanceId, cmd);
     setState(() => _dirty = false);
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('启动命令已更新')));
+    ).showSnackBar(SnackBar(content: Text(l.common_save)));
   }
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final memGb = _parseXmxGb();
     final hasXmx = memGb != null;
     final displayGb = hasXmx ? memGb.clamp(0.5, 32).toDouble() : 2.0;
@@ -880,9 +891,9 @@ class _StartCommandCardState extends State<_StartCommandCard> {
                     children: [
                       Row(
                         children: [
-                          const Text(
-                            '最大内存',
-                            style: TextStyle(fontWeight: FontWeight.w500),
+                          Text(
+                            l.instanceDetail_maxMemory,
+                            style: const TextStyle(fontWeight: FontWeight.w500),
                           ),
                           const Spacer(),
                           Text(
@@ -890,7 +901,7 @@ class _StartCommandCardState extends State<_StartCommandCard> {
                                 ? (displayGb == displayGb.truncateToDouble()
                                       ? '${displayGb.toInt()} GB'
                                       : '${displayGb.toStringAsFixed(1)} GB')
-                                : '未设置',
+                                : l.instanceDetail_notSet,
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               color: hasXmx
@@ -914,7 +925,7 @@ class _StartCommandCardState extends State<_StartCommandCard> {
                         Padding(
                           padding: const EdgeInsets.only(top: 2),
                           child: Text(
-                            '当前启动命令未指定 -Xmx，拖动滑块以设置内存',
+                            l.instanceDetail_noXmxHint,
                             style: TextStyle(
                               fontSize: 11,
                               color: Colors.grey[500],
@@ -935,11 +946,11 @@ class _StartCommandCardState extends State<_StartCommandCard> {
                 Expanded(
                   child: TextField(
                     controller: _controller,
-                    decoration: const InputDecoration(
-                      labelText: '启动命令',
-                      helperText: '如：java -Xmx2G -jar paper.jar nogui',
+                    decoration: InputDecoration(
+                      labelText: l.instanceDetail_startCommand,
+                      helperText: l.instanceDetail_startCommandHelper,
                       isDense: true,
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(),
                     ),
                     onChanged: (_) {
                       if (!_dirty) setState(() => _dirty = true);
@@ -951,7 +962,7 @@ class _StartCommandCardState extends State<_StartCommandCard> {
                 FilledButton.icon(
                   onPressed: _dirty ? _save : null,
                   icon: const Icon(Icons.check),
-                  label: const Text('保存'),
+                  label: Text(l.common_save),
                 ),
               ],
             ),
@@ -998,6 +1009,7 @@ class _SettingsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return ListView(
       children: [
         _InstanceNameCard(instanceId: instanceId),
@@ -1018,7 +1030,7 @@ class _SettingsTab extends StatelessWidget {
             ),
             onPressed: () => _confirmDelete(context),
             icon: const Icon(Icons.delete_outline),
-            label: const Text('删除实例'),
+            label: Text(l.instanceDetail_deleteInstance),
           ),
         ),
       ],
@@ -1045,6 +1057,7 @@ class _RunModeCard extends StatefulWidget {
 class _RunModeCardState extends State<_RunModeCard> {
   /// 切换运行方式。
   Future<void> _switchMode(RunMode mode) async {
+    final l = AppLocalizations.of(context);
     if (mode == RunMode.docker && !widget.dockerAvailable) return;
     final state = context.read<AppState>();
     final instance = state.instances
@@ -1054,18 +1067,19 @@ class _RunModeCardState extends State<_RunModeCard> {
     if (instance.status.isActive) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('请先停止服务器再切换运行方式')));
+      ).showSnackBar(SnackBar(content: Text(l.instanceDetail_stopBeforeSwitch)));
       return;
     }
     await state.updateRunMode(widget.instanceId, mode, instance.container);
     if (!mounted) return;
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text('已切换为「${mode.label}」运行')));
+    ).showSnackBar(SnackBar(content: Text(l.instanceDetail_switchedToMode(mode.label))));
   }
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final instance = context
         .watch<AppState>()
@@ -1087,7 +1101,7 @@ class _RunModeCardState extends State<_RunModeCard> {
                 const Icon(Icons.layers_outlined),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: Text('运行方式', style: theme.textTheme.titleMedium),
+                  child: Text(l.instanceDetail_runMode, style: theme.textTheme.titleMedium),
                 ),
               ],
             ),
@@ -1101,8 +1115,8 @@ class _RunModeCardState extends State<_RunModeCard> {
                 children: [
                   RadioListTile<RunMode>(
                     value: RunMode.native,
-                    title: const Text('原生进程'),
-                    subtitle: const Text('直接以 java 进程运行（默认）'),
+                    title: Text(l.instanceDetail_nativeProcess),
+                    subtitle: Text(l.instanceDetail_nativeProcessDesc),
                     dense: true,
                     contentPadding: EdgeInsets.zero,
                   ),
@@ -1111,7 +1125,7 @@ class _RunModeCardState extends State<_RunModeCard> {
                     enabled: !widget.dockerProbing && widget.dockerAvailable,
                     title: Row(
                       children: [
-                        const Text('Docker 容器'),
+                        Text(l.instanceDetail_dockerContainer),
                         if (widget.dockerProbing) ...[
                           const SizedBox(width: 8),
                           const SizedBox(
@@ -1124,7 +1138,7 @@ class _RunModeCardState extends State<_RunModeCard> {
                             !widget.dockerAvailable) ...[
                           const SizedBox(width: 8),
                           Text(
-                            '不可用',
+                            l.instanceDetail_unavailable,
                             style: TextStyle(
                               fontSize: 12,
                               color: theme.colorScheme.outline,
@@ -1135,8 +1149,8 @@ class _RunModeCardState extends State<_RunModeCard> {
                     ),
                     subtitle: Text(
                       !widget.dockerProbing && !widget.dockerAvailable
-                          ? '未检测到 Docker CLI，请先安装并启动 Docker Desktop'
-                          : '服务器运行在 Docker 容器中，启停/控制台/文件走容器',
+                          ? l.instanceDetail_dockerNotFound
+                          : l.instanceDetail_dockerDesc,
                     ),
                     dense: true,
                     contentPadding: EdgeInsets.zero,
@@ -1232,6 +1246,7 @@ class _ContainerConfigCardState extends State<_ContainerConfigCard> {
 
   /// 保存容器配置。
   Future<void> _save() async {
+    final l = AppLocalizations.of(context);
     final config = ContainerConfig(
       image: _imageController.text.trim(),
       containerName: _nameController.text.trim().isEmpty
@@ -1264,7 +1279,7 @@ class _ContainerConfigCardState extends State<_ContainerConfigCard> {
     setState(() => _dirty = false);
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('容器配置已保存')));
+    ).showSnackBar(SnackBar(content: Text(l.instanceDetail_containerConfigSaved)));
   }
 
   List<String> _splitList(String text) {
@@ -1289,6 +1304,7 @@ class _ContainerConfigCardState extends State<_ContainerConfigCard> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1297,49 +1313,49 @@ class _ContainerConfigCardState extends State<_ContainerConfigCard> {
           children: [
             const Icon(Icons.tune),
             const SizedBox(width: 16),
-            Expanded(child: Text('容器配置', style: theme.textTheme.titleSmall)),
+            Expanded(child: Text(l.instanceDetail_containerConfig, style: theme.textTheme.titleSmall)),
           ],
         ),
         const SizedBox(height: 12),
         TextField(
           controller: _imageController,
-          decoration: const InputDecoration(
-            labelText: '镜像',
-            helperText: '如 itzg/minecraft-server:latest',
+          decoration: InputDecoration(
+            labelText: l.instanceDetail_image,
+            helperText: l.instanceDetail_imageHelper,
             isDense: true,
-            border: OutlineInputBorder(),
+            border: const OutlineInputBorder(),
           ),
           onChanged: (_) => _markDirty(),
         ),
         const SizedBox(height: 12),
         TextField(
           controller: _nameController,
-          decoration: const InputDecoration(
-            labelText: '容器名称（留空自动生成）',
+          decoration: InputDecoration(
+            labelText: l.instanceDetail_containerName,
             isDense: true,
-            border: OutlineInputBorder(),
+            border: const OutlineInputBorder(),
           ),
           onChanged: (_) => _markDirty(),
         ),
         const SizedBox(height: 12),
         TextField(
           controller: _portsController,
-          decoration: const InputDecoration(
-            labelText: '端口映射',
-            helperText: '宿主机端口:容器端口，多个用逗号分隔，如 25565:25565, 8123:8123',
+          decoration: InputDecoration(
+            labelText: l.container_portMapping,
+            helperText: l.instanceDetail_portMappingHelper,
             isDense: true,
-            border: OutlineInputBorder(),
+            border: const OutlineInputBorder(),
           ),
           onChanged: (_) => _markDirty(),
         ),
         const SizedBox(height: 12),
         TextField(
           controller: _volumesController,
-          decoration: const InputDecoration(
-            labelText: '卷挂载',
-            helperText: '宿主机路径:容器路径；留空默认挂载实例目录到 /data',
+          decoration: InputDecoration(
+            labelText: l.container_volumeMount,
+            helperText: l.instanceDetail_volumeMountHelper,
             isDense: true,
-            border: OutlineInputBorder(),
+            border: const OutlineInputBorder(),
           ),
           onChanged: (_) => _markDirty(),
         ),
@@ -1347,33 +1363,33 @@ class _ContainerConfigCardState extends State<_ContainerConfigCard> {
         TextField(
           controller: _envController,
           maxLines: 3,
-          decoration: const InputDecoration(
-            labelText: '环境变量',
-            helperText: '每行一个 KEY=VALUE，如 MEMORY=2G、EULA=TRUE',
+          decoration: InputDecoration(
+            labelText: l.container_envVars,
+            helperText: l.container_envVarsHelper,
             alignLabelWithHint: true,
             isDense: true,
-            border: OutlineInputBorder(),
+            border: const OutlineInputBorder(),
           ),
           onChanged: (_) => _markDirty(),
         ),
         const SizedBox(height: 12),
         DropdownButtonFormField<String>(
           initialValue: _restartPolicy,
-          decoration: const InputDecoration(
-            labelText: '重启策略',
+          decoration: InputDecoration(
+            labelText: l.container_restartPolicy,
             isDense: true,
-            border: OutlineInputBorder(),
+            border: const OutlineInputBorder(),
           ),
-          items: const [
-            DropdownMenuItem(value: 'no', child: Text('no — 不自动重启')),
+          items: [
+            DropdownMenuItem(value: 'no', child: Text(l.container_restartNo)),
             DropdownMenuItem(
               value: 'unless-stopped',
-              child: Text('unless-stopped — 容器退出自动重启'),
+              child: Text(l.container_restartUnlessStopped),
             ),
-            DropdownMenuItem(value: 'always', child: Text('always — 总是重启')),
+            DropdownMenuItem(value: 'always', child: Text(l.container_restartAlways)),
             DropdownMenuItem(
               value: 'on-failure',
-              child: Text('on-failure — 异常退出时重启'),
+              child: Text(l.container_restartOnFailure),
             ),
           ],
           onChanged: (value) {
@@ -1390,10 +1406,10 @@ class _ContainerConfigCardState extends State<_ContainerConfigCard> {
               child: TextField(
                 controller: _memoryController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: '内存上限（MB，留空不限）',
+                decoration: InputDecoration(
+                  labelText: l.container_memoryLimit,
                   isDense: true,
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
                 ),
                 onChanged: (_) => _markDirty(),
               ),
@@ -1403,10 +1419,10 @@ class _ContainerConfigCardState extends State<_ContainerConfigCard> {
               child: TextField(
                 controller: _cpusController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'CPU 核数（留空不限）',
+                decoration: InputDecoration(
+                  labelText: l.container_cpuCores,
                   isDense: true,
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
                 ),
                 onChanged: (_) => _markDirty(),
               ),
@@ -1420,11 +1436,11 @@ class _ContainerConfigCardState extends State<_ContainerConfigCard> {
               child: TextField(
                 controller: _diskController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: '磁盘上限（MB，留空不限）',
-                  helperText: '需存储驱动支持 size 配额',
+                decoration: InputDecoration(
+                  labelText: l.container_diskLimit,
+                  helperText: l.container_diskLimitHelper,
                   isDense: true,
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
                 ),
                 onChanged: (_) => _markDirty(),
               ),
@@ -1433,11 +1449,11 @@ class _ContainerConfigCardState extends State<_ContainerConfigCard> {
             Expanded(
               child: TextField(
                 controller: _workdirController,
-                decoration: const InputDecoration(
-                  labelText: '工作目录（留空默认）',
-                  helperText: '如 /data，强制在数据目录启动',
+                decoration: InputDecoration(
+                  labelText: l.container_workdir,
+                  helperText: l.instanceDetail_workdirHelper,
                   isDense: true,
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
                 ),
                 onChanged: (_) => _markDirty(),
               ),
@@ -1449,14 +1465,14 @@ class _ContainerConfigCardState extends State<_ContainerConfigCard> {
           children: [
             Expanded(
               child: Text(
-                '容器由实例名派生，如 xmc-<名称>-<id后缀>',
+                l.instanceDetail_containerNameDerived,
                 style: TextStyle(fontSize: 11, color: Colors.grey[500]),
               ),
             ),
             FilledButton.icon(
               onPressed: _dirty ? _save : null,
               icon: const Icon(Icons.check),
-              label: const Text('保存'),
+              label: Text(l.common_save),
             ),
           ],
         ),
@@ -1492,19 +1508,20 @@ class _DeleteConfirmationDialogState extends State<_DeleteConfirmationDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return AlertDialog(
-      title: const Text('删除实例'),
+      title: Text(l.instanceDetail_deleteInstance),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('确定要删除此实例吗？'),
+          Text(l.instanceDetail_deleteInstanceConfirm),
           const SizedBox(height: 12),
           CheckboxListTile(
             value: _deleteFiles,
             onChanged: (v) => setState(() => _deleteFiles = v ?? false),
-            title: const Text('同时删除服务器文件'),
-            subtitle: const Text('勾选后将删除服务器根目录下的所有文件，包括世界、配置和核心。此操作不可撤销。'),
+            title: Text(l.instanceDetail_deleteFiles),
+            subtitle: Text(l.instanceDetail_deleteFilesDesc),
             dense: true,
             controlAffinity: ListTileControlAffinity.leading,
             contentPadding: EdgeInsets.zero,
@@ -1517,7 +1534,7 @@ class _DeleteConfirmationDialogState extends State<_DeleteConfirmationDialog> {
             context,
             _DeleteConfirmation(confirmed: false, deleteFiles: _deleteFiles),
           ),
-          child: const Text('取消'),
+          child: Text(l.common_cancel),
         ),
         FilledButton.tonal(
           style: FilledButton.styleFrom(
@@ -1527,7 +1544,7 @@ class _DeleteConfirmationDialogState extends State<_DeleteConfirmationDialog> {
             context,
             _DeleteConfirmation(confirmed: true, deleteFiles: _deleteFiles),
           ),
-          child: const Text('删除'),
+          child: Text(l.common_delete),
         ),
       ],
     );
@@ -1566,17 +1583,19 @@ class _InstanceNameCardState extends State<_InstanceNameCard> {
   }
 
   void _save() {
+    final l = AppLocalizations.of(context);
     final name = _controller.text.trim();
     if (name.isEmpty) return;
     context.read<AppState>().renameInstance(widget.instanceId, name);
     setState(() => _dirty = false);
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('实例名称已更新')));
+    ).showSnackBar(SnackBar(content: Text(l.instanceDetail_nameUpdated)));
   }
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Card(
       margin: const EdgeInsets.all(8),
       child: Padding(
@@ -1588,10 +1607,10 @@ class _InstanceNameCardState extends State<_InstanceNameCard> {
             Expanded(
               child: TextField(
                 controller: _controller,
-                decoration: const InputDecoration(
-                  labelText: '实例名称',
+                decoration: InputDecoration(
+                  labelText: l.instanceDetail_instanceName,
                   isDense: true,
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
                 ),
                 onChanged: (_) {
                   if (!_dirty) setState(() => _dirty = true);
@@ -1603,7 +1622,7 @@ class _InstanceNameCardState extends State<_InstanceNameCard> {
             FilledButton.icon(
               onPressed: _dirty ? _save : null,
               icon: const Icon(Icons.check),
-              label: const Text('保存'),
+              label: Text(l.common_save),
             ),
           ],
         ),
@@ -1651,6 +1670,7 @@ class _CompressionSettingsCardState extends State<_CompressionSettingsCard> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     if (_loading) {
       return const Card(
         margin: EdgeInsets.all(8),
@@ -1674,7 +1694,7 @@ class _CompressionSettingsCardState extends State<_CompressionSettingsCard> {
                 const SizedBox(width: 16),
                 Expanded(
                   child: Text(
-                    '备份压缩级别',
+                    l.instanceDetail_backupCompressionLevel,
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
@@ -1698,7 +1718,7 @@ class _CompressionSettingsCardState extends State<_CompressionSettingsCard> {
             ),
             const SizedBox(height: 4),
             Text(
-              '级别越低压缩越快但文件更大，级别越高压缩比越好但更慢。0=不压缩(仅存储)，6=标准，9=最佳压缩比。',
+              l.instanceDetail_compressionLevelDesc,
               style: TextStyle(fontSize: 12, color: Colors.grey[600]),
             ),
           ],
@@ -1779,6 +1799,7 @@ class _EulaCardState extends State<_EulaCard> {
   /// 将 eula.txt 中的 `eula=` 设为指定值，保留其余注释内容。
   /// 若文件不存在则创建一个标准的 eula.txt。
   Future<void> _setEula(bool value) async {
+    final l = AppLocalizations.of(context);
     final path = _eulaPath();
     final file = File(path);
     String content;
@@ -1807,18 +1828,19 @@ class _EulaCardState extends State<_EulaCard> {
       });
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(value ? '已同意 EULA' : '已撤销 EULA 同意')),
+        SnackBar(content: Text(value ? l.instanceDetail_eulaAccepted : l.instanceDetail_eulaRevoked)),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('写入 eula.txt 失败: $e')));
+      ).showSnackBar(SnackBar(content: Text(l.instanceDetail_eulaWriteFailed(e.toString()))));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     if (_loading) {
       return const Card(
         margin: EdgeInsets.all(8),
@@ -1841,7 +1863,7 @@ class _EulaCardState extends State<_EulaCard> {
                 const SizedBox(width: 16),
                 Expanded(
                   child: Text(
-                    'EULA 最终用户许可协议',
+                    l.instanceDetail_eulaTitle,
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
@@ -1852,7 +1874,7 @@ class _EulaCardState extends State<_EulaCard> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Text(
-                  '未找到 eula.txt，将在同意后自动创建。',
+                  l.instanceDetail_eulaNotFound,
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.primary,
                     fontSize: 12,
@@ -1862,13 +1884,13 @@ class _EulaCardState extends State<_EulaCard> {
             SwitchListTile(
               value: _accepted,
               onChanged: (v) => _setEula(v),
-              title: const Text('同意 Mojang EULA'),
-              subtitle: Text(_accepted ? '已同意，服务器可正常启动' : '未同意，服务器启动后将自动退出'),
+              title: Text(l.instanceDetail_eulaAccept),
+              subtitle: Text(_accepted ? l.instanceDetail_eulaAcceptedSubtitle : l.instanceDetail_eulaNotAcceptedSubtitle),
               contentPadding: EdgeInsets.zero,
             ),
             const SizedBox(height: 4),
             Text(
-              '同意后将写入 eula=true 到 eula.txt。详见 Mojang EULA。',
+              l.instanceDetail_eulaNote,
               style: TextStyle(
                 color: Theme.of(context).colorScheme.outline,
                 fontSize: 12,

@@ -18,6 +18,7 @@ import '../models/server_instance.dart';
 import '../services/ai_settings.dart';
 import '../services/http_ffi.dart';
 import '../services/knowledge_service.dart';
+import '../services/locale_settings.dart';
 import '../services/log_persistence.dart';
 import '../state/app_state.dart';
 
@@ -240,7 +241,11 @@ class AiConversation {
 
     final model = await AiSettings.getActiveModel();
     if (model == null) {
-      emit(const AiEvent.error('尚未添加 AI 模型，请先点击左上角添加模型'));
+      emit(AiEvent.error(
+        LocaleSettings.instance.localeCode == 'en'
+            ? 'No AI model added yet. Click the top-left button to add one first.'
+            : '尚未添加 AI 模型，请先点击左上角添加模型',
+      ));
       _running = false;
       return;
     }
@@ -254,7 +259,11 @@ class AiConversation {
         emit(const AiEvent.thinking());
         final message = await service._chatCompletion(_messages, model);
         if (message == null) {
-          emit(const AiEvent.error('模型无响应（choices 为空）'));
+          emit(AiEvent.error(
+            LocaleSettings.instance.localeCode == 'en'
+                ? 'The model did not respond (empty choices).'
+                : '模型无响应（choices 为空）',
+          ));
           break;
         }
         // 保留完整 assistant 消息（含 tool_calls）作为上下文。
@@ -282,7 +291,12 @@ class AiConversation {
               'tool_call_id': tc['id'],
               'content': '未知工具: $name',
             });
-            emit(AiEvent.toolResult(name, '未知工具，已忽略'));
+            emit(AiEvent.toolResult(
+              name,
+              LocaleSettings.instance.localeCode == 'en'
+                  ? 'Unknown tool, ignored.'
+                  : '未知工具，已忽略',
+            ));
             continue;
           }
 
@@ -295,7 +309,9 @@ class AiConversation {
             final allowed = await _permissionCompleter!.future;
             _permissionCompleter = null;
             if (_cancelled || !allowed) {
-              result = '用户拒绝了该操作: ${tool.describe(args)}';
+              result = LocaleSettings.instance.localeCode == 'en'
+                  ? 'User denied this operation: ${tool.describe(args)}'
+                  : '用户拒绝了该操作: ${tool.describe(args)}';
             } else {
               result = await service._safeHandle(tool, state, args);
             }
@@ -312,7 +328,9 @@ class AiConversation {
         }
       }
       if (_cancelled) {
-        emit(const AiEvent.text('已停止。'));
+        emit(AiEvent.text(
+          LocaleSettings.instance.localeCode == 'en' ? 'Stopped.' : '已停止。',
+        ));
       } else {
         // 根据上下文窗口压缩过长的对话历史。
         await _compressIfNeeded(emit);
@@ -542,7 +560,9 @@ class AiAssistantService {
       description: '列出所有服务器实例：ID、名称、运行状态与根目录路径',
       parameters: {'type': 'object', 'properties': {}, 'required': []},
       permission: AiToolPermission.read,
-      describe: (_) => '查看实例列表',
+      describe: (_) => LocaleSettings.instance.localeCode == 'en'
+          ? 'View instance list'
+          : '查看实例列表',
       handler: (state, _) async {
         final lines = [
           for (final i in state.instances)
@@ -564,7 +584,9 @@ class AiAssistantService {
         'required': ['instance_id'],
       },
       permission: AiToolPermission.read,
-      describe: (a) => '读取日志 · ${a['instance_id']} · 最近 ${a['tail'] ?? 200} 行',
+      describe: (a) => LocaleSettings.instance.localeCode == 'en'
+          ? 'Read logs · ${a['instance_id']} · last ${a['tail'] ?? 200} lines'
+          : '读取日志 · ${a['instance_id']} · 最近 ${a['tail'] ?? 200} 行',
       handler: (state, a) async {
         final id = a['instance_id'].toString();
         final tail = (a['tail'] as num?)?.toInt() ?? 200;
@@ -586,7 +608,9 @@ class AiAssistantService {
         'required': ['instance_id', 'pattern'],
       },
       permission: AiToolPermission.read,
-      describe: (a) => '搜索日志 · ${a['instance_id']} · 关键词 "${a['pattern']}"',
+      describe: (a) => LocaleSettings.instance.localeCode == 'en'
+          ? 'Search logs · ${a['instance_id']} · keyword "${a['pattern']}"'
+          : '搜索日志 · ${a['instance_id']} · 关键词 "${a['pattern']}"',
       handler: (state, a) async {
         final id = a['instance_id'].toString();
         final pattern = a['pattern'].toString();
@@ -619,7 +643,9 @@ class AiAssistantService {
         'required': ['instance_id'],
       },
       permission: AiToolPermission.read,
-      describe: (a) => '查看文件 · ${a['instance_id']} · 目录 "${a['path'] ?? ''}"',
+      describe: (a) => LocaleSettings.instance.localeCode == 'en'
+          ? 'View files · ${a['instance_id']} · dir "${a['path'] ?? ''}"'
+          : '查看文件 · ${a['instance_id']} · 目录 "${a['path'] ?? ''}"',
       handler: (state, a) async {
         final id = a['instance_id'].toString();
         final instance = state.instances.where((i) => i.id == id).firstOrNull;
@@ -665,7 +691,9 @@ class AiAssistantService {
         'required': ['instance_id', 'path'],
       },
       permission: AiToolPermission.read,
-      describe: (a) => '读取文件 · ${a['instance_id']} · "${a['path']}"',
+      describe: (a) => LocaleSettings.instance.localeCode == 'en'
+          ? 'Read file · ${a['instance_id']} · "${a['path']}"'
+          : '读取文件 · ${a['instance_id']} · "${a['path']}"',
       handler: (state, a) async {
         final id = a['instance_id'].toString();
         final instance = state.instances.where((i) => i.id == id).firstOrNull;
@@ -694,7 +722,9 @@ class AiAssistantService {
         'required': ['query'],
       },
       permission: AiToolPermission.read,
-      describe: (a) => '知识库检索 · "${a['query']}"',
+      describe: (a) => LocaleSettings.instance.localeCode == 'en'
+          ? 'Knowledge base search · "${a['query']}"'
+          : '知识库检索 · "${a['query']}"',
       handler: (state, a) async {
         final model = await AiSettings.getActiveModel();
         if (model == null) return '尚未配置 AI 模型，无法获取 embedding';
@@ -728,7 +758,9 @@ class AiAssistantService {
         'required': ['instance_id', 'command'],
       },
       permission: AiToolPermission.elevated,
-      describe: (a) => '发送命令 · ${a['instance_id']} · "${a['command']}"',
+      describe: (a) => LocaleSettings.instance.localeCode == 'en'
+          ? 'Send command · ${a['instance_id']} · "${a['command']}"'
+          : '发送命令 · ${a['instance_id']} · "${a['command']}"',
       handler: (state, a) async {
         final id = a['instance_id'].toString();
         final command = a['command'].toString();
@@ -750,7 +782,9 @@ class AiAssistantService {
         'required': ['instance_id'],
       },
       permission: AiToolPermission.elevated,
-      describe: (a) => '启动实例 · ${a['instance_id']}',
+      describe: (a) => LocaleSettings.instance.localeCode == 'en'
+          ? 'Start instance · ${a['instance_id']}'
+          : '启动实例 · ${a['instance_id']}',
       handler: (state, a) async {
         final id = a['instance_id'].toString();
         final instance = state.instances.where((i) => i.id == id).firstOrNull;
@@ -770,7 +804,9 @@ class AiAssistantService {
         'required': ['instance_id'],
       },
       permission: AiToolPermission.elevated,
-      describe: (a) => '停止实例 · ${a['instance_id']}',
+      describe: (a) => LocaleSettings.instance.localeCode == 'en'
+          ? 'Stop instance · ${a['instance_id']}'
+          : '停止实例 · ${a['instance_id']}',
       handler: (state, a) async {
         final id = a['instance_id'].toString();
         final instance = state.instances.where((i) => i.id == id).firstOrNull;

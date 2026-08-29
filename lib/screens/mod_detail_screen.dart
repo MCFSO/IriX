@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/modrinth.dart';
 import '../models/server_instance.dart';
 import '../services/downloader.dart';
@@ -94,6 +95,7 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
     if (project == null) return;
 
     // 在任何 await 之前读取下载线程数，避免跨异步间隙使用 BuildContext。
+    final l = AppLocalizations.of(context);
     final threads = context.read<AppState>().downloadThreads;
 
     // 选择主文件（优先 primary）
@@ -116,7 +118,7 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
         safeName.contains(r'\')) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('下载被拒绝：文件名为空或包含非法路径字符')),
+          SnackBar(content: Text(l.mod_downloadRejected)),
         );
       }
       return;
@@ -151,7 +153,7 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
         setState(() => _downloadProgress.remove(version.id));
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('下载失败: $e')));
+        ).showSnackBar(SnackBar(content: Text(l.mod_downloadFailed(e.toString()))));
       }
     }
   }
@@ -166,6 +168,7 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
     String? sha512,
     required String progressKey,
   }) async {
+    final l = AppLocalizations.of(context);
     final targetDir = p.join(instance.rootPath, subdir);
     final targetPath = p.join(targetDir, safeName);
     await _downloader.downloadFile(
@@ -186,9 +189,9 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
       setState(() => _downloadProgress.remove(progressKey));
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('已下载到 $subdir/$safeName'),
+          content: Text(l.mod_downloadedTo('$subdir/$safeName')),
           action: SnackBarAction(
-            label: '打开目录',
+            label: l.mod_openDirectory,
             onPressed: () => _openFolder(targetDir),
           ),
         ),
@@ -206,6 +209,7 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
     String? sha512,
     required String progressKey,
   }) async {
+    final l = AppLocalizations.of(context);
     // 下载到系统临时目录，安装完成后清理。
     final tempDir = await Directory.systemTemp.createTemp('irix_install_');
     final tempPath = p.join(tempDir.path, safeName);
@@ -232,7 +236,7 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
       if (mounted) {
         setState(() => _downloadProgress.remove(progressKey));
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('已安装到节点 ${target.displayName} 的 $subdir/')),
+          SnackBar(content: Text(l.mod_installedToNode(target.displayName, subdir))),
         );
       }
     } finally {
@@ -247,21 +251,24 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
   Future<void> _openFolder(String dirPath) async {
     // 简单提示：此处不引入额外的进程打开依赖，只显示路径
     if (mounted) {
+      final l = AppLocalizations.of(context);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('目录: $dirPath')));
+      ).showSnackBar(SnackBar(content: Text(l.mod_directory(dirPath))));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(_project?.title ?? '加载中...')),
+      appBar: AppBar(title: Text(_project?.title ?? l.common_loading)),
       body: _buildBody(),
     );
   }
 
   Widget _buildBody() {
+    final l = AppLocalizations.of(context);
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -274,13 +281,13 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
             const SizedBox(height: 8),
             Text(_error!, textAlign: TextAlign.center),
             const SizedBox(height: 16),
-            FilledButton(onPressed: _loadData, child: const Text('重试')),
+            FilledButton(onPressed: _loadData, child: Text(l.common_retry)),
           ],
         ),
       );
     }
     final project = _project;
-    if (project == null) return const Center(child: Text('未找到项目'));
+    if (project == null) return Center(child: Text(l.mod_notFound));
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -289,11 +296,11 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
         const SizedBox(height: 16),
         _buildStats(project),
         const SizedBox(height: 16),
-        Text('描述', style: Theme.of(context).textTheme.titleMedium),
+        Text(l.mod_description, style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
         Text(project.description),
         const SizedBox(height: 24),
-        Text('版本列表', style: Theme.of(context).textTheme.titleMedium),
+        Text(l.mod_versionList, style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
         ..._versions.map(_buildVersionTile),
       ],
@@ -342,11 +349,12 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
   }
 
   Widget _buildStats(ModrinthProject project) {
+    final l = AppLocalizations.of(context);
     return Row(
       children: [
-        _statItem(Icons.download, '${_formatNumber(project.downloads)} 下载'),
+        _statItem(Icons.download, '${_formatNumber(project.downloads)} ${l.mod_downloads}'),
         const SizedBox(width: 16),
-        _statItem(Icons.star, '${_formatNumber(project.followers)} 关注'),
+        _statItem(Icons.star, '${_formatNumber(project.followers)} ${l.mod_follows}'),
       ],
     );
   }
@@ -363,6 +371,7 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
   }
 
   Widget _buildVersionTile(ModrinthVersion version) {
+    final l = AppLocalizations.of(context);
     final progress = _downloadProgress[version.id];
     final isDownloading = progress != null;
 
@@ -386,7 +395,7 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
             Text(versionInfo, style: const TextStyle(fontSize: 12)),
             if (version.datePublished != null)
               Text(
-                '发布于 ${version.datePublished!.substring(0, 10)}',
+                l.mod_publishedOn(version.datePublished!.substring(0, 10)),
                 style: const TextStyle(fontSize: 11, color: Colors.grey),
               ),
             if (isDownloading) ...[
@@ -408,7 +417,7 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
             : FilledButton.icon(
                 onPressed: () => _downloadVersion(version),
                 icon: const Icon(Icons.download, size: 18),
-                label: const Text('下载'),
+                label: Text(l.common_download),
               ),
         isThreeLine: true,
       ),

@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../l10n/app_localizations.dart';
 import '../utils/apple_widgets.dart';
 import 'import_instance_screen.dart';
 import 'new_instance_screen.dart';
@@ -40,6 +41,7 @@ class OnboardingScreen extends StatelessWidget {
 
   /// 构建两张选项卡片的主体内容。
   Widget _buildBody(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 880),
@@ -52,8 +54,8 @@ class OnboardingScreen extends StatelessWidget {
                 Expanded(
                   child: _OptionCard(
                     icon: Icons.add_box,
-                    title: '新建',
-                    description: '新建一个MC服务器实例',
+                    title: l.onboarding_create,
+                    description: l.onboarding_createDesc,
                     onTap: () => _pushAndReturn(
                       context,
                       (_) => const NewInstanceScreen(),
@@ -64,8 +66,8 @@ class OnboardingScreen extends StatelessWidget {
                 Expanded(
                   child: _OptionCard(
                     icon: Icons.folder,
-                    title: '导入',
-                    description: '导入一个MC服务器实例',
+                    title: l.onboarding_import,
+                    description: l.onboarding_importDesc,
                     onTap: () => _pushAndReturn(
                       context,
                       (_) => const ImportInstanceScreen(),
@@ -82,12 +84,13 @@ class OnboardingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     // 嵌入模式：仅返回主体内容，由外层 HomeScreen 的 Scaffold 提供 AppBar。
     if (embedded) {
       return _buildBody(context);
     }
     return Scaffold(
-      appBar: AppBar(title: const Text('IriX'), centerTitle: true),
+      appBar: AppBar(title: Text(l.onboarding_title), centerTitle: true),
       body: _buildBody(context),
     );
   }

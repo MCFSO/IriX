@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../state/app_state.dart';
 import '../utils/naming.dart';
 
@@ -61,12 +62,13 @@ class _ImportInstanceScreenState extends State<ImportInstanceScreen> {
   /// 创建成功后通过 [Navigator.pop] 返回上一屏，列表会因
   /// [AppState.notifyListeners] 自动刷新。
   Future<void> _onCreate() async {
+    final l = AppLocalizations.of(context);
     final rootPath = _rootPathController.text.trim();
     final startCommand = _startCommandController.text.trim();
     if (rootPath.isEmpty || startCommand.isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('请填写服务器根目录路径与启动命令')));
+      ).showSnackBar(SnackBar(content: Text(l.importInstance_fillRequired)));
       return;
     }
 
@@ -90,8 +92,9 @@ class _ImportInstanceScreenState extends State<ImportInstanceScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('导入实例')),
+      appBar: AppBar(title: Text(l.importInstance_title)),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: ListView(
@@ -99,10 +102,10 @@ class _ImportInstanceScreenState extends State<ImportInstanceScreen> {
             // 实例名称（导入时可修改，留空自动分配随机名称）
             TextField(
               controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: '实例名称',
-                hintText: '留空则自动分配随机名称',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l.importInstance_instanceName,
+                hintText: l.importInstance_instanceNameHint,
+                border: const OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 16),
@@ -113,10 +116,10 @@ class _ImportInstanceScreenState extends State<ImportInstanceScreen> {
                 Expanded(
                   child: TextField(
                     controller: _rootPathController,
-                    decoration: const InputDecoration(
-                      labelText: '服务器根目录路径',
-                      hintText: '选择或输入服务器根目录',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: l.importInstance_rootPath,
+                      hintText: l.importInstance_rootPathHint,
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                 ),
@@ -126,7 +129,7 @@ class _ImportInstanceScreenState extends State<ImportInstanceScreen> {
                   child: FilledButton.tonalIcon(
                     onPressed: _pickRootPath,
                     icon: const Icon(Icons.folder_open),
-                    label: const Text('浏览'),
+                    label: Text(l.importInstance_browse),
                   ),
                 ),
               ],
@@ -135,10 +138,10 @@ class _ImportInstanceScreenState extends State<ImportInstanceScreen> {
             // 启动命令
             TextField(
               controller: _startCommandController,
-              decoration: const InputDecoration(
-                labelText: '启动命令',
-                hintText: 'java -Xmx2G -jar server.jar nogui',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l.instanceDetail_startCommand,
+                hintText: l.importInstance_startCommandHint,
+                border: const OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 24),
@@ -152,10 +155,10 @@ class _ImportInstanceScreenState extends State<ImportInstanceScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.download_for_offline),
-              label: Text(_creating ? '创建中…' : '创建实例'),
+              label: Text(_creating ? l.importInstance_creating : l.importInstance_createInstance),
             ),
             const SizedBox(height: 8),
-            Text('导入一个已存在的服务器目录，使用其原有文件结构。', style: theme.textTheme.bodySmall),
+            Text(l.importInstance_desc, style: theme.textTheme.bodySmall),
           ],
         ),
       ),

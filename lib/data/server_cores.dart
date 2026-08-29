@@ -2,27 +2,36 @@
 // 定义 Minecraft 服务端核心的分类、元数据以及 FastMirror 下载地址映射。
 // 数据来源：need.md 中的「核心目录表」与「FastMirror 核心下载渠道表」。
 
+import '../services/locale_settings.dart';
+
 /// 服务端核心分类枚举。
 ///
 /// 对应 need.md 表格中的「分类」列：
 /// 原版 / 插件服 / Mod服 / 混合服（插件+Mod）。
 enum CoreCategory {
   /// 原版
-  vanilla('原版'),
+  vanilla('原版', 'Vanilla'),
 
   /// 插件服
-  plugin('插件服'),
+  plugin('插件服', 'Plugin'),
 
   /// Mod服
-  mod('Mod服'),
+  mod('Mod服', 'Mod'),
 
   /// 混合服（插件 + Mod）
-  hybrid('混合服');
+  hybrid('混合服', 'Hybrid');
 
-  const CoreCategory(this.displayName);
+  const CoreCategory(this.displayNameZh, this.displayNameEn);
 
   /// 该分类的中文展示名称。
-  final String displayName;
+  final String displayNameZh;
+
+  /// 该分类的英文展示名称。
+  final String displayNameEn;
+
+  /// 根据当前界面语言返回展示名称。
+  String get displayName =>
+      LocaleSettings.instance.localeCode == 'en' ? displayNameEn : displayNameZh;
 }
 
 /// 单个核心版本的下载信息。
@@ -51,8 +60,11 @@ class ServerCore {
   /// 核心分类。
   final CoreCategory category;
 
-  /// 适用场景描述（来自 need.md 表格「适用场景」列）。
-  final String scenario;
+  /// 适用场景描述（中文，来自 need.md 表格「适用场景」列）。
+  final String scenarioZh;
+
+  /// 适用场景描述（英文）。
+  final String scenarioEn;
 
   /// 可用版本及其下载地址列表。
   ///
@@ -63,9 +75,14 @@ class ServerCore {
     required this.id,
     required this.name,
     required this.category,
-    required this.scenario,
+    required this.scenarioZh,
+    required this.scenarioEn,
     required this.versions,
   });
+
+  /// 根据当前界面语言返回适用场景描述。
+  String get scenario =>
+      LocaleSettings.instance.localeCode == 'en' ? scenarioEn : scenarioZh;
 }
 
 /// 全部服务端核心目录。
@@ -79,7 +96,8 @@ const List<ServerCore> serverCores = [
     id: 'Vanilla',
     name: 'Vanilla',
     category: CoreCategory.vanilla,
-    scenario: '超小型纯净生存服，不加插件/Mod',
+    scenarioZh: '超小型纯净生存服，不加插件/Mod',
+    scenarioEn: 'Tiny vanilla survival server, no plugins/Mods',
     versions: [
       CoreVersionInfo(
         '26.2',
@@ -113,14 +131,16 @@ const List<ServerCore> serverCores = [
     id: 'Spigot',
     name: 'Spigot',
     category: CoreCategory.plugin,
-    scenario: '中小型插件服务器',
+    scenarioZh: '中小型插件服务器',
+    scenarioEn: 'Small to medium plugin server',
     versions: [],
   ),
   ServerCore(
     id: 'Paper',
     name: 'Paper',
     category: CoreCategory.plugin,
-    scenario: '中大型插件服',
+    scenarioZh: '中大型插件服',
+    scenarioEn: 'Medium to large plugin server',
     versions: [
       CoreVersionInfo(
         '26.2',
@@ -160,7 +180,8 @@ const List<ServerCore> serverCores = [
     id: 'Purpur',
     name: 'Purpur',
     category: CoreCategory.plugin,
-    scenario: '追求极致自定义的插件服',
+    scenarioZh: '追求极致自定义的插件服',
+    scenarioEn: 'Plugin server with maximum customization',
     versions: [
       CoreVersionInfo(
         '26.2',
@@ -188,7 +209,8 @@ const List<ServerCore> serverCores = [
     id: 'Folia',
     name: 'Folia',
     category: CoreCategory.plugin,
-    scenario: '高性能CPU（16核+）大型生电服',
+    scenarioZh: '高性能CPU（16核+）大型生电服',
+    scenarioEn: 'Large technical/factory server on high-core CPU (16+ cores)',
     versions: [
       CoreVersionInfo(
         '26.1.2',
@@ -212,14 +234,16 @@ const List<ServerCore> serverCores = [
     id: 'Mint',
     name: 'Mint',
     category: CoreCategory.plugin,
-    scenario: '多核高性能服务器，追求原版特性还原的大型服',
+    scenarioZh: '多核高性能服务器，追求原版特性还原的大型服',
+    scenarioEn: 'Multi-core high-performance server, large vanilla-faithful server',
     versions: [],
   ),
   ServerCore(
     id: 'Leaves',
     name: 'Leaves',
     category: CoreCategory.plugin,
-    scenario: '生电服玩家的插件端',
+    scenarioZh: '生电服玩家的插件端',
+    scenarioEn: 'Plugin build for technical/factory players',
     versions: [
       CoreVersionInfo(
         '1.21.8',
@@ -231,21 +255,24 @@ const List<ServerCore> serverCores = [
     id: 'Leaf',
     name: 'Leaf',
     category: CoreCategory.plugin,
-    scenario: '大型高负载插件服',
+    scenarioZh: '大型高负载插件服',
+    scenarioEn: 'Large high-load plugin server',
     versions: [],
   ),
   ServerCore(
     id: 'Glowstone',
     name: 'Glowstone',
     category: CoreCategory.plugin,
-    scenario: '开发者研究/实验性项目',
+    scenarioZh: '开发者研究/实验性项目',
+    scenarioEn: 'Developer research / experimental projects',
     versions: [],
   ),
   ServerCore(
     id: 'SpongeVanilla',
     name: 'SpongeVanilla',
     category: CoreCategory.plugin,
-    scenario: '使用Sponge插件体系的服务器',
+    scenarioZh: '使用Sponge插件体系的服务器',
+    scenarioEn: 'Server using the Sponge plugin platform',
     versions: [
       CoreVersionInfo(
         '26.1.2',
@@ -269,7 +296,8 @@ const List<ServerCore> serverCores = [
     id: 'Pufferfish',
     name: 'Pufferfish',
     category: CoreCategory.plugin,
-    scenario: '需要极致稳定性的超大型插件服',
+    scenarioZh: '需要极致稳定性的超大型插件服',
+    scenarioEn: 'Extra-large plugin server needing maximum stability',
     versions: [],
   ),
 
@@ -278,14 +306,16 @@ const List<ServerCore> serverCores = [
     id: 'Forge',
     name: 'Forge',
     category: CoreCategory.mod,
-    scenario: '经典整合包（1.12.2~1.20.1）',
+    scenarioZh: '经典整合包（1.12.2~1.20.1）',
+    scenarioEn: 'Classic modpacks (1.12.2~1.20.1)',
     versions: [],
   ),
   ServerCore(
     id: 'Fabric',
     name: 'Fabric',
     category: CoreCategory.mod,
-    scenario: '高版本（1.17+）轻量Mod服',
+    scenarioZh: '高版本（1.17+）轻量Mod服',
+    scenarioEn: 'Lightweight mod server on newer versions (1.17+)',
     versions: [
       CoreVersionInfo(
         '26.2',
@@ -317,14 +347,16 @@ const List<ServerCore> serverCores = [
     id: 'NeoForge',
     name: 'NeoForge',
     category: CoreCategory.mod,
-    scenario: '1.20.1+ 新世代Forge整合包',
+    scenarioZh: '1.20.1+ 新世代Forge整合包',
+    scenarioEn: 'New-generation Forge modpacks (1.20.1+)',
     versions: [],
   ),
   ServerCore(
     id: 'Quilt',
     name: 'Quilt',
     category: CoreCategory.mod,
-    scenario: '完全兼容Fabric Mod',
+    scenarioZh: '完全兼容Fabric Mod',
+    scenarioEn: 'Fully compatible with Fabric Mods',
     versions: [],
   ),
 
@@ -333,14 +365,16 @@ const List<ServerCore> serverCores = [
     id: 'Mohist',
     name: 'Mohist',
     category: CoreCategory.hybrid,
-    scenario: '1.16.5~1.20.1 高版本混合服',
+    scenarioZh: '1.16.5~1.20.1 高版本混合服',
+    scenarioEn: 'Hybrid server on newer versions (1.16.5~1.20.1)',
     versions: [],
   ),
   ServerCore(
     id: 'Arclight',
     name: 'Arclight',
     category: CoreCategory.hybrid,
-    scenario: '1.18+ 高版本混合服',
+    scenarioZh: '1.18+ 高版本混合服',
+    scenarioEn: 'Hybrid server on versions 1.18+',
     versions: [
       CoreVersionInfo(
         '1.20.1',
@@ -352,7 +386,8 @@ const List<ServerCore> serverCores = [
     id: 'CatServer',
     name: 'CatServer',
     category: CoreCategory.hybrid,
-    scenario: '1.12.2 怀旧混合服',
+    scenarioZh: '1.12.2 怀旧混合服',
+    scenarioEn: 'Nostalgic hybrid server on 1.12.2',
     versions: [
       CoreVersionInfo(
         '1.18.2',
@@ -372,14 +407,16 @@ const List<ServerCore> serverCores = [
     id: 'Banner',
     name: 'Banner',
     category: CoreCategory.hybrid,
-    scenario: '1.19.4~1.20.1 Fabric系混合服',
+    scenarioZh: '1.19.4~1.20.1 Fabric系混合服',
+    scenarioEn: 'Fabric-based hybrid server (1.19.4~1.20.1)',
     versions: [],
   ),
   ServerCore(
     id: 'SpongeForge',
     name: 'SpongeForge',
     category: CoreCategory.hybrid,
-    scenario: '使用Sponge插件+Forge Mod的混合服',
+    scenarioZh: '使用Sponge插件+Forge Mod的混合服',
+    scenarioEn: 'Hybrid server using Sponge plugins + Forge Mods',
     versions: [
       CoreVersionInfo(
         '1.12.2',
@@ -391,14 +428,16 @@ const List<ServerCore> serverCores = [
     id: 'SpongeNeoForge',
     name: 'SpongeNeoForge',
     category: CoreCategory.hybrid,
-    scenario: '使用Sponge插件+NeoForge Mod的混合服',
+    scenarioZh: '使用Sponge插件+NeoForge Mod的混合服',
+    scenarioEn: 'Hybrid server using Sponge plugins + NeoForge Mods',
     versions: [],
   ),
   ServerCore(
     id: 'Cardboard',
     name: 'Cardboard',
     category: CoreCategory.hybrid,
-    scenario: '在Fabric Mod服上运行Bukkit插件',
+    scenarioZh: '在Fabric Mod服上运行Bukkit插件',
+    scenarioEn: 'Run Bukkit plugins on a Fabric Mod server',
     versions: [],
   ),
 ];

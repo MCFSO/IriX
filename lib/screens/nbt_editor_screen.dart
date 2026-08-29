@@ -14,6 +14,7 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../l10n/app_localizations.dart';
 import '../services/nbt_service.dart';
 
 /// NBT 编辑器主界面。
@@ -33,18 +34,18 @@ class NbtEditorScreen extends StatefulWidget {
 enum _Domain { tree, item, entity, villager, rcon }
 
 extension _DomainMeta on _Domain {
-  String get label {
+  String label(AppLocalizations l) {
     switch (this) {
       case _Domain.tree:
-        return '通用树';
+        return l.nbt_domainTree;
       case _Domain.item:
-        return '物品';
+        return l.nbt_domainItem;
       case _Domain.entity:
-        return '实体';
+        return l.nbt_domainEntity;
       case _Domain.villager:
-        return '村民交易';
+        return l.nbt_domainVillager;
       case _Domain.rcon:
-        return '连服务器';
+        return l.nbt_domainRcon;
     }
   }
 }
@@ -66,6 +67,7 @@ class _NbtEditorScreenState extends State<NbtEditorScreen> {
   }
 
   Future<void> _loadInitial() async {
+    final l = AppLocalizations.of(context);
     setState(() => _loading = true);
     try {
       if (widget.initialBytes != null) {
@@ -76,7 +78,7 @@ class _NbtEditorScreenState extends State<NbtEditorScreen> {
       }
     } catch (e) {
       _error = true;
-      _errorMsg = '加载失败：$e';
+      _errorMsg = '${l.nbt_loadFailed}: $e';
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -85,6 +87,7 @@ class _NbtEditorScreenState extends State<NbtEditorScreen> {
   // === 导入/导出 ===
 
   Future<void> _importNbtFile() async {
+    final l = AppLocalizations.of(context);
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['nbt'],
@@ -98,14 +101,15 @@ class _NbtEditorScreenState extends State<NbtEditorScreen> {
         _fileName = result.files.single.name;
         _error = false;
       });
-      if (mounted) _toast('已导入 ${result.files.single.name}');
+      if (mounted) _toast(l.nbt_imported(result.files.single.name));
     } catch (e) {
-      if (mounted) _toast('导入失败：$e', error: true);
+      if (mounted) _toast(l.nbt_importFailed(e.toString()), error: true);
     }
   }
 
   Future<void> _importSnbt() async {
-    final text = await _showSnbtDialog(title: '粘贴 SNBT', multiLine: true);
+    final l = AppLocalizations.of(context);
+    final text = await _showSnbtDialog(title: l.nbt_pasteSnbt, multiLine: true);
     if (text == null || text.trim().isEmpty) return;
     try {
       final node = await NbtService.instance.toTree(text.trim());
@@ -113,13 +117,14 @@ class _NbtEditorScreenState extends State<NbtEditorScreen> {
         _root = node;
         _error = false;
       });
-      if (mounted) _toast('已解析 SNBT');
+      if (mounted) _toast(l.nbt_snbtParsed);
     } catch (e) {
-      if (mounted) _toast('解析失败：$e', error: true);
+      if (mounted) _toast(l.nbt_parseFailed(e.toString()), error: true);
     }
   }
 
   Future<void> _exportNbt() async {
+    final l = AppLocalizations.of(context);
     try {
       final bytes = await NbtService.instance.treeToBinary(_root, gzip: true);
       final savePath = await FilePicker.platform.saveFile(
@@ -130,18 +135,19 @@ class _NbtEditorScreenState extends State<NbtEditorScreen> {
       if (savePath == null) return;
       final path = savePath.endsWith('.nbt') ? savePath : '$savePath.nbt';
       await File(path).writeAsBytes(bytes);
-      if (mounted) _toast('已导出 $path');
+      if (mounted) _toast(l.nbt_exported(path));
     } catch (e) {
-      if (mounted) _toast('导出失败：$e', error: true);
+      if (mounted) _toast(l.nbt_exportFailed(e.toString()), error: true);
     }
   }
 
   Future<void> _viewSnbt() async {
+    final l = AppLocalizations.of(context);
     try {
       final snbt = await NbtService.instance.fromTree(_root);
-      await _showSnbtDialog(title: '当前 SNBT', initial: snbt, readOnly: true);
+      await _showSnbtDialog(title: l.nbt_currentSnbt, initial: snbt, readOnly: true);
     } catch (e) {
-      if (mounted) _toast('生成 SNBT 失败：$e', error: true);
+      if (mounted) _toast(l.nbt_generateSnbtFailed(e.toString()), error: true);
     }
   }
 
@@ -221,28 +227,29 @@ class _NbtEditorScreenState extends State<NbtEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: Text('NBT 编辑器 · $_fileName'),
+        title: Text('${l.nbt_title} · $_fileName'),
         actions: [
           IconButton(
             icon: const Icon(Icons.file_open),
-            tooltip: '导入 .nbt',
+            tooltip: l.nbt_importNbt,
             onPressed: _importNbtFile,
           ),
           IconButton(
             icon: const Icon(Icons.paste),
-            tooltip: '粘贴 SNBT',
+            tooltip: l.nbt_pasteSnbt,
             onPressed: _importSnbt,
           ),
           IconButton(
             icon: const Icon(Icons.save),
-            tooltip: '导出 .nbt',
+            tooltip: l.nbt_exportNbt,
             onPressed: _exportNbt,
           ),
           IconButton(
             icon: const Icon(Icons.code),
-            tooltip: '导出/查看 SNBT',
+            tooltip: l.nbt_exportViewSnbt,
             onPressed: _viewSnbt,
           ),
         ],
@@ -260,6 +267,7 @@ class _NbtEditorScreenState extends State<NbtEditorScreen> {
   }
 
   Widget _buildTabBar() {
+    final l = AppLocalizations.of(context);
     final domains = _Domain.values;
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -269,7 +277,7 @@ class _NbtEditorScreenState extends State<NbtEditorScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4),
               child: ChoiceChip(
-                label: Text(d.label),
+                label: Text(d.label(l)),
                 selected: _domain == d,
                 onSelected: (_) => setState(() => _domain = d),
               ),
@@ -280,6 +288,7 @@ class _NbtEditorScreenState extends State<NbtEditorScreen> {
   }
 
   Widget _buildBody() {
+    final l = AppLocalizations.of(context);
     if (_domain == _Domain.rcon) {
       return const _RconPanel();
     }
@@ -290,11 +299,11 @@ class _NbtEditorScreenState extends State<NbtEditorScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           child: Row(
             children: [
-              const Text('模式：'),
+              Text('${l.nbt_mode}: '),
               SegmentedButton<bool>(
-                segments: const [
-                  ButtonSegment(value: false, label: Text('高级树')),
-                  ButtonSegment(value: true, label: Text('简易模式')),
+                segments: [
+                  ButtonSegment(value: false, label: Text(l.nbt_advancedTree)),
+                  ButtonSegment(value: true, label: Text(l.nbt_simpleMode)),
                 ],
                 selected: {_simpleMode},
                 onSelectionChanged: (s) => setState(() => _simpleMode = s.first),
@@ -315,6 +324,7 @@ class _NbtEditorScreenState extends State<NbtEditorScreen> {
   }
 
   Future<void> _search(String query) async {
+    final l = AppLocalizations.of(context);
     if (query.trim().isEmpty) return;
     try {
       final snbt = await NbtService.instance.fromTree(_root);
@@ -323,7 +333,7 @@ class _NbtEditorScreenState extends State<NbtEditorScreen> {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: Text('搜索结果（${hits.length}）'),
+          title: Text(l.nbt_searchResults(hits.length)),
           content: SizedBox(
             width: double.maxFinite,
             child: ListView(
@@ -336,13 +346,13 @@ class _NbtEditorScreenState extends State<NbtEditorScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('关闭'),
+              child: Text(l.common_close),
             ),
           ],
         ),
       );
     } catch (e) {
-      _toast('搜索失败：$e', error: true);
+      _toast(l.nbt_searchFailed(e.toString()), error: true);
     }
   }
 
@@ -362,6 +372,7 @@ class _NbtEditorScreenState extends State<NbtEditorScreen> {
   }
 
   Widget _buildSimpleForm() {
+    final l = AppLocalizations.of(context);
     switch (_domain) {
       case _Domain.item:
         return _ItemSimpleForm(get: _field, set: _setField, onChanged: _rebuildFromTree);
@@ -370,7 +381,7 @@ class _NbtEditorScreenState extends State<NbtEditorScreen> {
       case _Domain.villager:
         return _VillagerSimpleForm(get: _field, set: _setField, onChanged: _rebuildFromTree);
       default:
-        return const Center(child: Text('通用树模式仅提供高级树编辑。'));
+        return Center(child: Text(l.nbt_treeOnlyAdvanced));
     }
   }
 
@@ -382,6 +393,7 @@ class _NbtEditorScreenState extends State<NbtEditorScreen> {
     bool multiLine = false,
     bool readOnly = false,
   }) async {
+    final l = AppLocalizations.of(context);
     final controller = TextEditingController(text: initial ?? '');
     if (readOnly && initial != null) {
       // 只读展示。
@@ -408,11 +420,11 @@ class _NbtEditorScreenState extends State<NbtEditorScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
+            child: Text(l.common_cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, controller.text),
-            child: const Text('确定'),
+            child: Text(l.common_confirm),
           ),
         ],
       ),
@@ -482,6 +494,7 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final color = typeColor(_node.type);
     final hasChildren = _node.isContainer && _node.children.isNotEmpty;
 
@@ -512,7 +525,7 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
                   ),
                 )
               else
-                const Expanded(child: Text('(root)', style: TextStyle(color: Colors.grey))),
+                Expanded(child: Text(l.nbt_root, style: const TextStyle(color: Colors.grey))),
               // 类型标签。
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
@@ -545,7 +558,7 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
               Padding(
                 padding: const EdgeInsets.only(left: 40),
                 child: Text(
-                  _node.type == NbtType.list ? '(空列表)' : '(空 Compound)',
+                  _node.type == NbtType.list ? l.nbt_emptyList : l.nbt_emptyCompound,
                   style: const TextStyle(color: Colors.grey, fontSize: 12),
                 ),
               ),
@@ -563,11 +576,12 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
   }
 
   Widget _actions() {
+    final l = AppLocalizations.of(context);
     // 编辑标量值 / 数组。
     if (_node.isScalar || _node.isArray) {
       return IconButton(
         icon: const Icon(Icons.edit, size: 16),
-        tooltip: '编辑值',
+        tooltip: l.nbt_editValue,
         onPressed: () => _editValue(context),
       );
     }
@@ -577,12 +591,12 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
       children: [
         IconButton(
           icon: const Icon(Icons.add, size: 16),
-          tooltip: '添加子节点',
+          tooltip: l.nbt_addChild,
           onPressed: () => _addChild(context),
         ),
         IconButton(
           icon: const Icon(Icons.delete_outline, size: 16),
-          tooltip: '删除',
+          tooltip: l.common_delete,
           onPressed: () => _delete(context),
         ),
       ],
@@ -590,13 +604,14 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
   }
 
   Future<void> _editValue(BuildContext context) async {
+    final l = AppLocalizations.of(context);
     final current = _node.value?.toString() ?? '';
     final edited = await showDialog<String>(
       context: context,
       builder: (ctx) {
         final c = TextEditingController(text: current);
         return AlertDialog(
-          title: Text('编辑值（${_node.type}）'),
+          title: Text(l.nbt_editValueTitle(_node.type)),
           content: TextField(
             controller: c,
             decoration: const InputDecoration(border: OutlineInputBorder()),
@@ -605,11 +620,11 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('取消'),
+              child: Text(l.common_cancel),
             ),
             TextButton(
               onPressed: () => Navigator.pop(ctx, c.text),
-              child: const Text('保存'),
+              child: Text(l.common_save),
             ),
           ],
         );
@@ -621,6 +636,7 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
   }
 
   Future<void> _addChild(BuildContext context) async {
+    final l = AppLocalizations.of(context);
     // 收集类型与（Compound 所需）键名：合并到单个对话框，避免多次 await 后使用 context。
     final result = await showDialog<(String, String)>(
       context: context,
@@ -629,14 +645,14 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
         final nameCtl = TextEditingController();
         return StatefulBuilder(
           builder: (stx, setInner) => AlertDialog(
-            title: const Text('添加子节点'),
+            title: Text(l.nbt_addChild),
             content: SizedBox(
               width: double.maxFinite,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('类型'),
+                  Text(l.nbt_type),
                   Wrap(
                     spacing: 6,
                     children: [
@@ -650,7 +666,7 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
                   ),
                   if (_node.type == NbtType.compound) ...[
                     const SizedBox(height: 12),
-                    const Text('键名'),
+                    Text(l.nbt_keyName),
                     TextField(
                       controller: nameCtl,
                       decoration: const InputDecoration(border: OutlineInputBorder()),
@@ -662,11 +678,11 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('取消'),
+                child: Text(l.common_cancel),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(ctx, (type ?? NbtType.compound, nameCtl.text.trim())),
-                child: const Text('确定'),
+                child: Text(l.common_confirm),
               ),
             ],
           ),
@@ -688,10 +704,11 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
 
 
   void _delete(BuildContext context) {
+    final l = AppLocalizations.of(context);
     // 从父容器移除自身（根不允许删除）。
     if (_node == widget.root) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('根节点不可删除')),
+        SnackBar(content: Text(l.nbt_rootUndeletable)),
       );
       return;
     }
@@ -720,13 +737,14 @@ class _SearchButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final c = TextEditingController();
     return SizedBox(
       width: 200,
       child: TextField(
         controller: c,
         decoration: InputDecoration(
-          hintText: '搜索路径…',
+          hintText: l.nbt_searchPath,
           isDense: true,
           suffixIcon: IconButton(
             icon: const Icon(Icons.search, size: 18),
@@ -788,16 +806,19 @@ class _ItemSimpleForm extends StatelessWidget {
   const _ItemSimpleForm({required this.get, required this.set, required this.onChanged});
 
   @override
-  Widget build(BuildContext context) => _SimpleForm(fields: [
-        _textField('物品 ID', 'id', get, set, onChanged),
-        _textField('数量 Count', 'Count', get, set, onChanged),
-        _textField('自定义名称 custom_name', 'components/custom_name', get, set, onChanged),
-        _textField(' Lore（逗号分隔）', 'components/lore', get, set, onChanged),
-        _boolField('是否损坏 Unbreakable', 'components/unbreakable', get, set, onChanged),
-        _boolField('防火 Fire-resistant', 'components/fire_resistant', get, set, onChanged),
-        _textField('附魔（JSON 数组）', 'components/enchantments', get, set, onChanged),
-        _textField('伤害值 damage', 'components/damage', get, set, onChanged),
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return _SimpleForm(fields: [
+        _textField(l.nbt_itemId, 'id', get, set, onChanged),
+        _textField(l.nbt_itemCount, 'Count', get, set, onChanged),
+        _textField(l.nbt_itemCustomName, 'components/custom_name', get, set, onChanged),
+        _textField(l.nbt_itemLore, 'components/lore', get, set, onChanged),
+        _boolField(l.nbt_itemUnbreakable, 'components/unbreakable', get, set, onChanged),
+        _boolField(l.nbt_itemFireResistant, 'components/fire_resistant', get, set, onChanged),
+        _textField(l.nbt_itemEnchantments, 'components/enchantments', get, set, onChanged),
+        _textField(l.nbt_itemDamage, 'components/damage', get, set, onChanged),
       ]);
+  }
 }
 
 class _EntitySimpleForm extends StatelessWidget {
@@ -807,15 +828,18 @@ class _EntitySimpleForm extends StatelessWidget {
   const _EntitySimpleForm({required this.get, required this.set, required this.onChanged});
 
   @override
-  Widget build(BuildContext context) => _SimpleForm(fields: [
-        _textField('自定义名称 CustomName', 'CustomName', get, set, onChanged),
-        _textField('生命值 Health', 'Health', get, set, onChanged),
-        _boolField('静音 Silent', 'Silent', get, set, onChanged),
-        _boolField('发光 Glowing', 'Glowing', get, set, onChanged),
-        _boolField('无重力 NoGravity', 'NoGravity', get, set, onChanged),
-        _boolField('无敌 Invulnerable', 'Invulnerable', get, set, onChanged),
-        _textField('已捕获 Poicounted', 'Poicounted', get, set, onChanged),
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return _SimpleForm(fields: [
+        _textField(l.nbt_entityCustomName, 'CustomName', get, set, onChanged),
+        _textField(l.nbt_entityHealth, 'Health', get, set, onChanged),
+        _boolField(l.nbt_entitySilent, 'Silent', get, set, onChanged),
+        _boolField(l.nbt_entityGlowing, 'Glowing', get, set, onChanged),
+        _boolField(l.nbt_entityNoGravity, 'NoGravity', get, set, onChanged),
+        _boolField(l.nbt_entityInvulnerable, 'Invulnerable', get, set, onChanged),
+        _textField(l.nbt_entityPoiCounted, 'Poicounted', get, set, onChanged),
       ]);
+  }
 }
 
 class _VillagerSimpleForm extends StatelessWidget {
@@ -825,12 +849,15 @@ class _VillagerSimpleForm extends StatelessWidget {
   const _VillagerSimpleForm({required this.get, required this.set, required this.onChanged});
 
   @override
-  Widget build(BuildContext context) => _SimpleForm(fields: [
-        _textField('职业 profession', 'profession', get, set, onChanged),
-        _textField('等级 level（经验）', 'level', get, set, onChanged),
-        _textField('村民类型 type', 'type', get, set, onChanged),
-        _textField('交易数量 Offers（JSON）', 'Offers', get, set, onChanged),
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return _SimpleForm(fields: [
+        _textField(l.nbt_villagerProfession, 'profession', get, set, onChanged),
+        _textField(l.nbt_villagerLevel, 'level', get, set, onChanged),
+        _textField(l.nbt_villagerType, 'type', get, set, onChanged),
+        _textField(l.nbt_villagerOffers, 'Offers', get, set, onChanged),
       ]);
+  }
 }
 
 // ======================== RCON 面板（阶段 3 占位） ========================
@@ -839,13 +866,11 @@ class _RconPanel extends StatelessWidget {
   const _RconPanel();
 
   @override
-  Widget build(BuildContext context) => const Center(
+  Widget build(BuildContext context) => Center(
         child: Padding(
-          padding: EdgeInsets.all(24),
+          padding: const EdgeInsets.all(24),
           child: Text(
-            '连服务器（RCON）面板将在阶段 3 接入：\n'
-            '在此输入 host/port/password 连接开启了 RCON 的服务器，\n'
-            '并把当前编辑的 NBT 经 /give、/data merge 等命令下发。',
+            AppLocalizations.of(context).nbt_rconPlaceholder,
             textAlign: TextAlign.center,
           ),
         ),

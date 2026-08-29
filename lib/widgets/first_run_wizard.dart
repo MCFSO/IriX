@@ -12,6 +12,7 @@ import 'dart:isolate';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../services/jdk_installer.dart';
 import '../services/nat_detector.dart';
 import '../state/app_state.dart';
@@ -41,10 +42,10 @@ enum _JdkStatus { pending, installing, installed, failed }
 
 class _FirstRunWizardOverlayState extends State<FirstRunWizardOverlay> {
   static const _jdkSteps = [
-    (version: '8', title: 'JDK 8', note: 'Minecraft 1.16.5 及更早版本'),
-    (version: '17', title: 'JDK 17', note: 'Minecraft 1.18+ 官方推荐'),
-    (version: '21', title: 'JDK 21', note: 'Minecraft 1.20.5+ 推荐'),
-    (version: '25', title: 'JDK 25', note: '最新 LTS（新版本服务端）'),
+    (version: '8', title: 'JDK 8'),
+    (version: '17', title: 'JDK 17'),
+    (version: '21', title: 'JDK 21'),
+    (version: '25', title: 'JDK 25'),
   ];
 
   int _step = 0;
@@ -125,9 +126,10 @@ class _FirstRunWizardOverlayState extends State<FirstRunWizardOverlay> {
     if (!mounted) return;
     final created = context.read<AppState>().instances.isNotEmpty;
     if (!created) {
+      final l = AppLocalizations.of(context);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('还没有创建实例，请先完成实例创建')));
+      ).showSnackBar(SnackBar(content: Text(l.wizard_noInstanceCreated)));
       return;
     }
     await _startNatDetection();
@@ -156,6 +158,7 @@ class _FirstRunWizardOverlayState extends State<FirstRunWizardOverlay> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Stack(
       children: [
         // 变暗 30% + 阻断点击
@@ -176,7 +179,7 @@ class _FirstRunWizardOverlayState extends State<FirstRunWizardOverlay> {
             child: TextButton.icon(
               onPressed: widget.onSkip,
               icon: const Icon(Icons.skip_next, size: 18),
-              label: const Text('跳过'),
+              label: Text(l.common_skip),
             ),
           ),
         ),
@@ -186,6 +189,7 @@ class _FirstRunWizardOverlayState extends State<FirstRunWizardOverlay> {
 
   Widget _buildCard(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     // 小窗口适配：按可用空间限制卡片尺寸，内容可滚动，避免纵向溢出
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -205,9 +209,9 @@ class _FirstRunWizardOverlayState extends State<FirstRunWizardOverlay> {
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: switch (_phase) {
-                  'natDetecting' => const _Centered(
+                  'natDetecting' => _Centered(
                     icon: Icons.network_check,
-                    title: '正在检测 NAT 类型...',
+                    title: l.wizard_detectingNat,
                     child: Padding(
                       padding: EdgeInsets.only(top: 16),
                       child: CircularProgressIndicator(),
@@ -226,6 +230,7 @@ class _FirstRunWizardOverlayState extends State<FirstRunWizardOverlay> {
 
   /// 引导主界面：左侧步骤列表 + 右侧步骤内容。
   Widget _buildWizard(ThemeData theme) {
+    final l = AppLocalizations.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -237,10 +242,10 @@ class _FirstRunWizardOverlayState extends State<FirstRunWizardOverlay> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('首次配置引导', style: theme.textTheme.titleMedium),
+                Text(l.wizard_title, style: theme.textTheme.titleMedium),
                 const SizedBox(height: 4),
                 Text(
-                  '共 ${_jdkSteps.length + 1} 步，按顺序完成',
+                  l.wizard_totalSteps(_jdkSteps.length + 1),
                   style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                 ),
                 const SizedBox(height: 16),
@@ -248,8 +253,8 @@ class _FirstRunWizardOverlayState extends State<FirstRunWizardOverlay> {
                   _StepRow(
                     index: i,
                     title: i < _jdkSteps.length
-                        ? '安装 ${_jdkSteps[i].title}'
-                        : '创建第一个实例',
+                        ? l.wizard_installJdk(_jdkSteps[i].title)
+                        : l.wizard_createFirstInstance,
                     state: i < _jdkSteps.length
                         ? switch (_statuses[_jdkSteps[i].version]) {
                             _JdkStatus.installed => _StepState.done,
@@ -288,21 +293,29 @@ class _FirstRunWizardOverlayState extends State<FirstRunWizardOverlay> {
   /// JDK 步骤内容。
   Widget _buildJdkStep(
     ThemeData theme,
-    ({String version, String title, String note}) step,
+    ({String version, String title}) step,
   ) {
+    final l = AppLocalizations.of(context);
     final status = _statuses[step.version] ?? _JdkStatus.pending;
     final progress = _progress[step.version] ?? 0.0;
     final error = _errors[step.version];
+    final note = switch (step.version) {
+      '8' => l.wizard_jdk8Note,
+      '17' => l.wizard_jdk17Note,
+      '21' => l.wizard_jdk21Note,
+      '25' => l.wizard_jdk25Note,
+      _ => '',
+    };
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '第 ${_step + 1} 步 · 安装 ${step.title}',
+          l.wizard_stepInstallJdk(_step + 1, step.title),
           style: theme.textTheme.titleLarge,
         ),
         const SizedBox(height: 8),
         Text(
-          step.note,
+          note,
           style: TextStyle(fontSize: 13, color: theme.colorScheme.outline),
         ),
         const SizedBox(height: 20),
@@ -310,20 +323,23 @@ class _FirstRunWizardOverlayState extends State<FirstRunWizardOverlay> {
           _JdkStatus.pending => FilledButton.icon(
             onPressed: () => _installJdk(step.version),
             icon: const Icon(Icons.download),
-            label: Text('开始安装 ${step.title}'),
+            label: Text(l.wizard_startInstall(step.title)),
           ),
           _JdkStatus.installing => Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '正在下载 ${step.title} ... ${(progress * 100).toStringAsFixed(0)}%',
+                l.wizard_downloading(
+                  step.title,
+                  (progress * 100).toStringAsFixed(0),
+                ),
                 style: const TextStyle(fontSize: 13),
               ),
               const SizedBox(height: 8),
               LinearProgressIndicator(value: progress > 0 ? progress : null),
               const SizedBox(height: 8),
               Text(
-                '来自 Adoptium（Eclipse Temurin），下载约 200MB',
+                l.wizard_adoptiumSource,
                 style: TextStyle(fontSize: 11, color: Colors.grey[500]),
               ),
             ],
@@ -336,7 +352,7 @@ class _FirstRunWizardOverlayState extends State<FirstRunWizardOverlay> {
                   const Icon(Icons.check_circle, color: Colors.green),
                   const SizedBox(width: 8),
                   Text(
-                    '${step.title} 已安装',
+                    l.wizard_jdkInstalled(step.title),
                     style: const TextStyle(fontSize: 13),
                   ),
                 ],
@@ -344,7 +360,7 @@ class _FirstRunWizardOverlayState extends State<FirstRunWizardOverlay> {
               const SizedBox(height: 12),
               FilledButton.tonal(
                 onPressed: () => setState(() => _step = _step + 1),
-                child: const Text('下一步'),
+                child: Text(l.addNode_nextStep),
               ),
             ],
           ),
@@ -352,7 +368,7 @@ class _FirstRunWizardOverlayState extends State<FirstRunWizardOverlay> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '安装失败：${error ?? '未知错误'}',
+                l.wizard_installFailed(error ?? l.wizard_unknownError),
                 style: TextStyle(fontSize: 13, color: theme.colorScheme.error),
               ),
               const SizedBox(height: 12),
@@ -361,12 +377,12 @@ class _FirstRunWizardOverlayState extends State<FirstRunWizardOverlay> {
                   FilledButton.icon(
                     onPressed: () => _installJdk(step.version),
                     icon: const Icon(Icons.refresh),
-                    label: const Text('重试'),
+                    label: Text(l.common_retry),
                   ),
                   const SizedBox(width: 8),
                   TextButton(
                     onPressed: () => setState(() => _step = _step + 1),
-                    child: const Text('跳过此步'),
+                    child: Text(l.wizard_skipThisStep),
                   ),
                 ],
               ),
@@ -375,7 +391,7 @@ class _FirstRunWizardOverlayState extends State<FirstRunWizardOverlay> {
         },
         const SizedBox(height: 12),
         Text(
-          '提示：可随时点击左上角「跳过」退出引导。',
+          l.wizard_skipHint,
           style: TextStyle(fontSize: 11, color: Colors.grey[500]),
         ),
       ],
@@ -384,21 +400,21 @@ class _FirstRunWizardOverlayState extends State<FirstRunWizardOverlay> {
 
   /// 创建实例步骤内容。
   Widget _buildInstanceStep(ThemeData theme) {
+    final l = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('第 5 步 · 创建第一个实例', style: theme.textTheme.titleLarge),
+        Text(l.wizard_stepCreateInstance, style: theme.textTheme.titleLarge),
         const SizedBox(height: 8),
         Text(
-          '下载或导入服务端核心，创建你的第一个 Minecraft 服务器实例。\n'
-          '完成后将自动检测网络环境（NAT 类型）并给出内网穿透建议。',
+          l.wizard_createInstanceDesc,
           style: TextStyle(fontSize: 13, color: theme.colorScheme.outline),
         ),
         const SizedBox(height: 20),
         FilledButton.icon(
           onPressed: _createInstance,
           icon: const Icon(Icons.add_box),
-          label: const Text('创建第一个实例'),
+          label: Text(l.wizard_createFirstInstance),
         ),
       ],
     );
@@ -406,6 +422,7 @@ class _FirstRunWizardOverlayState extends State<FirstRunWizardOverlay> {
 
   /// NAT 检测结果 + FRP 询问。
   Widget _buildNatResult(ThemeData theme) {
+    final l = AppLocalizations.of(context);
     final result = _natResult!;
     final color = result.type == NatType.openInternet
         ? Colors.green
@@ -414,16 +431,16 @@ class _FirstRunWizardOverlayState extends State<FirstRunWizardOverlay> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('引导完成！', style: theme.textTheme.titleLarge),
+        Text(l.wizard_done, style: theme.textTheme.titleLarge),
         const SizedBox(height: 12),
         Row(
           children: [
             Icon(Icons.network_check, color: color),
             const SizedBox(width: 8),
             Text(
-              'NAT 类型：${result.type.label}'
-              '${result.mappedAddress != null ? '（${result.mappedAddress}）' : ''}'
-              '${result.uncertain ? '（结果不确定）' : ''}',
+              '${l.wizard_natType(result.type.label)}'
+              '${result.mappedAddress != null ? l.wizard_natMapped(result.mappedAddress!) : ''}'
+              '${result.uncertain ? l.wizard_natUncertain : ''}',
               style: TextStyle(fontSize: 14, color: color),
             ),
           ],
@@ -431,8 +448,8 @@ class _FirstRunWizardOverlayState extends State<FirstRunWizardOverlay> {
         const SizedBox(height: 12),
         Text(
           result.needsFrp
-              ? '你的网络处于 NAT 之后，好友可能无法直接连接服务器。\n是否需要配置 FRP 内网穿透，让外网玩家可以加入？'
-              : '你的网络为公网直连，玩家可直接通过你的公网 IP 连接，无需内网穿透。',
+              ? l.wizard_frpNeeded
+              : l.wizard_frpNotNeeded,
           style: const TextStyle(fontSize: 13),
         ),
         const SizedBox(height: 20),
@@ -442,12 +459,12 @@ class _FirstRunWizardOverlayState extends State<FirstRunWizardOverlay> {
               FilledButton.icon(
                 onPressed: () => widget.onFinish(true),
                 icon: const Icon(Icons.swap_horiz),
-                label: const Text('需要，去配置 FRP'),
+                label: Text(l.wizard_configureFrp),
               ),
             const SizedBox(width: 8),
             FilledButton.tonal(
               onPressed: () => widget.onFinish(false),
-              child: const Text('暂不需要'),
+              child: Text(l.wizard_notNow),
             ),
           ],
         ),
@@ -473,6 +490,7 @@ class _StepRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     final (color, icon) = switch (state) {
       _StepState.done => (Colors.green, Icons.check_circle),
       _StepState.active => (
@@ -490,7 +508,7 @@ class _StepRow extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              '${index + 1}. $title',
+              l.wizard_stepNumber(index + 1, title),
               style: TextStyle(
                 fontSize: 13,
                 color: state == _StepState.pending ? Colors.grey : null,

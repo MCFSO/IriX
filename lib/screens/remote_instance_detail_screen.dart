@@ -9,6 +9,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/node.dart';
 import '../models/remote.dart';
 import '../services/container/node_container_backend.dart';
@@ -306,19 +307,20 @@ class _RemoteInstanceDetailScreenState
   }
 
   Future<void> _delete() async {
+    final l = AppLocalizations.of(context);
     final confirmed = await showAppDialog<bool>(
       context,
       (_) => AlertDialog(
-        title: Text('删除实例「${_instance.config.nickname}」？'),
-        content: const Text('同时删除实例文件需要面板 API 权限支持。'),
+        title: Text(l.remoteInstance_deleteTitle(_instance.config.nickname)),
+        content: Text(l.remoteInstance_deleteContent),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('取消'),
+            child: Text(l.common_cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('删除'),
+            child: Text(l.common_delete),
           ),
         ],
       ),
@@ -344,17 +346,18 @@ class _RemoteInstanceDetailScreenState
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
         title: Text(
           _instance.config.nickname.isEmpty
-              ? '实例详情'
+              ? l.instanceDetail_title
               : _instance.config.nickname,
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.delete_outline),
-            tooltip: '删除实例',
+            tooltip: l.instanceDetail_deleteInstance,
             onPressed: _busy ? null : _delete,
           ),
           const SizedBox(width: 4),
@@ -381,13 +384,13 @@ class _RemoteInstanceDetailScreenState
                   TabBar(
                     isScrollable: true,
                     tabAlignment: TabAlignment.start,
-                    tabs: const [
-                      Tab(icon: Icon(Icons.terminal), text: '控制台'),
-                      Tab(icon: Icon(Icons.settings_outlined), text: '配置'),
-                      Tab(icon: Icon(Icons.folder), text: '文件'),
-                      Tab(icon: Icon(Icons.extension), text: '插件/Mod'),
-                      Tab(icon: Icon(Icons.backup), text: '备份'),
-                      Tab(icon: Icon(Icons.inventory_2), text: '容器'),
+                    tabs: [
+                      Tab(icon: const Icon(Icons.terminal), text: l.remoteInstance_tabConsole),
+                      Tab(icon: const Icon(Icons.settings_outlined), text: l.instanceDetail_tabConfig),
+                      Tab(icon: const Icon(Icons.folder), text: l.instanceDetail_tabFiles),
+                      Tab(icon: const Icon(Icons.extension), text: l.instanceDetail_tabPlugins),
+                      Tab(icon: const Icon(Icons.backup), text: l.instanceDetail_tabBackup),
+                      Tab(icon: const Icon(Icons.inventory_2), text: l.container_tabContainers),
                     ],
                   ),
                   Expanded(
@@ -449,6 +452,7 @@ class _RemoteInstanceDetailScreenState
 
   /// 头部：状态 + 控制按钮。
   Widget _buildHeader(ThemeData theme) {
+    final l = AppLocalizations.of(context);
     final status = _instance.status;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -470,7 +474,7 @@ class _RemoteInstanceDetailScreenState
               Expanded(
                 child: Text(
                   _instance.config.cwd.isEmpty
-                      ? '工作目录未知'
+                      ? l.nodeDetail_cwdUnknown
                       : _instance.config.cwd,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodySmall?.copyWith(
@@ -486,28 +490,28 @@ class _RemoteInstanceDetailScreenState
             children: [
               _HeaderButton(
                 icon: Icons.play_arrow,
-                label: '启动',
+                label: l.instanceDetail_start,
                 color: Colors.green,
                 enabled: status == RemoteStatus.stopped && !_busy,
                 onPressed: () => _action(RemoteAction.start),
               ),
               _HeaderButton(
                 icon: Icons.stop,
-                label: '停止',
+                label: l.instanceDetail_stop,
                 color: Colors.orange,
                 enabled: status.isActive && !_busy,
                 onPressed: () => _action(RemoteAction.stop),
               ),
               _HeaderButton(
                 icon: Icons.restart_alt,
-                label: '重启',
+                label: l.instanceDetail_restart,
                 color: Colors.blue,
                 enabled: status.isActive && !_busy,
                 onPressed: () => _action(RemoteAction.restart),
               ),
               _HeaderButton(
                 icon: Icons.power_settings_new,
-                label: '强制终止',
+                label: l.instanceDetail_forceStop,
                 color: Colors.red,
                 enabled: status.isActive && !_busy,
                 onPressed: () => _action(RemoteAction.kill),
@@ -521,6 +525,7 @@ class _RemoteInstanceDetailScreenState
 
   /// 控制台。
   Widget _buildConsole(ThemeData theme) {
+    final l = AppLocalizations.of(context);
     return Column(
       children: [
         Expanded(
@@ -536,7 +541,7 @@ class _RemoteInstanceDetailScreenState
               child: SelectableText.rich(
                 TextSpan(
                   children: _log.isEmpty
-                      ? const [TextSpan(text: '（暂无日志输出）')]
+                      ? [TextSpan(text: l.remoteInstance_noLogOutput)]
                       : ansiSpans(
                           _log,
                           TextStyle(
@@ -563,7 +568,7 @@ class _RemoteInstanceDetailScreenState
                 child: TextField(
                   controller: _commandController,
                   decoration: InputDecoration(
-                    hintText: '输入命令（如 say hello），回车发送',
+                    hintText: l.remoteInstance_commandInputHint,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -575,12 +580,12 @@ class _RemoteInstanceDetailScreenState
               const SizedBox(width: 8),
               IconButton.filled(
                 icon: const Icon(Icons.send),
-                tooltip: '发送命令',
+                tooltip: l.remoteInstance_sendCommand,
                 onPressed: _sendCommand,
               ),
               IconButton(
                 icon: const Icon(Icons.refresh),
-                tooltip: '刷新日志',
+                tooltip: l.jailDetail_refreshLog,
                 onPressed: _fetchLog,
               ),
             ],
@@ -592,39 +597,40 @@ class _RemoteInstanceDetailScreenState
 
   /// 配置信息。
   Widget _buildConfig(ThemeData theme) {
+    final l = AppLocalizations.of(context);
     final cfg = _instance.config;
     final rows = <(String, String)>[
-      ('实例 ID', _instance.uuid),
-      ('名称', cfg.nickname),
-      ('启动命令', cfg.startCommand.isEmpty ? '—' : cfg.startCommand),
-      ('停止命令', cfg.stopCommand.isEmpty ? '—' : cfg.stopCommand),
-      ('工作目录', cfg.cwd.isEmpty ? '—' : cfg.cwd),
-      ('类型', cfg.type),
-      ('进程类型', cfg.processType),
-      ('文件编码', cfg.fileCode),
-      ('输入编码', cfg.ie),
-      ('输出编码', cfg.oe),
-      ('自动启动', cfg.autoStart ? '是' : '否'),
-      ('自动重启', cfg.autoRestart ? '是' : '否'),
-      ('启动次数', '${_instance.started}'),
-      ('进程 PID', _instance.pid > 0 ? '${_instance.pid}' : '—'),
+      (l.remoteInstance_fInstanceId, _instance.uuid),
+      (l.remoteInstance_fName, cfg.nickname),
+      (l.remoteInstance_fStartCommand, cfg.startCommand.isEmpty ? '—' : cfg.startCommand),
+      (l.remoteInstance_fStopCommand, cfg.stopCommand.isEmpty ? '—' : cfg.stopCommand),
+      (l.remoteInstance_fWorkdir, cfg.cwd.isEmpty ? '—' : cfg.cwd),
+      (l.remoteInstance_fType, cfg.type),
+      (l.remoteInstance_fProcessType, cfg.processType),
+      (l.remoteInstance_fFileEncoding, cfg.fileCode),
+      (l.remoteInstance_fInputEncoding, cfg.ie),
+      (l.remoteInstance_fOutputEncoding, cfg.oe),
+      (l.remoteInstance_fAutoStart, cfg.autoStart ? l.common_enabled : l.common_disabled),
+      (l.remoteInstance_fAutoRestart, cfg.autoRestart ? l.common_enabled : l.common_disabled),
+      (l.remoteInstance_fStartCount, '${_instance.started}'),
+      (l.remoteInstance_fPid, _instance.pid > 0 ? '${_instance.pid}' : '—'),
     ];
     if (cfg.processType == 'docker') {
       rows.addAll([
         (
-          '容器名称',
+          l.remoteInstance_fContainerName,
           cfg.docker.containerName.isEmpty ? '—' : cfg.docker.containerName,
         ),
-        ('镜像', cfg.docker.image.isEmpty ? '—' : cfg.docker.image),
-        ('内存限制', '${cfg.docker.memory} MB'),
-        ('端口映射', cfg.docker.ports.isEmpty ? '—' : cfg.docker.ports.join(', ')),
+        (l.remoteInstance_fImage, cfg.docker.image.isEmpty ? '—' : cfg.docker.image),
+        (l.remoteInstance_fMemoryLimit, '${cfg.docker.memory} MB'),
+        (l.remoteInstance_fPortMapping, cfg.docker.ports.isEmpty ? '—' : cfg.docker.ports.join(', ')),
         (
-          '额外挂载卷',
+          l.remoteInstance_fExtraVolumes,
           cfg.docker.extraVolumes.isEmpty
               ? '—'
               : cfg.docker.extraVolumes.join(', '),
         ),
-        ('网络模式', cfg.docker.networkMode),
+        (l.remoteInstance_fNetworkMode, cfg.docker.networkMode),
       ]);
     }
     return ListView(
@@ -634,7 +640,7 @@ class _RemoteInstanceDetailScreenState
           alignment: Alignment.centerRight,
           child: OutlinedButton.icon(
             icon: const Icon(Icons.edit_outlined, size: 18),
-            label: const Text('编辑配置'),
+            label: Text(l.remoteInstance_editConfig),
             onPressed: _busy ? null : _editConfig,
           ),
         ),
@@ -800,8 +806,9 @@ class _ConfigEditDialogState extends State<_ConfigEditDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return AlertDialog(
-      title: const Text('编辑实例配置'),
+      title: Text(l.remoteInstance_editConfigDialog),
       content: SizedBox(
         width: 440,
         child: SingleChildScrollView(
@@ -811,38 +818,38 @@ class _ConfigEditDialogState extends State<_ConfigEditDialog> {
             children: [
               TextField(
                 controller: _nickname,
-                decoration: const InputDecoration(
-                  labelText: '实例名称',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l.remoteInstance_fName,
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _startCommand,
-                decoration: const InputDecoration(
-                  labelText: '启动命令',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l.remoteInstance_fStartCommand,
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _stopCommand,
-                decoration: const InputDecoration(
-                  labelText: '停止命令',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l.remoteInstance_fStopCommand,
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _cwd,
-                decoration: const InputDecoration(
-                  labelText: '工作目录',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l.remoteInstance_fWorkdir,
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 8),
               SwitchListTile(
-                title: const Text('崩溃后自动重启'),
+                title: Text(l.remoteInstance_autoRestartToggle),
                 value: _autoRestart,
                 onChanged: (v) => setState(() => _autoRestart = v),
                 contentPadding: EdgeInsets.zero,
@@ -851,24 +858,24 @@ class _ConfigEditDialogState extends State<_ConfigEditDialog> {
                 const Divider(),
                 DropdownButtonFormField<String>(
                   initialValue: _processType,
-                  decoration: const InputDecoration(
-                    labelText: '进程类型',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: l.remoteInstance_fProcessType,
+                    border: const OutlineInputBorder(),
                   ),
-                  items: const [
+                  items: [
                     DropdownMenuItem(
                       value: 'universal',
-                      child: Text('通用（直接运行进程）'),
+                      child: Text(l.remoteInstance_processUniversal),
                     ),
                     DropdownMenuItem(
                       value: 'docker',
-                      child: Text('Docker（容器内运行）'),
+                      child: Text(l.remoteInstance_processDocker),
                     ),
                   ],
                   onChanged: (v) =>
                       setState(() => _processType = v ?? 'universal'),
                 ),
-                if (_processType == 'docker') ..._buildDockerFields(theme),
+                if (_processType == 'docker') ..._buildDockerFields(theme, l),
               ],
             ],
           ),
@@ -877,7 +884,7 @@ class _ConfigEditDialogState extends State<_ConfigEditDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
+          child: Text(l.common_cancel),
         ),
         FilledButton(
           onPressed: () {
@@ -893,21 +900,21 @@ class _ConfigEditDialogState extends State<_ConfigEditDialog> {
               ),
             );
           },
-          child: const Text('保存'),
+          child: Text(l.common_save),
         ),
       ],
     );
   }
 
   /// Docker 配置字段（进程类型为 docker 时显示）。
-  List<Widget> _buildDockerFields(ThemeData theme) {
+  List<Widget> _buildDockerFields(ThemeData theme, AppLocalizations l) {
     return [
       const SizedBox(height: 12),
       TextField(
         controller: _dockerImage,
-        decoration: const InputDecoration(
-          labelText: 'Docker 镜像（如 mcsm-ubuntu:22.04）',
-          border: OutlineInputBorder(),
+        decoration: InputDecoration(
+          labelText: l.remoteInstance_dockerImage,
+          border: const OutlineInputBorder(),
         ),
       ),
       const SizedBox(height: 12),
@@ -917,9 +924,9 @@ class _ConfigEditDialogState extends State<_ConfigEditDialog> {
             child: TextField(
               controller: _dockerMemory,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: '内存限制（MB）',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l.remoteInstance_memoryLimitMb,
+                border: const OutlineInputBorder(),
               ),
             ),
           ),
@@ -927,9 +934,9 @@ class _ConfigEditDialogState extends State<_ConfigEditDialog> {
           Expanded(
             child: DropdownButtonFormField<String>(
               initialValue: _networkMode,
-              decoration: const InputDecoration(
-                labelText: '网络模式',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l.remoteInstance_fNetworkMode,
+                border: const OutlineInputBorder(),
               ),
               items: const [
                 DropdownMenuItem(value: 'bridge', child: Text('bridge')),
@@ -944,25 +951,25 @@ class _ConfigEditDialogState extends State<_ConfigEditDialog> {
       const SizedBox(height: 12),
       TextField(
         controller: _dockerPorts,
-        decoration: const InputDecoration(
-          labelText: '端口映射（逗号分隔，如 25565:25565/tcp）',
-          border: OutlineInputBorder(),
+        decoration: InputDecoration(
+          labelText: l.remoteInstance_portsMapping,
+          border: const OutlineInputBorder(),
         ),
       ),
       const SizedBox(height: 12),
       TextField(
         controller: _dockerVolumes,
-        decoration: const InputDecoration(
-          labelText: '额外挂载卷（逗号分隔，如 /data:/data）',
-          border: OutlineInputBorder(),
+        decoration: InputDecoration(
+          labelText: l.remoteInstance_extraVolumes,
+          border: const OutlineInputBorder(),
         ),
       ),
       const SizedBox(height: 12),
       TextField(
         controller: _dockerContainerName,
-        decoration: const InputDecoration(
-          labelText: '容器名称（可留空自动生成）',
-          border: OutlineInputBorder(),
+        decoration: InputDecoration(
+          labelText: l.remoteInstance_containerNameAuto,
+          border: const OutlineInputBorder(),
         ),
       ),
     ];

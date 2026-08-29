@@ -4,18 +4,27 @@
 
 import 'dart:convert';
 
+import '../services/locale_settings.dart';
+
 /// 实例的运行方式。
 ///
 /// - [native]：原生进程（java 直接运行，默认）。
 /// - [docker]：运行在 Docker 容器中，启停 / 控制台走容器运行时。
 enum RunMode {
-  native('原生进程'),
-  docker('Docker 容器');
+  native('原生进程', 'Native process'),
+  docker('Docker 容器', 'Docker container');
 
-  const RunMode(this.label);
+  const RunMode(this.labelZh, this.labelEn);
 
   /// 中文展示标签。
-  final String label;
+  final String labelZh;
+
+  /// 英文展示标签。
+  final String labelEn;
+
+  /// 展示标签（随语言设置切换）。
+  String get label =>
+      LocaleSettings.instance.localeCode == 'en' ? labelEn : labelZh;
 
   /// 从数据库 / JSON 字符串反序列化，未知值回退为 [native]。
   static RunMode fromString(String? value) {
@@ -154,17 +163,24 @@ class ContainerConfig {
 
   /// 校验配置合法性，返回错误消息；合法时返回 null。
   String? validate() {
-    if (image.trim().isEmpty) return '镜像不能为空';
+    final en = LocaleSettings.instance.localeCode == 'en';
+    if (image.trim().isEmpty) {
+      return en ? 'Image cannot be empty' : '镜像不能为空';
+    }
     for (final port in ports) {
       if (!RegExp(
         r'^(\d+(-\d+)?)(:(\d+(-\d+)?))?(/(tcp|udp))?$',
       ).hasMatch(port)) {
-        return '端口映射格式错误：$port（应为 宿主机:容器端口）';
+        return en
+            ? 'Invalid port mapping: $port (expected host:container)'
+            : '端口映射格式错误：$port（应为 宿主机:容器端口）';
       }
     }
     for (final volume in volumes) {
       if (!volume.contains(':')) {
-        return '卷挂载格式错误：$volume（应为 宿主机路径:容器路径）';
+        return en
+            ? 'Invalid volume mount: $volume (expected hostPath:containerPath)'
+            : '卷挂载格式错误：$volume（应为 宿主机路径:容器路径）';
       }
     }
     return null;
@@ -191,16 +207,19 @@ enum InstanceStatus {
   /// 已关闭：服务器当前未运行。
   stopped;
 
-  /// 状态的中文展示标签。
+  /// 状态的展示标签（随语言设置切换）。
   ///
   /// [starting] 显示"启动中"，[running] 显示"运行中"，
   /// 便于用户区分服务器是正在启动还是已成功运行。
-  String get label => switch (this) {
-    InstanceStatus.starting => '启动中',
-    InstanceStatus.running => '运行中',
-    InstanceStatus.restarting => '重启中',
-    InstanceStatus.stopped => '已关闭',
-  };
+  String get label {
+    final en = LocaleSettings.instance.localeCode == 'en';
+    return switch (this) {
+      InstanceStatus.starting => en ? 'Starting' : '启动中',
+      InstanceStatus.running => en ? 'Running' : '运行中',
+      InstanceStatus.restarting => en ? 'Restarting' : '重启中',
+      InstanceStatus.stopped => en ? 'Stopped' : '已关闭',
+    };
+  }
 
   /// 服务器是否处于活跃（启动中或运行中）状态。
   ///

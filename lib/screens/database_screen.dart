@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../l10n/app_localizations.dart';
 import '../services/remote_db_service.dart';
 import '../utils/apple_widgets.dart';
 import 'database_detail_screen.dart';
@@ -92,24 +93,26 @@ class _DatabaseScreenState extends State<DatabaseScreen> {
       (_) => _ConnectionDialog(existing: existing),
     );
     if (saved == true && mounted) {
+      final l = AppLocalizations.of(context);
       _load();
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('已保存')));
+      ).showSnackBar(SnackBar(content: Text(l.dbScreen_saved)));
     }
   }
 
   /// 删除连接（带确认对话框）。
   Future<void> _delete(DbConnectionInfo connection) async {
+    final l = AppLocalizations.of(context);
     final confirmed = await showAppDialog<bool>(
       context,
       (_) => AlertDialog(
-        title: const Text('删除连接'),
-        content: Text('确定删除 "${connection.name}"？此操作不会影响远程服务器。'),
+        title: Text(l.dbScreen_deleteTitle),
+        content: Text(l.dbScreen_deleteConfirm(connection.name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('取消'),
+            child: Text(l.common_cancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -117,7 +120,7 @@ class _DatabaseScreenState extends State<DatabaseScreen> {
               foregroundColor: Theme.of(context).colorScheme.onError,
             ),
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('删除'),
+            child: Text(l.common_delete),
           ),
         ],
       ),
@@ -129,7 +132,7 @@ class _DatabaseScreenState extends State<DatabaseScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('已删除')));
+      ).showSnackBar(SnackBar(content: Text(l.dbScreen_deleted)));
     } catch (e) {
       if (!mounted) return;
       _showErrorDialog(e.toString());
@@ -138,10 +141,11 @@ class _DatabaseScreenState extends State<DatabaseScreen> {
 
   /// 显示连接失败对话框。
   void _showErrorDialog(String message) {
+    final l = AppLocalizations.of(context);
     showAppDialog<void>(
       context,
       (_) => AlertDialog(
-        title: const Text('连接失败'),
+        title: Text(l.dbScreen_connectionFailed),
         content: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -156,7 +160,7 @@ class _DatabaseScreenState extends State<DatabaseScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('确定'),
+            child: Text(l.common_ok),
           ),
         ],
       ),
@@ -166,6 +170,7 @@ class _DatabaseScreenState extends State<DatabaseScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return Scaffold(
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -177,7 +182,7 @@ class _DatabaseScreenState extends State<DatabaseScreen> {
               children: [
                 Expanded(
                   child: Text(
-                    '数据库',
+                    l.dbScreen_title,
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -185,12 +190,12 @@ class _DatabaseScreenState extends State<DatabaseScreen> {
                 ),
                 AppleButton(
                   onPressed: () => _openEditor(),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.add, size: 18),
-                      SizedBox(width: 4),
-                      Text('添加连接'),
+                      const Icon(Icons.add, size: 18),
+                      const SizedBox(width: 4),
+                      Text(l.dbScreen_addConnection),
                     ],
                   ),
                 ),
@@ -201,7 +206,7 @@ class _DatabaseScreenState extends State<DatabaseScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
             child: Text(
-              '管理 MySQL / MariaDB / PostgreSQL / Redis 服务器连接',
+              l.dbScreen_manageHint,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -215,6 +220,7 @@ class _DatabaseScreenState extends State<DatabaseScreen> {
 
   Widget _buildBody() {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -227,7 +233,7 @@ class _DatabaseScreenState extends State<DatabaseScreen> {
             const SizedBox(height: 8),
             Text(_error!, textAlign: TextAlign.center),
             const SizedBox(height: 16),
-            FilledButton(onPressed: _load, child: const Text('重试')),
+            FilledButton(onPressed: _load, child: Text(l.common_retry)),
           ],
         ),
       );
@@ -243,10 +249,10 @@ class _DatabaseScreenState extends State<DatabaseScreen> {
               color: theme.colorScheme.outline,
             ),
             const SizedBox(height: 8),
-            Text('还没有数据库连接', style: theme.textTheme.titleMedium),
+            Text(l.dbScreen_emptyTitle, style: theme.textTheme.titleMedium),
             const SizedBox(height: 4),
             Text(
-              '点击右上角添加',
+              l.dbScreen_emptyAddHint,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -305,6 +311,7 @@ class _ConnectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     final username = connection.username;
     final database = connection.databaseName;
     final subInfo = [
@@ -392,13 +399,13 @@ class _ConnectionCard extends StatelessWidget {
                       IconButton(
                         icon: const Icon(Icons.edit_outlined),
                         visualDensity: VisualDensity.compact,
-                        tooltip: '编辑',
+                        tooltip: l.common_edit,
                         onPressed: onEdit,
                       ),
                       IconButton(
                         icon: const Icon(Icons.delete_outline),
                         visualDensity: VisualDensity.compact,
-                        tooltip: '删除',
+                        tooltip: l.common_delete,
                         onPressed: onDelete,
                       ),
                     ],
@@ -420,12 +427,12 @@ class _ConnectionCard extends StatelessWidget {
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Row(
+                      : Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(Icons.link, size: 16),
-                            SizedBox(width: 4),
-                            Text('连接'),
+                            const SizedBox(width: 4),
+                            Text(l.dbScreen_connect),
                           ],
                         ),
                 ),
@@ -534,15 +541,16 @@ class _ConnectionDialogState extends State<_ConnectionDialog> {
   }
 
   Future<void> _save() async {
+    final l = AppLocalizations.of(context);
     final name = _nameController.text.trim();
     final host = _hostController.text.trim();
     final port = int.tryParse(_portController.text.trim());
 
     setState(() {
-      _nameError = name.isEmpty ? '请输入名称' : null;
-      _hostError = host.isEmpty ? '请输入主机地址' : null;
+      _nameError = name.isEmpty ? l.dbScreen_nameRequired : null;
+      _hostError = host.isEmpty ? l.dbScreen_hostRequired : null;
       _portError = (port == null || port < 1 || port > 65535)
-          ? '端口需在 1-65535 之间'
+          ? l.dbScreen_portRange
           : null;
     });
     if (_nameError != null || _hostError != null || _portError != null) return;
@@ -570,8 +578,9 @@ class _ConnectionDialogState extends State<_ConnectionDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return AlertDialog(
-      title: Text(_isEdit ? '编辑连接' : '添加连接'),
+      title: Text(_isEdit ? l.dbScreen_editTitle : l.dbScreen_addConnection),
       content: SizedBox(
         width: 440,
         child: SingleChildScrollView(
@@ -582,7 +591,7 @@ class _ConnectionDialogState extends State<_ConnectionDialog> {
               TextField(
                 controller: _nameController,
                 decoration: InputDecoration(
-                  labelText: '名称',
+                  labelText: l.common_name,
                   errorText: _nameError,
                 ),
               ),
@@ -590,7 +599,7 @@ class _ConnectionDialogState extends State<_ConnectionDialog> {
               DropdownButtonFormField<DbType>(
                 key: ValueKey(_type),
                 initialValue: _type,
-                decoration: const InputDecoration(labelText: '类型'),
+                decoration: InputDecoration(labelText: l.dbDetail_type),
                 items: [
                   for (final type in DbType.values)
                     DropdownMenuItem(value: type, child: Text(type.label)),
@@ -601,8 +610,8 @@ class _ConnectionDialogState extends State<_ConnectionDialog> {
               TextField(
                 controller: _hostController,
                 decoration: InputDecoration(
-                  labelText: '主机',
-                  hintText: '例如 127.0.0.1',
+                  labelText: l.dbScreen_host,
+                  hintText: l.dbScreen_hostHint,
                   errorText: _hostError,
                 ),
               ),
@@ -612,33 +621,37 @@ class _ConnectionDialogState extends State<_ConnectionDialog> {
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: InputDecoration(
-                  labelText: '端口',
+                  labelText: l.dbScreen_port,
                   errorText: _portError,
                 ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _usernameController,
-                decoration: const InputDecoration(labelText: '用户名（可选）'),
+                decoration: InputDecoration(
+                  labelText: l.dbScreen_usernameOptional,
+                ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _passwordController,
                 obscureText: true,
-                decoration: const InputDecoration(labelText: '密码（可选）'),
+                decoration: InputDecoration(
+                  labelText: l.dbScreen_passwordOptional,
+                ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _databaseController,
-                decoration: const InputDecoration(labelText: '数据库名（可选）'),
+                decoration: InputDecoration(
+                  labelText: l.dbScreen_databaseNameOptional,
+                ),
               ),
               const SizedBox(height: 4),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('使用 SSL 连接'),
-                subtitle: const Text(
-                  '加密传输（MySQL/MariaDB/PostgreSQL/Redis，验证服务器证书）',
-                ),
+                title: Text(l.dbScreen_useSsl),
+                subtitle: Text(l.dbScreen_sslSubtitle),
                 value: _useSsl,
                 onChanged: (v) => setState(() => _useSsl = v),
               ),
@@ -649,9 +662,9 @@ class _ConnectionDialogState extends State<_ConnectionDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('取消'),
+          child: Text(l.common_cancel),
         ),
-        FilledButton(onPressed: _save, child: const Text('保存')),
+        FilledButton(onPressed: _save, child: Text(l.common_save)),
       ],
     );
   }

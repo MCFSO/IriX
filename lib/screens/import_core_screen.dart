@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../state/app_state.dart';
 
 /// 导入核心界面。
@@ -76,13 +77,14 @@ class _ImportCoreScreenState extends State<ImportCoreScreen> {
   /// 三个字段均不能为空（去除首尾空白后），否则通过 SnackBar 提示。
   /// 创建成功后通过 [Navigator.pop] 返回上一屏。
   Future<void> _onCreate() async {
+    final l = AppLocalizations.of(context);
     final coreFilePath = _coreFilePathController.text.trim();
     final rootPath = _rootPathController.text.trim();
     final startCommand = _startCommandController.text.trim();
     if (coreFilePath.isEmpty || rootPath.isEmpty || startCommand.isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('请填写核心文件、服务器根目录路径与启动命令')));
+      ).showSnackBar(SnackBar(content: Text(l.importCore_fillAllFields)));
       return;
     }
 
@@ -106,8 +108,9 @@ class _ImportCoreScreenState extends State<ImportCoreScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('导入核心')),
+      appBar: AppBar(title: Text(l.importCore_title)),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: ListView(
@@ -119,10 +122,10 @@ class _ImportCoreScreenState extends State<ImportCoreScreen> {
                 Expanded(
                   child: TextField(
                     controller: _coreFilePathController,
-                    decoration: const InputDecoration(
-                      labelText: '核心文件',
-                      hintText: '选择 .jar 核心文件',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: l.importCore_coreFile,
+                      hintText: l.importCore_coreFileHint,
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                 ),
@@ -132,7 +135,7 @@ class _ImportCoreScreenState extends State<ImportCoreScreen> {
                   child: FilledButton.tonalIcon(
                     onPressed: _pickCoreFile,
                     icon: const Icon(Icons.file_open),
-                    label: const Text('浏览'),
+                    label: Text(l.importCore_browse),
                   ),
                 ),
               ],
@@ -145,10 +148,10 @@ class _ImportCoreScreenState extends State<ImportCoreScreen> {
                 Expanded(
                   child: TextField(
                     controller: _rootPathController,
-                    decoration: const InputDecoration(
-                      labelText: '服务器根目录路径',
-                      hintText: '选择或输入服务器根目录',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: l.importCore_rootPath,
+                      hintText: l.importCore_rootPathHint,
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                 ),
@@ -158,7 +161,7 @@ class _ImportCoreScreenState extends State<ImportCoreScreen> {
                   child: FilledButton.tonalIcon(
                     onPressed: _pickRootPath,
                     icon: const Icon(Icons.folder_open),
-                    label: const Text('浏览'),
+                    label: Text(l.importCore_browse),
                   ),
                 ),
               ],
@@ -167,10 +170,10 @@ class _ImportCoreScreenState extends State<ImportCoreScreen> {
             // 启动命令（选择 jar 后自动预填文件名）
             TextField(
               controller: _startCommandController,
-              decoration: const InputDecoration(
-                labelText: '启动命令',
-                hintText: 'java -Xmx2G -jar <jar文件名> nogui',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l.instanceDetail_startCommand,
+                hintText: l.importCore_startCommandHint,
+                border: const OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 24),
@@ -184,11 +187,11 @@ class _ImportCoreScreenState extends State<ImportCoreScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.add_box),
-              label: Text(_creating ? '创建中…' : '创建实例'),
+              label: Text(_creating ? l.importCore_creating : l.importCore_createInstance),
             ),
             const SizedBox(height: 8),
             Text(
-              '导入已下载的核心 .jar 文件并基于它创建一个新实例。',
+              l.importCore_desc,
               style: theme.textTheme.bodySmall,
             ),
           ],

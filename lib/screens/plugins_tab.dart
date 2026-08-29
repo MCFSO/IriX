@@ -11,6 +11,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
+import '../l10n/app_localizations.dart';
 import '../services/jar_metadata_service.dart';
 import 'config_editor_screen.dart';
 
@@ -239,10 +240,11 @@ class _PluginsTabState extends State<PluginsTab> {
 
   /// 点击卡片：进入配置编辑详情。
   void _openItem(_PluginItem item) {
+    final l = AppLocalizations.of(context);
     if (!item.hasConfig) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('${item.displayName} 暂无可管理的配置文件')));
+      ).showSnackBar(SnackBar(content: Text(l.pluginsUI_noConfigFiles(item.displayName))));
       return;
     }
     setState(() => _selected = item);
@@ -255,6 +257,7 @@ class _PluginsTabState extends State<PluginsTab> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -278,14 +281,14 @@ class _PluginsTabState extends State<PluginsTab> {
           children: [
             const Icon(Icons.extension_off, size: 64, color: Colors.grey),
             const SizedBox(height: 16),
-            Text('暂无插件 / Mod', style: Theme.of(context).textTheme.titleMedium),
+            Text(l.pluginsUI_empty, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
-            const Text('将插件放入 plugins/、Mod 放入 mods/ 后重新扫描'),
+            Text(l.pluginsUI_emptyHint),
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: _scan,
               icon: const Icon(Icons.refresh),
-              label: const Text('重新扫描'),
+              label: Text(l.common_refresh),
             ),
           ],
         ),
@@ -298,7 +301,7 @@ class _PluginsTabState extends State<PluginsTab> {
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
             sliver: SliverToBoxAdapter(
-              child: _sectionHeader('插件', Icons.extension),
+              child: _sectionHeader(l.pluginsUI_sectionPlugins, Icons.extension),
             ),
           ),
           SliverPadding(
@@ -321,7 +324,7 @@ class _PluginsTabState extends State<PluginsTab> {
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
             sliver: SliverToBoxAdapter(
-              child: _sectionHeader('Mod', Icons.widgets),
+              child: _sectionHeader(l.pluginsUI_sectionMods, Icons.widgets),
             ),
           ),
           SliverPadding(
@@ -422,8 +425,10 @@ class _PluginCardState extends State<_PluginCard> {
   Widget build(BuildContext context) {
     final item = widget.item;
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     final hasIcon = item.meta.iconBytes != null;
-    final kindLabel = item.kind == _ItemKind.plugin ? '插件' : 'Mod';
+    final kindLabel =
+        item.kind == _ItemKind.plugin ? l.pluginsUI_kindPlugin : 'Mod';
     final kindColor = item.kind == _ItemKind.plugin
         ? Colors.blue
         : Colors.deepPurple;
@@ -480,10 +485,10 @@ class _PluginCardState extends State<_PluginCard> {
                     _KindBadge(label: kindLabel, color: kindColor),
                     if (!item.hasConfig) ...[
                       const SizedBox(width: 6),
-                      _KindBadge(label: '无配置', color: Colors.grey),
+                      _KindBadge(label: l.pluginsUI_noConfig, color: Colors.grey),
                     ] else if (item.orphan) ...[
                       const SizedBox(width: 6),
-                      _KindBadge(label: '仅配置', color: Colors.orange),
+                      _KindBadge(label: l.pluginsUI_configOnly, color: Colors.orange),
                     ],
                   ],
                 ),

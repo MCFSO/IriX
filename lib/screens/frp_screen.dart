@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/server_instance.dart';
 import '../services/chmlfrp_provider.dart';
 import '../services/custom_frp_provider.dart';
@@ -104,6 +105,7 @@ class _FrpScreenState extends State<FrpScreen> {
   }
 
   Future<void> _login() async {
+    final l = AppLocalizations.of(context);
     final Map<String, String>? credentials;
     switch (FrpProviderKind.fromId(_providerId)) {
       case FrpProviderKind.openfrp:
@@ -142,27 +144,30 @@ class _FrpScreenState extends State<FrpScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('登录失败: $e')));
+      ).showSnackBar(SnackBar(content: Text(l.frp_loginFailed(e.toString()))));
     }
   }
 
   Future<void> _logout() async {
     final confirmed = await showAppDialog<bool>(
       context,
-      (ctx) => AlertDialog(
-        title: const Text('退出登录'),
-        content: const Text('确定要退出登录吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('退出'),
-          ),
-        ],
-      ),
+      (ctx) {
+        final l = AppLocalizations.of(ctx);
+        return AlertDialog(
+          title: Text(l.frp_logoutTitle),
+          content: Text(l.frp_logoutConfirm),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(l.common_cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(l.frp_logout),
+            ),
+          ],
+        );
+      },
     );
     if (confirmed != true) return;
     await _provider.logout();
@@ -175,6 +180,7 @@ class _FrpScreenState extends State<FrpScreen> {
   }
 
   Future<void> _addTunnel() async {
+    final l = AppLocalizations.of(context);
     final draft = await showAppDialog<FrpTunnelDraft>(
       context,
       (ctx) => _NewTunnelDialog(
@@ -188,36 +194,40 @@ class _FrpScreenState extends State<FrpScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('隧道创建成功')));
+      ).showSnackBar(SnackBar(content: Text(l.frp_tunnelCreated)));
       await _loadAll();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('创建失败: $e')));
+      ).showSnackBar(SnackBar(content: Text(l.frp_createFailed(e.toString()))));
     }
   }
 
   Future<void> _deleteTunnel(FrpTunnel tunnel) async {
+    final l = AppLocalizations.of(context);
     final confirmed = await showAppDialog<bool>(
       context,
-      (ctx) => AlertDialog(
-        title: const Text('删除隧道'),
-        content: Text('确定删除隧道 "${tunnel.name}" 吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
+      (ctx) {
+        final l = AppLocalizations.of(ctx);
+        return AlertDialog(
+          title: Text(l.frp_deleteTunnelTitle),
+          content: Text(l.frp_deleteTunnelConfirm(tunnel.name)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(l.common_cancel),
             ),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(ctx).colorScheme.error,
+              ),
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(l.common_delete),
+            ),
+          ],
+        );
+      },
     );
     if (confirmed != true) return;
     try {
@@ -225,17 +235,18 @@ class _FrpScreenState extends State<FrpScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('已删除 ${tunnel.name}')));
+      ).showSnackBar(SnackBar(content: Text(l.frp_deleted(tunnel.name))));
       await _loadAll();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('删除失败: $e')));
+      ).showSnackBar(SnackBar(content: Text(l.frp_deleteFailed(e.toString()))));
     }
   }
 
   Future<void> _toggleTunnel(FrpTunnel tunnel) async {
+    final l = AppLocalizations.of(context);
     if (_provider.isTunnelRunning(tunnel.id)) {
       await _provider.stopTunnel(tunnel.id);
     } else {
@@ -245,7 +256,7 @@ class _FrpScreenState extends State<FrpScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('启动失败: $e')));
+        ).showSnackBar(SnackBar(content: Text(l.frp_startFailed(e.toString()))));
       }
     }
     if (!mounted) return;
@@ -255,13 +266,14 @@ class _FrpScreenState extends State<FrpScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     final loggedIn = _account != null;
     return Scaffold(
       appBar: AppBar(
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('FRP 端口映射'),
+            Text(l.frp_title),
             const SizedBox(width: 12),
             // 提供商切换
             Container(
@@ -295,12 +307,12 @@ class _FrpScreenState extends State<FrpScreen> {
           if (loggedIn) ...[
             IconButton(
               icon: const Icon(Icons.refresh),
-              tooltip: '刷新',
+              tooltip: l.common_refresh,
               onPressed: _loadAll,
             ),
             IconButton(
               icon: const Icon(Icons.logout),
-              tooltip: '退出登录',
+              tooltip: l.frp_logout,
               onPressed: _logout,
             ),
           ],
@@ -312,6 +324,7 @@ class _FrpScreenState extends State<FrpScreen> {
   }
 
   Widget _buildBody(ThemeData theme) {
+    final l = AppLocalizations.of(context);
     if (_account == null && _loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -333,7 +346,7 @@ class _FrpScreenState extends State<FrpScreen> {
               child: Text(_error!, textAlign: TextAlign.center),
             ),
             const SizedBox(height: 16),
-            FilledButton(onPressed: _loadAll, child: const Text('重试')),
+            FilledButton(onPressed: _loadAll, child: Text(l.common_retry)),
           ],
         ),
       );
@@ -346,14 +359,14 @@ class _FrpScreenState extends State<FrpScreen> {
           child: Row(
             children: [
               Text(
-                '隧道 (${_tunnels?.length ?? 0})',
+                l.frp_tunnelCount(_tunnels?.length ?? 0),
                 style: theme.textTheme.titleMedium,
               ),
               const Spacer(),
               FilledButton.tonalIcon(
                 onPressed: _addTunnel,
                 icon: const Icon(Icons.add, size: 18),
-                label: const Text('添加隧道'),
+                label: Text(l.frp_addTunnel),
               ),
             ],
           ),
@@ -373,7 +386,7 @@ class _FrpScreenState extends State<FrpScreen> {
           Padding(
             padding: const EdgeInsets.all(8),
             child: Text(
-              '此项目由社区开发，OpenFrp 官方不负责除节点问题以外的技术支持',
+              l.frp_openfrpDisclaimer,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.outline,
               ),
@@ -386,6 +399,7 @@ class _FrpScreenState extends State<FrpScreen> {
 
   /// 右侧日志面板：显示选中隧道的完整日志（自动滚动到最新）。
   Widget _buildLogPanel(ThemeData theme) {
+    final l = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, 8, 16, 8),
       child: Card(
@@ -406,14 +420,14 @@ class _FrpScreenState extends State<FrpScreen> {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      '日志',
+                      l.frp_log,
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
                   IconButton(
-                    tooltip: '清空内存日志',
+                    tooltip: l.frp_clearMemoryLog,
                     visualDensity: VisualDensity.compact,
                     icon: const Icon(Icons.clear_all, size: 18),
                     onPressed: () => FrpcManager.instance.clearOutput(
@@ -431,7 +445,7 @@ class _FrpScreenState extends State<FrpScreen> {
                   final key = _provider.tunnelKey(_selectedTunnelId ?? '');
                   final output = FrpcManager.instance.outputFor(key);
                   final text = output == null || output.isEmpty
-                      ? '暂无日志\n\n点击左侧隧道卡片可查看对应日志'
+                      ? l.frp_noLogYet
                       : output;
                   final controller = _logScrollController;
                   WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -463,6 +477,7 @@ class _FrpScreenState extends State<FrpScreen> {
   Widget _buildLoginPrompt(ThemeData theme) {
     final isCustom = _provider is CustomFrpProvider;
     final isChmlFrp = _provider is ChmlFrpProvider;
+    final l = AppLocalizations.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -476,19 +491,16 @@ class _FrpScreenState extends State<FrpScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              '${_provider.label} · 端口映射',
+              '${_provider.label} · ${l.frp_portMapping}',
               style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
             Text(
               isCustom
-                  ? '配置你的 frps 服务器地址与认证 token，\n'
-                        '隧道保存在本地，一键启动 frpc 实现内网穿透。'
+                  ? l.frp_loginPromptCustom
                   : isChmlFrp
-                  ? '登录 ChmlFrp 账号后可为服务器创建端口映射（隧道），\n'
-                        '并在 IriX 内一键启动 frpc 实现内网穿透。'
-                  : '登录 OpenFrp 后可为服务器创建端口映射（隧道），\n'
-                        '并在 IriX 内一键启动 frpc 实现内网穿透。',
+                  ? l.frp_loginPromptChml
+                  : l.frp_loginPromptOpen,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -498,19 +510,19 @@ class _FrpScreenState extends State<FrpScreen> {
             FilledButton.icon(
               onPressed: _login,
               icon: const Icon(Icons.login, size: 18),
-              label: Text(isCustom ? '配置 frps' : '登录 ${_provider.label}'),
+              label: Text(isCustom ? l.frp_configFrps : '${l.frp_login} ${_provider.label}'),
             ),
             if (isChmlFrp) ...[
               const SizedBox(height: 4),
               TextButton(
                 onPressed: _openRegisterPage,
-                child: const Text('还没有账号？去注册'),
+                child: Text(l.frp_noAccountRegister),
               ),
             ],
             const SizedBox(height: 16),
             if (_provider is OpenFrpProvider)
               Text(
-                '此项目由社区开发，OpenFrp 官方不负责除节点问题以外的技术支持',
+                l.frp_openfrpDisclaimer,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.outline,
                 ),
@@ -523,17 +535,19 @@ class _FrpScreenState extends State<FrpScreen> {
   }
 
   Future<void> _openRegisterPage() async {
+    final l = AppLocalizations.of(context);
     final uri = Uri.parse(chmlFrpRegisterUrl);
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('无法打开注册页面')));
+      ).showSnackBar(SnackBar(content: Text(l.frp_cannotOpenRegisterPage)));
     }
   }
 
   Widget _buildUserCard(ThemeData theme) {
     final account = _account;
+    final l = AppLocalizations.of(context);
     if (account == null) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -597,11 +611,11 @@ class _FrpScreenState extends State<FrpScreen> {
               Row(
                 children: [
                   if (account.traffic != null)
-                    _statItem(theme, '剩余流量', account.traffic!),
+                    _statItem(theme, l.frp_traffic, account.traffic!),
                   if (account.usage != null)
-                    _statItem(theme, '隧道', account.usage!),
+                    _statItem(theme, l.frp_tunnels, account.usage!),
                   if (account.extra != null)
-                    _statItem(theme, '状态', account.extra!),
+                    _statItem(theme, l.frp_status, account.extra!),
                 ],
               ),
             ],
@@ -636,6 +650,7 @@ class _FrpScreenState extends State<FrpScreen> {
 
   Widget _buildTunnelList(ThemeData theme) {
     final tunnels = _tunnels ?? [];
+    final l = AppLocalizations.of(context);
     if (tunnels.isEmpty) {
       return Center(
         child: Column(
@@ -647,10 +662,10 @@ class _FrpScreenState extends State<FrpScreen> {
               color: theme.colorScheme.outline,
             ),
             const SizedBox(height: 8),
-            Text('还没有隧道', style: theme.textTheme.titleMedium),
+            Text(l.frp_noTunnelsYet, style: theme.textTheme.titleMedium),
             const SizedBox(height: 4),
             Text(
-              '点击右上角「添加隧道」创建端口映射',
+              l.frp_addTunnelHint,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -675,6 +690,7 @@ class _FrpScreenState extends State<FrpScreen> {
   Widget _buildTunnelCard(ThemeData theme, FrpTunnel tunnel) {
     final running = _provider.isTunnelRunning(tunnel.id);
     final selected = tunnel.id == _selectedTunnelId;
+    final l = AppLocalizations.of(context);
     final typeIcon = switch (tunnel.type) {
       'udp' => Icons.bolt,
       'http' => Icons.language,
@@ -684,9 +700,9 @@ class _FrpScreenState extends State<FrpScreen> {
     };
     final remoteText = tunnel.type == 'http' || tunnel.type == 'https'
         ? tunnel.remoteAddress.isEmpty
-              ? tunnel.domain ?? '域名: ${tunnel.domain ?? '-'}'
+              ? l.frp_domainLabel(tunnel.domain ?? '-')
               : tunnel.remoteAddress
-        : '远程端口 ${tunnel.remotePort ?? '-'}';
+        : l.frp_remotePort((tunnel.remotePort ?? '-').toString());
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -746,13 +762,13 @@ class _FrpScreenState extends State<FrpScreen> {
                         ? Colors.orange
                         : theme.colorScheme.outline,
                     label: tunnel.online
-                        ? '在线'
+                        ? l.frp_online
                         : running
-                        ? '连接中'
-                        : '离线',
+                        ? l.frp_connecting
+                        : l.frp_offline,
                   ),
                   IconButton(
-                    tooltip: running ? '停止' : '启动',
+                    tooltip: running ? l.frp_stop : l.frp_start,
                     visualDensity: VisualDensity.compact,
                     icon: Icon(
                       running ? Icons.stop_circle_outlined : Icons.play_circle,
@@ -761,7 +777,7 @@ class _FrpScreenState extends State<FrpScreen> {
                     onPressed: () => _toggleTunnel(tunnel),
                   ),
                   IconButton(
-                    tooltip: '删除',
+                    tooltip: l.common_delete,
                     visualDensity: VisualDensity.compact,
                     icon: const Icon(Icons.delete_outline),
                     onPressed: () => _deleteTunnel(tunnel),
@@ -770,13 +786,13 @@ class _FrpScreenState extends State<FrpScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                '本地 ${tunnel.localAddr}:${tunnel.localPort}  →  $remoteText',
+                l.frp_localMapping(tunnel.localAddr, tunnel.localPort, remoteText),
                 style: theme.textTheme.bodySmall,
               ),
               if (tunnel.remoteAddress.isNotEmpty) ...[
                 const SizedBox(height: 2),
                 Text(
-                  '连接地址 ${tunnel.remoteAddress}',
+                  l.frp_connectAddress(tunnel.remoteAddress),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.primary,
                     fontFamily: FontSettings.instance.terminalFamily,
@@ -791,14 +807,14 @@ class _FrpScreenState extends State<FrpScreen> {
                 Row(
                   children: [
                     if (tunnel.useEncryption)
-                      _buildMiniTag(text: '加密', theme: theme),
+                      _buildMiniTag(text: l.frp_encrypt, theme: theme),
                     if (tunnel.useCompression) ...[
                       const SizedBox(width: 6),
-                      _buildMiniTag(text: '压缩', theme: theme),
+                      _buildMiniTag(text: l.frp_compress, theme: theme),
                     ],
                     if (!tunnel.enabled) ...[
                       const SizedBox(width: 6),
-                      _buildMiniTag(text: '未启用', theme: theme),
+                      _buildMiniTag(text: l.frp_disabledLabel, theme: theme),
                     ],
                   ],
                 ),
@@ -882,7 +898,7 @@ class _OpenFrpLoginDialogState extends State<_OpenFrpLoginDialog> {
   bool _loading = false;
   bool _cancelled = false;
   String? _error;
-  String _status = '等待浏览器授权…';
+  String _status = '';
 
   @override
   void dispose() {
@@ -891,11 +907,12 @@ class _OpenFrpLoginDialogState extends State<_OpenFrpLoginDialog> {
   }
 
   Future<void> _start() async {
+    final l = AppLocalizations.of(context);
     setState(() {
       _loading = true;
       _cancelled = false;
       _error = null;
-      _status = '正在请求授权…';
+      _status = l.frp_requestingAuth;
     });
     final api = OfrpService.instance;
     try {
@@ -909,7 +926,7 @@ class _OpenFrpLoginDialogState extends State<_OpenFrpLoginDialog> {
         mode: LaunchMode.externalApplication,
       );
       if (!launched) {
-        throw Exception('无法打开浏览器，请重试');
+        throw Exception(l.frp_cannotOpenBrowser);
       }
 
       // 3. 轮询授权结果（每 5 秒，最长 5 分钟）。
@@ -919,7 +936,7 @@ class _OpenFrpLoginDialogState extends State<_OpenFrpLoginDialog> {
       while (!_cancelled && DateTime.now().isBefore(deadline)) {
         try {
           final poll = await api.pollRemoteLogin(request.requestUuid);
-          if (mounted) setState(() => _status = '已授权，正在解密…');
+          if (mounted) setState(() => _status = l.frp_authorizedDecrypting);
           auth = await OfrpService.decryptAuthorization(
             poll.authorizationData,
             keys.keyPair,
@@ -928,7 +945,7 @@ class _OpenFrpLoginDialogState extends State<_OpenFrpLoginDialog> {
           break;
         } on PendingAuthorizationException {
           // 尚未授权，继续轮询。
-          if (mounted) setState(() => _status = '等待浏览器授权…');
+          if (mounted) setState(() => _status = l.frp_waitingBrowserAuth);
         } catch (e) {
           // 真实错误（网络/解密失败等），立即停止并展示。
           lastError = e;
@@ -941,7 +958,7 @@ class _OpenFrpLoginDialogState extends State<_OpenFrpLoginDialog> {
         return;
       }
       if (auth == null || auth.isEmpty) {
-        throw Exception(lastError?.toString() ?? '授权超时，请重试');
+        throw Exception(lastError?.toString() ?? l.frp_authTimeout);
       }
       if (!mounted) return;
       Navigator.of(context).pop({'authorization': auth});
@@ -958,8 +975,9 @@ class _OpenFrpLoginDialogState extends State<_OpenFrpLoginDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return AlertDialog(
-      title: const Text('登录 OpenFrp'),
+      title: Text(l.frp_loginOpenFrpTitle),
       content: SizedBox(
         width: 460,
         child: SingleChildScrollView(
@@ -968,9 +986,7 @@ class _OpenFrpLoginDialogState extends State<_OpenFrpLoginDialog> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                '点击下方按钮后将在浏览器中打开 OpenFrp 授权页：\n'
-                '登录并在授权页确认后，IriX 会自动完成登录，无需复制任何内容。\n'
-                '轮询最长 5 分钟，超时或取消需重新发起。',
+                l.frp_openfrpAuthDesc,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -997,7 +1013,7 @@ class _OpenFrpLoginDialogState extends State<_OpenFrpLoginDialog> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      _status.isEmpty ? '等待浏览器授权…' : _status,
+                      _status.isEmpty ? l.frp_waitingBrowserAuth : _status,
                       style: theme.textTheme.bodySmall,
                     ),
                   ],
@@ -1016,11 +1032,11 @@ class _OpenFrpLoginDialogState extends State<_OpenFrpLoginDialog> {
               Navigator.of(context).pop();
             }
           },
-          child: Text(_loading ? '取消' : '关闭'),
+          child: Text(_loading ? l.common_cancel : l.common_close),
         ),
         FilledButton(
           onPressed: _loading ? null : _start,
-          child: const Text('在浏览器中授权'),
+          child: Text(l.frp_authorizeInBrowser),
         ),
       ],
     );
@@ -1049,9 +1065,10 @@ class _CustomLoginDialogState extends State<_CustomLoginDialog> {
   }
 
   Future<void> _save() async {
+    final l = AppLocalizations.of(context);
     final server = _serverController.text.trim();
     if (server.isEmpty) {
-      setState(() => _error = '请输入服务器地址');
+      setState(() => _error = l.frp_enterServerAddress);
       return;
     }
     setState(() {
@@ -1079,8 +1096,9 @@ class _CustomLoginDialogState extends State<_CustomLoginDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return AlertDialog(
-      title: const Text('配置自建 frps'),
+      title: Text(l.frp_configSelfHosted),
       content: SizedBox(
         width: 440,
         child: SingleChildScrollView(
@@ -1093,7 +1111,7 @@ class _CustomLoginDialogState extends State<_CustomLoginDialog> {
                 autofocus: true,
                 style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
                 decoration: InputDecoration(
-                  labelText: '服务器地址',
+                  labelText: l.frp_serverAddress,
                   hintText: 'frps.example.com:7000',
                   border: const OutlineInputBorder(),
                   isDense: true,
@@ -1105,16 +1123,16 @@ class _CustomLoginDialogState extends State<_CustomLoginDialog> {
                 controller: _tokenController,
                 obscureText: true,
                 style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
-                decoration: const InputDecoration(
-                  labelText: '认证 token',
-                  hintText: 'frps 配置中的 auth.token（可留空）',
+                decoration: InputDecoration(
+                  labelText: l.frp_authToken,
+                  hintText: l.frp_authTokenHint,
                   border: OutlineInputBorder(),
                   isDense: true,
                 ),
               ),
               const SizedBox(height: 12),
               Text(
-                '隧道将保存在本地，启动时生成 frpc TOML 配置并运行。',
+                l.frp_selfHostedHint,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -1126,7 +1144,7 @@ class _CustomLoginDialogState extends State<_CustomLoginDialog> {
       actions: [
         TextButton(
           onPressed: _loading ? null : () => Navigator.of(context).pop(),
-          child: const Text('取消'),
+          child: Text(l.common_cancel),
         ),
         FilledButton(
           onPressed: _loading ? null : _save,
@@ -1136,7 +1154,7 @@ class _CustomLoginDialogState extends State<_CustomLoginDialog> {
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('保存'),
+              : Text(l.common_save),
         ),
       ],
     );
@@ -1169,6 +1187,7 @@ class _ChmlFrpLoginDialogState extends State<_ChmlFrpLoginDialog> {
   }
 
   Future<void> _start() async {
+    final l = AppLocalizations.of(context);
     setState(() {
       _loading = true;
       _cancelled = false;
@@ -1188,16 +1207,16 @@ class _ChmlFrpLoginDialogState extends State<_ChmlFrpLoginDialog> {
         mode: LaunchMode.externalApplication,
       );
       if (!launched) {
-        throw Exception('无法打开浏览器，请重试');
+        throw Exception(l.frp_cannotOpenBrowser);
       }
       final params = await _callback.waitForParams();
       if (_cancelled) return;
       if (params == null) {
-        throw Exception('等待网页授权超时或已取消');
+        throw Exception(l.frp_authCallbackTimeout);
       }
       final accessToken = params['access_token'];
       if (accessToken == null || accessToken.isEmpty) {
-        throw Exception('授权回调中未获取到 access_token，请重试');
+        throw Exception(l.frp_noAccessToken);
       }
       if (!mounted) return;
       Navigator.of(context).pop({
@@ -1218,20 +1237,22 @@ class _ChmlFrpLoginDialogState extends State<_ChmlFrpLoginDialog> {
   }
 
   Future<void> _openRegister() async {
+    final l = AppLocalizations.of(context);
     final uri = Uri.parse(chmlFrpRegisterUrl);
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('无法打开注册页面')));
+      ).showSnackBar(SnackBar(content: Text(l.frp_cannotOpenRegisterPage)));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return AlertDialog(
-      title: const Text('登录 ChmlFrp'),
+      title: Text(l.frp_loginChmlFrpTitle),
       content: SizedBox(
         width: 460,
         child: SingleChildScrollView(
@@ -1240,8 +1261,7 @@ class _ChmlFrpLoginDialogState extends State<_ChmlFrpLoginDialog> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                '点击下方按钮后将在浏览器中打开 ChmlFrp 授权页：\n'
-                '登录并授权后会自动跳回 IriX，无需复制粘贴任何内容。',
+                l.frp_chmlfrpAuthDesc,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -1249,10 +1269,10 @@ class _ChmlFrpLoginDialogState extends State<_ChmlFrpLoginDialog> {
               const SizedBox(height: 8),
               TextButton(
                 onPressed: _loading ? null : _openRegister,
-                child: const Text('还没有账号？去注册'),
+                child: Text(l.frp_noAccountRegister),
               ),
               Text(
-                'IriX 不提供 ChmlFrp 账号注册，请前往官网注册后登录。',
+                l.frp_chmlfrpNoRegister,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -1278,7 +1298,7 @@ class _ChmlFrpLoginDialogState extends State<_ChmlFrpLoginDialog> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                     const SizedBox(width: 8),
-                    Text('等待浏览器授权…', style: theme.textTheme.bodySmall),
+                    Text(l.frp_waitingBrowserAuth, style: theme.textTheme.bodySmall),
                   ],
                 ),
               ],
@@ -1296,11 +1316,11 @@ class _ChmlFrpLoginDialogState extends State<_ChmlFrpLoginDialog> {
               Navigator.of(context).pop();
             }
           },
-          child: Text(_loading ? '取消' : '关闭'),
+          child: Text(_loading ? l.common_cancel : l.common_close),
         ),
         FilledButton(
           onPressed: _loading ? null : _start,
-          child: const Text('在浏览器中授权'),
+          child: Text(l.frp_authorizeInBrowser),
         ),
       ],
     );
@@ -1330,9 +1350,10 @@ class _SakuraFrpLoginDialogState extends State<_SakuraFrpLoginDialog> {
   }
 
   Future<void> _login() async {
+    final l = AppLocalizations.of(context);
     final token = _tokenController.text.trim();
     if (token.isEmpty) {
-      setState(() => _error = '请输入访问密钥');
+      setState(() => _error = l.frp_enterAccessToken);
       return;
     }
     setState(() {
@@ -1355,8 +1376,9 @@ class _SakuraFrpLoginDialogState extends State<_SakuraFrpLoginDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return AlertDialog(
-      title: const Text('登录 SakuraFrp'),
+      title: Text(l.frp_loginSakuraFrpTitle),
       content: SizedBox(
         width: 460,
         child: SingleChildScrollView(
@@ -1372,8 +1394,8 @@ class _SakuraFrpLoginDialogState extends State<_SakuraFrpLoginDialog> {
                 autocorrect: false,
                 style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 12),
                 decoration: InputDecoration(
-                  labelText: '访问密钥 (Access Token)',
-                  hintText: '粘贴 SakuraFrp 访问密钥',
+                  labelText: l.frp_accessToken,
+                  hintText: l.frp_accessTokenHint,
                   border: const OutlineInputBorder(),
                   isDense: true,
                   errorText: _error,
@@ -1382,7 +1404,7 @@ class _SakuraFrpLoginDialogState extends State<_SakuraFrpLoginDialog> {
                       _obscureToken ? Icons.visibility : Icons.visibility_off,
                       size: 18,
                     ),
-                    tooltip: _obscureToken ? '显示' : '隐藏',
+                    tooltip: _obscureToken ? l.frp_show : l.frp_hide,
                     onPressed: () =>
                         setState(() => _obscureToken = !_obscureToken),
                   ),
@@ -1390,8 +1412,7 @@ class _SakuraFrpLoginDialogState extends State<_SakuraFrpLoginDialog> {
               ),
               const SizedBox(height: 12),
               Text(
-                '获取方式：打开 SakuraFrp 控制台 → 账户信息 → 访问密钥，'
-                '点击复制后粘贴到此处。',
+                l.frp_sakurafrpTokenHint,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -1403,7 +1424,7 @@ class _SakuraFrpLoginDialogState extends State<_SakuraFrpLoginDialog> {
       actions: [
         TextButton(
           onPressed: _loading ? null : () => Navigator.of(context).pop(),
-          child: const Text('取消'),
+          child: Text(l.common_cancel),
         ),
         FilledButton(
           onPressed: _loading ? null : _login,
@@ -1413,7 +1434,7 @@ class _SakuraFrpLoginDialogState extends State<_SakuraFrpLoginDialog> {
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('登录'),
+              : Text(l.frp_login),
         ),
       ],
     );
@@ -1442,10 +1463,11 @@ class _HayFrpLoginDialogState extends State<_HayFrpLoginDialog> {
   }
 
   Future<void> _login() async {
+    final l = AppLocalizations.of(context);
     final username = _usernameController.text.trim();
     final password = _passwordController.text;
     if (username.isEmpty || password.isEmpty) {
-      setState(() => _error = '请输入用户名和密码');
+      setState(() => _error = l.frp_enterUsernamePassword);
       return;
     }
     setState(() {
@@ -1471,8 +1493,9 @@ class _HayFrpLoginDialogState extends State<_HayFrpLoginDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return AlertDialog(
-      title: const Text('登录 HayFrp'),
+      title: Text(l.frp_loginHayFrpTitle),
       content: SizedBox(
         width: 420,
         child: SingleChildScrollView(
@@ -1485,7 +1508,7 @@ class _HayFrpLoginDialogState extends State<_HayFrpLoginDialog> {
                 autofocus: true,
                 style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
                 decoration: InputDecoration(
-                  labelText: '用户名或邮箱',
+                  labelText: l.frp_usernameOrEmail,
                   border: const OutlineInputBorder(),
                   isDense: true,
                   errorText: _error,
@@ -1497,15 +1520,15 @@ class _HayFrpLoginDialogState extends State<_HayFrpLoginDialog> {
                 obscureText: true,
                 style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
                 onSubmitted: (_) => _login(),
-                decoration: const InputDecoration(
-                  labelText: '密码',
+                decoration: InputDecoration(
+                  labelText: l.frp_password,
                   border: OutlineInputBorder(),
                   isDense: true,
                 ),
               ),
               const SizedBox(height: 12),
               Text(
-                '登录获取的 Token 有效期 7 天，每次登录会使上次 Token 失效。',
+                l.frp_hayfrpTokenHint,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -1517,7 +1540,7 @@ class _HayFrpLoginDialogState extends State<_HayFrpLoginDialog> {
       actions: [
         TextButton(
           onPressed: _loading ? null : () => Navigator.of(context).pop(),
-          child: const Text('取消'),
+          child: Text(l.common_cancel),
         ),
         FilledButton(
           onPressed: _loading ? null : _login,
@@ -1527,7 +1550,7 @@ class _HayFrpLoginDialogState extends State<_HayFrpLoginDialog> {
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('登录'),
+              : Text(l.frp_login),
         ),
       ],
     );
@@ -1623,6 +1646,7 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
   }
 
   void _submit() {
+    final l = AppLocalizations.of(context);
     final name = _nameController.text.trim();
     final type = _type;
     final localAddr = _localAddrController.text.trim();
@@ -1633,28 +1657,28 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
     final domain = _domainController.text.trim();
 
     if (!RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(name)) {
-      _toast('隧道名称仅支持英文、数字、- 和 _');
+      _toast(l.frp_tunnelNameRule);
       return;
     }
     if (_hasNodes && nodeId == null) {
-      _toast('请选择节点');
+      _toast(l.frp_selectNode);
       return;
     }
     if (localAddr.isEmpty) {
-      _toast('请输入本地地址');
+      _toast(l.frp_enterLocalAddr);
       return;
     }
     if (localPort == null || localPort < 1 || localPort > 65535) {
-      _toast('本地端口需在 1-65535 之间');
+      _toast(l.frp_localPortRange);
       return;
     }
     if (isWeb) {
       if (domain.isEmpty) {
-        _toast('HTTP/HTTPS 隧道需要填写绑定域名');
+        _toast(l.frp_webNeedsDomain);
         return;
       }
     } else if (remotePort == null || remotePort < 1 || remotePort > 65535) {
-      _toast('远程端口需在 1-65535 之间');
+      _toast(l.frp_remotePortRange);
       return;
     }
 
@@ -1682,9 +1706,10 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     final isWeb = _type == 'http' || _type == 'https';
     return AlertDialog(
-      title: const Text('添加隧道'),
+      title: Text(l.frp_addTunnel),
       content: SizedBox(
         width: 460,
         child: SingleChildScrollView(
@@ -1695,9 +1720,9 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
               TextField(
                 controller: _nameController,
                 style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
-                decoration: const InputDecoration(
-                  labelText: '隧道名称',
-                  hintText: '例如 my_server（不支持中文）',
+                decoration: InputDecoration(
+                  labelText: l.frp_tunnelName,
+                  hintText: l.frp_tunnelNameHint,
                   border: OutlineInputBorder(),
                   isDense: true,
                 ),
@@ -1707,17 +1732,17 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
               if (_hasNodes) const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 initialValue: _type,
-                decoration: const InputDecoration(
-                  labelText: '隧道类型',
+                decoration: InputDecoration(
+                  labelText: l.frp_tunnelType,
                   border: OutlineInputBorder(),
                   isDense: true,
                 ),
                 items: [
-                  const DropdownMenuItem(value: 'tcp', child: Text('TCP')),
-                  const DropdownMenuItem(value: 'udp', child: Text('UDP')),
+                  DropdownMenuItem(value: 'tcp', child: Text('TCP')),
+                  DropdownMenuItem(value: 'udp', child: Text('UDP')),
                   if (widget.provider.supportsWebTunnels) ...[
-                    const DropdownMenuItem(value: 'http', child: Text('HTTP')),
-                    const DropdownMenuItem(
+                    DropdownMenuItem(value: 'http', child: Text('HTTP')),
+                    DropdownMenuItem(
                       value: 'https',
                       child: Text('HTTPS'),
                     ),
@@ -1731,24 +1756,24 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
               TextField(
                 controller: _localAddrController,
                 style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
-                decoration: const InputDecoration(
-                  labelText: '本地地址',
+                decoration: InputDecoration(
+                  labelText: l.frp_localAddress,
                   border: OutlineInputBorder(),
                   isDense: true,
                 ),
               ),
               const SizedBox(height: 12),
               SegmentedButton<bool>(
-                segments: const [
+                segments: [
                   ButtonSegment(
                     value: true,
                     icon: Icon(Icons.storage, size: 16),
-                    label: Text('选择实例'),
+                    label: Text(l.frp_selectInstance),
                   ),
                   ButtonSegment(
                     value: false,
                     icon: Icon(Icons.edit_outlined, size: 16),
-                    label: Text('手动填写'),
+                    label: Text(l.frp_manualInput),
                   ),
                 ],
                 selected: {_useInstance},
@@ -1764,9 +1789,9 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
-                  decoration: const InputDecoration(
-                    labelText: '本地端口',
-                    hintText: '例如 25565',
+                  decoration: InputDecoration(
+                    labelText: l.frp_localPort,
+                    hintText: l.frp_localPortExample,
                     border: OutlineInputBorder(),
                     isDense: true,
                   ),
@@ -1777,8 +1802,8 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
                   controller: _localPortController,
                   readOnly: true,
                   style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
-                  decoration: const InputDecoration(
-                    labelText: '本地端口（自动读取）',
+                  decoration: InputDecoration(
+                    labelText: l.frp_localPortAuto,
                     border: OutlineInputBorder(),
                     isDense: true,
                   ),
@@ -1791,9 +1816,9 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
-                  decoration: const InputDecoration(
-                    labelText: '远程端口',
-                    hintText: '开放给外部的端口',
+                  decoration: InputDecoration(
+                    labelText: l.frp_remotePortLabel,
+                    hintText: l.frp_remotePortHint,
                     border: OutlineInputBorder(),
                     isDense: true,
                   ),
@@ -1803,8 +1828,8 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
                 TextField(
                   controller: _domainController,
                   style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
-                  decoration: const InputDecoration(
-                    labelText: '绑定域名',
+                  decoration: InputDecoration(
+                    labelText: l.frp_bindDomain,
                     border: OutlineInputBorder(),
                     isDense: true,
                   ),
@@ -1817,7 +1842,7 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
                     child: CheckboxListTile(
                       value: _encrypt,
                       onChanged: (v) => setState(() => _encrypt = v ?? false),
-                      title: const Text('加密', style: TextStyle(fontSize: 13)),
+                      title: Text(l.frp_encrypt, style: const TextStyle(fontSize: 13)),
                       dense: true,
                       contentPadding: EdgeInsets.zero,
                       controlAffinity: ListTileControlAffinity.leading,
@@ -1827,7 +1852,7 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
                     child: CheckboxListTile(
                       value: _gzip,
                       onChanged: (v) => setState(() => _gzip = v ?? false),
-                      title: const Text('压缩', style: TextStyle(fontSize: 13)),
+                      title: Text(l.frp_compress, style: const TextStyle(fontSize: 13)),
                       dense: true,
                       contentPadding: EdgeInsets.zero,
                       controlAffinity: ListTileControlAffinity.leading,
@@ -1842,24 +1867,25 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
+          child: Text(l.common_cancel),
         ),
-        FilledButton(onPressed: _submit, child: const Text('创建')),
+        FilledButton(onPressed: _submit, child: Text(l.frp_create)),
       ],
     );
   }
 
   Widget _buildNodeSelector(ThemeData theme) {
+    final l = AppLocalizations.of(context);
     if (_nodesError != null) {
       return Row(
         children: [
           Expanded(
             child: Text(
-              '节点加载失败: $_nodesError',
+              l.frp_nodeLoadFailed(_nodesError!),
               style: TextStyle(color: theme.colorScheme.error, fontSize: 12),
             ),
           ),
-          TextButton(onPressed: _loadNodes, child: const Text('重试')),
+          TextButton(onPressed: _loadNodes, child: Text(l.common_retry)),
         ],
       );
     }
@@ -1877,12 +1903,12 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
     }
     final nodes = _nodes!;
     if (nodes.isEmpty) {
-      return Text('没有可用的节点', style: TextStyle(color: theme.colorScheme.error));
+      return Text(l.frp_noAvailableNodes, style: TextStyle(color: theme.colorScheme.error));
     }
     return DropdownButtonFormField<String>(
       initialValue: _selectedNodeId,
-      decoration: const InputDecoration(
-        labelText: '节点',
+      decoration: InputDecoration(
+        labelText: l.frp_node,
         border: OutlineInputBorder(),
         isDense: true,
       ),
@@ -1898,17 +1924,18 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
   }
 
   Widget _buildInstanceSelector(ThemeData theme) {
+    final l = AppLocalizations.of(context);
     final candidates = _instanceCandidates;
     if (candidates.isEmpty) {
       return Text(
-        '没有可用实例（需存在 server.properties 才能自动读取端口）',
+        l.frp_noAvailableInstances,
         style: TextStyle(color: theme.colorScheme.error, fontSize: 12),
       );
     }
     return DropdownButtonFormField<String>(
       initialValue: _selectedInstancePath,
-      decoration: const InputDecoration(
-        labelText: '实例（自动读取 server-port）',
+      decoration: InputDecoration(
+        labelText: l.frp_instanceAutoPort,
         border: OutlineInputBorder(),
         isDense: true,
       ),
@@ -1917,7 +1944,7 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
           DropdownMenuItem(
             value: candidate.instance.rootPath,
             child: Text(
-              '${candidate.instance.name} · 端口 ${candidate.port}',
+              l.frp_instancePort(candidate.instance.name, candidate.port),
               overflow: TextOverflow.ellipsis,
             ),
           ),

@@ -12,6 +12,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/node.dart';
 import '../models/node_ops.dart';
 import '../models/remote.dart';
@@ -51,6 +52,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
   }
 
   Future<void> _init() async {
+    final l = AppLocalizations.of(context);
     final state = context.read<NodeState>();
     NodeInfo? node;
     for (final n in state.nodes) {
@@ -62,7 +64,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
     if (node == null) {
       setState(() {
         _loading = false;
-        _error = '节点不存在或已被删除';
+        _error = l.nodeDetail_notFoundOrDeleted;
       });
       return;
     }
@@ -115,12 +117,13 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
   /// 「容器」标签页展示节点容器环境的全功能管理（Docker / Bastille 按节点平台），
   /// 节点在线即展示；平台不支持时面板呈现不可用状态与原因。
   List<({String label, IconData icon, Widget child})> _tabs(NodeInfo node) {
+    final l = AppLocalizations.of(context);
     final client = _client!;
     final daemonId = _daemonId;
     final overview = _overview;
     final tabs = <({String label, IconData icon, Widget child})>[
       (
-        label: '概览',
+        label: l.nodeDetail_tabOverview,
         icon: Icons.monitor_heart_outlined,
         child: _OverviewTab(
           node: node,
@@ -130,7 +133,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
         ),
       ),
       (
-        label: '实例',
+        label: l.nodeDetail_tabInstances,
         icon: Icons.storage_outlined,
         child: _InstancesTab(
           node: node,
@@ -144,7 +147,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
     // 节点在线即展示；平台不支持时面板呈现不可用状态与原因。
     if (overview != null) {
       tabs.add((
-        label: '容器',
+        label: l.container_tabContainers,
         icon: Icons.inventory_2,
         child: ContainerEnvironmentPanel(
           backend: nodeContainerBackend(
@@ -160,7 +163,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
     // MCSM 面板额外提供用户管理 API
     if (node.type == NodeType.mcsm) {
       tabs.add((
-        label: '用户',
+        label: l.nodeDetail_tabUsers,
         icon: Icons.people_outline,
         child: _UsersTab(client: client, daemonId: daemonId),
       ));
@@ -169,7 +172,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
     // 节点负载 / 审计日志，见 node_api_client 新增方法组）。
     if (node.type == NodeType.node) {
       tabs.add((
-        label: '运维',
+        label: l.nodeDetail_tabOps,
         icon: Icons.build_outlined,
         child: NodeOpsTab(client: client, daemonId: daemonId),
       ));
@@ -179,14 +182,15 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     if (_loading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     final node = _node;
     if (node == null || _client == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('节点')),
-        body: Center(child: Text(_error ?? '未知错误')),
+        appBar: AppBar(title: Text(l.nodeDetail_title)),
+        body: Center(child: Text(_error ?? l.wizard_unknownError)),
       );
     }
     final tabs = _tabs(node);
@@ -198,7 +202,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
           actions: [
             IconButton(
               icon: const Icon(Icons.refresh),
-              tooltip: '刷新',
+              tooltip: l.common_refresh,
               onPressed: _refreshOverview,
             ),
             const SizedBox(width: 4),
@@ -226,6 +230,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
 
   /// 节点在线状态提示条。
   Widget _buildStatusBar(NodeInfo node) {
+    final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final online = _overview != null;
     return Container(
@@ -244,7 +249,9 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              online ? '节点在线 · ${node.address}' : '节点离线：${_error ?? '无法连接'}',
+              online
+                  ? l.nodeDetail_onlineWithAddr(node.address)
+                  : l.nodeDetail_offlineWithError(_error ?? l.nodeDetail_cannotConnect),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: online ? Colors.green : theme.colorScheme.error,
               ),
@@ -253,7 +260,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
           if (!online && node.type == NodeType.node)
             TextButton.icon(
               icon: const Icon(Icons.play_arrow, size: 16),
-              label: const Text('启动本地节点'),
+              label: Text(l.nodeDetail_launchLocal),
               style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
               onPressed: _launchLocalDaemon,
             ),
@@ -264,6 +271,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
 
   /// 启动本地 Go 守护进程。
   Future<void> _launchLocalDaemon() async {
+    final l = AppLocalizations.of(context);
     final node = _node;
     if (node == null) return;
     final uri = Uri.tryParse(node.address);
@@ -271,12 +279,12 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
       showAppDialog<void>(
         context,
         (_) => AlertDialog(
-          title: const Text('无法启动'),
-          content: Text('「${node.name}」不是本地地址，请确认 irix-node 已在该服务器上运行。'),
+          title: Text(l.nodeDetail_cannotLaunch),
+          content: Text(l.nodeDetail_notLocalAddress(node.name)),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('关闭'),
+              child: Text(l.common_close),
             ),
           ],
         ),
@@ -321,6 +329,7 @@ class _OverviewTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final data = overview;
     if (data == null) {
@@ -329,7 +338,7 @@ class _OverviewTab extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              '无法获取节点信息\n${client.baseUrl}',
+              l.nodeDetail_cannotGetInfo(client.baseUrl),
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.error,
@@ -338,7 +347,7 @@ class _OverviewTab extends StatelessWidget {
             const SizedBox(height: 12),
             FilledButton.icon(
               icon: const Icon(Icons.refresh),
-              label: const Text('重试'),
+              label: Text(l.common_retry),
               onPressed: onRetry,
             ),
           ],
@@ -357,63 +366,67 @@ class _OverviewTab extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       children: [
         _InfoCard(
-          title: '主机信息',
+          title: l.nodeDetail_hostInfo,
           icon: Icons.computer,
           rows: [
-            ('主机名', sys.hostname.isEmpty ? '—' : sys.hostname),
-            ('系统', sys.type.isEmpty ? '—' : '${sys.type} / ${sys.release}'),
-            ('平台', sys.platform.isEmpty ? '—' : sys.platform),
-            ('运行时间', _formatUptime(uptime)),
+            (l.nodeDetail_hostname, sys.hostname.isEmpty ? '—' : sys.hostname),
+            (l.nodeDetail_system, sys.type.isEmpty ? '—' : '${sys.type} / ${sys.release}'),
+            (l.nodeDetail_platform, sys.platform.isEmpty ? '—' : sys.platform),
+            (l.nodeDetail_uptime, _formatUptime(uptime, l)),
           ],
         ),
         const SizedBox(height: 12),
         _InfoCard(
-          title: '资源占用',
+          title: l.nodeDetail_resourceUsage,
           icon: Icons.memory,
           rows: [
             (
-              '内存',
+              l.nodeDetail_memory,
               totalGb > 0
                   ? '${usedGb.toStringAsFixed(1)} / ${totalGb.toStringAsFixed(1)} GB（${memPercent.toStringAsFixed(1)}%）'
                   : '—',
             ),
             (
-              'CPU',
+              l.nodeDetail_cpu,
               data.system.cpuUsage > 0
                   ? '${(data.system.cpuUsage * 100).toStringAsFixed(1)}%'
                   : '—',
             ),
             (
-              '节点进程内存',
+              l.nodeDetail_nodeProcessMemory,
               data.process.memory > 0 ? _formatBytes(data.process.memory) : '—',
             ),
-            ('节点版本', data.version.isEmpty ? '—' : data.version),
+            (l.nodeDetail_nodeVersion, data.version.isEmpty ? '—' : data.version),
           ],
         ),
         const SizedBox(height: 12),
         _InfoCard(
-          title: '实例统计',
+          title: l.nodeDetail_instanceStats,
           icon: Icons.storage,
           rows: [
-            ('守护进程', data.remote.isEmpty ? '—' : '${data.remote.length} 个'),
+            (l.nodeDetail_daemons, data.remote.isEmpty ? '—' : l.nodeDetail_daemonCount(data.remote.length)),
             for (final daemon in data.remote)
               (
                 daemon.displayName,
-                '运行 ${daemon.runningInstances} / 共 ${daemon.totalInstances}',
+                l.nodeDetail_runningTotal(daemon.runningInstances, daemon.totalInstances),
               ),
           ],
         ),
         if (data.remote.length > 1) ...[
           const SizedBox(height: 12),
           _InfoCard(
-            title: '守护进程列表',
+            title: l.nodeDetail_daemonList,
             icon: Icons.dns_outlined,
             rows: [
               for (final daemon in data.remote)
                 (
                   daemon.displayName,
-                  '${daemon.available ? '在线' : '离线'} · ${daemon.version.isEmpty ? '版本未知' : daemon.version} · '
-                      '${daemon.ip.isNotEmpty ? daemon.ip : '—'}:${daemon.port}',
+                  l.nodeDetail_daemonListLine(
+                    daemon.available ? l.node_online : l.node_offline,
+                    daemon.version.isEmpty ? l.nodeDetail_versionUnknown : daemon.version,
+                    daemon.ip.isNotEmpty ? daemon.ip : '—',
+                    daemon.port,
+                  ),
                 ),
             ],
           ),
@@ -422,15 +435,15 @@ class _OverviewTab extends StatelessWidget {
     );
   }
 
-  static String _formatUptime(double seconds) {
+  static String _formatUptime(double seconds, AppLocalizations l) {
     if (seconds <= 0) return '—';
     final totalMinutes = seconds ~/ 60;
     final days = totalMinutes ~/ (24 * 60);
     final hours = (totalMinutes % (24 * 60)) ~/ 60;
     final minutes = totalMinutes % 60;
-    if (days > 0) return '$days 天 $hours 小时';
-    if (hours > 0) return '$hours 小时 $minutes 分钟';
-    return '$minutes 分钟';
+    if (days > 0) return l.nodeDetail_uptimeDaysHours(days, hours);
+    if (hours > 0) return l.nodeDetail_uptimeHoursMinutes(hours, minutes);
+    return l.nodeDetail_uptimeMinutes(minutes);
   }
 
   static String _formatBytes(int bytes) {
@@ -562,6 +575,7 @@ class _InstancesTabState extends State<_InstancesTab> {
   }
 
   Future<void> _load() async {
+    final l = AppLocalizations.of(context);
     setState(() {
       _loading = true;
       _error = null;
@@ -570,7 +584,7 @@ class _InstancesTabState extends State<_InstancesTab> {
     if (daemonId == null || daemonId.isEmpty) {
       setState(() {
         _loading = false;
-        _error = '无法确定守护进程 ID，请检查节点连接';
+        _error = l.nodeDetail_noDaemonId;
       });
       return;
     }
@@ -655,6 +669,7 @@ class _InstancesTabState extends State<_InstancesTab> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final daemons = widget.overview?.remote ?? [];
 
@@ -687,8 +702,8 @@ class _InstancesTabState extends State<_InstancesTab> {
               Expanded(
                 child: Text(
                   daemons.length > 1
-                      ? '选择守护进程后管理其实例'
-                      : '共 ${_instances?.length ?? 0} 个实例',
+                      ? l.nodeDetail_selectDaemonToManage
+                      : l.nodeDetail_instanceCount(_instances?.length ?? 0),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.outline,
                   ),
@@ -696,13 +711,13 @@ class _InstancesTabState extends State<_InstancesTab> {
               ),
               IconButton(
                 icon: const Icon(Icons.refresh),
-                tooltip: '刷新',
+                tooltip: l.common_refresh,
                 onPressed: _loading ? null : _load,
               ),
               FilledButton.icon(
                 onPressed: _loading ? null : _create,
                 icon: const Icon(Icons.add, size: 18),
-                label: const Text('新建实例'),
+                label: Text(l.nodeDetail_newInstance),
               ),
             ],
           ),
@@ -723,6 +738,7 @@ class _InstancesTabState extends State<_InstancesTab> {
   }
 
   Widget _buildList(ThemeData theme) {
+    final l = AppLocalizations.of(context);
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -737,7 +753,7 @@ class _InstancesTabState extends State<_InstancesTab> {
               const SizedBox(height: 12),
               FilledButton.icon(
                 icon: const Icon(Icons.refresh),
-                label: const Text('重试'),
+                label: Text(l.common_retry),
                 onPressed: _load,
               ),
             ],
@@ -749,7 +765,7 @@ class _InstancesTabState extends State<_InstancesTab> {
     if (instances.isEmpty) {
       return Center(
         child: Text(
-          '暂无实例\n点击右上角「新建实例」创建',
+          l.nodeDetail_noInstances,
           textAlign: TextAlign.center,
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.outline,
@@ -796,6 +812,7 @@ class _RemoteInstanceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final status = instance.status;
     return Card(
@@ -832,7 +849,7 @@ class _RemoteInstanceCard extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                instance.config.cwd.isEmpty ? '工作目录未知' : instance.config.cwd,
+                instance.config.cwd.isEmpty ? l.nodeDetail_cwdUnknown : instance.config.cwd,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
@@ -841,7 +858,7 @@ class _RemoteInstanceCard extends StatelessWidget {
               if (instance.currentPlayers >= 0) ...[
                 const SizedBox(height: 2),
                 Text(
-                  '在线玩家 ${instance.currentPlayers} / ${instance.maxPlayers}',
+                  '${l.nodeDetail_onlinePlayers}${instance.currentPlayers} / ${instance.maxPlayers}',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -853,25 +870,25 @@ class _RemoteInstanceCard extends StatelessWidget {
                 children: [
                   _ActionButton(
                     icon: Icons.play_arrow,
-                    label: '启动',
+                    label: l.nodeDetail_start,
                     color: Colors.green,
                     onPressed: status == RemoteStatus.stopped ? onStart : null,
                   ),
                   _ActionButton(
                     icon: Icons.stop,
-                    label: '停止',
+                    label: l.nodeDetail_stop,
                     color: Colors.orange,
                     onPressed: status.isActive ? onStop : null,
                   ),
                   _ActionButton(
                     icon: Icons.restart_alt,
-                    label: '重启',
+                    label: l.nodeDetail_restart,
                     color: Colors.blue,
                     onPressed: status.isActive ? onRestart : null,
                   ),
                   _ActionButton(
                     icon: Icons.power_settings_new,
-                    label: '强杀',
+                    label: l.nodeDetail_kill,
                     color: Colors.red,
                     onPressed: status.isActive ? onKill : null,
                   ),
@@ -992,18 +1009,19 @@ class _UsersTabState extends State<_UsersTab> {
   }
 
   Future<void> _delete(RemoteUser user) async {
+    final l = AppLocalizations.of(context);
     final confirmed = await showAppDialog<bool>(
       context,
       (_) => AlertDialog(
-        title: Text('删除用户「${user.userName}」？'),
+        title: Text(l.nodeDetail_deleteUserConfirm(user.userName)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('取消'),
+            child: Text(l.common_cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('删除'),
+            child: Text(l.common_delete),
           ),
         ],
       ),
@@ -1026,6 +1044,7 @@ class _UsersTabState extends State<_UsersTab> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
     return Column(
       children: [
@@ -1035,7 +1054,7 @@ class _UsersTabState extends State<_UsersTab> {
             children: [
               Expanded(
                 child: Text(
-                  '用户管理（面板 API）',
+                  l.nodeDetail_userManagement,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.outline,
                   ),
@@ -1043,13 +1062,13 @@ class _UsersTabState extends State<_UsersTab> {
               ),
               IconButton(
                 icon: const Icon(Icons.refresh),
-                tooltip: '刷新',
+                tooltip: l.common_refresh,
                 onPressed: _loading ? null : _load,
               ),
               FilledButton.icon(
                 onPressed: _loading ? null : _create,
                 icon: const Icon(Icons.person_add, size: 18),
-                label: const Text('新建用户'),
+                label: Text(l.nodeDetail_newUser),
               ),
             ],
           ),
@@ -1060,6 +1079,7 @@ class _UsersTabState extends State<_UsersTab> {
   }
 
   Widget _buildList(ThemeData theme) {
+    final l = AppLocalizations.of(context);
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
       return Center(
@@ -1072,7 +1092,7 @@ class _UsersTabState extends State<_UsersTab> {
               const SizedBox(height: 12),
               FilledButton.icon(
                 icon: const Icon(Icons.refresh),
-                label: const Text('重试'),
+                label: Text(l.common_retry),
                 onPressed: _load,
               ),
             ],
@@ -1082,7 +1102,7 @@ class _UsersTabState extends State<_UsersTab> {
     }
     final users = _users ?? [];
     if (users.isEmpty) {
-      return Center(child: Text('暂无用户', style: theme.textTheme.bodyMedium));
+      return Center(child: Text(l.nodeDetail_noUsers, style: theme.textTheme.bodyMedium));
     }
     return ListView.separated(
       padding: const EdgeInsets.all(16),
@@ -1107,8 +1127,8 @@ class _UsersTabState extends State<_UsersTab> {
             ),
             title: Text(user.userName),
             subtitle: Text(
-              '注册 ${user.registerTime.isEmpty ? '—' : user.registerTime}\n'
-              '实例 ${user.instances.length} 个',
+              '${l.nodeDetail_registered(user.registerTime.isEmpty ? '—' : user.registerTime)}\n'
+              '${l.nodeDetail_instancesCount(user.instances.length)}',
             ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
@@ -1129,7 +1149,7 @@ class _UsersTabState extends State<_UsersTab> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    isBanned ? '已禁用' : (isAdmin ? '管理员' : '普通用户'),
+                    isBanned ? l.common_disabled : (isAdmin ? l.nodeDetail_admin : l.nodeDetail_normalUser),
                     style: TextStyle(
                       fontSize: 11,
                       color: isBanned
@@ -1157,17 +1177,17 @@ class _UsersTabState extends State<_UsersTab> {
                   },
                   itemBuilder: (_) => [
                     if (!isAdmin)
-                      const PopupMenuItem(value: 'admin', child: Text('设为管理员')),
+                      PopupMenuItem(value: 'admin', child: Text(l.nodeDetail_setAdmin)),
                     if (isAdmin)
-                      const PopupMenuItem(value: 'user', child: Text('设为普通用户')),
+                      PopupMenuItem(value: 'user', child: Text(l.nodeDetail_setNormalUser)),
                     if (!isBanned)
-                      const PopupMenuItem(value: 'ban', child: Text('禁用')),
+                      PopupMenuItem(value: 'ban', child: Text(l.common_disabled)),
                     if (isBanned)
-                      const PopupMenuItem(value: 'unban', child: Text('解除禁用')),
+                      PopupMenuItem(value: 'unban', child: Text(l.nodeDetail_unban)),
                     const PopupMenuDivider(),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'delete',
-                      child: Text('删除', style: TextStyle(color: Colors.red)),
+                      child: Text(l.common_delete, style: const TextStyle(color: Colors.red)),
                     ),
                   ],
                 ),
@@ -1202,8 +1222,9 @@ class _CreateUserDialogState extends State<_CreateUserDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return AlertDialog(
-      title: const Text('新建用户'),
+      title: Text(l.nodeDetail_newUser),
       content: SizedBox(
         width: 360,
         child: Column(
@@ -1211,31 +1232,31 @@ class _CreateUserDialogState extends State<_CreateUserDialog> {
           children: [
             TextField(
               controller: _username,
-              decoration: const InputDecoration(
-                labelText: '用户名',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l.nodeDetail_username,
+                border: const OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _password,
               obscureText: true,
-              decoration: const InputDecoration(
-                labelText: '密码',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l.nodeDetail_password,
+                border: const OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<int>(
               initialValue: _permission,
-              decoration: const InputDecoration(
-                labelText: '权限',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l.nodeDetail_permission,
+                border: const OutlineInputBorder(),
               ),
-              items: const [
-                DropdownMenuItem(value: 1, child: Text('普通用户')),
-                DropdownMenuItem(value: 10, child: Text('管理员')),
-                DropdownMenuItem(value: -1, child: Text('禁用')),
+              items: [
+                DropdownMenuItem(value: 1, child: Text(l.nodeDetail_normalUser)),
+                DropdownMenuItem(value: 10, child: Text(l.nodeDetail_admin)),
+                DropdownMenuItem(value: -1, child: Text(l.common_disabled)),
               ],
               onChanged: (v) => setState(() => _permission = v ?? 1),
             ),
@@ -1245,7 +1266,7 @@ class _CreateUserDialogState extends State<_CreateUserDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
+          child: Text(l.common_cancel),
         ),
         FilledButton(
           onPressed: () {
@@ -1254,7 +1275,7 @@ class _CreateUserDialogState extends State<_CreateUserDialog> {
             if (name.isEmpty || pass.isEmpty) return;
             Navigator.of(context).pop((name, pass, _permission));
           },
-          child: const Text('创建'),
+          child: Text(l.nodeDetail_create),
         ),
       ],
     );
@@ -1328,9 +1349,10 @@ class _CreateInstanceDialogState extends State<_CreateInstanceDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
     return AlertDialog(
-      title: const Text('新建实例'),
+      title: Text(l.nodeDetail_newInstance),
       content: SizedBox(
         width: 440,
         child: SingleChildScrollView(
@@ -1340,25 +1362,25 @@ class _CreateInstanceDialogState extends State<_CreateInstanceDialog> {
             children: [
               TextField(
                 controller: _name,
-                decoration: const InputDecoration(
-                  labelText: '实例名称',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l.nodeDetail_instanceName,
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _cwd,
-                decoration: const InputDecoration(
-                  labelText: '工作目录（服务器上的绝对路径）',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l.nodeDetail_workdirAbsolute,
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _command,
-                decoration: const InputDecoration(
-                  labelText: '启动命令（如 java -Xmx2G -jar server.jar nogui）',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l.nodeDetail_startCommandHelper,
+                  border: const OutlineInputBorder(),
                 ),
               ),
               if (widget.showDocker) ...[
@@ -1366,18 +1388,18 @@ class _CreateInstanceDialogState extends State<_CreateInstanceDialog> {
                 const Divider(),
                 DropdownButtonFormField<String>(
                   initialValue: _processType,
-                  decoration: const InputDecoration(
-                    labelText: '进程类型',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: l.nodeDetail_processType,
+                    border: const OutlineInputBorder(),
                   ),
-                  items: const [
+                  items: [
                     DropdownMenuItem(
                       value: 'universal',
-                      child: Text('通用（直接运行进程）'),
+                      child: Text(l.nodeDetail_processUniversal),
                     ),
                     DropdownMenuItem(
                       value: 'docker',
-                      child: Text('Docker（容器内运行）'),
+                      child: Text(l.nodeDetail_processDocker),
                     ),
                   ],
                   onChanged: (v) =>
@@ -1392,7 +1414,7 @@ class _CreateInstanceDialogState extends State<_CreateInstanceDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
+          child: Text(l.common_cancel),
         ),
         FilledButton(
           onPressed: () {
@@ -1410,7 +1432,7 @@ class _CreateInstanceDialogState extends State<_CreateInstanceDialog> {
               ),
             );
           },
-          child: const Text('创建'),
+          child: Text(l.nodeDetail_create),
         ),
       ],
     );
@@ -1418,13 +1440,14 @@ class _CreateInstanceDialogState extends State<_CreateInstanceDialog> {
 
   /// Docker 配置字段（进程类型为 docker 时显示）。
   List<Widget> _buildDockerFields(ThemeData theme) {
+    final l = AppLocalizations.of(context);
     return [
       const SizedBox(height: 12),
       TextField(
         controller: _dockerImage,
-        decoration: const InputDecoration(
-          labelText: 'Docker 镜像（如 mcsm-ubuntu:22.04）',
-          border: OutlineInputBorder(),
+        decoration: InputDecoration(
+          labelText: l.nodeDetail_dockerImage,
+          border: const OutlineInputBorder(),
         ),
       ),
       const SizedBox(height: 12),
@@ -1434,9 +1457,9 @@ class _CreateInstanceDialogState extends State<_CreateInstanceDialog> {
             child: TextField(
               controller: _dockerMemory,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: '内存限制（MB）',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l.nodeDetail_memoryLimit,
+                border: const OutlineInputBorder(),
               ),
             ),
           ),
@@ -1444,9 +1467,9 @@ class _CreateInstanceDialogState extends State<_CreateInstanceDialog> {
           Expanded(
             child: DropdownButtonFormField<String>(
               initialValue: _networkMode,
-              decoration: const InputDecoration(
-                labelText: '网络模式',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l.nodeDetail_networkMode,
+                border: const OutlineInputBorder(),
               ),
               items: const [
                 DropdownMenuItem(value: 'bridge', child: Text('bridge')),
@@ -1461,25 +1484,25 @@ class _CreateInstanceDialogState extends State<_CreateInstanceDialog> {
       const SizedBox(height: 12),
       TextField(
         controller: _dockerPorts,
-        decoration: const InputDecoration(
-          labelText: '端口映射（逗号分隔，如 25565:25565/tcp）',
-          border: OutlineInputBorder(),
+        decoration: InputDecoration(
+          labelText: l.nodeDetail_portMappingHelper,
+          border: const OutlineInputBorder(),
         ),
       ),
       const SizedBox(height: 12),
       TextField(
         controller: _dockerVolumes,
-        decoration: const InputDecoration(
-          labelText: '额外挂载卷（逗号分隔，如 /data:/data）',
-          border: OutlineInputBorder(),
+        decoration: InputDecoration(
+          labelText: l.nodeDetail_extraVolumes,
+          border: const OutlineInputBorder(),
         ),
       ),
       const SizedBox(height: 12),
       TextField(
         controller: _dockerContainerName,
-        decoration: const InputDecoration(
-          labelText: '容器名称（可留空自动生成）',
-          border: OutlineInputBorder(),
+        decoration: InputDecoration(
+          labelText: l.nodeDetail_containerNameOptional,
+          border: const OutlineInputBorder(),
         ),
       ),
     ];
@@ -1576,11 +1599,12 @@ class _NodeOpsTabState extends State<NodeOpsTab> {
 
   /// 安装指定大版本 JDK（任务化，轮询进度）。
   Future<void> _installJava(int major) async {
+    final l = AppLocalizations.of(context);
     if (_javaBusy) return;
     _cancelJavaPoll();
     setState(() {
       _javaBusy = true;
-      _javaStatus = '安装 JDK $major 中…';
+      _javaStatus = l.nodeDetail_installingJdk(major);
       _javaError = null;
     });
     try {
@@ -1602,7 +1626,7 @@ class _NodeOpsTabState extends State<NodeOpsTab> {
               await _loadJavas();
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('JDK $major 安装完成')),
+                  SnackBar(content: Text(l.nodeDetail_jdkInstalled(major))),
                 );
               }
             } else if (p.isFailed) {
@@ -1611,7 +1635,7 @@ class _NodeOpsTabState extends State<NodeOpsTab> {
               setState(() {
                 _javaBusy = false;
                 _javaStatus = null;
-                _javaError = 'JDK $major 安装失败';
+                _javaError = l.nodeDetail_jdkInstallFailed(major);
               });
             }
           } catch (e) {
@@ -1636,19 +1660,20 @@ class _NodeOpsTabState extends State<NodeOpsTab> {
   }
 
   Future<void> _uninstallJava(int major) async {
+    final l = AppLocalizations.of(context);
     final confirmed = await showAppDialog<bool>(
       context,
       (_) => AlertDialog(
-        title: Text('卸载 JDK $major？'),
-        content: const Text('将从节点 {data}/jdk 删除该版本。'),
+        title: Text(l.nodeDetail_uninstallJdkTitle(major)),
+        content: Text(l.nodeDetail_uninstallJdkContent('{data}')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('取消'),
+            child: Text(l.common_cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('卸载'),
+            child: Text(l.nodeDetail_uninstall),
           ),
         ],
       ),
@@ -1671,6 +1696,7 @@ class _NodeOpsTabState extends State<NodeOpsTab> {
   // ==================== 从目录导入实例 ====================
 
   Future<void> _importInstance() async {
+    final l = AppLocalizations.of(context);
     final daemonId = widget.daemonId ?? '';
     if (daemonId.isEmpty) return;
     final result = await showAppDialog<({String path, String nickname})?>(
@@ -1687,17 +1713,17 @@ class _NodeOpsTabState extends State<NodeOpsTab> {
       if (!mounted) return;
       if (uuid.isNotEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('已导入实例 $uuid，请在「实例」标签页查看')),
+          SnackBar(content: Text(l.nodeDetail_importedInstance(uuid))),
         );
       } else {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('导入失败')));
+        ).showSnackBar(SnackBar(content: Text(l.nodeDetail_importFailed)));
       }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('导入失败：$e')),
+        SnackBar(content: Text(l.nodeDetail_importFailedWith(e.toString()))),
       );
     }
   }
@@ -1705,6 +1731,7 @@ class _NodeOpsTabState extends State<NodeOpsTab> {
   // ==================== 下载核心到实例 ====================
 
   Future<void> _downloadCore() async {
+    final l = AppLocalizations.of(context);
     final result =
         await showAppDialog<({String uuid, String url, String fileName, String? sha512})?>(
       context,
@@ -1720,12 +1747,12 @@ class _NodeOpsTabState extends State<NodeOpsTab> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已开始下载核心（任务 $jobId），进度见节点日志')),
+        SnackBar(content: Text(l.nodeDetail_coreDownloadStarted(jobId))),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('核心下载失败：$e')),
+        SnackBar(content: Text(l.nodeDetail_coreDownloadFailed(e.toString()))),
       );
     }
   }
@@ -1733,28 +1760,29 @@ class _NodeOpsTabState extends State<NodeOpsTab> {
   // ==================== 节点负载 ====================
 
   Future<void> _showLoad() async {
+    final l = AppLocalizations.of(context);
     setState(() => _auditLoading = true);
     try {
       final load = await widget.client.nodeLoad();
       if (!mounted) return;
       final cpuBusy = ((load['cpuBusy'] as num?) ?? 0).toDouble() * 100;
       final rows = <(String, String)>[
-        ('状态', '${load['state'] ?? '—'}'),
-        ('GOMAXPROCS', '${load['gomaxprocs'] ?? '—'}'),
-        ('GC 百分比', '${load['gcPercent'] ?? '—'}'),
-        ('CPU 占用', '${cpuBusy.toStringAsFixed(1)}%'),
-        ('goroutine 数', '${load['goroutines'] ?? '—'}'),
-        ('堆内存', '${load['heapAlloc'] ?? '—'}'),
-        ('CPU 核数', '${load['numCPU'] ?? '—'}'),
+        (l.common_status, '${load['state'] ?? '—'}'),
+        (l.nodeDetail_gomaxprocs, '${load['gomaxprocs'] ?? '—'}'),
+        (l.nodeDetail_gcPercent, '${load['gcPercent'] ?? '—'}'),
+        (l.nodeDetail_cpuUsage, '${cpuBusy.toStringAsFixed(1)}%'),
+        (l.nodeDetail_goroutines, '${load['goroutines'] ?? '—'}'),
+        (l.nodeDetail_heapMemory, '${load['heapAlloc'] ?? '—'}'),
+        (l.nodeDetail_cpuCores, '${load['numCPU'] ?? '—'}'),
       ];
       await showAppDialog<void>(
         context,
-        (_) => _NodeInfoDialog(title: '节点负载', rows: rows),
+        (_) => _NodeInfoDialog(title: l.nodeDetail_nodeLoad, rows: rows),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('读取负载失败：$e')),
+        SnackBar(content: Text(l.nodeDetail_loadFailed(e.toString()))),
       );
     } finally {
       if (mounted) setState(() => _auditLoading = false);
@@ -1764,6 +1792,7 @@ class _NodeOpsTabState extends State<NodeOpsTab> {
   // ==================== 审计日志 ====================
 
   Future<void> _showAudit() async {
+    final l = AppLocalizations.of(context);
     setState(() => _auditLoading = true);
     try {
       final log = await widget.client.auditLog(tail: 200);
@@ -1775,7 +1804,7 @@ class _NodeOpsTabState extends State<NodeOpsTab> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('读取审计日志失败：$e')),
+        SnackBar(content: Text(l.nodeDetail_auditFailed(e.toString()))),
       );
     } finally {
       if (mounted) setState(() => _auditLoading = false);
@@ -1784,30 +1813,31 @@ class _NodeOpsTabState extends State<NodeOpsTab> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         _opsCard(
           theme,
-          title: '从目录导入实例',
-          description: '指定节点侧已存在的服务端目录，节点扫描特征后创建实例。',
+          title: l.nodeDetail_importInstanceTitle,
+          description: l.nodeDetail_importInstanceDesc,
           icon: Icons.drive_folder_upload_outlined,
           trailing: FilledButton.icon(
             icon: const Icon(Icons.download_for_offline, size: 18),
-            label: const Text('导入'),
+            label: Text(l.nodeDetail_import),
             onPressed: _importInstance,
           ),
         ),
         const SizedBox(height: 12),
         _opsCard(
           theme,
-          title: '下载服务端核心到实例',
-          description: '节点直连 URL 下载核心 jar 到实例根目录（支持 sha512 校验）。',
+          title: l.nodeDetail_downloadCoreTitle,
+          description: l.nodeDetail_downloadCoreDesc,
           icon: Icons.download_outlined,
           trailing: FilledButton.icon(
             icon: const Icon(Icons.cloud_download, size: 18),
-            label: const Text('下载核心'),
+            label: Text(l.nodeDetail_downloadCore),
             onPressed: _downloadCore,
           ),
         ),
@@ -1816,24 +1846,24 @@ class _NodeOpsTabState extends State<NodeOpsTab> {
         const SizedBox(height: 12),
         _opsCard(
           theme,
-          title: '节点负载',
-          description: '守护进程自身负载调谐状态（idle/normal/busy、GOMAXPROCS、GC）。',
+          title: l.nodeDetail_nodeLoad,
+          description: l.nodeDetail_nodeLoadDesc,
           icon: Icons.speed_outlined,
           trailing: FilledButton.tonalIcon(
             icon: const Icon(Icons.analytics_outlined, size: 18),
-            label: const Text('查看'),
+            label: Text(l.nodeDetail_view),
             onPressed: _auditLoading ? null : _showLoad,
           ),
         ),
         const SizedBox(height: 12),
         _opsCard(
           theme,
-          title: '审计日志',
-          description: '记录每一次 API 请求（来源 IP、方法、路径、状态码、耗时）。',
+          title: l.nodeDetail_auditLog,
+          description: l.nodeDetail_auditLogDesc,
           icon: Icons.history_edu_outlined,
           trailing: FilledButton.tonalIcon(
             icon: const Icon(Icons.list_alt, size: 18),
-            label: const Text('查看'),
+            label: Text(l.nodeDetail_view),
             onPressed: _auditLoading ? null : _showAudit,
           ),
         ),
@@ -1842,6 +1872,7 @@ class _NodeOpsTabState extends State<NodeOpsTab> {
   }
 
   Widget _buildJavaCard(ThemeData theme) {
+    final l = AppLocalizations.of(context);
     return Card(
       elevation: 0,
       color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
@@ -1856,18 +1887,18 @@ class _NodeOpsTabState extends State<NodeOpsTab> {
                 Icon(Icons.coffee_outlined, size: 18, color: theme.colorScheme.primary),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text('Java 运行时', style: theme.textTheme.titleSmall),
+                  child: Text(l.nodeDetail_javaRuntime, style: theme.textTheme.titleSmall),
                 ),
                 IconButton(
                   icon: const Icon(Icons.refresh, size: 20),
-                  tooltip: '刷新',
+                  tooltip: l.common_refresh,
                   onPressed: _javaBusy ? null : _loadJavas,
                 ),
               ],
             ),
             const SizedBox(height: 4),
             Text(
-              '检测节点上的 Java 安装；可安装 Adoptium JDK 到 {data}/jdk。',
+              l.nodeDetail_javaRuntimeDesc('{data}'),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -1882,7 +1913,7 @@ class _NodeOpsTabState extends State<NodeOpsTab> {
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Text(
-                  '（未检测到 Java 运行时）',
+                  l.nodeDetail_noJavaRuntime,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -1904,7 +1935,7 @@ class _NodeOpsTabState extends State<NodeOpsTab> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'JDK ${rt.major} · ${rt.version} · ${rt.vendor}${rt.available ? '' : '（不可用）'}',
+                          'JDK ${rt.major} · ${rt.version} · ${rt.vendor}${rt.available ? '' : l.nodeDetail_unavailableParen}',
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodySmall,
                         ),
@@ -1912,7 +1943,7 @@ class _NodeOpsTabState extends State<NodeOpsTab> {
                       if (rt.major > 0)
                         IconButton(
                           icon: const Icon(Icons.delete_outline, size: 18),
-                          tooltip: '卸载',
+                          tooltip: l.nodeDetail_uninstall,
                           visualDensity: VisualDensity.compact,
                           onPressed: _javaBusy ? null : () => _uninstallJava(rt.major),
                         ),
@@ -1926,7 +1957,7 @@ class _NodeOpsTabState extends State<NodeOpsTab> {
                   .map(
                     (major) => OutlinedButton(
                       onPressed: _javaBusy ? null : () => _installJava(major),
-                      child: Text('安装 JDK $major'),
+                      child: Text(l.nodeDetail_installJdk(major)),
                     ),
                   )
                   .toList(),
@@ -1943,7 +1974,7 @@ class _NodeOpsTabState extends State<NodeOpsTab> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      _javaStatus ?? '处理中…',
+                      _javaStatus ?? l.nodeDetail_processing,
                       style: theme.textTheme.bodySmall,
                     ),
                   ),
@@ -2033,8 +2064,9 @@ class _ImportInstanceDialogState extends State<_ImportInstanceDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return AlertDialog(
-      title: const Text('从目录导入实例'),
+      title: Text(l.nodeDetail_importInstanceTitle),
       content: SizedBox(
         width: 360,
         child: Column(
@@ -2042,19 +2074,19 @@ class _ImportInstanceDialogState extends State<_ImportInstanceDialog> {
           children: [
             TextField(
               controller: _pathController,
-              decoration: const InputDecoration(
-                labelText: '节点侧目录绝对路径',
-                hintText: '如 /home/mc/server',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l.nodeDetail_nodeDirPath,
+                hintText: l.nodeDetail_nodeDirPathHint,
+                border: const OutlineInputBorder(),
               ),
               autofocus: true,
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: '实例名（可空，默认取目录名）',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l.nodeDetail_instanceNameOptional,
+                border: const OutlineInputBorder(),
               ),
             ),
           ],
@@ -2063,9 +2095,9 @@ class _ImportInstanceDialogState extends State<_ImportInstanceDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(null),
-          child: const Text('取消'),
+          child: Text(l.common_cancel),
         ),
-        FilledButton(onPressed: _submit, child: const Text('导入')),
+        FilledButton(onPressed: _submit, child: Text(l.nodeDetail_import)),
       ],
     );
   }
@@ -2110,8 +2142,9 @@ class _DownloadCoreDialogState extends State<_DownloadCoreDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return AlertDialog(
-      title: const Text('下载服务端核心'),
+      title: Text(l.nodeDetail_downloadCoreTitle),
       content: SizedBox(
         width: 380,
         child: SingleChildScrollView(
@@ -2120,33 +2153,33 @@ class _DownloadCoreDialogState extends State<_DownloadCoreDialog> {
             children: [
               TextField(
                 controller: _uuidController,
-                decoration: const InputDecoration(
-                  labelText: '目标实例 UUID',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l.nodeDetail_targetUuid,
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _urlController,
-                decoration: const InputDecoration(
-                  labelText: '下载链接 (http/https)',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l.nodeDetail_downloadUrl,
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: '文件名（如 server.jar）',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l.nodeDetail_fileName,
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _shaController,
-                decoration: const InputDecoration(
-                  labelText: 'sha512 校验（可选）',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l.nodeDetail_sha512,
+                  border: const OutlineInputBorder(),
                 ),
               ),
             ],
@@ -2156,9 +2189,9 @@ class _DownloadCoreDialogState extends State<_DownloadCoreDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(null),
-          child: const Text('取消'),
+          child: Text(l.common_cancel),
         ),
-        FilledButton(onPressed: _submit, child: const Text('开始下载')),
+        FilledButton(onPressed: _submit, child: Text(l.nodeDetail_startDownload)),
       ],
     );
   }
@@ -2173,6 +2206,7 @@ class _NodeInfoDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
     return AlertDialog(
       title: Text(title),
@@ -2208,7 +2242,7 @@ class _NodeInfoDialog extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('关闭'),
+          child: Text(l.common_close),
         ),
       ],
     );
@@ -2223,14 +2257,15 @@ class _AuditLogDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return AlertDialog(
-      title: const Text('审计日志（最近 200 行）'),
+      title: Text(l.nodeDetail_auditLogRecent),
       content: SizedBox(
         width: 640,
         height: 480,
         child: SingleChildScrollView(
           child: SelectableText(
-            log.isEmpty ? '（无审计日志）' : log,
+            log.isEmpty ? l.nodeDetail_noAuditLog : log,
             style: const TextStyle(
               fontFamily: 'monospace',
               fontSize: 11,
@@ -2241,7 +2276,7 @@ class _AuditLogDialog extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('关闭'),
+          child: Text(l.common_close),
         ),
       ],
     );

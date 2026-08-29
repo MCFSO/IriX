@@ -5,6 +5,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/node.dart';
 import '../utils/apple_widgets.dart';
 
@@ -60,26 +61,27 @@ class NodeCardGrid extends StatelessWidget {
 /// 重命名节点对话框，返回新名称（取消返回 null）。
 Future<String?> showRenameNodeDialog(BuildContext context, NodeInfo node) {
   final controller = TextEditingController(text: node.name);
+  final l = AppLocalizations.of(context);
   return showAppDialog<String>(
     context,
     (_) => AlertDialog(
-      title: const Text('重命名节点'),
+      title: Text(l.node_renameTitle),
       content: TextField(
         controller: controller,
         autofocus: true,
-        decoration: const InputDecoration(
-          border: OutlineInputBorder(),
-          hintText: '节点名称',
+        decoration: InputDecoration(
+          border: const OutlineInputBorder(),
+          hintText: l.node_nameHint,
         ),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
+          child: Text(l.common_cancel),
         ),
         FilledButton(
           onPressed: () => Navigator.of(context).pop(controller.text),
-          child: const Text('确定'),
+          child: Text(l.common_confirm),
         ),
       ],
     ),
@@ -88,19 +90,20 @@ Future<String?> showRenameNodeDialog(BuildContext context, NodeInfo node) {
 
 /// 删除节点确认对话框，返回是否确认删除。
 Future<bool?> showDeleteNodeConfirmDialog(BuildContext context, NodeInfo node) {
+  final l = AppLocalizations.of(context);
   return showAppDialog<bool>(
     context,
     (_) => AlertDialog(
-      title: Text('删除节点「${node.name}」？'),
-      content: const Text('仅删除本地保存的节点信息，不会影响服务器上的数据。'),
+      title: Text(l.node_deleteConfirmTitle(node.name)),
+      content: Text(l.node_deleteConfirmContent),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('取消'),
+          child: Text(l.common_cancel),
         ),
         FilledButton(
           onPressed: () => Navigator.of(context).pop(true),
-          child: const Text('删除'),
+          child: Text(l.common_delete),
         ),
       ],
     ),
@@ -128,6 +131,7 @@ class _NodeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     final isLocal = node.type == NodeType.node;
     return AppleCard(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -197,7 +201,7 @@ class _NodeCard extends StatelessWidget {
                     const SizedBox(width: 6),
                     Flexible(
                       child: Text(
-                        online ? '在线' : (error ?? '离线'),
+                        online ? l.node_online : (error ?? l.node_offline),
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: online
@@ -226,9 +230,9 @@ class _NodeCard extends StatelessWidget {
                   onDelete();
               }
             },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'rename', child: Text('重命名')),
-              PopupMenuItem(value: 'delete', child: Text('删除')),
+            itemBuilder: (_) => [
+              PopupMenuItem(value: 'rename', child: Text(l.node_renameMenu)),
+              PopupMenuItem(value: 'delete', child: Text(l.node_deleteMenu)),
             ],
           ),
         ],

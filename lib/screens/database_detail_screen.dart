@@ -5,6 +5,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../l10n/app_localizations.dart';
 import '../services/db_page_settings.dart';
 import '../services/remote_db_service.dart';
 import '../services/font_settings.dart';
@@ -250,6 +251,7 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
   // ---------- 顶部操作 ----------
 
   Future<void> _testConnection() async {
+    final l = AppLocalizations.of(context);
     try {
       if (_isRedis) {
         await _service.getRedisKeys(_connection, pattern: '*');
@@ -259,13 +261,13 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('连接成功')));
+      ).showSnackBar(SnackBar(content: Text(l.dbDetail_connectionSuccess)));
       _refreshCurrent();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('连接失败: $e')));
+      ).showSnackBar(SnackBar(content: Text(l.dbDetail_connectionFailed(e.toString()))));
     }
   }
 
@@ -283,6 +285,7 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
   // ---------- 数据库管理 ----------
 
   Future<void> _showCreateDatabaseDialog() async {
+    final l = AppLocalizations.of(context);
     final creds =
         await showAppDialog<
           ({String database, String username, String password})
@@ -298,33 +301,36 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('已创建数据库 ${creds.database}')));
+      ).showSnackBar(
+        SnackBar(content: Text(l.dbDetail_databaseCreated(creds.database))),
+      );
       _loadDatabases();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('创建失败: $e')));
+      ).showSnackBar(SnackBar(content: Text(l.dbDetail_createFailed(e.toString()))));
     }
   }
 
   Future<void> _confirmDropDatabase(String database) async {
+    final l = AppLocalizations.of(context);
     final confirmed = await showAppDialog<bool>(
       context,
       (ctx) => AlertDialog(
-        title: const Text('删除数据库'),
-        content: Text('确定要删除数据库 $database 吗？\n此操作不可恢复！'),
+        title: Text(l.dbDetail_dropDatabaseTitle),
+        content: Text(l.dbDetail_dropDatabaseConfirm(database)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
+            child: Text(l.common_cancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(ctx).colorScheme.error,
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('删除'),
+            child: Text(l.common_delete),
           ),
         ],
       ),
@@ -335,7 +341,9 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('已删除数据库 $database')));
+      ).showSnackBar(
+        SnackBar(content: Text(l.dbDetail_databaseDeleted(database))),
+      );
       if (_selectedDb == database) {
         _selectedDb = null;
         _level = 1;
@@ -345,7 +353,7 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('删除失败: $e')));
+      ).showSnackBar(SnackBar(content: Text(l.dbDetail_deleteFailed(e.toString()))));
     }
   }
 
@@ -390,18 +398,19 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
   }
 
   Future<void> _deleteRedisKey(String key) async {
+    final l = AppLocalizations.of(context);
     try {
       await _service.redisDelete(_connection, key);
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('已删除 $key')));
+      ).showSnackBar(SnackBar(content: Text(l.dbDetail_redisKeyDeleted(key))));
       _loadRedisKeys();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('删除失败: $e')));
+      ).showSnackBar(SnackBar(content: Text(l.dbDetail_deleteFailed(e.toString()))));
     }
   }
 
@@ -429,6 +438,7 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
   }
 
   Future<void> _showCreateUserDialog() async {
+    final l = AppLocalizations.of(context);
     final creds =
         await showAppDialog<({String username, String password, String host})>(
           context,
@@ -445,34 +455,37 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('已创建用户 ${creds.username}')));
+      ).showSnackBar(
+        SnackBar(content: Text(l.dbDetail_userCreated(creds.username))),
+      );
       _loadUsers();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('创建失败: $e')));
+      ).showSnackBar(SnackBar(content: Text(l.dbDetail_createFailed(e.toString()))));
     }
   }
 
   Future<void> _confirmDropUser(DbUserInfo user) async {
+    final l = AppLocalizations.of(context);
     final hostText = user.host == null ? '' : '@${user.host}';
     final confirmed = await showAppDialog<bool>(
       context,
       (ctx) => AlertDialog(
-        title: const Text('删除用户'),
-        content: Text('确定要删除用户 ${user.username}$hostText 吗？'),
+        title: Text(l.dbDetail_dropUserTitle),
+        content: Text(l.dbDetail_dropUserConfirm('${user.username}$hostText')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
+            child: Text(l.common_cancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(ctx).colorScheme.error,
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('删除'),
+            child: Text(l.common_delete),
           ),
         ],
       ),
@@ -487,13 +500,15 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('已删除用户 ${user.username}')));
+      ).showSnackBar(
+        SnackBar(content: Text(l.dbDetail_userDeleted(user.username))),
+      );
       _loadUsers();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('删除失败: $e')));
+      ).showSnackBar(SnackBar(content: Text(l.dbDetail_deleteFailed(e.toString()))));
     }
   }
 
@@ -511,8 +526,9 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text('${_connection.name} - 数据库')),
+      appBar: AppBar(title: Text(l.dbDetail_title(_connection.name))),
       body: Column(
         children: [
           // 顶部：连接信息（左）与用户管理（右）对半分布
@@ -539,6 +555,7 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
   /// 顶部连接信息卡。
   Widget _buildInfoCard() {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
@@ -554,7 +571,7 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
                   color: theme.colorScheme.primary,
                 ),
                 const SizedBox(width: 8),
-                Text('连接信息', style: theme.textTheme.titleMedium),
+                Text(l.dbDetail_connectionInfo, style: theme.textTheme.titleMedium),
                 const Spacer(),
                 Container(
                   width: 8,
@@ -565,37 +582,37 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
                   ),
                 ),
                 const SizedBox(width: 6),
-                const Text(
-                  '已连接',
-                  style: TextStyle(color: Colors.green, fontSize: 12),
+                Text(
+                  l.dbDetail_connected,
+                  style: const TextStyle(color: Colors.green, fontSize: 12),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            _infoRow('类型', _connection.type.label),
-            _infoRow('地址', '${_connection.host}:${_connection.port}'),
-            _infoRow('用户', _connection.username ?? '-'),
-            _infoRow('数据库', _connection.databaseName ?? '无'),
+            _infoRow(l.dbDetail_type, _connection.type.label),
+            _infoRow(l.dbDetail_address, '${_connection.host}:${_connection.port}'),
+            _infoRow(l.dbDetail_user, _connection.username ?? '-'),
+            _infoRow(l.dbDetail_database, _connection.databaseName ?? l.dbDetail_none),
             const SizedBox(height: 8),
             Row(
               children: [
                 TextButton.icon(
                   onPressed: _testConnection,
                   icon: const Icon(Icons.refresh, size: 18),
-                  label: const Text('测试连接'),
+                  label: Text(l.dbDetail_testConnection),
                 ),
                 if (!_isRedis) ...[
                   const SizedBox(width: 8),
                   FilledButton.tonalIcon(
                     onPressed: _showSqlDialog,
                     icon: const Icon(Icons.terminal, size: 18),
-                    label: const Text('执行 SQL'),
+                    label: Text(l.dbDetail_runSql),
                   ),
                   const SizedBox(width: 8),
                   FilledButton.tonalIcon(
                     onPressed: _showUserManagementDialog,
                     icon: const Icon(Icons.manage_accounts, size: 18),
-                    label: const Text('用户管理'),
+                    label: Text(l.dbDetail_userManagement),
                   ),
                 ],
               ],
@@ -628,6 +645,7 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
   /// 顶部用户管理卡（与连接信息卡左右对半）。
   Widget _buildUserCard() {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
@@ -643,13 +661,13 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
                   color: theme.colorScheme.primary,
                 ),
                 const SizedBox(width: 8),
-                Text('用户管理', style: theme.textTheme.titleMedium),
+                Text(l.dbDetail_userManagement, style: theme.textTheme.titleMedium),
                 const Spacer(),
                 if (!_isRedis)
                   FilledButton.tonalIcon(
                     onPressed: _showCreateUserDialog,
                     icon: const Icon(Icons.add, size: 18),
-                    label: const Text('新建用户'),
+                    label: Text(l.dbDetail_newUser),
                   ),
               ],
             ),
@@ -663,12 +681,13 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
 
   /// 用户管理卡内容：加载中 / 错误 / 空态 / 用户列表。
   Widget _buildUserList(ThemeData theme) {
+    final l = AppLocalizations.of(context);
     if (_isRedis) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 24),
         child: Center(
           child: Text(
-            'Redis 不支持用户管理',
+            l.dbDetail_redisNoUserManagement,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -697,7 +716,7 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 4),
-            TextButton(onPressed: _loadUsers, child: const Text('重试')),
+            TextButton(onPressed: _loadUsers, child: Text(l.common_retry)),
           ],
         ),
       );
@@ -707,7 +726,7 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
         padding: const EdgeInsets.symmetric(vertical: 24),
         child: Center(
           child: Text(
-            '暂无用户',
+            l.dbDetail_noUsers,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -751,7 +770,7 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
                     ),
                   ),
             trailing: IconButton(
-              tooltip: '删除',
+              tooltip: l.common_delete,
               icon: const Icon(Icons.delete_outline, size: 20),
               onPressed: () => _confirmDropUser(user),
             ),
@@ -772,6 +791,7 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
 
   /// 内容区错误提示。
   Widget _buildError(String message, {required VoidCallback onRetry}) {
+    final l = AppLocalizations.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -782,7 +802,7 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
             const SizedBox(height: 12),
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 16),
-            FilledButton(onPressed: onRetry, child: const Text('重试')),
+            FilledButton(onPressed: onRetry, child: Text(l.common_retry)),
           ],
         ),
       ),
@@ -806,25 +826,26 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
 
   Widget _buildDatabaseList() {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
           child: Row(
             children: [
-              Text('数据库', style: theme.textTheme.titleMedium),
+              Text(l.dbDetail_database, style: theme.textTheme.titleMedium),
               const Spacer(),
               FilledButton.tonalIcon(
                 onPressed: _showCreateDatabaseDialog,
                 icon: const Icon(Icons.add, size: 18),
-                label: const Text('新建数据库'),
+                label: Text(l.dbDetail_newDatabase),
               ),
             ],
           ),
         ),
         Expanded(
           child: _databases.isEmpty
-              ? const Center(child: Text('未找到数据库'))
+              ? Center(child: Text(l.dbDetail_noDatabases))
               : ListView.builder(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
@@ -848,7 +869,7 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                              tooltip: '删除',
+                              tooltip: l.common_delete,
                               icon: const Icon(Icons.delete_outline),
                               onPressed: () => _confirmDropDatabase(db),
                             ),
@@ -867,12 +888,13 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
 
   Widget _buildTableList() {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return Column(
       children: [
-        _buildLevelHeader(title: '数据库: ${_selectedDb ?? ''}'),
+        _buildLevelHeader(title: l.dbDetail_databasePrefix(_selectedDb ?? '')),
         Expanded(
           child: _tables.isEmpty
-              ? const Center(child: Text('该数据库没有表'))
+              ? Center(child: Text(l.dbDetail_noTables))
               : ListView.builder(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
@@ -905,6 +927,7 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
 
   Widget _buildDataBrowse() {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     final maxPage = _totalRows == 0 ? 1 : ((_totalRows - 1) ~/ _pageSize) + 1;
     return Column(
       children: [
@@ -915,11 +938,11 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
               TextButton.icon(
                 onPressed: _goBack,
                 icon: const Icon(Icons.arrow_back, size: 18),
-                label: const Text('返回'),
+                label: Text(l.common_back),
               ),
               Expanded(
                 child: Text(
-                  '表: ${_selectedTable ?? ''}',
+                  l.dbDetail_tablePrefix(_selectedTable ?? ''),
                   style: theme.textTheme.titleMedium,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -927,14 +950,20 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
               FilledButton.tonalIcon(
                 onPressed: _showAddRowDialog,
                 icon: const Icon(Icons.add, size: 18),
-                label: const Text('添加行'),
+                label: Text(l.dbDetail_addRow),
               ),
             ],
           ),
         ),
         Expanded(
           child: _rows.isEmpty
-              ? Center(child: Text(_totalRows == 0 ? '该表没有数据' : '当前页无数据'))
+              ? Center(
+                  child: Text(
+                    _totalRows == 0
+                        ? l.dbDetail_noDataInTable
+                        : l.dbDetail_noDataInPage,
+                  ),
+                )
               : _EditableTable(
                   rows: _rows,
                   columns: _columns,
@@ -948,16 +977,16 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               IconButton(
-                tooltip: '上一页',
+                tooltip: l.dbDetail_prevPage,
                 onPressed: _page > 1 ? () => _goToPage(_page - 1) : null,
                 icon: const Icon(Icons.chevron_left),
               ),
               Text(
-                '第 $_page / $maxPage 页 · 共 $_totalRows 行 · 每页 $_pageSize 行',
+                l.dbDetail_pageInfo(_page, maxPage, _totalRows, _pageSize),
                 style: theme.textTheme.bodySmall,
               ),
               IconButton(
-                tooltip: '下一页',
+                tooltip: l.dbDetail_nextPage,
                 onPressed: _page < maxPage ? () => _goToPage(_page + 1) : null,
                 icon: const Icon(Icons.chevron_right),
               ),
@@ -975,6 +1004,7 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
     String column,
     String newValue,
   ) async {
+    final l = AppLocalizations.of(context);
     final db = _selectedDb;
     final table = _selectedTable;
     if (db == null || table == null) return;
@@ -989,7 +1019,9 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(affected > 0 ? '已保存' : '未找到匹配行，数据未修改'),
+          content: Text(
+            affected > 0 ? l.dbDetail_saved : l.dbDetail_noMatchingRow,
+          ),
           duration: const Duration(seconds: 1),
         ),
       );
@@ -998,11 +1030,12 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('保存失败: $e')));
+      ).showSnackBar(SnackBar(content: Text(l.dbDetail_saveFailed(e.toString()))));
     }
   }
 
   Future<void> _showAddRowDialog() async {
+    final l = AppLocalizations.of(context);
     final values = await showAppDialog<Map<String, dynamic>>(
       context,
       (ctx) => _AddRowDialog(columns: _columns),
@@ -1016,33 +1049,34 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('已添加行')));
+      ).showSnackBar(SnackBar(content: Text(l.dbDetail_rowAdded)));
       _loadRows();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('添加失败: $e')));
+      ).showSnackBar(SnackBar(content: Text(l.dbDetail_addFailed(e.toString()))));
     }
   }
 
   Future<void> _confirmDeleteRow(Map<String, dynamic> row) async {
+    final l = AppLocalizations.of(context);
     final confirmed = await showAppDialog<bool>(
       context,
       (ctx) => AlertDialog(
-        title: const Text('删除行'),
-        content: const Text('确定要删除这一行吗？此操作不可恢复！'),
+        title: Text(l.dbDetail_deleteRow),
+        content: Text(l.dbDetail_deleteRowConfirm),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
+            child: Text(l.common_cancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(ctx).colorScheme.error,
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('删除'),
+            child: Text(l.common_delete),
           ),
         ],
       ),
@@ -1054,20 +1088,21 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
     try {
       final affected = await _service.deleteRow(_connection, db, table, row);
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('已删除 $affected 行')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.dbDetail_rowsDeleted(affected))),
+      );
       _loadRows();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('删除失败: $e')));
+      ).showSnackBar(SnackBar(content: Text(l.dbDetail_deleteFailed(e.toString()))));
     }
   }
 
   /// 层级标题栏：返回按钮 + 当前层级标题。
   Widget _buildLevelHeader({required String title}) {
+    final l = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: Row(
@@ -1075,7 +1110,7 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
           TextButton.icon(
             onPressed: _goBack,
             icon: const Icon(Icons.arrow_back, size: 18),
-            label: const Text('返回'),
+            label: Text(l.common_back),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -1092,6 +1127,7 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
 
   /// Redis Key 列表视图。
   Widget _buildRedisView() {
+    final l = AppLocalizations.of(context);
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -1107,18 +1143,18 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
               TextButton.icon(
                 onPressed: _redisPattern == '*' ? null : _resetRedisPattern,
                 icon: const Icon(Icons.arrow_back, size: 18),
-                label: const Text('返回'),
+                label: Text(l.common_back),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: TextField(
                   controller: _redisSearchController,
                   onChanged: _onRedisSearchChanged,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     isDense: true,
-                    prefixIcon: Icon(Icons.search, size: 20),
-                    hintText: '前缀搜索 Key',
-                    border: OutlineInputBorder(
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    hintText: l.dbDetail_searchKeyPrefix,
+                    border: const OutlineInputBorder(
                       borderRadius: BorderRadius.all(Radius.circular(10)),
                     ),
                   ),
@@ -1126,7 +1162,7 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
               ),
               IconButton(
                 icon: const Icon(Icons.add),
-                tooltip: '添加 Key',
+                tooltip: l.dbDetail_addRedisKey,
                 onPressed: _addRedisKey,
               ),
             ],
@@ -1134,7 +1170,7 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
         ),
         Expanded(
           child: _redisKeys.isEmpty
-              ? const Center(child: Text('没有匹配的 Key'))
+              ? Center(child: Text(l.dbDetail_noMatchingKeys))
               : ListView.builder(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
@@ -1150,6 +1186,7 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
   }
 
   Widget _buildRedisKeyItem(String key) {
+    final l = AppLocalizations.of(context);
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1164,12 +1201,12 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
           children: [
             IconButton(
               icon: const Icon(Icons.visibility_outlined),
-              tooltip: '查看',
+              tooltip: l.dbDetail_view,
               onPressed: () => _viewRedisKey(key),
             ),
             IconButton(
               icon: const Icon(Icons.delete_outline),
-              tooltip: '删除',
+              tooltip: l.common_delete,
               onPressed: () => _deleteRedisKey(key),
             ),
           ],
@@ -1244,8 +1281,9 @@ class _EditableTableState extends State<_EditableTable> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     if (widget.rows.isEmpty) {
-      return const Center(child: Text('无数据'));
+      return Center(child: Text(l.dbDetail_noData));
     }
     final cols = widget.columns ?? widget.rows.first.keys.toList();
     final theme = Theme.of(context);
@@ -1288,6 +1326,7 @@ class _EditableTableState extends State<_EditableTable> {
     Map<String, dynamic> row,
     ThemeData theme,
   ) {
+    final l = AppLocalizations.of(context);
     return DataRow(
       cells: [
         for (final c in cols)
@@ -1297,7 +1336,7 @@ class _EditableTableState extends State<_EditableTable> {
           ),
         DataCell(
           IconButton(
-            tooltip: '删除行',
+            tooltip: l.dbDetail_deleteRow,
             icon: Icon(Icons.delete_outline, color: theme.colorScheme.error),
             onPressed: () => widget.onDeleteRow(row),
           ),
@@ -1383,8 +1422,9 @@ class _AddRowDialogState extends State<_AddRowDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return AlertDialog(
-      title: const Text('添加行'),
+      title: Text(l.dbDetail_addRow),
       content: SizedBox(
         width: 420,
         child: SingleChildScrollView(
@@ -1409,9 +1449,9 @@ class _AddRowDialogState extends State<_AddRowDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
+          child: Text(l.common_cancel),
         ),
-        FilledButton(onPressed: _submit, child: const Text('添加')),
+        FilledButton(onPressed: _submit, child: Text(l.common_add)),
       ],
     );
   }
@@ -1425,8 +1465,9 @@ class _SqlResultTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     if (rows.isEmpty) {
-      return const Center(child: Text('无数据'));
+      return Center(child: Text(l.dbDetail_noData));
     }
     final cols = rows.first.keys.toList();
     final theme = Theme.of(context);
@@ -1569,8 +1610,9 @@ class _SqlDialogState extends State<_SqlDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return AlertDialog(
-      title: const Text('执行 SQL'),
+      title: Text(l.dbDetail_runSql),
       content: SizedBox(
         width: 560,
         height: 480,
@@ -1600,7 +1642,7 @@ class _SqlDialogState extends State<_SqlDialog> {
                   onPressed: _running
                       ? null
                       : () => Navigator.of(context).pop(),
-                  child: const Text('取消'),
+                  child: Text(l.common_cancel),
                 ),
                 const SizedBox(width: 8),
                 FilledButton(
@@ -1611,7 +1653,7 @@ class _SqlDialogState extends State<_SqlDialog> {
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('执行'),
+                      : Text(l.dbDetail_execute),
                 ),
               ],
             ),
@@ -1622,21 +1664,22 @@ class _SqlDialogState extends State<_SqlDialog> {
   }
 
   Widget _buildDatabaseSelector() {
+    final l = AppLocalizations.of(context);
     if (widget.databases.isEmpty) {
       return Text(
-        '未找到数据库',
+        l.dbDetail_noDatabases,
         style: TextStyle(color: Theme.of(context).colorScheme.error),
       );
     }
     return DropdownButtonFormField<String?>(
       initialValue: _selectedDb,
-      decoration: const InputDecoration(
-        labelText: '数据库',
-        border: OutlineInputBorder(),
+      decoration: InputDecoration(
+        labelText: l.dbDetail_database,
+        border: const OutlineInputBorder(),
         isDense: true,
       ),
       items: [
-        const DropdownMenuItem<String?>(value: null, child: Text('选择数据库')),
+        DropdownMenuItem<String?>(value: null, child: Text(l.dbDetail_selectDatabase)),
         for (final db in widget.databases)
           DropdownMenuItem<String?>(value: db, child: Text(db)),
       ],
@@ -1646,6 +1689,7 @@ class _SqlDialogState extends State<_SqlDialog> {
 
   Widget _buildResultArea() {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     if (_running) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -1664,7 +1708,7 @@ class _SqlDialogState extends State<_SqlDialog> {
     if (_lastSql == null) {
       return Center(
         child: Text(
-          '执行后在此显示结果',
+          l.dbDetail_resultShownAfterRun,
           style: TextStyle(color: theme.colorScheme.outline),
         ),
       );
@@ -1673,9 +1717,9 @@ class _SqlDialogState extends State<_SqlDialog> {
       return _SqlResultTable(rows: _resultRows);
     }
     if (_isQueryStatement(_lastSql!)) {
-      return const Center(child: Text('查询返回 0 行'));
+      return Center(child: Text(l.dbDetail_queryNoRows));
     }
-    return Center(child: Text('受影响行数: ${_affected ?? 0}'));
+    return Center(child: Text(l.dbDetail_affectedRows(_affected ?? 0)));
   }
 }
 
@@ -1726,6 +1770,7 @@ class _RedisValueDialogState extends State<_RedisValueDialog> {
   }
 
   Future<void> _delete() async {
+    final l = AppLocalizations.of(context);
     setState(() => _deleting = true);
     try {
       await _service.redisDelete(widget.connection, widget.keyName);
@@ -1736,13 +1781,14 @@ class _RedisValueDialogState extends State<_RedisValueDialog> {
       setState(() => _deleting = false);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('删除失败: $e')));
+      ).showSnackBar(SnackBar(content: Text(l.dbDetail_deleteFailed(e.toString()))));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return AlertDialog(
       title: Text(
         widget.keyName,
@@ -1754,18 +1800,19 @@ class _RedisValueDialogState extends State<_RedisValueDialog> {
         TextButton.icon(
           onPressed: _deleting ? null : _delete,
           icon: const Icon(Icons.delete_outline, size: 18),
-          label: const Text('删除'),
+          label: Text(l.common_delete),
           style: TextButton.styleFrom(foregroundColor: theme.colorScheme.error),
         ),
         FilledButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('关闭'),
+          child: Text(l.common_close),
         ),
       ],
     );
   }
 
   Widget _buildContent(ThemeData theme) {
+    final l = AppLocalizations.of(context);
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -1786,7 +1833,7 @@ class _RedisValueDialogState extends State<_RedisValueDialog> {
       ),
       child: SingleChildScrollView(
         child: Text(
-          _value ?? '(空)',
+          _value ?? l.dbDetail_emptyValue,
           style: TextStyle(
             fontFamily: FontSettings.instance.terminalFamily,
             fontSize: 13,
@@ -1825,9 +1872,10 @@ class _RedisAddKeyDialogState extends State<_RedisAddKeyDialog> {
   }
 
   Future<void> _save() async {
+    final l = AppLocalizations.of(context);
     final key = _keyController.text.trim();
     if (key.isEmpty) {
-      setState(() => _error = 'Key 不能为空');
+      setState(() => _error = l.dbDetail_keyRequired);
       return;
     }
     setState(() {
@@ -1850,8 +1898,9 @@ class _RedisAddKeyDialogState extends State<_RedisAddKeyDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return AlertDialog(
-      title: const Text('添加 Key'),
+      title: Text(l.dbDetail_addRedisKey),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1860,9 +1909,9 @@ class _RedisAddKeyDialogState extends State<_RedisAddKeyDialog> {
             controller: _keyController,
             autofocus: true,
             style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
-            decoration: const InputDecoration(
-              labelText: 'Key 名称',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: l.dbDetail_keyName,
+              border: const OutlineInputBorder(),
               isDense: true,
             ),
           ),
@@ -1871,9 +1920,9 @@ class _RedisAddKeyDialogState extends State<_RedisAddKeyDialog> {
             controller: _valueController,
             maxLines: 3,
             style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
-            decoration: const InputDecoration(
-              labelText: '值',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: l.dbDetail_value,
+              border: const OutlineInputBorder(),
               isDense: true,
             ),
           ),
@@ -1889,7 +1938,7 @@ class _RedisAddKeyDialogState extends State<_RedisAddKeyDialog> {
       actions: [
         TextButton(
           onPressed: _saving ? null : () => Navigator.of(context).pop(),
-          child: const Text('取消'),
+          child: Text(l.common_cancel),
         ),
         FilledButton(
           onPressed: _saving ? null : _save,
@@ -1899,7 +1948,7 @@ class _RedisAddKeyDialogState extends State<_RedisAddKeyDialog> {
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('保存'),
+              : Text(l.common_save),
         ),
       ],
     );
@@ -1939,19 +1988,20 @@ class _CreateUserDialogState extends State<_CreateUserDialog> {
   }
 
   void _submit() {
+    final l = AppLocalizations.of(context);
     final username = _usernameController.text.trim();
     final password = _passwordController.text;
     final host = _isMysql ? _hostController.text.trim() : '%';
     if (username.isEmpty) {
-      setState(() => _error = '请输入用户名');
+      setState(() => _error = l.dbDetail_usernameRequired);
       return;
     }
     if (password.isEmpty) {
-      setState(() => _error = '请输入密码');
+      setState(() => _error = l.dbDetail_passwordRequired);
       return;
     }
     if (host.isEmpty) {
-      setState(() => _error = '请输入登录主机');
+      setState(() => _error = l.dbDetail_hostRequired);
       return;
     }
     Navigator.of(
@@ -1962,8 +2012,9 @@ class _CreateUserDialogState extends State<_CreateUserDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return AlertDialog(
-      title: const Text('新建用户'),
+      title: Text(l.dbDetail_newUser),
       content: SizedBox(
         width: 420,
         child: SingleChildScrollView(
@@ -1975,9 +2026,9 @@ class _CreateUserDialogState extends State<_CreateUserDialog> {
                 controller: _usernameController,
                 autofocus: true,
                 style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
-                decoration: const InputDecoration(
-                  labelText: '用户名',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l.dbDetail_username,
+                  border: const OutlineInputBorder(),
                   isDense: true,
                 ),
               ),
@@ -1985,9 +2036,9 @@ class _CreateUserDialogState extends State<_CreateUserDialog> {
               TextField(
                 controller: _passwordController,
                 obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: '密码',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l.dbDetail_password,
+                  border: const OutlineInputBorder(),
                   isDense: true,
                 ),
               ),
@@ -1996,10 +2047,10 @@ class _CreateUserDialogState extends State<_CreateUserDialog> {
                 TextField(
                   controller: _hostController,
                   style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
-                  decoration: const InputDecoration(
-                    labelText: '登录主机',
-                    hintText: '例如 % 或 localhost',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: l.dbDetail_loginHost,
+                    hintText: l.dbDetail_loginHostHint,
+                    border: const OutlineInputBorder(),
                     isDense: true,
                   ),
                 ),
@@ -2021,9 +2072,9 @@ class _CreateUserDialogState extends State<_CreateUserDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
+          child: Text(l.common_cancel),
         ),
-        FilledButton(onPressed: _submit, child: const Text('创建')),
+        FilledButton(onPressed: _submit, child: Text(l.dbDetail_create)),
       ],
     );
   }
@@ -2105,9 +2156,10 @@ class _CreateDatabaseDialogState extends State<_CreateDatabaseDialog> {
   }
 
   void _submit() {
+    final l = AppLocalizations.of(context);
     final database = _databaseController.text.trim();
     if (database.isEmpty) {
-      setState(() => _databaseError = '请输入数据库名称');
+      setState(() => _databaseError = l.dbDetail_databaseNameRequired);
       return;
     }
     final username = _autoGenerate
@@ -2117,11 +2169,11 @@ class _CreateDatabaseDialogState extends State<_CreateDatabaseDialog> {
         ? _generatedPassword
         : _passwordController.text;
     if (username.isEmpty) {
-      setState(() => _databaseError = '请输入用户名');
+      setState(() => _databaseError = l.dbDetail_usernameRequired);
       return;
     }
     if (password.isEmpty) {
-      setState(() => _databaseError = '请输入密码');
+      setState(() => _databaseError = l.dbDetail_passwordRequired);
       return;
     }
     Navigator.of(
@@ -2132,8 +2184,9 @@ class _CreateDatabaseDialogState extends State<_CreateDatabaseDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return AlertDialog(
-      title: const Text('新建数据库'),
+      title: Text(l.dbDetail_newDatabase),
       content: SizedBox(
         width: 420,
         child: SingleChildScrollView(
@@ -2149,29 +2202,29 @@ class _CreateDatabaseDialogState extends State<_CreateDatabaseDialog> {
                   setState(() => _databaseError = null);
                 },
                 decoration: InputDecoration(
-                  labelText: '数据库名称',
+                  labelText: l.dbDetail_databaseName,
                   hintText: widget.type == DbType.postgres
-                      ? '小写字母/数字/下划线'
-                      : '例如 minecraft',
+                      ? l.dbDetail_databaseNameHintPg
+                      : l.dbDetail_databaseNameHint,
                   border: const OutlineInputBorder(),
                   isDense: true,
                   errorText: _databaseError,
                 ),
               ),
               const SizedBox(height: 16),
-              Text('数据库专用账号', style: theme.textTheme.titleSmall),
+              Text(l.dbDetail_databaseAccount, style: theme.textTheme.titleSmall),
               const SizedBox(height: 8),
               SegmentedButton<bool>(
-                segments: const [
+                segments: [
                   ButtonSegment(
                     value: true,
-                    icon: Icon(Icons.auto_awesome, size: 18),
-                    label: Text('自动生成'),
+                    icon: const Icon(Icons.auto_awesome, size: 18),
+                    label: Text(l.dbDetail_autoGenerate),
                   ),
                   ButtonSegment(
                     value: false,
-                    icon: Icon(Icons.edit_outlined, size: 18),
-                    label: Text('自定义'),
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    label: Text(l.dbDetail_custom),
                   ),
                 ],
                 selected: {_autoGenerate},
@@ -2184,16 +2237,16 @@ class _CreateDatabaseDialogState extends State<_CreateDatabaseDialog> {
               ),
               const SizedBox(height: 12),
               if (_autoGenerate) ...[
-                _readOnlyField('用户名', _generatedUsername, false),
+                _readOnlyField(l.dbDetail_username, _generatedUsername, false),
                 const SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(
-                      child: _readOnlyField('密码', _generatedPassword, true),
+                      child: _readOnlyField(l.dbDetail_password, _generatedPassword, true),
                     ),
                     const SizedBox(width: 8),
                     IconButton(
-                      tooltip: '重新生成',
+                      tooltip: l.dbDetail_regenerate,
                       icon: const Icon(Icons.refresh),
                       onPressed: _generate,
                     ),
@@ -2202,9 +2255,9 @@ class _CreateDatabaseDialogState extends State<_CreateDatabaseDialog> {
               ] else ...[
                 TextField(
                   controller: _usernameController,
-                  decoration: const InputDecoration(
-                    labelText: '用户名',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: l.dbDetail_username,
+                    border: const OutlineInputBorder(),
                     isDense: true,
                   ),
                 ),
@@ -2212,16 +2265,16 @@ class _CreateDatabaseDialogState extends State<_CreateDatabaseDialog> {
                 TextField(
                   controller: _passwordController,
                   obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: '密码',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: l.dbDetail_password,
+                    border: const OutlineInputBorder(),
                     isDense: true,
                   ),
                 ),
               ],
               const SizedBox(height: 12),
               Text(
-                '将创建独立数据库并授予该账号全部权限',
+                l.dbDetail_databaseAccountNote,
                 style: TextStyle(
                   color: theme.colorScheme.onSurfaceVariant,
                   fontSize: 12,
@@ -2234,9 +2287,9 @@ class _CreateDatabaseDialogState extends State<_CreateDatabaseDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
+          child: Text(l.common_cancel),
         ),
-        FilledButton(onPressed: _submit, child: const Text('创建')),
+        FilledButton(onPressed: _submit, child: Text(l.dbDetail_create)),
       ],
     );
   }
@@ -2290,6 +2343,7 @@ class _DbUserManagementDialogState extends State<_DbUserManagementDialog> {
   }
 
   Future<void> _showCreateUserDialog() async {
+    final l = AppLocalizations.of(context);
     final creds =
         await showAppDialog<({String username, String password, String host})>(
           context,
@@ -2306,34 +2360,37 @@ class _DbUserManagementDialogState extends State<_DbUserManagementDialog> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('已创建用户 ${creds.username}')));
+      ).showSnackBar(
+        SnackBar(content: Text(l.dbDetail_userCreated(creds.username))),
+      );
       _loadUsers();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('创建失败: $e')));
+      ).showSnackBar(SnackBar(content: Text(l.dbDetail_createFailed(e.toString()))));
     }
   }
 
   Future<void> _confirmDropUser(DbUserInfo user) async {
+    final l = AppLocalizations.of(context);
     final hostText = user.host == null ? '' : '@${user.host}';
     final confirmed = await showAppDialog<bool>(
       context,
       (ctx) => AlertDialog(
-        title: const Text('删除用户'),
-        content: Text('确定要删除用户 ${user.username}$hostText 吗？'),
+        title: Text(l.dbDetail_dropUserTitle),
+        content: Text(l.dbDetail_dropUserConfirm('${user.username}$hostText')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
+            child: Text(l.common_cancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(ctx).colorScheme.error,
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('删除'),
+            child: Text(l.common_delete),
           ),
         ],
       ),
@@ -2348,28 +2405,31 @@ class _DbUserManagementDialogState extends State<_DbUserManagementDialog> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('已删除用户 ${user.username}')));
+      ).showSnackBar(
+        SnackBar(content: Text(l.dbDetail_userDeleted(user.username))),
+      );
       _loadUsers();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('删除失败: $e')));
+      ).showSnackBar(SnackBar(content: Text(l.dbDetail_deleteFailed(e.toString()))));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return AlertDialog(
       title: Row(
         children: [
-          const Text('用户管理'),
+          Text(l.dbDetail_userManagement),
           const Spacer(),
           FilledButton.tonalIcon(
             onPressed: _showCreateUserDialog,
             icon: const Icon(Icons.add, size: 18),
-            label: const Text('新建用户'),
+            label: Text(l.dbDetail_newUser),
           ),
         ],
       ),
@@ -2377,13 +2437,14 @@ class _DbUserManagementDialogState extends State<_DbUserManagementDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('关闭'),
+          child: Text(l.common_close),
         ),
       ],
     );
   }
 
   Widget _buildBody(ThemeData theme) {
+    final l = AppLocalizations.of(context);
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -2398,7 +2459,7 @@ class _DbUserManagementDialogState extends State<_DbUserManagementDialog> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
-            TextButton(onPressed: _loadUsers, child: const Text('重试')),
+            TextButton(onPressed: _loadUsers, child: Text(l.common_retry)),
           ],
         ),
       );
@@ -2406,7 +2467,7 @@ class _DbUserManagementDialogState extends State<_DbUserManagementDialog> {
     if (_users.isEmpty) {
       return Center(
         child: Text(
-          '暂无用户',
+          l.dbDetail_noUsers,
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -2443,7 +2504,7 @@ class _DbUserManagementDialogState extends State<_DbUserManagementDialog> {
                   ),
                 ),
           trailing: IconButton(
-            tooltip: '删除',
+            tooltip: l.common_delete,
             icon: const Icon(Icons.delete_outline, size: 20),
             onPressed: () => _confirmDropUser(user),
           ),

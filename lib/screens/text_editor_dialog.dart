@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
+import '../l10n/app_localizations.dart';
 import '../services/font_settings.dart';
 import '../utils/code_highlight.dart';
 
@@ -86,6 +87,7 @@ class _TextEditorDialogState extends State<TextEditorDialog> {
   Widget build(BuildContext context) {
     final fileName = p.basename(widget.filePath);
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
 
     return Dialog.fullscreen(
       child: Scaffold(
@@ -99,12 +101,12 @@ class _TextEditorDialogState extends State<TextEditorDialog> {
             IconButton(
               icon: const Icon(Icons.undo),
               onPressed: _undoStack.isNotEmpty ? _undo : null,
-              tooltip: '撤回',
+              tooltip: l.textEditor_undo,
             ),
             IconButton(
               icon: const Icon(Icons.save),
               onPressed: _save,
-              tooltip: '保存',
+              tooltip: l.common_save,
             ),
           ],
         ),
@@ -113,7 +115,7 @@ class _TextEditorDialogState extends State<TextEditorDialog> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('无法读取文件', style: theme.textTheme.titleMedium),
+                    Text(l.textEditor_cannotRead, style: theme.textTheme.titleMedium),
                     const SizedBox(height: 8),
                     Text(_error!, style: theme.textTheme.bodySmall),
                   ],

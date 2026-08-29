@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../l10n/app_localizations.dart';
 import '../utils/apple_widgets.dart';
 import 'download_core_screen.dart';
 import 'import_core_screen.dart';
@@ -17,8 +18,9 @@ class NewInstanceScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('新建实例')),
+      appBar: AppBar(title: Text(l.home_newInstance)),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 880),
@@ -31,8 +33,8 @@ class NewInstanceScreen extends StatelessWidget {
                   Expanded(
                     child: _SubOptionCard(
                       icon: Icons.download,
-                      title: '下载',
-                      description: '自动下载核心并新建服务器实例',
+                      title: l.newInstance_download,
+                      description: l.newInstance_downloadDesc,
                       onTap: () =>
                           pushPage(context, (_) => const DownloadCoreScreen()),
                     ),
@@ -41,8 +43,8 @@ class NewInstanceScreen extends StatelessWidget {
                   Expanded(
                     child: _SubOptionCard(
                       icon: Icons.file_download_done,
-                      title: '导入',
-                      description: '导入一个服务器核心新建服务器实例',
+                      title: l.newInstance_import,
+                      description: l.newInstance_importDesc,
                       onTap: () =>
                           pushPage(context, (_) => const ImportCoreScreen()),
                     ),

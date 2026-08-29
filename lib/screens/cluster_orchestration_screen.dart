@@ -12,6 +12,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/node.dart';
 import '../models/orchestration.dart';
 import '../services/orchestrator_service.dart';
@@ -86,6 +87,7 @@ class _ClusterOrchestrationScreenState
   // ======================== 服务操作 ========================
 
   Future<void> _createService() async {
+    final l = AppLocalizations.of(context);
     final service = await showAppDialog<McService>(
       context,
       (_) => const _ServiceDialog(),
@@ -93,21 +95,22 @@ class _ClusterOrchestrationScreenState
     if (service == null || !mounted) return;
     try {
       await OrchestratorService.instance.upsertService(service);
-      _toast('服务已创建：${service.name}');
+      _toast(l.clusterOrch_serviceCreated(service.name));
       await _refresh();
       unawaited(OrchestratorService.instance.tick());
     } catch (e) {
-      _toast('创建失败：$e');
+      _toast(l.clusterOrch_createFailed(e.toString()));
     }
   }
 
   Future<void> _updateService(McService service) async {
+    final l = AppLocalizations.of(context);
     try {
       await OrchestratorService.instance.upsertService(service);
       await _refresh();
       unawaited(OrchestratorService.instance.tick());
     } catch (e) {
-      _toast('更新失败：$e');
+      _toast(l.clusterOrch_updateFailed(e.toString()));
     }
   }
 
@@ -128,22 +131,23 @@ class _ClusterOrchestrationScreenState
       _updateService(_copyWith(service, autoHeal: value));
 
   Future<void> _deleteService(McService service) async {
+    final l = AppLocalizations.of(context);
     final ok = await showAppDialog<bool>(
       context,
       (_) => AlertDialog(
-        title: Text('删除服务 ${service.name}'),
-        content: const Text('将销毁该服务的全部副本（容器 / jail），确定继续？'),
+        title: Text(l.clusterOrch_deleteService(service.name)),
+        content: Text(l.clusterOrch_deleteServiceConfirm),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
+            child: Text(l.common_cancel),
           ),
           FilledButton.tonal(
             style: FilledButton.styleFrom(
               foregroundColor: Theme.of(context).colorScheme.error,
             ),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('删除'),
+            child: Text(l.common_delete),
           ),
         ],
       ),
@@ -153,15 +157,16 @@ class _ClusterOrchestrationScreenState
       await OrchestratorService.instance.deleteService(service.id);
       await _refresh();
     } catch (e) {
-      _toast('删除失败：$e');
+      _toast(l.clusterOrch_deleteFailed(e.toString()));
     }
   }
 
   /// 发起跨物理机迁移。
   Future<void> _migrate(ServiceStatus status) async {
+    final l = AppLocalizations.of(context);
     final nodes = context.read<NodeState>().nodes;
     if (nodes.length < 2) {
-      _toast('迁移需要至少 2 个节点');
+      _toast(l.clusterOrch_migrateNeedTwoNodes);
       return;
     }
     final replicas = status.replicas;
@@ -177,12 +182,12 @@ class _ClusterOrchestrationScreenState
         replicaId: result.replica.id,
         toNode: result.target,
       );
-      _toast('迁移任务已创建');
+      _toast(l.clusterOrch_migrationCreated);
       // 自动推进后续步骤（每步执行后回报）
       unawaited(_drainMigration(job));
       await _refresh();
     } catch (e) {
-      _toast('迁移失败：$e');
+      _toast(l.clusterOrch_migrateFailed(e.toString()));
     }
   }
 
@@ -224,6 +229,7 @@ class _ClusterOrchestrationScreenState
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     final service = OrchestratorService.instance;
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
@@ -234,12 +240,12 @@ class _ClusterOrchestrationScreenState
           padding: const EdgeInsets.fromLTRB(16, 10, 8, 0),
           child: Row(
             children: [
-              Text('编排服务', style: theme.textTheme.titleSmall),
+              Text(l.clusterOrch_title, style: theme.textTheme.titleSmall),
               const SizedBox(width: 8),
               // 长说明文案用 Expanded + 省略号，避免窄窗口下 RenderFlex overflow
               Expanded(
                 child: Text(
-                  'K8s 风格：自动修复崩溃 · 按在线人数弹性开服 · 跨物理机迁移存档',
+                  l.clusterOrch_subtitle,
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
                   style: TextStyle(
@@ -256,7 +262,7 @@ class _ClusterOrchestrationScreenState
                 ),
               IconButton(
                 icon: const Icon(Icons.sync),
-                tooltip: '立即对账',
+                tooltip: l.clusterOrch_reconcileNow,
                 onPressed: () async {
                   await service.tick();
                   await _refresh();
@@ -264,13 +270,13 @@ class _ClusterOrchestrationScreenState
               ),
               IconButton(
                 icon: const Icon(Icons.refresh),
-                tooltip: '刷新',
+                tooltip: l.common_refresh,
                 onPressed: _refresh,
               ),
               FilledButton.icon(
                 onPressed: _createService,
                 icon: const Icon(Icons.add, size: 18),
-                label: const Text('新建服务'),
+                label: Text(l.clusterOrch_newService),
               ),
             ],
           ),
@@ -296,17 +302,17 @@ class _ClusterOrchestrationScreenState
                         color: Colors.grey,
                       ),
                       const SizedBox(height: 12),
-                      const Text('还没有编排服务'),
+                      Text(l.clusterOrch_noServices),
                       const SizedBox(height: 8),
-                      const Text(
-                        '新建服务后，引擎将自动调度副本到 Docker / Bastille 节点',
-                        style: TextStyle(fontSize: 12),
+                      Text(
+                        l.clusterOrch_noServicesHint,
+                        style: const TextStyle(fontSize: 12),
                       ),
                       const SizedBox(height: 16),
                       FilledButton.icon(
                         onPressed: _createService,
                         icon: const Icon(Icons.add),
-                        label: const Text('新建服务'),
+                        label: Text(l.clusterOrch_newService),
                       ),
                     ],
                   ),
@@ -331,7 +337,7 @@ class _ClusterOrchestrationScreenState
                       ),
                     if (_migrations.isNotEmpty) ...[
                       const SizedBox(height: 16),
-                      Text('迁移任务', style: theme.textTheme.titleSmall),
+                      Text(l.clusterOrch_migrationTasks, style: theme.textTheme.titleSmall),
                       const SizedBox(height: 8),
                       for (final job in _migrations)
                         _MigrationTile(
@@ -375,6 +381,7 @@ class _ServiceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     final service = status.service;
     final isBastille = service.runtime == 'bastille';
     return Card(
@@ -399,7 +406,9 @@ class _ServiceCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
-                    isBastille ? 'Bastille' : 'Docker',
+                    isBastille
+                        ? l.clusterOrch_runtimeBastille
+                        : l.clusterOrch_runtimeDocker,
                     style: TextStyle(
                       fontSize: 11,
                       color: isBastille ? Colors.redAccent : Colors.lightBlue,
@@ -413,14 +422,18 @@ class _ServiceCard extends StatelessWidget {
                 const Spacer(),
                 IconButton(
                   icon: const Icon(Icons.remove_circle_outline),
-                  tooltip: '缩容',
+                  tooltip: l.clusterOrch_scaleDown,
                   onPressed: () => onScale(-1),
                 ),
                 // 副本/在线统计用 Flexible + 省略号，窄窗口不溢出
                 Flexible(
                   child: Text(
-                    '${status.replicas.length}/${service.desiredReplicas} 副本'
-                    ' · 在线 ${status.totalPlayers}（均 ${status.avgPlayers.toStringAsFixed(1)}）',
+                    l.clusterOrch_replicaStat(
+                      status.replicas.length,
+                      service.desiredReplicas,
+                      status.totalPlayers,
+                      status.avgPlayers.toStringAsFixed(1),
+                    ),
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,
                     style: TextStyle(
@@ -431,7 +444,7 @@ class _ServiceCard extends StatelessWidget {
                 ),
                 IconButton(
                   icon: const Icon(Icons.add_circle_outline),
-                  tooltip: '扩容',
+                  tooltip: l.clusterOrch_scaleUp,
                   onPressed: () => onScale(1),
                 ),
                 PopupMenuButton<String>(
@@ -443,9 +456,15 @@ class _ServiceCard extends StatelessWidget {
                         onDelete();
                     }
                   },
-                  itemBuilder: (context) => const [
-                    PopupMenuItem(value: 'migrate', child: Text('迁移存档到其它节点')),
-                    PopupMenuItem(value: 'delete', child: Text('删除服务')),
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'migrate',
+                      child: Text(l.clusterOrch_migrateArchive),
+                    ),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Text(l.clusterOrch_deleteServiceMenuItem),
+                    ),
                   ],
                 ),
               ],
@@ -459,15 +478,19 @@ class _ServiceCard extends StatelessWidget {
             Row(
               children: [
                 Switch(value: service.autoHeal, onChanged: onToggleAutoHeal),
-                const Text('自动修复崩溃', style: TextStyle(fontSize: 13)),
+                Text(l.clusterOrch_autoHeal, style: const TextStyle(fontSize: 13)),
                 const SizedBox(width: 16),
                 Switch(value: service.autoscale, onChanged: onToggleAutoscale),
-                const Text('弹性开服', style: TextStyle(fontSize: 13)),
+                Text(l.clusterOrch_autoscale, style: const TextStyle(fontSize: 13)),
                 if (service.autoscale) ...[
                   const SizedBox(width: 8),
                   Flexible(
                     child: Text(
-                      '目标 ${service.targetPlayers}/副本 · 阈值 ${service.scaleDownPlayers}~${service.scaleUpPlayers}',
+                      l.clusterOrch_scaleTarget(
+                        service.targetPlayers,
+                        service.scaleDownPlayers,
+                        service.scaleUpPlayers,
+                      ),
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
                       style: TextStyle(fontSize: 11, color: Colors.grey[500]),
@@ -504,6 +527,7 @@ class _ReplicaChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final running = replica.running;
     final color = replica.crashLoop
         ? Colors.red
@@ -523,13 +547,13 @@ class _ReplicaChip extends StatelessWidget {
         children: [
           Text(
             pending
-                ? 'r${replica.indexNo} · 待调度'
+                ? l.clusterOrch_replicaPending(replica.indexNo)
                 : 'r${replica.indexNo} · ${nodeName ?? replica.nodeId}',
             style: TextStyle(fontSize: 11, color: color),
           ),
           Text(
             pending
-                ? '无满足条件的节点'
+                ? l.clusterOrch_noSchedulableNode
                 : '${replica.containerName}\n'
                       '在线 ${replica.playersOnline}'
                       '${replica.crashCount > 0 ? ' · 崩溃 ${replica.crashCount}' : ''}'
@@ -553,6 +577,7 @@ class _MigrationTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final done = job.state == MigrationState.done;
     final failed = job.state == MigrationState.failed;
     final color = done
@@ -578,13 +603,13 @@ class _MigrationTile extends StatelessWidget {
           if (onContinue != null)
             IconButton(
               icon: const Icon(Icons.play_arrow, size: 20),
-              tooltip: '继续执行',
+              tooltip: l.clusterOrch_continueMigration,
               onPressed: onContinue,
             ),
           if (onCancel != null)
             IconButton(
               icon: const Icon(Icons.close, size: 20),
-              tooltip: '取消迁移',
+              tooltip: l.clusterOrch_cancelMigration,
               onPressed: onCancel,
             ),
         ],
@@ -638,12 +663,13 @@ class _ServiceDialogState extends State<_ServiceDialog> {
       .toList();
 
   void _submit() {
+    final l = AppLocalizations.of(context);
     final name = _nameController.text.trim();
     final image = _imageController.text.trim();
     if (name.isEmpty || image.isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('名称与镜像 / 发行版不能为空')));
+      ).showSnackBar(SnackBar(content: Text(l.clusterOrch_nameAndImageRequired)));
       return;
     }
     final target = int.tryParse(_targetController.text.trim()) ?? 20;
@@ -678,8 +704,9 @@ class _ServiceDialogState extends State<_ServiceDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return AlertDialog(
-      title: const Text('新建编排服务'),
+      title: Text(l.clusterOrch_newServiceDialog),
       content: SizedBox(
         width: 480,
         child: SingleChildScrollView(
@@ -690,10 +717,10 @@ class _ServiceDialogState extends State<_ServiceDialog> {
               TextField(
                 controller: _nameController,
                 autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: '服务名称',
+                decoration: InputDecoration(
+                  labelText: l.clusterOrch_serviceName,
                   isDense: true,
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 12),
@@ -702,19 +729,19 @@ class _ServiceDialogState extends State<_ServiceDialog> {
                   Expanded(
                     child: DropdownButtonFormField<String>(
                       initialValue: _runtime,
-                      decoration: const InputDecoration(
-                        labelText: '运行时',
+                      decoration: InputDecoration(
+                        labelText: l.clusterOrch_runtime,
                         isDense: true,
-                        border: OutlineInputBorder(),
+                        border: const OutlineInputBorder(),
                       ),
-                      items: const [
+                      items: [
                         DropdownMenuItem(
                           value: 'docker',
-                          child: Text('Docker（Linux 节点）'),
+                          child: Text(l.clusterOrch_runtimeDockerLinux),
                         ),
                         DropdownMenuItem(
                           value: 'bastille',
-                          child: Text('Bastille（FreeBSD 节点）'),
+                          child: Text(l.clusterOrch_runtimeBastilleFbsd),
                         ),
                       ],
                       onChanged: (value) =>
@@ -726,10 +753,10 @@ class _ServiceDialogState extends State<_ServiceDialog> {
                     child: TextField(
                       controller: _imageController,
                       decoration: InputDecoration(
-                        labelText: '镜像 / 发行版',
+                        labelText: l.clusterOrch_imageOrRelease,
                         hintText: _runtime == 'bastille'
-                            ? '如 14.2-RELEASE'
-                            : '如 itzg/minecraft-server:latest',
+                            ? l.clusterOrch_imageHintRelease
+                            : l.clusterOrch_imageHintDocker,
                         isDense: true,
                         border: const OutlineInputBorder(),
                       ),
@@ -740,39 +767,39 @@ class _ServiceDialogState extends State<_ServiceDialog> {
               const SizedBox(height: 12),
               TextField(
                 controller: _portsController,
-                decoration: const InputDecoration(
-                  labelText: '端口映射（扩容时宿主端口按序号顺延）',
+                decoration: InputDecoration(
+                  labelText: l.clusterOrch_portsMapping,
                   isDense: true,
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _volumesController,
-                decoration: const InputDecoration(
-                  labelText: '数据目录挂载（宿主机:容器内）',
-                  hintText: '如 /data/mc-survival:/data',
+                decoration: InputDecoration(
+                  labelText: l.clusterOrch_volumeMount,
+                  hintText: l.clusterOrch_volumeMountHint,
                   isDense: true,
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _worldDirController,
-                decoration: const InputDecoration(
-                  labelText: '世界存档目录（容器内，迁移对象）',
+                decoration: InputDecoration(
+                  labelText: l.clusterOrch_worldDir,
                   isDense: true,
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
                 ),
               ),
               if (_runtime == 'bastille') ...[
                 const SizedBox(height: 12),
                 TextField(
                   controller: _bastilleIpController,
-                  decoration: const InputDecoration(
-                    labelText: 'IP 基址（副本按序号顺延，如 .50 → .51）',
+                  decoration: InputDecoration(
+                    labelText: l.clusterOrch_bastilleIpBase,
                     isDense: true,
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
                   ),
                 ),
               ],
@@ -783,10 +810,10 @@ class _ServiceDialogState extends State<_ServiceDialog> {
                     child: TextField(
                       controller: _minController,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: '最小副本',
+                      decoration: InputDecoration(
+                        labelText: l.clusterOrch_minReplicas,
                         isDense: true,
-                        border: OutlineInputBorder(),
+                        border: const OutlineInputBorder(),
                       ),
                     ),
                   ),
@@ -795,10 +822,10 @@ class _ServiceDialogState extends State<_ServiceDialog> {
                     child: TextField(
                       controller: _desiredController,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: '期望副本',
+                      decoration: InputDecoration(
+                        labelText: l.clusterOrch_desiredReplicas,
                         isDense: true,
-                        border: OutlineInputBorder(),
+                        border: const OutlineInputBorder(),
                       ),
                     ),
                   ),
@@ -807,10 +834,10 @@ class _ServiceDialogState extends State<_ServiceDialog> {
                     child: TextField(
                       controller: _maxController,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: '最大副本',
+                      decoration: InputDecoration(
+                        labelText: l.clusterOrch_maxReplicas,
                         isDense: true,
-                        border: OutlineInputBorder(),
+                        border: const OutlineInputBorder(),
                       ),
                     ),
                   ),
@@ -820,9 +847,9 @@ class _ServiceDialogState extends State<_ServiceDialog> {
               SwitchListTile(
                 value: _autoscale,
                 onChanged: (value) => setState(() => _autoscale = value),
-                title: const Text(
-                  '弹性开服（按在线人数扩缩容）',
-                  style: TextStyle(fontSize: 13),
+                title: Text(
+                  l.clusterOrch_autoscaleDesc,
+                  style: const TextStyle(fontSize: 13),
                 ),
                 contentPadding: EdgeInsets.zero,
                 dense: true,
@@ -831,18 +858,18 @@ class _ServiceDialogState extends State<_ServiceDialog> {
                 TextField(
                   controller: _targetController,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: '每副本目标在线人数',
+                  decoration: InputDecoration(
+                    labelText: l.clusterOrch_targetPlayersPerReplica,
                     isDense: true,
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
                   ),
                 ),
               SwitchListTile(
                 value: _autoHeal,
                 onChanged: (value) => setState(() => _autoHeal = value),
-                title: const Text(
-                  '自动修复崩溃（指数退避重启）',
-                  style: TextStyle(fontSize: 13),
+                title: Text(
+                  l.clusterOrch_autoHealDesc,
+                  style: const TextStyle(fontSize: 13),
                 ),
                 contentPadding: EdgeInsets.zero,
                 dense: true,
@@ -854,12 +881,12 @@ class _ServiceDialogState extends State<_ServiceDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('取消'),
+          child: Text(l.common_cancel),
         ),
         FilledButton.icon(
           onPressed: _submit,
           icon: const Icon(Icons.add),
-          label: const Text('创建'),
+          label: Text(l.nodeDetail_create),
         ),
       ],
     );
@@ -895,11 +922,12 @@ class _MigrateDialogState extends State<_MigrateDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final candidates = widget.nodes
         .where((n) => n.id != (_replica?.nodeId ?? ''))
         .toList();
     return AlertDialog(
-      title: const Text('迁移存档到其它物理机'),
+      title: Text(l.clusterOrch_migrateToPhysical),
       content: SizedBox(
         width: 380,
         child: Column(
@@ -907,18 +935,19 @@ class _MigrateDialogState extends State<_MigrateDialog> {
           children: [
             DropdownButtonFormField<McReplica>(
               initialValue: _replica,
-              decoration: const InputDecoration(
-                labelText: '副本',
+              decoration: InputDecoration(
+                labelText: l.clusterOrch_replica,
                 isDense: true,
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
               ),
               items: [
                 for (final r in widget.status.replicas)
                   DropdownMenuItem(
                     value: r,
                     child: Text(
-                      'r${r.indexNo} · ${r.nodeId}'
-                      '${r.running ? '（运行中）' : ''}',
+                      r.running
+                          ? l.clusterOrch_replicaRunning(r.indexNo, r.nodeId)
+                          : 'r${r.indexNo} · ${r.nodeId}',
                     ),
                   ),
               ],
@@ -933,10 +962,10 @@ class _MigrateDialogState extends State<_MigrateDialog> {
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               initialValue: _target,
-              decoration: const InputDecoration(
-                labelText: '目标节点',
+              decoration: InputDecoration(
+                labelText: l.clusterOrch_targetNode,
                 isDense: true,
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
               ),
               items: [
                 for (final n in candidates)
@@ -946,7 +975,7 @@ class _MigrateDialogState extends State<_MigrateDialog> {
             ),
             const SizedBox(height: 8),
             Text(
-              '迁移流程：停止副本 → 压缩世界存档 → 传输 → 目标节点恢复 → 重建并启动。',
+              l.clusterOrch_migrateFlow,
               style: TextStyle(fontSize: 11, color: Colors.grey[500]),
             ),
           ],
@@ -955,7 +984,7 @@ class _MigrateDialogState extends State<_MigrateDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('取消'),
+          child: Text(l.common_cancel),
         ),
         FilledButton(
           onPressed: _replica == null || _target == null
@@ -964,7 +993,7 @@ class _MigrateDialogState extends State<_MigrateDialog> {
                   replica: _replica!,
                   target: _target!,
                 )),
-          child: const Text('开始迁移'),
+          child: Text(l.clusterOrch_startMigration),
         ),
       ],
     );

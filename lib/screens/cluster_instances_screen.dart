@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/cluster_instance.dart';
 import '../models/node.dart';
 import '../models/remote.dart';
@@ -105,6 +106,7 @@ class _ClusterInstancesScreenState extends State<ClusterInstancesScreen> {
   }
 
   Future<void> _migrate(ClusterInstance instance) async {
+    final l = AppLocalizations.of(context);
     final nodeState = context.read<NodeState>();
     final candidates = nodeState.nodes
         .where((n) => n.id != instance.nodeId)
@@ -112,7 +114,7 @@ class _ClusterInstancesScreenState extends State<ClusterInstancesScreen> {
     if (candidates.isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('没有其它节点可迁移')));
+      ).showSnackBar(SnackBar(content: Text(l.clusterInstances_noNodeToMigrate)));
       return;
     }
     String? targetId = candidates.first.id;
@@ -133,6 +135,7 @@ class _ClusterInstancesScreenState extends State<ClusterInstancesScreen> {
   }
 
   Future<void> _openDetail(ClusterInstance instance) async {
+    final l = AppLocalizations.of(context);
     final nodeState = context.read<NodeState>();
     NodeInfo? node;
     for (final n in nodeState.nodes) {
@@ -154,7 +157,7 @@ class _ClusterInstancesScreenState extends State<ClusterInstancesScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('无法打开详情: $e')));
+      ).showSnackBar(SnackBar(content: Text(l.clusterInstances_cannotOpenDetail(e.toString()))));
       return;
     }
     // 取节点平台（决定详情页是否展示容器 Tab：Docker / Bastille）。
@@ -182,22 +185,23 @@ class _ClusterInstancesScreenState extends State<ClusterInstancesScreen> {
   Widget build(BuildContext context) {
     return Consumer2<NodeState, ClusterState>(
       builder: (context, nodeState, cluster, _) {
+        final l = AppLocalizations.of(context);
         final instances = cluster.instances;
         return CustomScrollView(
           slivers: [
             SliverAppBar(
-              title: const Text('实例管理'),
+              title: Text(l.clusterInstances_title),
               floating: true,
               actions: [
                 IconButton(
                   icon: const Icon(Icons.refresh),
-                  tooltip: '刷新',
+                  tooltip: l.common_refresh,
                   onPressed: _busy ? null : _loadStatuses,
                 ),
                 FilledButton.icon(
                   onPressed: _busy ? null : _create,
                   icon: const Icon(Icons.add, size: 18),
-                  label: const Text('新建实例'),
+                  label: Text(l.clusterInstances_newInstance),
                 ),
                 const SizedBox(width: 8),
               ],
@@ -215,7 +219,7 @@ class _ClusterInstancesScreenState extends State<ClusterInstancesScreen> {
                         color: Theme.of(context).colorScheme.outline,
                       ),
                       const SizedBox(height: 16),
-                      const Text('暂无集群实例，点击右上角「新建实例」'),
+                      Text(l.clusterInstances_empty),
                     ],
                   ),
                 ),
@@ -278,6 +282,7 @@ class _ClusterInstanceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     final isActive =
         status == RemoteStatus.running ||
         status == RemoteStatus.starting ||
@@ -314,7 +319,7 @@ class _ClusterInstanceCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '节点：$nodeName',
+                          l.clusterInstances_nodeOf(nodeName),
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
@@ -327,7 +332,10 @@ class _ClusterInstanceCard extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Text(
-                '崩溃 $instance.crashCount 次 · 上次同步 ${synced == null ? '—' : _fmtTime(synced)}',
+                l.clusterInstances_crashLine(
+                  instance.crashCount,
+                  synced == null ? '—' : _fmtTime(synced),
+                ),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.outline,
                 ),
@@ -339,17 +347,17 @@ class _ClusterInstanceCard extends StatelessWidget {
                   TextButton.icon(
                     onPressed: isActive ? null : onStart,
                     icon: const Icon(Icons.play_arrow, size: 16),
-                    label: const Text('启动'),
+                    label: Text(l.instanceDetail_start),
                   ),
                   TextButton.icon(
                     onPressed: isActive ? onStop : null,
                     icon: const Icon(Icons.stop, size: 16),
-                    label: const Text('停止'),
+                    label: Text(l.instanceDetail_stop),
                   ),
                   TextButton.icon(
                     onPressed: isActive ? null : onMigrate,
                     icon: const Icon(Icons.swap_horiz, size: 16),
-                    label: const Text('迁移'),
+                    label: Text(l.clusterInstances_migrate),
                   ),
                 ],
               ),
@@ -409,8 +417,9 @@ class _CreateClusterDialogState extends State<_CreateClusterDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return AlertDialog(
-      title: const Text('新建集群实例'),
+      title: Text(l.clusterInstances_newClusterInstance),
       content: SizedBox(
         width: 440,
         child: SingleChildScrollView(
@@ -420,38 +429,38 @@ class _CreateClusterDialogState extends State<_CreateClusterDialog> {
             children: [
               TextField(
                 controller: _name,
-                decoration: const InputDecoration(
-                  labelText: '实例名称',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l.nodeDetail_instanceName,
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _cwd,
-                decoration: const InputDecoration(
-                  labelText: '工作目录（服务器上的绝对路径）',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l.clusterInstances_workdir,
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _command,
-                decoration: const InputDecoration(
-                  labelText: '启动命令（如 java -Xmx2G -jar server.jar nogui）',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l.nodeDetail_serverCommandHelper,
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String?>(
                 initialValue: _nodeId,
-                decoration: const InputDecoration(
-                  labelText: '节点',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l.clusterInstances_node,
+                  border: const OutlineInputBorder(),
                 ),
                 items: [
-                  const DropdownMenuItem<String?>(
+                  DropdownMenuItem<String?>(
                     value: null,
-                    child: Text('自动（按资源分配）'),
+                    child: Text(l.clusterInstances_autoAllocate),
                   ),
                   for (final node in widget.nodes)
                     DropdownMenuItem<String?>(
@@ -468,7 +477,7 @@ class _CreateClusterDialogState extends State<_CreateClusterDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
+          child: Text(l.common_cancel),
         ),
         FilledButton(
           onPressed: () {
@@ -485,7 +494,7 @@ class _CreateClusterDialogState extends State<_CreateClusterDialog> {
               ),
             );
           },
-          child: const Text('创建'),
+          child: Text(l.nodeDetail_create),
         ),
       ],
     );
@@ -500,8 +509,9 @@ class _TargetNodeDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return AlertDialog(
-      title: const Text('选择迁移目标节点'),
+      title: Text(l.clusterInstances_selectMigrateTarget),
       content: SizedBox(
         width: 320,
         child: ListView(

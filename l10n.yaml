@@ -1,0 +1,9 @@
+# gen-l10n 配置：从 lib/l10n/*.arb 生成 AppLocalizations（见 pubspec.yaml generate: true）。
+arb-dir: lib/l10n
+template-arb-file: app_zh.arb
+output-localization-file: app_localizations.dart
+output-class: AppLocalizations
+# AppLocalizations.of(context) 返回非空类型（调用方无需 !）。
+nullable-getter: false
+# 启用 ICU 转义（{name} 占位、=N 复数等）。
+output-dir: lib/l10n

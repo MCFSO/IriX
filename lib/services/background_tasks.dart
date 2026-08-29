@@ -10,6 +10,8 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as path;
 
+import 'locale_settings.dart';
+
 const _oneMegabyte = 1024 * 1024;
 
 int _nextId = 0;
@@ -381,11 +383,17 @@ class _FileProgressDialogBody extends StatelessWidget {
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
               const SizedBox(width: 12),
-              Text('文件操作 (${running.length})'),
+              Text(
+                LocaleSettings.instance.localeCode == 'en'
+                    ? 'File operations (${running.length})'
+                    : '文件操作 (${running.length})',
+              ),
               const Spacer(),
               IconButton(
                 icon: const Icon(Icons.minimize, size: 20),
-                tooltip: '最小化',
+                tooltip: LocaleSettings.instance.localeCode == 'en'
+                    ? 'Minimize'
+                    : '最小化',
                 onPressed: () => Navigator.of(context).pop(),
               ),
             ],
@@ -397,9 +405,14 @@ class _FileProgressDialogBody extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (running.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    child: Text('暂无运行中的任务', textAlign: TextAlign.center),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Text(
+                      LocaleSettings.instance.localeCode == 'en'
+                          ? 'No running tasks'
+                          : '暂无运行中的任务',
+                      textAlign: TextAlign.center,
+                    ),
                   ),
                 ...running.map((t) => _TaskTile(task: t, manager: manager)),
                 if (others.isNotEmpty) ...[
@@ -412,7 +425,9 @@ class _FileProgressDialogBody extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
-                        '... 还有 ${others.length - 10} 个已完成任务',
+                        LocaleSettings.instance.localeCode == 'en'
+                            ? '... ${others.length - 10} more completed tasks'
+                            : '... 还有 ${others.length - 10} 个已完成任务',
                         style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                       ),
                     ),
@@ -428,11 +443,17 @@ class _FileProgressDialogBody extends StatelessWidget {
                       Navigator.of(context).pop();
                     }
                   : null,
-              child: const Text('清除已完成'),
+              child: Text(
+                LocaleSettings.instance.localeCode == 'en'
+                    ? 'Clear completed'
+                    : '清除已完成',
+              ),
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('关闭'),
+              child: Text(
+                LocaleSettings.instance.localeCode == 'en' ? 'Close' : '关闭',
+              ),
             ),
           ],
         );
@@ -475,7 +496,9 @@ class FileProgressOverlay extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    '最后完成: ${path.basename(lastDone.first.sourcePath)}',
+                    LocaleSettings.instance.localeCode == 'en'
+                        ? 'Last finished: ${path.basename(lastDone.first.sourcePath)}'
+                        : '最后完成: ${path.basename(lastDone.first.sourcePath)}',
                     style: const TextStyle(fontSize: 13),
                   ),
                   const Spacer(),
@@ -512,7 +535,9 @@ class FileProgressOverlay extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      '${running.length} 个任务运行中',
+                      LocaleSettings.instance.localeCode == 'en'
+                          ? '${running.length} task(s) running'
+                          : '${running.length} 个任务运行中',
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
@@ -521,9 +546,14 @@ class FileProgressOverlay extends StatelessWidget {
                     const Spacer(),
                     InkWell(
                       onTap: () => FileProgressDialog.show(context, manager),
-                      child: const Padding(
-                        padding: EdgeInsets.all(4),
-                        child: Text('详情', style: TextStyle(fontSize: 12)),
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Text(
+                          LocaleSettings.instance.localeCode == 'en'
+                              ? 'Details'
+                              : '详情',
+                          style: const TextStyle(fontSize: 12),
+                        ),
                       ),
                     ),
                   ],
@@ -536,7 +566,9 @@ class FileProgressOverlay extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(
-                      '... 还有 ${running.length - 3} 个任务',
+                      LocaleSettings.instance.localeCode == 'en'
+                          ? '... ${running.length - 3} more task(s)'
+                          : '... 还有 ${running.length - 3} 个任务',
                       style: TextStyle(fontSize: 11, color: Colors.grey[500]),
                     ),
                   ),
@@ -609,7 +641,9 @@ class _TaskTile extends StatelessWidget {
           if (isRunning)
             IconButton(
               icon: const Icon(Icons.close, size: 16),
-              tooltip: '取消',
+              tooltip: LocaleSettings.instance.localeCode == 'en'
+                  ? 'Cancel'
+                  : '取消',
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
               onPressed: () => manager.cancelTask(task.id),
@@ -617,7 +651,9 @@ class _TaskTile extends StatelessWidget {
           else
             IconButton(
               icon: const Icon(Icons.close, size: 16),
-              tooltip: '移除',
+              tooltip: LocaleSettings.instance.localeCode == 'en'
+                  ? 'Remove'
+                  : '移除',
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
               onPressed: () => manager.removeTask(task.id),
@@ -628,21 +664,22 @@ class _TaskTile extends StatelessWidget {
   }
 
   Widget _statusChip(FileTask task) {
+    final en = LocaleSettings.instance.localeCode == 'en';
     Color color;
     String label;
     switch (task.status) {
       case TaskStatus.running:
         color = Colors.blue;
-        label = '进行中';
+        label = en ? 'Running' : '进行中';
       case TaskStatus.completed:
         color = Colors.green;
-        label = '完成';
+        label = en ? 'Done' : '完成';
       case TaskStatus.failed:
         color = Colors.red;
-        label = '失败';
+        label = en ? 'Failed' : '失败';
       case TaskStatus.cancelled:
         color = Colors.orange;
-        label = '已取消';
+        label = en ? 'Cancelled' : '已取消';
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),

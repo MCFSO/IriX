@@ -3,6 +3,7 @@
 // McService ≈ Deployment（期望状态）、McReplica ≈ Pod（有状态副本）、
 // MigrationJob ≈ 跨物理机迁移工作流、OrchestrationAction ≈ 对账动作。
 
+import '../services/locale_settings.dart';
 /// 服务组（Deployment）：期望状态与弹性/自愈策略。
 class McService {
   const McService({
@@ -293,18 +294,21 @@ enum MigrationState {
     return MigrationState.pending;
   }
 
-  /// 中文展示标签。
-  String get label => switch (this) {
-    MigrationState.pending => '等待开始',
-    MigrationState.stopping => '停止副本',
-    MigrationState.archiving => '压缩存档',
-    MigrationState.transferring => '传输存档',
-    MigrationState.restoring => '恢复存档',
-    MigrationState.creating => '创建容器',
-    MigrationState.starting => '启动副本',
-    MigrationState.done => '完成',
-    MigrationState.failed => '失败',
-  };
+  /// 展示标签（随语言设置切换）。
+  String get label {
+    final en = LocaleSettings.instance.localeCode == 'en';
+    return switch (this) {
+      MigrationState.pending => en ? 'Waiting to start' : '等待开始',
+      MigrationState.stopping => en ? 'Stopping replica' : '停止副本',
+      MigrationState.archiving => en ? 'Archiving world' : '压缩存档',
+      MigrationState.transferring => en ? 'Transferring' : '传输存档',
+      MigrationState.restoring => en ? 'Restoring' : '恢复存档',
+      MigrationState.creating => en ? 'Creating container' : '创建容器',
+      MigrationState.starting => en ? 'Starting replica' : '启动副本',
+      MigrationState.done => en ? 'Done' : '完成',
+      MigrationState.failed => en ? 'Failed' : '失败',
+    };
+  }
 
   bool get isActive =>
       this != MigrationState.done && this != MigrationState.failed;

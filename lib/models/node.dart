@@ -4,21 +4,33 @@
 
 import 'dart:convert';
 
+import '../services/locale_settings.dart';
+
 /// 节点类型。
 enum NodeType {
   /// MCSManager 面板节点（远程，使用面板 API Key）。
-  mcsm('MCSM', 'MCSManager 面板'),
+  mcsm('MCSM', 'MCSManager 面板', 'MCSManager Panel'),
 
   /// IriX 本地节点（Go 语言守护进程，见项目根目录 node/）。
-  node('Node', 'IriX 本地节点');
+  node('Node', 'IriX 本地节点', 'IriX Local Node');
 
-  const NodeType(this.label, this.description);
+  const NodeType(this.value, this.labelZh, this.labelEn);
 
-  /// 显示名称。
-  final String label;
+  /// 存储值（'mcsm' / 'node'），与枚举名一致。
+  final String value;
 
-  /// 类型说明。
-  final String description;
+  /// 中文显示名称。
+  final String labelZh;
+
+  /// 英文显示名称。
+  final String labelEn;
+
+  /// 显示名称（随语言设置切换）。
+  String get label =>
+      LocaleSettings.instance.localeCode == 'en' ? labelEn : labelZh;
+
+  /// 类型说明（随语言设置切换）。
+  String get description => label;
 
   /// 从数据库字符串反序列化。
   static NodeType fromString(String value) {

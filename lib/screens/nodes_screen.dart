@@ -7,6 +7,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/node.dart';
 import '../services/node_daemon_launcher.dart';
 import '../state/node_state.dart';
@@ -75,12 +76,13 @@ class _NodesScreenState extends State<NodesScreen> {
   Widget build(BuildContext context) {
     return Consumer<NodeState>(
       builder: (context, state, _) {
+        final l = AppLocalizations.of(context);
         final nodes = state.nodes;
         return Scaffold(
           body: CustomScrollView(
             slivers: [
               SliverAppBar(
-                title: const Text('节点'),
+                title: Text(l.nodes_title),
                 floating: true,
                 actions: [
                   IconButton(
@@ -91,12 +93,12 @@ class _NodesScreenState extends State<NodesScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.refresh),
-                    tooltip: '刷新状态',
+                    tooltip: l.nodes_refreshStatus,
                     onPressed: _pinging ? null : _refresh,
                   ),
                   IconButton(
                     icon: const Icon(Icons.add),
-                    tooltip: '添加节点',
+                    tooltip: l.nodes_addNode,
                     onPressed: _addNode,
                   ),
                   const SizedBox(width: 4),
@@ -115,12 +117,12 @@ class _NodesScreenState extends State<NodesScreen> {
                           color: Theme.of(context).colorScheme.outline,
                         ),
                         const SizedBox(height: 16),
-                        const Text('还没有节点，点击右上角 + 添加'),
+                        Text(l.nodes_empty),
                         const SizedBox(height: 8),
-                        const Text(
-                          'MCSM：连接 MCSManager 面板\nNode：本地 Go 语言节点（node/ 目录）',
+                        Text(
+                          l.nodes_emptyHint,
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 12),
+                          style: const TextStyle(fontSize: 12),
                         ),
                       ],
                     ),
@@ -140,8 +142,8 @@ class _NodesScreenState extends State<NodesScreen> {
                 sliver: SliverToBoxAdapter(
                   child: Text(
                     NodeDaemonLauncher.isRunning
-                        ? '本地节点守护进程正在运行'
-                        : '提示：Node 类型节点需要先运行 node/ 目录构建的 irix-node 服务',
+                        ? l.nodes_daemonRunning
+                        : l.nodes_daemonHint,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Theme.of(context).colorScheme.outline,
                     ),

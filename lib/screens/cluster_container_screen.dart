@@ -13,6 +13,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/node.dart';
 import '../models/remote.dart';
 import '../services/container/container_backend.dart';
@@ -149,23 +150,24 @@ class _ClusterContainerScreenState extends State<ClusterContainerScreen> {
     final nodeState = context.watch<NodeState>();
     final nodes = nodeState.nodes;
     if (nodes.isEmpty) {
+      final l = AppLocalizations.of(context);
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(Icons.inventory_2, size: 64, color: Colors.grey),
             const SizedBox(height: 16),
-            const Text('还没有节点'),
+            Text(l.clusterContainer_noNodes),
             const SizedBox(height: 8),
-            const Text(
-              '添加 Linux 节点管理 Docker、添加 FreeBSD 节点管理 Bastille',
-              style: TextStyle(fontSize: 12),
+            Text(
+              l.clusterContainer_noNodesHint,
+              style: const TextStyle(fontSize: 12),
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: _addNode,
               icon: const Icon(Icons.add),
-              label: const Text('添加节点'),
+              label: Text(l.clusterContainer_addNode),
             ),
           ],
         ),
@@ -182,6 +184,7 @@ class _ClusterContainerScreenState extends State<ClusterContainerScreen> {
     selected ??= nodes.first;
     final overview = _overviews[selected.id];
     final online = nodeState.isOnline(selected.id);
+    final l = AppLocalizations.of(context);
 
     return Row(
       children: [
@@ -194,7 +197,7 @@ class _ClusterContainerScreenState extends State<ClusterContainerScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
                 child: Text(
-                  '节点',
+                  l.clusterContainer_node,
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
               ),
@@ -203,7 +206,7 @@ class _ClusterContainerScreenState extends State<ClusterContainerScreen> {
                   itemCount: nodes.length,
                   itemBuilder: (context, index) {
                     final node = nodes[index];
-                    return _buildNodeTile(nodeState, node, selected!);
+                    return _buildNodeTile(nodeState, node, selected!, context);
                   },
                 ),
               ),
@@ -211,7 +214,8 @@ class _ClusterContainerScreenState extends State<ClusterContainerScreen> {
               ListTile(
                 dense: true,
                 leading: const Icon(Icons.add, size: 20),
-                title: const Text('添加节点', style: TextStyle(fontSize: 13)),
+                title: Text(l.clusterContainer_addNode,
+                    style: const TextStyle(fontSize: 13)),
                 onTap: _addNode,
               ),
             ],
@@ -224,7 +228,13 @@ class _ClusterContainerScreenState extends State<ClusterContainerScreen> {
     );
   }
 
-  Widget _buildNodeTile(NodeState nodeState, NodeInfo node, NodeInfo selected) {
+  Widget _buildNodeTile(
+    NodeState nodeState,
+    NodeInfo node,
+    NodeInfo selected,
+    BuildContext context,
+  ) {
+    final l = AppLocalizations.of(context);
     final online = nodeState.isOnline(node.id);
     final overview = _overviews[node.id];
     final runtime = _runtimeHint(overview?.system.platform);
@@ -249,9 +259,9 @@ class _ClusterContainerScreenState extends State<ClusterContainerScreen> {
       subtitle: Text(
         online
             ? runtime == null
-                  ? '在线 · 探测中…'
-                  : '在线 · ${runtime.label}'
-            : '离线',
+                  ? l.clusterContainer_onlineDetecting
+                  : l.clusterContainer_onlineWith(runtime.label)
+            : l.node_offline,
         style: TextStyle(fontSize: 11, color: Colors.grey[500]),
       ),
       trailing: online && runtime != null
@@ -267,6 +277,7 @@ class _ClusterContainerScreenState extends State<ClusterContainerScreen> {
     OverviewData? overview,
     bool online,
   ) {
+    final l = AppLocalizations.of(context);
     if (!online) {
       return Center(
         child: Column(
@@ -275,7 +286,7 @@ class _ClusterContainerScreenState extends State<ClusterContainerScreen> {
             const Icon(Icons.cloud_off_outlined, size: 48, color: Colors.grey),
             const SizedBox(height: 12),
             Text(
-              '节点离线：${node.name}',
+              l.clusterContainer_nodeOffline(node.name),
               style: Theme.of(context).textTheme.titleMedium,
             ),
             if (nodeState.errorOf(node.id) != null) ...[
@@ -321,7 +332,7 @@ class _ClusterContainerScreenState extends State<ClusterContainerScreen> {
                   unawaited(_loadOverview(node));
                 },
                 icon: const Icon(Icons.refresh),
-                label: const Text('重试'),
+                label: Text(l.common_retry),
               ),
             ],
           ],
@@ -355,7 +366,7 @@ class _ClusterContainerScreenState extends State<ClusterContainerScreen> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.refresh),
-                tooltip: '刷新',
+                tooltip: l.common_refresh,
                 onPressed: _refreshing ? null : _refresh,
               ),
             ],

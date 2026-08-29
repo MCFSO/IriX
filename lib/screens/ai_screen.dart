@@ -17,6 +17,7 @@ import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../l10n/app_localizations.dart';
 import '../services/ai_assistant_service.dart';
 import '../services/ai_settings.dart';
 import '../services/knowledge_service.dart';
@@ -166,6 +167,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
 
   /// 解析日志文件并将格式化内容发送给 AI。
   Future<void> _analyzeAndSendLog(String path, {required String source}) async {
+    final l = AppLocalizations.of(context);
     final controller = widget.controller;
     if (controller.conversation.running) return;
     if (controller.activeModel == null) {
@@ -195,7 +197,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('日志解析失败: $e')));
+      ).showSnackBar(SnackBar(content: Text(l.ai_logParseFailed(e.toString()))));
     }
   }
 
@@ -218,6 +220,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
 
   Widget _buildHeader(AiConversation conversation) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
@@ -230,27 +233,27 @@ class _AiChatPanelState extends State<AiChatPanel> {
           if (conversation.running)
             IconButton(
               icon: const Icon(Icons.stop, size: 20),
-              tooltip: '停止',
+              tooltip: l.ai_stop,
               visualDensity: VisualDensity.compact,
               onPressed: conversation.cancel,
             ),
           if (!conversation.running && widget.controller.events.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_outline, size: 20),
-              tooltip: '清空对话',
+              tooltip: l.ai_clearConversation,
               visualDensity: VisualDensity.compact,
               onPressed: widget.controller.reset,
             ),
           IconButton(
             icon: const Icon(Icons.settings_outlined, size: 20),
-            tooltip: '模型与 MCP 设置',
+            tooltip: l.ai_modelMcpSettings,
             visualDensity: VisualDensity.compact,
             onPressed: _openModels,
           ),
           if (widget.onClose != null)
             IconButton(
               icon: const Icon(Icons.close, size: 20),
-              tooltip: '关闭 AI 面板',
+              tooltip: l.ai_closePanel,
               visualDensity: VisualDensity.compact,
               onPressed: widget.onClose,
             ),
@@ -262,6 +265,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
   /// 左上角模型信息（名称 + 上下文窗口）。
   Widget _buildModelChip(ThemeData theme) {
     final model = widget.controller.activeModel;
+    final l = AppLocalizations.of(context);
     final InkWell clickable = InkWell(
       onTap: _openModels,
       borderRadius: BorderRadius.circular(8),
@@ -281,7 +285,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
             Flexible(
               child: Text(
                 model == null
-                    ? '添加模型'
+                    ? l.ai_addModel
                     : '${model.name} · ${_contextLabel(model.contextWindow)}',
                 style: theme.textTheme.bodySmall?.copyWith(
                   fontWeight: FontWeight.bold,
@@ -340,6 +344,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
 
   Widget _buildEmptyState() {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     final hasModel = widget.controller.activeModel != null;
     return Center(
       child: Padding(
@@ -356,14 +361,14 @@ class _AiChatPanelState extends State<AiChatPanel> {
             ),
             const SizedBox(height: 12),
             Text(
-              hasModel ? '开始和 AI 对话吧' : '请先添加模型',
+              hasModel ? l.ai_startChat : l.ai_addModelFirst,
               style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: 6),
             Text(
               hasModel
-                  ? '可以让 AI 查看日志、分析报错、管理文件'
-                  : '配置 OpenAI 兼容 API 模型（DeepSeek / OpenAI / Ollama 等）后即可使用',
+                  ? l.ai_emptyHintHasModel
+                  : l.ai_emptyHintNoModel,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -374,7 +379,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
               FilledButton.icon(
                 onPressed: _openModels,
                 icon: const Icon(Icons.add, size: 18),
-                label: const Text('添加模型'),
+                label: Text(l.ai_addModel),
               ),
             ],
           ],
@@ -422,6 +427,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
           ),
         );
       case AiEventKind.thinking:
+        final l = AppLocalizations.of(context);
         return Align(
           alignment: Alignment.centerLeft,
           child: Padding(
@@ -436,7 +442,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'AI 思考中…',
+                  l.ai_thinking,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -472,18 +478,20 @@ class _AiChatPanelState extends State<AiChatPanel> {
       case AiEventKind.permission:
         return _buildPermissionCard(event);
       case AiEventKind.compressing:
+        final l = AppLocalizations.of(context);
         return _buildToolChip(
           icon: Icons.compress,
           color: theme.colorScheme.tertiary,
-          text: '对话历史较长，正在压缩…',
+          text: l.ai_compressingHistory,
         );
       case AiEventKind.compressed:
+        final l = AppLocalizations.of(context);
         final summary = event.text ?? '';
         return _buildToolChip(
           icon: Icons.compress,
           color: theme.colorScheme.tertiary,
           text:
-              '已压缩对话历史：${summary.length > 120 ? '${summary.substring(0, 120)}…' : summary}',
+              l.ai_compressedHistory(summary.length > 120 ? '${summary.substring(0, 120)}…' : summary),
         );
       case AiEventKind.error:
         return Container(
@@ -620,6 +628,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
 
   Widget _buildPermissionCard(AiEvent event) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -642,7 +651,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
               ),
               const SizedBox(width: 8),
               Text(
-                'AI 申请执行敏感操作',
+                l.ai_requestSensitiveOp,
                 style: theme.textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -658,13 +667,13 @@ class _AiChatPanelState extends State<AiChatPanel> {
               TextButton(
                 onPressed: () =>
                     widget.controller.conversation.resolvePermission(false),
-                child: const Text('拒绝'),
+                child: Text(l.ai_deny),
               ),
               const SizedBox(width: 8),
               FilledButton(
                 onPressed: () =>
                     widget.controller.conversation.resolvePermission(true),
-                child: const Text('允许'),
+                child: Text(l.ai_allow),
               ),
             ],
           ),
@@ -675,6 +684,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
 
   Widget _buildInputBar(AiConversation conversation) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     final hasModel = widget.controller.activeModel != null;
     final busy = conversation.running;
     final hasLogsShortcut = widget.rootPath != null;
@@ -694,7 +704,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
                 TextButton.icon(
                   onPressed: busy ? null : _pickServerLog,
                   icon: const Icon(Icons.manage_search, size: 16),
-                  label: const Text('看日志'),
+                  label: Text(l.ai_viewLog),
                   style: TextButton.styleFrom(
                     visualDensity: VisualDensity.compact,
                     minimumSize: const Size(0, 32),
@@ -704,7 +714,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '从实例 logs/ 文件夹挑选日志，解析后发送给 AI 分析',
+                    l.ai_viewLogHint,
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: theme.colorScheme.outline,
                     ),
@@ -719,7 +729,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
           Row(
             children: [
               IconButton(
-                tooltip: '选择日志文件（.log / .log.gz），解析后发送给 AI',
+                tooltip: l.ai_pickLogFileTooltip,
                 visualDensity: VisualDensity.compact,
                 onPressed: busy ? null : _pickExternalLog,
                 icon: const Icon(Icons.attach_file, size: 18),
@@ -734,7 +744,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
                   textInputAction: TextInputAction.send,
                   onSubmitted: (_) => _send(),
                   decoration: InputDecoration(
-                    hintText: hasModel ? '向 AI 提问…' : '请先添加模型再开始对话',
+                    hintText: hasModel ? l.ai_askHint : l.ai_addModelToChat,
                     isDense: true,
                     filled: true,
                     fillColor: theme.colorScheme.surface,
@@ -747,7 +757,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
               ),
               const SizedBox(width: 8),
               IconButton.filled(
-                tooltip: hasModel ? '发送' : '添加模型',
+                tooltip: hasModel ? l.ai_send : l.ai_addModel,
                 onPressed: conversation.running
                     ? null
                     : hasModel
@@ -790,8 +800,9 @@ class _AiScreenState extends State<AiScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('AI 助手')),
+      appBar: AppBar(title: Text(l.ai_title)),
       body: AiChatPanel(controller: _controller),
     );
   }
@@ -855,6 +866,7 @@ class _ModelsDialogState extends State<_ModelsDialog> {
 
   /// 保存知识库 Milvus 连接配置。
   Future<void> _saveMilvus() async {
+    final l = AppLocalizations.of(context);
     if (_savingMilvus) return;
     setState(() => _savingMilvus = true);
     try {
@@ -873,13 +885,13 @@ class _ModelsDialogState extends State<_ModelsDialog> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Milvus 连接已保存')));
+        ).showSnackBar(SnackBar(content: Text(l.ai_milvusSaved)));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('保存失败: $e')));
+        ).showSnackBar(SnackBar(content: Text(l.ai_saveFailed(e.toString()))));
       }
     } finally {
       if (mounted) setState(() => _savingMilvus = false);
@@ -924,12 +936,13 @@ class _ModelsDialogState extends State<_ModelsDialog> {
   }
 
   Future<void> _importKnowledge() async {
+    final l = AppLocalizations.of(context);
     if (_importing) return;
     final milvus = await AiSettings.getMilvusConfig();
     if (!milvus.isValid) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请先在上方配置 Milvus 连接再导入知识库')),
+          SnackBar(content: Text(l.ai_configMilvusFirst)),
         );
       }
       return;
@@ -938,7 +951,7 @@ class _ModelsDialogState extends State<_ModelsDialog> {
     if (model == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请先添加 AI 模型，知识库导入需要调用 Embedding 接口')),
+          SnackBar(content: Text(l.ai_addModelForEmbedding)),
         );
       }
       return;
@@ -959,7 +972,7 @@ class _ModelsDialogState extends State<_ModelsDialog> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('读取文件失败: $e')));
+        ).showSnackBar(SnackBar(content: Text(l.ai_readFileFailed(e.toString()))));
       }
       return;
     }
@@ -975,13 +988,13 @@ class _ModelsDialogState extends State<_ModelsDialog> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('知识库导入完成')));
+        ).showSnackBar(SnackBar(content: Text(l.ai_knowledgeImported)));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('导入失败: $e')));
+        ).showSnackBar(SnackBar(content: Text(l.ai_importFailed(e.toString()))));
       }
     } finally {
       if (mounted) setState(() => _importing = false);
@@ -989,25 +1002,29 @@ class _ModelsDialogState extends State<_ModelsDialog> {
   }
 
   Future<void> _deleteKnowledge(KnowledgeDocument doc) async {
+    final l = AppLocalizations.of(context);
     final confirmed = await showAppDialog<bool>(
       context,
-      (ctx) => AlertDialog(
-        title: const Text('删除文档'),
-        content: Text('确定从知识库删除 "${doc.title}" 吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
+      (ctx) {
+        final l = AppLocalizations.of(ctx);
+        return AlertDialog(
+          title: Text(l.ai_deleteDocumentTitle),
+          content: Text(l.ai_deleteDocumentConfirm(doc.title)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(l.common_cancel),
             ),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(ctx).colorScheme.error,
+              ),
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(l.common_delete),
+            ),
+          ],
+        );
+      },
     );
     if (confirmed != true) return;
     try {
@@ -1017,7 +1034,7 @@ class _ModelsDialogState extends State<_ModelsDialog> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('删除失败: $e')));
+        ).showSnackBar(SnackBar(content: Text(l.ai_deleteFailed(e.toString()))));
       }
     }
   }
@@ -1059,23 +1076,26 @@ class _ModelsDialogState extends State<_ModelsDialog> {
   Future<void> _deleteModel(AiModelConfig model) async {
     final confirmed = await showAppDialog<bool>(
       context,
-      (ctx) => AlertDialog(
-        title: const Text('删除模型'),
-        content: Text('确定删除模型 "${model.name}" 吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
+      (ctx) {
+        final l = AppLocalizations.of(ctx);
+        return AlertDialog(
+          title: Text(l.ai_deleteModelTitle),
+          content: Text(l.ai_deleteModelConfirm(model.name)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(l.common_cancel),
             ),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(ctx).colorScheme.error,
+              ),
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(l.common_delete),
+            ),
+          ],
+        );
+      },
     );
     if (confirmed != true) return;
     await AiSettings.removeModel(model.id);
@@ -1083,6 +1103,7 @@ class _ModelsDialogState extends State<_ModelsDialog> {
   }
 
   Future<void> _saveMcp() async {
+    final l = AppLocalizations.of(context);
     await AiSettings.setMcpEnabled(_mcpEnabled);
     await AiSettings.setMcpPort(
       int.tryParse(_mcpPortController.text.trim()) ?? AiSettings.defaultMcpPort,
@@ -1100,12 +1121,13 @@ class _ModelsDialogState extends State<_ModelsDialog> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('MCP 服务器启动失败: $e')));
+        ).showSnackBar(SnackBar(content: Text(l.ai_mcpStartFailed(e.toString()))));
       }
     }
   }
 
   void _copyEndpoint() {
+    final l = AppLocalizations.of(context);
     final endpoint = McpServer.instance.endpoint;
     final token = McpServer.instance.token;
     // 复制含 Authorization 头完整配置，方便直接粘贴到 Claude Desktop / Cursor。
@@ -1115,14 +1137,15 @@ class _ModelsDialogState extends State<_ModelsDialog> {
     Clipboard.setData(ClipboardData(text: config));
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('已复制 MCP 完整配置（含鉴权 token）')));
+    ).showSnackBar(SnackBar(content: Text(l.ai_mcpConfigCopied)));
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return AlertDialog(
-      title: const Text('AI 设置'),
+      title: Text(l.ai_settingsTitle),
       content: SizedBox(
         width: 500,
         child: SingleChildScrollView(
@@ -1140,7 +1163,7 @@ class _ModelsDialogState extends State<_ModelsDialog> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    '模型',
+                    l.ai_models,
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -1149,7 +1172,7 @@ class _ModelsDialogState extends State<_ModelsDialog> {
                   FilledButton.tonalIcon(
                     onPressed: _addModel,
                     icon: const Icon(Icons.add, size: 18),
-                    label: const Text('添加模型'),
+                    label: Text(l.ai_addModel),
                   ),
                 ],
               ),
@@ -1158,7 +1181,7 @@ class _ModelsDialogState extends State<_ModelsDialog> {
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   child: Text(
-                    '还没有模型，点击右上角「添加模型」',
+                    l.ai_noModelsYet,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -1194,7 +1217,7 @@ class _ModelsDialogState extends State<_ModelsDialog> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         subtitle: Text(
-                          '${model.baseUrl}\n上下文窗口: ${model.contextWindow} tokens',
+                          l.ai_modelSubtitle(model.baseUrl, model.contextWindow),
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.outline,
                           ),
@@ -1205,13 +1228,13 @@ class _ModelsDialogState extends State<_ModelsDialog> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                              tooltip: '编辑',
+                              tooltip: l.common_edit,
                               visualDensity: VisualDensity.compact,
                               icon: const Icon(Icons.edit_outlined, size: 18),
                               onPressed: () => _editModel(model),
                             ),
                             IconButton(
-                              tooltip: '删除',
+                              tooltip: l.common_delete,
                               visualDensity: VisualDensity.compact,
                               icon: Icon(
                                 Icons.delete_outline,
@@ -1241,7 +1264,7 @@ class _ModelsDialogState extends State<_ModelsDialog> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    '知识库',
+                    l.ai_knowledgeBase,
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -1256,24 +1279,24 @@ class _ModelsDialogState extends State<_ModelsDialog> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.upload_file, size: 18),
-                    label: Text(_importing ? '导入中…' : '导入文档'),
+                    label: Text(_importing ? l.ai_importing : l.ai_importDoc),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
               // === 知识库 Milvus 连接配置 ===
               Text(
-                '向量库（Milvus）连接',
+                l.ai_milvusConnection,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 8),
-              _milvusField(theme, 'Milvus 地址', 'http://localhost:19530', _milvusUriController),
+              _milvusField(theme, l.ai_milvusAddress, 'http://localhost:19530', _milvusUriController),
               const SizedBox(height: 8),
-              _milvusField(theme, 'Token（可选）', '未启用鉴权可留空', _milvusTokenController, obscure: true),
+              _milvusField(theme, l.ai_milvusToken, l.ai_milvusTokenHint, _milvusTokenController, obscure: true),
               const SizedBox(height: 8),
-              _milvusField(theme, '集合名称', 'xmc_knowledge', _milvusCollectionController),
+              _milvusField(theme, l.ai_milvusCollection, 'xmc_knowledge', _milvusCollectionController),
               const SizedBox(height: 8),
               Align(
                 alignment: Alignment.centerRight,
@@ -1286,14 +1309,14 @@ class _ModelsDialogState extends State<_ModelsDialog> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.save_outlined, size: 18),
-                  label: Text(_savingMilvus ? '保存中…' : '保存连接'),
+                  label: Text(_savingMilvus ? l.ai_saving : l.ai_saveConnection),
                 ),
               ),
               const SizedBox(height: 6),
               Text(
                 _milvus.isValid
-                    ? '已配置 Milvus 连接：${_milvus.uri}'
-                    : '尚未配置 Milvus 连接，导入/检索知识库前请先保存',
+                    ? l.ai_milvusConfigured(_milvus.uri)
+                    : l.ai_milvusNotConfigured,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: _milvus.isValid
                       ? theme.colorScheme.primary
@@ -1316,8 +1339,7 @@ class _ModelsDialogState extends State<_ModelsDialog> {
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   child: Text(
-                    '知识库为空。导入 .txt/.md 文档后，AI 对话时可检索知识库内容。\n'
-                    '（需在模型设置中配置 Embedding 模型，或留空使用同名模型）',
+                    l.ai_knowledgeEmpty,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -1349,7 +1371,7 @@ class _ModelsDialogState extends State<_ModelsDialog> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         subtitle: Text(
-                          '${doc.chunkCount} 个分块 · ${doc.createdAt}',
+                          l.ai_docSubtitle(doc.chunkCount, doc.createdAt),
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.outline,
                           ),
@@ -1357,7 +1379,7 @@ class _ModelsDialogState extends State<_ModelsDialog> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         trailing: IconButton(
-                          tooltip: '删除',
+                          tooltip: l.common_delete,
                           visualDensity: VisualDensity.compact,
                           icon: Icon(
                             Icons.delete_outline,
@@ -1381,7 +1403,7 @@ class _ModelsDialogState extends State<_ModelsDialog> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    '本地 MCP 服务器',
+                    l.ai_localMcpServer,
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -1403,8 +1425,8 @@ class _ModelsDialogState extends State<_ModelsDialog> {
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   onChanged: (_) => _saveMcp(),
-                  decoration: const InputDecoration(
-                    labelText: '端口',
+                  decoration: InputDecoration(
+                    labelText: l.ai_port,
                     border: OutlineInputBorder(),
                     isDense: true,
                   ),
@@ -1426,8 +1448,8 @@ class _ModelsDialogState extends State<_ModelsDialog> {
                     Expanded(
                       child: Text(
                         McpServer.instance.running
-                            ? '运行中 ${McpServer.instance.endpoint}'
-                            : '未运行',
+                            ? l.ai_mcpRunning(McpServer.instance.endpoint)
+                            : l.ai_mcpNotRunning,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -1436,7 +1458,7 @@ class _ModelsDialogState extends State<_ModelsDialog> {
                     if (McpServer.instance.running) ...[
                       IconButton(
                         icon: const Icon(Icons.copy, size: 16),
-                        tooltip: '复制端点',
+                        tooltip: l.ai_copyEndpoint,
                         visualDensity: VisualDensity.compact,
                         onPressed: _copyEndpoint,
                       ),
@@ -1445,12 +1467,11 @@ class _ModelsDialogState extends State<_ModelsDialog> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '在 Claude Desktop / Cursor 等工具中配置（已启用鉴权，'
-                  'token 每次启动随机生成）：\n'
+                  '${l.ai_mcpConfigNote}\n'
                   '{"mcpServers": {"IriX": {"url": '
                   '"http://127.0.0.1:${_mcpPortController.text}/mcp", '
                   '"headers": {"Authorization": "Bearer <token>"}}}}\n'
-                  '点击复制按钮可直接复制完整配置。',
+                  '${l.ai_mcpConfigNoteTail}',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.outline,
                     fontFamily: FontSettings.instance.terminalFamily,
@@ -1465,7 +1486,7 @@ class _ModelsDialogState extends State<_ModelsDialog> {
       actions: [
         FilledButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('完成'),
+          child: Text(l.common_ok),
         ),
       ],
     );
@@ -1550,15 +1571,16 @@ class _ServerLogPickerDialogState extends State<_ServerLogPickerDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return AlertDialog(
       title: Row(
         children: [
           const Icon(Icons.manage_search, size: 20),
           const SizedBox(width: 8),
-          const Text('选择日志文件（logs/）'),
+          Text(l.ai_selectLogFile),
           const Spacer(),
           IconButton(
-            tooltip: '刷新',
+            tooltip: l.common_refresh,
             visualDensity: VisualDensity.compact,
             onPressed: _loading ? null : _load,
             icon: const Icon(Icons.refresh, size: 18),
@@ -1592,7 +1614,7 @@ class _ServerLogPickerDialogState extends State<_ServerLogPickerDialog> {
             : _entries.isEmpty
             ? Center(
                 child: Text(
-                  'logs/ 文件夹内没有 .log / .log.gz 文件',
+                  l.ai_noLogFiles,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -1642,7 +1664,7 @@ class _ServerLogPickerDialogState extends State<_ServerLogPickerDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
+          child: Text(l.common_cancel),
         ),
       ],
     );

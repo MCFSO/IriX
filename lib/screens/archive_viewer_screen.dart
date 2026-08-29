@@ -5,6 +5,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
+import '../l10n/app_localizations.dart';
+
 class ArchiveViewerScreen extends StatefulWidget {
   final String filePath;
 
@@ -20,13 +22,14 @@ class _ArchiveViewerScreenState extends State<ArchiveViewerScreen> {
   @override
   void initState() {
     super.initState();
-    _entriesFuture = _loadArchive();
+    final l = AppLocalizations.of(context);
+    _entriesFuture = _loadArchive(l);
   }
 
-  Future<List<ArchiveFile>> _loadArchive() async {
+  Future<List<ArchiveFile>> _loadArchive(AppLocalizations l) async {
     final file = File(widget.filePath);
     if (!await file.exists()) {
-      throw Exception('文件不存在: ${widget.filePath}');
+      throw Exception(l.archive_fileNotFound(widget.filePath));
     }
     final bytes = await file.readAsBytes();
     final archive = ZipDecoder().decodeBytes(bytes);
@@ -34,8 +37,9 @@ class _ArchiveViewerScreenState extends State<ArchiveViewerScreen> {
   }
 
   Future<void> _extractEntry(ArchiveFile entry) async {
+    final l = AppLocalizations.of(context);
     final dir = await FilePicker.platform.getDirectoryPath(
-      dialogTitle: '选择解压目标文件夹',
+      dialogTitle: l.archive_selectExtractDir,
     );
     if (dir == null || !mounted) return;
 
@@ -47,12 +51,12 @@ class _ArchiveViewerScreenState extends State<ArchiveViewerScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('已解压: ${entry.name}')));
+      ).showSnackBar(SnackBar(content: Text(l.archive_extracted(entry.name))));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('解压失败: $e')));
+      ).showSnackBar(SnackBar(content: Text(l.archive_extractFailed(e.toString()))));
     }
   }
 
@@ -76,6 +80,7 @@ class _ArchiveViewerScreenState extends State<ArchiveViewerScreen> {
     Offset position,
     ArchiveFile entry,
   ) {
+    final l = AppLocalizations.of(context);
     final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
     final overlayRect = Rect.fromPoints(
       overlay.localToGlobal(Offset.zero),
@@ -88,14 +93,14 @@ class _ArchiveViewerScreenState extends State<ArchiveViewerScreen> {
         Rect.fromLTWH(position.dx, position.dy, 1, 1),
         overlayRect,
       ),
-      items: [
+        items: [
         PopupMenuItem(
           value: 'extract',
           child: Row(
             children: [
               const Icon(Icons.unarchive, size: 18),
               const SizedBox(width: 10),
-              const Text('解压到...'),
+              Text(l.archive_extractTo),
             ],
           ),
         ),
@@ -144,6 +149,7 @@ class _ArchiveViewerScreenState extends State<ArchiveViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -176,7 +182,7 @@ class _ArchiveViewerScreenState extends State<ArchiveViewerScreen> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      '无法打开压缩文件',
+                      l.archive_cannotOpen,
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const SizedBox(height: 8),
@@ -189,7 +195,7 @@ class _ArchiveViewerScreenState extends State<ArchiveViewerScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '请确认该文件是有效的 ZIP/JAR 归档文件',
+                      l.archive_invalidArchiveHint,
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.outline,
                       ),
@@ -205,11 +211,11 @@ class _ArchiveViewerScreenState extends State<ArchiveViewerScreen> {
             children: [
               _buildBreadcrumb(),
               const Divider(height: 1),
-              _buildColumnHeaders(),
+              _buildColumnHeaders(l),
               const Divider(height: 1),
               Expanded(
                 child: entries.isEmpty
-                    ? const Center(child: Text('归档文件为空'))
+                    ? Center(child: Text(l.archive_emptyArchive))
                     : ListView.builder(
                         itemCount: entries.length,
                         itemBuilder: (context, index) =>
@@ -217,7 +223,7 @@ class _ArchiveViewerScreenState extends State<ArchiveViewerScreen> {
                       ),
               ),
               const Divider(height: 1),
-              _buildStatusBar(entries.length),
+              _buildStatusBar(entries.length, l),
             ],
           );
         },
@@ -252,7 +258,7 @@ class _ArchiveViewerScreenState extends State<ArchiveViewerScreen> {
     );
   }
 
-  Widget _buildColumnHeaders() {
+  Widget _buildColumnHeaders(AppLocalizations l) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
@@ -261,28 +267,28 @@ class _ArchiveViewerScreenState extends State<ArchiveViewerScreen> {
         ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
         border: const Border(bottom: BorderSide(color: Colors.white12)),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          SizedBox(width: 28),
+          const SizedBox(width: 28),
           Expanded(
             flex: 3,
             child: Text(
-              '文件名',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              l.archive_colName,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
             ),
           ),
           Expanded(
             flex: 1,
             child: Text(
-              '大小',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              l.archive_colSize,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
             ),
           ),
           Expanded(
             flex: 2,
             child: Text(
-              '修改时间',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              l.archive_colModified,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -346,7 +352,7 @@ class _ArchiveViewerScreenState extends State<ArchiveViewerScreen> {
     );
   }
 
-  Widget _buildStatusBar(int count) {
+  Widget _buildStatusBar(int count, AppLocalizations l) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
@@ -355,7 +361,7 @@ class _ArchiveViewerScreenState extends State<ArchiveViewerScreen> {
         ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
       ),
       child: Row(
-        children: [Text('$count 个条目', style: const TextStyle(fontSize: 12))],
+        children: [Text(l.archive_entryCount(count), style: const TextStyle(fontSize: 12))],
       ),
     );
   }

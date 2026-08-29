@@ -8,6 +8,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
+import '../l10n/app_localizations.dart';
 import '../services/trash_store.dart';
 
 class TrashView extends StatefulWidget {
@@ -63,55 +64,58 @@ class _TrashViewState extends State<TrashView> {
   }
 
   Future<void> _restore(String rootPath, TrashItem item) async {
+    final l = AppLocalizations.of(context);
     try {
       await _store.restoreItem(rootPath, item.id);
       await _refresh();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已恢复 "${p.basename(item.originalPath)}"')),
+        SnackBar(content: Text(l.trash_restored(p.basename(item.originalPath)))),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('恢复失败: $e')));
+      ).showSnackBar(SnackBar(content: Text(l.trash_restoreFailed(e.toString()))));
     }
   }
 
   Future<void> _permanentlyDelete(String rootPath, TrashItem item) async {
+    final l = AppLocalizations.of(context);
     try {
       await _store.permanentlyDelete(rootPath, item.id);
       await _refresh();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已永久删除 "${p.basename(item.originalPath)}"')),
+        SnackBar(content: Text(l.trash_permanentlyDeleted(p.basename(item.originalPath)))),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('删除失败: $e')));
+      ).showSnackBar(SnackBar(content: Text(l.trash_deleteFailed(e.toString()))));
     }
   }
 
   Future<void> _purgeAll() async {
+    final l = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('清空回收站'),
+        title: Text(l.trash_purgeTitle),
         content: Text(
           widget.rootPath == null
-              ? '确定要永久删除所有实例回收站中的文件吗？此操作不可撤销。'
-              : '确定要永久删除该实例回收站中的所有文件吗？此操作不可撤销。',
+              ? l.trash_purgeAllConfirm
+              : l.trash_purgeScopeConfirm,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
+            child: Text(l.common_cancel),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('清空', style: TextStyle(color: Colors.red)),
+            child: Text(l.trash_purge, style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -128,24 +132,24 @@ class _TrashViewState extends State<TrashView> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('回收站已清空')));
+      ).showSnackBar(SnackBar(content: Text(l.trash_purged)));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('清空失败: $e')));
+      ).showSnackBar(SnackBar(content: Text(l.trash_purgeFailed(e.toString()))));
     }
   }
 
-  String _formatDate(DateTime dt) {
+  String _formatDate(DateTime dt, AppLocalizations l) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final day = DateTime(dt.year, dt.month, dt.day);
     final dayDiff = today.difference(day).inDays;
     final hh = dt.hour.toString().padLeft(2, '0');
     final mm = dt.minute.toString().padLeft(2, '0');
-    if (dayDiff == 0) return '今天 $hh:$mm';
-    if (dayDiff == 1) return '昨天 $hh:$mm';
+    if (dayDiff == 0) return l.trash_today('$hh:$mm');
+    if (dayDiff == 1) return l.trash_yesterday('$hh:$mm');
     return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-'
         '${dt.day.toString().padLeft(2, '0')} $hh:$mm';
   }
@@ -153,28 +157,29 @@ class _TrashViewState extends State<TrashView> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     final count =
         _groups?.values.fold<int>(0, (sum, items) => sum + items.length) ?? 0;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('回收站'),
+        title: Text(l.trash_title),
         actions: [
           if (count > 0)
             TextButton.icon(
               onPressed: _purgeAll,
               icon: const Icon(Icons.delete_sweep, size: 20),
-              label: const Text('清空回收站'),
+              label: Text(l.trash_purge),
               style: TextButton.styleFrom(foregroundColor: Colors.red),
             ),
           const SizedBox(width: 4),
         ],
       ),
-      body: _buildBody(theme),
+      body: _buildBody(theme, l),
     );
   }
 
-  Widget _buildBody(ThemeData theme) {
+  Widget _buildBody(ThemeData theme, AppLocalizations l) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -192,7 +197,7 @@ class _TrashViewState extends State<TrashView> {
             ),
             const SizedBox(height: 16),
             Text(
-              '回收站为空',
+              l.trash_empty,
               style: theme.textTheme.titleMedium?.copyWith(
                 color: theme.colorScheme.outline,
               ),
@@ -214,7 +219,7 @@ class _TrashViewState extends State<TrashView> {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    '${_instanceLabel(entry.key)} · ${entry.value.length} 项',
+                    l.trash_groupHeader(_instanceLabel(entry.key), entry.value.length),
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -229,7 +234,7 @@ class _TrashViewState extends State<TrashView> {
               item: item,
               onRestore: () => _restore(entry.key, item),
               onDelete: () => _permanentlyDelete(entry.key, item),
-              formatDate: _formatDate,
+              formatDate: (dt) => _formatDate(dt, l),
             ),
         ],
       ],
@@ -257,6 +262,7 @@ class _TrashEntryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -292,7 +298,7 @@ class _TrashEntryCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '删除于 ${formatDate(item.deletedAt)}',
+                    l.trash_deletedAt(formatDate(item.deletedAt)),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.outline,
                     ),
@@ -311,23 +317,23 @@ class _TrashEntryCard extends StatelessWidget {
                 }
               },
               itemBuilder: (ctx) => [
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'restore',
                   child: Row(
                     children: [
-                      Icon(Icons.restore, color: Colors.green, size: 20),
-                      SizedBox(width: 8),
-                      Text('恢复'),
+                      const Icon(Icons.restore, color: Colors.green, size: 20),
+                      const SizedBox(width: 8),
+                      Text(l.trash_restore),
                     ],
                   ),
                 ),
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'delete',
                   child: Row(
                     children: [
-                      Icon(Icons.delete_forever, color: Colors.red, size: 20),
-                      SizedBox(width: 8),
-                      Text('永久删除'),
+                      const Icon(Icons.delete_forever, color: Colors.red, size: 20),
+                      const SizedBox(width: 8),
+                      Text(l.trash_permanentlyDelete),
                     ],
                   ),
                 ),

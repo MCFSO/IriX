@@ -4,6 +4,8 @@
 
 import 'dart:convert';
 
+import '../services/locale_settings.dart';
+
 /// 概览数据（GET /api/overview）。
 class OverviewData {
   /// 面板/守护进程版本。
@@ -210,16 +212,25 @@ class DaemonInfo {
 
 /// 远程实例运行状态（与 MCSM 一致）。
 enum RemoteStatus {
-  busy(-1, '忙碌'),
-  stopped(0, '已关闭'),
-  stopping(1, '停止中'),
-  starting(2, '启动中'),
-  running(3, '运行中');
+  busy(-1, '忙碌', 'Busy'),
+  stopped(0, '已关闭', 'Stopped'),
+  stopping(1, '停止中', 'Stopping'),
+  starting(2, '启动中', 'Starting'),
+  running(3, '运行中', 'Running');
 
-  const RemoteStatus(this.code, this.label);
+  const RemoteStatus(this.code, this.labelZh, this.labelEn);
 
   final int code;
-  final String label;
+
+  /// 中文展示标签。
+  final String labelZh;
+
+  /// 英文展示标签。
+  final String labelEn;
+
+  /// 展示标签（随语言设置切换）。
+  String get label =>
+      LocaleSettings.instance.localeCode == 'en' ? labelEn : labelZh;
 
   static RemoteStatus fromCode(int code) {
     for (final s in RemoteStatus.values) {

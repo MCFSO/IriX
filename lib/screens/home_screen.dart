@@ -7,12 +7,14 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/server_instance.dart';
 import '../services/cluster_monitor.dart';
 import '../services/database_manager.dart';
 import '../services/db_page_settings.dart';
 import '../services/download_settings.dart';
 import '../services/font_settings.dart';
+import '../services/locale_settings.dart';
 import '../services/management_mode_settings.dart';
 import '../services/mcp_server.dart';
 import '../services/vault_settings.dart';
@@ -95,11 +97,12 @@ class _HomeScreenState extends State<HomeScreen> {
     final request = McpServer.instance.currentRequest.value;
     if (request == null || _mcpDialogOpen) return;
     _mcpDialogOpen = true;
+    final l = AppLocalizations.of(context);
     showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: const Text('AI 申请执行敏感操作'),
+        title: Text(l.home_mcpRequestTitle),
         content: Text(
           '来自 ${request.clientName}\n\n${request.tool.describe(request.args)}',
         ),
@@ -110,7 +113,7 @@ class _HomeScreenState extends State<HomeScreen> {
               _mcpDialogOpen = false;
               Navigator.of(ctx).pop();
             },
-            child: const Text('拒绝'),
+            child: Text(l.home_mcpDeny),
           ),
           FilledButton(
             onPressed: () {
@@ -118,7 +121,7 @@ class _HomeScreenState extends State<HomeScreen> {
               _mcpDialogOpen = false;
               Navigator.of(ctx).pop();
             },
-            child: const Text('允许'),
+            child: Text(l.home_mcpAllow),
           ),
         ],
       ),
@@ -144,8 +147,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
                 labelType: NavigationRailLabelType.all,
                 destinations: multi
-                    ? _multiDestinations()
-                    : _singleDestinations(),
+                    ? _multiDestinations(context)
+                    : _singleDestinations(context),
               ),
               const VerticalDivider(thickness: 1, width: 1),
               // 右侧内容区
@@ -191,82 +194,88 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// 单机模式导航（默认 6 个标签）。
-  List<NavigationRailDestination> _singleDestinations() => const [
-    NavigationRailDestination(
-      icon: Icon(Icons.storage_outlined),
-      selectedIcon: Icon(Icons.storage),
-      label: Text('实例'),
-    ),
-    NavigationRailDestination(
-      icon: Icon(Icons.lan_outlined),
-      selectedIcon: Icon(Icons.lan),
-      label: Text('节点'),
-    ),
-    NavigationRailDestination(
-      icon: Icon(Icons.store_outlined),
-      selectedIcon: Icon(Icons.store),
-      label: Text('市场'),
-    ),
-    NavigationRailDestination(
-      icon: Icon(Icons.dns_outlined),
-      selectedIcon: Icon(Icons.dns),
-      label: Text('数据库'),
-    ),
-    NavigationRailDestination(
-      icon: Icon(Icons.smart_toy_outlined),
-      selectedIcon: Icon(Icons.smart_toy),
-      label: Text('AI'),
-    ),
-    NavigationRailDestination(
-      icon: Icon(Icons.hub_outlined),
-      selectedIcon: Icon(Icons.hub),
-      label: Text('FRP'),
-    ),
-  ];
+  List<NavigationRailDestination> _singleDestinations(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return [
+      NavigationRailDestination(
+        icon: const Icon(Icons.storage_outlined),
+        selectedIcon: const Icon(Icons.storage),
+        label: Text(l.home_navInstances),
+      ),
+      NavigationRailDestination(
+        icon: const Icon(Icons.lan_outlined),
+        selectedIcon: const Icon(Icons.lan),
+        label: Text(l.home_navNodes),
+      ),
+      NavigationRailDestination(
+        icon: const Icon(Icons.store_outlined),
+        selectedIcon: const Icon(Icons.store),
+        label: Text(l.home_navMarket),
+      ),
+      NavigationRailDestination(
+        icon: const Icon(Icons.dns_outlined),
+        selectedIcon: const Icon(Icons.dns),
+        label: Text(l.home_navDatabase),
+      ),
+      NavigationRailDestination(
+        icon: const Icon(Icons.smart_toy_outlined),
+        selectedIcon: const Icon(Icons.smart_toy),
+        label: Text(l.home_navAi),
+      ),
+      NavigationRailDestination(
+        icon: const Icon(Icons.hub_outlined),
+        selectedIcon: const Icon(Icons.hub),
+        label: Text(l.home_navFrp),
+      ),
+    ];
+  }
 
   /// 多机模式导航（节点优先，8 项）。
-  List<NavigationRailDestination> _multiDestinations() => const [
-    NavigationRailDestination(
-      icon: Icon(Icons.lan_outlined),
-      selectedIcon: Icon(Icons.lan),
-      label: Text('主页'),
-    ),
-    NavigationRailDestination(
-      icon: Icon(Icons.storage_outlined),
-      selectedIcon: Icon(Icons.storage),
-      label: Text('实例'),
-    ),
-    NavigationRailDestination(
-      icon: Icon(Icons.inventory_2_outlined),
-      selectedIcon: Icon(Icons.inventory_2),
-      label: Text('容器'),
-    ),
-    NavigationRailDestination(
-      icon: Icon(Icons.dashboard_customize_outlined),
-      selectedIcon: Icon(Icons.dashboard_customize),
-      label: Text('编排'),
-    ),
-    NavigationRailDestination(
-      icon: Icon(Icons.store_outlined),
-      selectedIcon: Icon(Icons.store),
-      label: Text('市场'),
-    ),
-    NavigationRailDestination(
-      icon: Icon(Icons.dns_outlined),
-      selectedIcon: Icon(Icons.dns),
-      label: Text('数据库'),
-    ),
-    NavigationRailDestination(
-      icon: Icon(Icons.smart_toy_outlined),
-      selectedIcon: Icon(Icons.smart_toy),
-      label: Text('AI'),
-    ),
-    NavigationRailDestination(
-      icon: Icon(Icons.hub_outlined),
-      selectedIcon: Icon(Icons.hub),
-      label: Text('FRP'),
-    ),
-  ];
+  List<NavigationRailDestination> _multiDestinations(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return [
+      NavigationRailDestination(
+        icon: const Icon(Icons.lan_outlined),
+        selectedIcon: const Icon(Icons.lan),
+        label: Text(l.home_navHome),
+      ),
+      NavigationRailDestination(
+        icon: const Icon(Icons.storage_outlined),
+        selectedIcon: const Icon(Icons.storage),
+        label: Text(l.home_navInstances),
+      ),
+      NavigationRailDestination(
+        icon: const Icon(Icons.inventory_2_outlined),
+        selectedIcon: const Icon(Icons.inventory_2),
+        label: Text(l.home_navContainers),
+      ),
+      NavigationRailDestination(
+        icon: const Icon(Icons.dashboard_customize_outlined),
+        selectedIcon: const Icon(Icons.dashboard_customize),
+        label: Text(l.home_navOrchestration),
+      ),
+      NavigationRailDestination(
+        icon: const Icon(Icons.store_outlined),
+        selectedIcon: const Icon(Icons.store),
+        label: Text(l.home_navMarket),
+      ),
+      NavigationRailDestination(
+        icon: const Icon(Icons.dns_outlined),
+        selectedIcon: const Icon(Icons.dns),
+        label: Text(l.home_navDatabase),
+      ),
+      NavigationRailDestination(
+        icon: const Icon(Icons.smart_toy_outlined),
+        selectedIcon: const Icon(Icons.smart_toy),
+        label: Text(l.home_navAi),
+      ),
+      NavigationRailDestination(
+        icon: const Icon(Icons.hub_outlined),
+        selectedIcon: const Icon(Icons.hub),
+        label: Text(l.home_navFrp),
+      ),
+    ];
+  }
 
   /// 多机模式内容区。
   Widget _buildMultiContent(int index) {
@@ -315,6 +324,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildInstancesPage() {
     return Consumer<AppState>(
       builder: (context, state, _) {
+        final l = AppLocalizations.of(context);
         final instances = state.instances;
         if (instances.isEmpty) {
           return const OnboardingScreen(embedded: true);
@@ -327,13 +337,13 @@ class _HomeScreenState extends State<HomeScreen> {
               actions: [
                 IconButton(
                   icon: const Icon(Icons.add),
-                  tooltip: '新建实例',
+                  tooltip: l.home_newInstance,
                   onPressed: () =>
                       pushPage(context, (_) => const OnboardingScreen()),
                 ),
                 IconButton(
                   icon: const Icon(Icons.settings_outlined),
-                  tooltip: '设置',
+                  tooltip: l.common_settings,
                   onPressed: () => showSettingsDialog(context),
                 ),
                 const SizedBox(width: 4),
@@ -375,6 +385,7 @@ class _ToolsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: Wrap(
@@ -383,7 +394,7 @@ class _ToolsRow extends StatelessWidget {
         children: [
           _ToolTile(
             icon: Icons.edit_note,
-            label: 'NBT 编辑器',
+            label: l.home_nbtEditor,
             onTap: () => pushPage(context, (_) => const NbtEditorScreen()),
           ),
         ],
@@ -521,6 +532,7 @@ class SettingsDialogState extends State<SettingsDialog> {
   late bool _vaultEnabled;
   late String _uiFont;
   late String _terminalFont;
+  late AppLanguage _language;
   bool _loading = true;
 
   @override
@@ -534,6 +546,7 @@ class SettingsDialogState extends State<SettingsDialog> {
     final fonts = FontSettings.instance;
     _uiFont = fonts.uiFamily;
     _terminalFont = fonts.terminalFamily;
+    _language = LocaleSettings.instance.language;
     unawaited(_loadVaultEnabled());
   }
 
@@ -561,176 +574,218 @@ class SettingsDialogState extends State<SettingsDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     if (_loading) {
       return const AlertDialog(content: CircularProgressIndicator());
     }
     return AlertDialog(
-      title: const Text('设置'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 管理模式
-          Row(
-            children: [
-              const Icon(Icons.lan_outlined, size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '多机管理模式',
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    Text(
-                      _multi ? '实例分布到多个节点，自动分配资源、崩溃迁移与数据同步' : '单机模式：实例在本机运行',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
+      title: Text(l.settings_title),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 界面语言
+            Text(l.common_language,
+                style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 4),
+            DropdownButtonFormField<AppLanguage>(
+              initialValue: _language,
+              decoration: InputDecoration(
+                border: const OutlineInputBorder(),
+                isDense: true,
+                labelText: l.common_language,
               ),
-              AppleSwitch(value: _multi, onChanged: _toggleMode),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '多机模式需至少 2 个节点，可在「主页」中添加。',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const Divider(height: 24),
-          // Vault 加密保险库（客户端功能开关）
-          Row(
-            children: [
-              const Icon(Icons.shield_outlined, size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Vault 加密保险库',
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    Text(
-                      _vaultEnabled
-                          ? '已启用：节点详情 / 解锁 / 初始化 / 证书绑定等保险库能力可用'
-                          : '关闭：不展示保险库相关能力（节点需以 -vault 开启并配置 TLS）',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-              ),
-              AppleSwitch(
-                value: _vaultEnabled,
-                onChanged: (v) async {
-                  setState(() => _vaultEnabled = v);
-                  await VaultSettings.setEnabled(v);
-                },
-              ),
-            ],
-          ),
-          const Divider(height: 24),
-          // 下载线程数
-          Text(
-            '下载线程数: ${_threads.round()}',
-            style: Theme.of(context).textTheme.titleSmall,
-          ),
-          const SizedBox(height: 4),
-          Slider(
-            value: _threads,
-            min: DownloadSettings.minThreads.toDouble(),
-            max: DownloadSettings.maxThreads.toDouble(),
-            divisions:
-                DownloadSettings.maxThreads - DownloadSettings.minThreads,
-            label: '${_threads.round()}',
-            onChanged: (v) => setState(() => _threads = v),
-            onChangeEnd: (v) =>
-                context.read<AppState>().setDownloadThreads(v.round()),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '多线程分片断点续传；服务端不支持 Range 时自动回退单线程。',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 16),
-          // 数据库表格每页行数
-          Text(
-            '数据库每页行数: ${_pageSize.round()}',
-            style: Theme.of(context).textTheme.titleSmall,
-          ),
-          const SizedBox(height: 4),
-          Slider(
-            value: _pageSize,
-            min: DbPageSettings.minPageSize.toDouble(),
-            max: DbPageSettings.maxPageSize.toDouble(),
-            divisions: DbPageSettings.maxPageSize - DbPageSettings.minPageSize,
-            label: '${_pageSize.round()}',
-            onChanged: (v) => setState(() => _pageSize = v),
-            onChangeEnd: (v) => DbPageSettings.setPageSize(v.round()),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '浏览数据库表数据时每页显示的行数。',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const Divider(height: 24),
-          // 字体（UI 与终端分开管理）
-          Text('字体', style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 4),
-          Text(
-            '终端（控制台 / 日志 / 代码）与其余界面字体分开设置；其余界面默认 MiSans，终端默认 JetBrains Mono。',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            initialValue: _uiFont,
-            decoration: const InputDecoration(
-              labelText: '界面字体',
-              border: OutlineInputBorder(),
-              isDense: true,
+              items: [
+                for (final lang in LocaleSettings.options)
+                  DropdownMenuItem(
+                    value: lang,
+                    child: Text(_languageLabel(l, lang)),
+                  ),
+              ],
+              onChanged: (v) {
+                if (v == null) return;
+                setState(() => _language = v);
+                LocaleSettings.instance.setLanguage(v);
+              },
             ),
-            items: [
-              for (final (value, label) in FontSettings.uiOptions)
-                DropdownMenuItem(value: value, child: Text(label)),
-            ],
-            onChanged: (v) {
-              if (v == null) return;
-              setState(() => _uiFont = v);
-              FontSettings.instance.setUiFamily(v);
-            },
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            initialValue: _terminalFont,
-            decoration: const InputDecoration(
-              labelText: '终端字体',
-              border: OutlineInputBorder(),
-              isDense: true,
+            const Divider(height: 24),
+            // 管理模式
+            Row(
+              children: [
+                const Icon(Icons.lan_outlined, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        l.settings_multiMode,
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      Text(
+                        _multi
+                            ? l.settings_multiModeOn
+                            : l.settings_singleMode,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                AppleSwitch(value: _multi, onChanged: _toggleMode),
+              ],
             ),
-            items: [
-              for (final (value, label) in FontSettings.terminalOptions)
-                DropdownMenuItem(value: value, child: Text(label)),
-            ],
-            onChanged: (v) {
-              if (v == null) return;
-              setState(() => _terminalFont = v);
-              FontSettings.instance.setTerminalFamily(v);
-            },
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '未安装的系统字体（如 JetBrains Mono）会自动回退到默认字体。',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              l.settings_multiModeHint,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const Divider(height: 24),
+            // Vault 加密保险库（客户端功能开关）
+            Row(
+              children: [
+                const Icon(Icons.shield_outlined, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        l.settings_vault,
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      Text(
+                        _vaultEnabled ? l.settings_vaultOn : l.settings_vaultOff,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                AppleSwitch(
+                  value: _vaultEnabled,
+                  onChanged: (v) async {
+                    setState(() => _vaultEnabled = v);
+                    await VaultSettings.setEnabled(v);
+                  },
+                ),
+              ],
+            ),
+            const Divider(height: 24),
+            // 下载线程数
+            Text(
+              l.settings_downloadThreads(_threads.round()),
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 4),
+            Slider(
+              value: _threads,
+              min: DownloadSettings.minThreads.toDouble(),
+              max: DownloadSettings.maxThreads.toDouble(),
+              divisions:
+                  DownloadSettings.maxThreads - DownloadSettings.minThreads,
+              label: '${_threads.round()}',
+              onChanged: (v) => setState(() => _threads = v),
+              onChangeEnd: (v) =>
+                  context.read<AppState>().setDownloadThreads(v.round()),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              l.settings_downloadThreadsHint,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 16),
+            // 数据库表格每页行数
+            Text(
+              l.settings_dbPageSize(_pageSize.round()),
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 4),
+            Slider(
+              value: _pageSize,
+              min: DbPageSettings.minPageSize.toDouble(),
+              max: DbPageSettings.maxPageSize.toDouble(),
+              divisions:
+                  DbPageSettings.maxPageSize - DbPageSettings.minPageSize,
+              label: '${_pageSize.round()}',
+              onChanged: (v) => setState(() => _pageSize = v),
+              onChangeEnd: (v) => DbPageSettings.setPageSize(v.round()),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              l.settings_dbPageSizeHint,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const Divider(height: 24),
+            // 字体（UI 与终端分开管理）
+            Text(l.settings_font,
+                style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Text(
+              l.settings_fontHint,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _uiFont,
+              decoration: InputDecoration(
+                labelText: l.settings_uiFont,
+                border: const OutlineInputBorder(),
+                isDense: true,
+              ),
+              items: [
+                for (final (value, label) in FontSettings.uiOptions)
+                  DropdownMenuItem(value: value, child: Text(label)),
+              ],
+              onChanged: (v) {
+                if (v == null) return;
+                setState(() => _uiFont = v);
+                FontSettings.instance.setUiFamily(v);
+              },
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _terminalFont,
+              decoration: InputDecoration(
+                labelText: l.settings_terminalFont,
+                border: const OutlineInputBorder(),
+                isDense: true,
+              ),
+              items: [
+                for (final (value, label) in FontSettings.terminalOptions)
+                  DropdownMenuItem(value: value, child: Text(label)),
+              ],
+              onChanged: (v) {
+                if (v == null) return;
+                setState(() => _terminalFont = v);
+                FontSettings.instance.setTerminalFamily(v);
+              },
+            ),
+            const SizedBox(height: 8),
+            Text(
+              l.settings_fontFallbackHint,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('关闭'),
+          child: Text(l.common_close),
         ),
       ],
     );
+  }
+
+  /// 语言下拉项的显示名（复用 common_language* 键）。
+  String _languageLabel(AppLocalizations l, AppLanguage lang) {
+    switch (lang) {
+      case AppLanguage.system:
+        return l.common_languageSystem;
+      case AppLanguage.zh:
+        return l.common_languageChinese;
+      case AppLanguage.en:
+        return l.common_languageEnglish;
+    }
   }
 }

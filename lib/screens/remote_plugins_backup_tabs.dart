@@ -16,6 +16,7 @@ import 'dart:async';
 
 import 'package:path/path.dart' as p;
 
+import '../l10n/app_localizations.dart';
 import '../models/node_ops.dart';
 import '../models/remote.dart';
 import '../services/node_api_client.dart';
@@ -142,8 +143,9 @@ class _RemotePluginsTabState extends State<RemotePluginsTab> {
 
   /// 上传 .jar 到指定目录。
   Future<void> _upload(String uploadDir) async {
+    final l = AppLocalizations.of(context);
     final result = await FilePicker.platform.pickFiles(
-      dialogTitle: '选择要上传的 .jar 文件',
+      dialogTitle: l.remoteTab_selectJarToUpload,
       allowMultiple: true,
       type: FileType.custom,
       allowedExtensions: ['jar'],
@@ -184,6 +186,7 @@ class _RemotePluginsTabState extends State<RemotePluginsTab> {
       _downloadJar(meta.path, meta.fileName, meta.size);
 
   Future<void> _downloadJar(String path, String name, int size) async {
+    final l = AppLocalizations.of(context);
     setState(() => _busy = true);
     try {
       final ticket = await widget.client.downloadTicket(
@@ -194,12 +197,12 @@ class _RemotePluginsTabState extends State<RemotePluginsTab> {
       );
       final bytes = await widget.client.directDownload(ticket);
       final savePath = await FilePicker.platform.saveFile(
-        dialogTitle: '保存文件',
+        dialogTitle: l.remoteTab_saveFile,
         fileName: name,
       );
       if (savePath != null) {
         await File(savePath).writeAsBytes(bytes, flush: true);
-        if (mounted) _showSnack('已下载到 $savePath');
+        if (mounted) _showSnack(l.remoteTab_downloadedTo(savePath));
       }
     } catch (e) {
       if (!mounted) return;
@@ -217,19 +220,20 @@ class _RemotePluginsTabState extends State<RemotePluginsTab> {
       _deleteJar(meta.path, meta.fileName);
 
   Future<void> _deleteJar(String path, String name) async {
+    final l = AppLocalizations.of(context);
     final confirmed = await showAppDialog<bool>(
       context,
       (_) => AlertDialog(
-        title: Text('删除 $name？'),
-        content: const Text('将从节点实例中删除该文件。'),
+        title: Text(l.remoteTab_deleteJar(name)),
+        content: Text(l.remoteTab_deleteFileHint),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('取消'),
+            child: Text(l.common_cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('删除'),
+            child: Text(l.common_delete),
           ),
         ],
       ),
@@ -260,6 +264,7 @@ class _RemotePluginsTabState extends State<RemotePluginsTab> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -280,7 +285,7 @@ class _RemotePluginsTabState extends State<RemotePluginsTab> {
               const SizedBox(height: 12),
               FilledButton.icon(
                 icon: const Icon(Icons.refresh),
-                label: const Text('重试'),
+                label: Text(l.common_retry),
                 onPressed: _load,
               ),
             ],
@@ -294,7 +299,8 @@ class _RemotePluginsTabState extends State<RemotePluginsTab> {
         if (_usingMeta) ...[
           _buildMetaSection(
             theme,
-            title: '插件（plugins/）',
+            l,
+            title: l.remoteTab_plugins,
             icon: Icons.extension,
             items: _metas.where((m) => m.isPlugin).toList(),
             uploadDir: '/plugins',
@@ -302,14 +308,15 @@ class _RemotePluginsTabState extends State<RemotePluginsTab> {
           const SizedBox(height: 16),
           _buildMetaSection(
             theme,
-            title: 'Mod（mods/）',
+            l,
+            title: l.remoteTab_mods,
             icon: Icons.category_outlined,
             items: _metas.where((m) => !m.isPlugin).toList(),
             uploadDir: '/mods',
           ),
           const SizedBox(height: 8),
           Text(
-            '已从 jar 元数据检测（plugin.yml / fabric.mod.json 等）。上传的 .jar 会直接写入节点实例对应目录。',
+            l.remoteTab_metaDetectionHint,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -317,7 +324,8 @@ class _RemotePluginsTabState extends State<RemotePluginsTab> {
         ] else ...[
           _buildSection(
             theme,
-            title: '插件（plugins/）',
+            l,
+            title: l.remoteTab_plugins,
             icon: Icons.extension,
             items: _plugins,
             uploadDir: '/plugins',
@@ -325,15 +333,15 @@ class _RemotePluginsTabState extends State<RemotePluginsTab> {
           const SizedBox(height: 16),
           _buildSection(
             theme,
-            title: 'Mod（mods/）',
+            l,
+            title: l.remoteTab_mods,
             icon: Icons.category_outlined,
             items: _mods,
             uploadDir: '/mods',
           ),
           const SizedBox(height: 8),
           Text(
-            '节点未提供插件元数据（版本过旧？），仅显示文件列表。'
-            '上传的 .jar 会直接写入节点实例对应目录（mods 支持版本子目录，此处统一列出）。',
+            l.remoteTab_fileListHint,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -345,7 +353,8 @@ class _RemotePluginsTabState extends State<RemotePluginsTab> {
 
   /// 元数据展示分区（名称 / 版本 / 描述 / 图标）。
   Widget _buildMetaSection(
-    ThemeData theme, {
+    ThemeData theme,
+    AppLocalizations l, {
     required String title,
     required IconData icon,
     required List<RemotePluginMeta> items,
@@ -367,7 +376,7 @@ class _RemotePluginsTabState extends State<RemotePluginsTab> {
                 Expanded(child: Text(title, style: theme.textTheme.titleSmall)),
                 IconButton(
                   icon: const Icon(Icons.upload_file, size: 20),
-                  tooltip: '上传 .jar',
+                  tooltip: l.remoteTab_uploadJar,
                   onPressed: _busy ? null : () => _upload(uploadDir),
                 ),
               ],
@@ -377,7 +386,7 @@ class _RemotePluginsTabState extends State<RemotePluginsTab> {
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Text(
-                  '（空）未检测到${title.startsWith('插件') ? '插件' : 'Mod'}',
+                  l.remoteTab_emptyNoDetection,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -455,13 +464,13 @@ class _RemotePluginsTabState extends State<RemotePluginsTab> {
                       ),
                       IconButton(
                         icon: const Icon(Icons.download, size: 18),
-                        tooltip: '下载',
+                        tooltip: l.remoteTab_download,
                         visualDensity: VisualDensity.compact,
                         onPressed: _busy ? null : () => _downloadMeta(meta),
                       ),
                       IconButton(
                         icon: const Icon(Icons.delete_outline, size: 18),
-                        tooltip: '删除',
+                        tooltip: l.remoteTab_delete,
                         visualDensity: VisualDensity.compact,
                         onPressed: _busy ? null : () => _deleteMeta(meta),
                       ),
@@ -504,7 +513,8 @@ class _RemotePluginsTabState extends State<RemotePluginsTab> {
   }
 
   Widget _buildSection(
-    ThemeData theme, {
+    ThemeData theme,
+    AppLocalizations l, {
     required String title,
     required IconData icon,
     required List<_JarItem> items,
@@ -526,7 +536,7 @@ class _RemotePluginsTabState extends State<RemotePluginsTab> {
                 Expanded(child: Text(title, style: theme.textTheme.titleSmall)),
                 IconButton(
                   icon: const Icon(Icons.upload_file, size: 20),
-                  tooltip: '上传 .jar',
+                  tooltip: l.remoteTab_uploadJar,
                   onPressed: _busy ? null : () => _upload(uploadDir),
                 ),
               ],
@@ -536,7 +546,7 @@ class _RemotePluginsTabState extends State<RemotePluginsTab> {
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Text(
-                  '（空）',
+                  l.remoteTab_empty,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -565,13 +575,13 @@ class _RemotePluginsTabState extends State<RemotePluginsTab> {
                       ),
                       IconButton(
                         icon: const Icon(Icons.download, size: 18),
-                        tooltip: '下载',
+                        tooltip: l.remoteTab_download,
                         visualDensity: VisualDensity.compact,
                         onPressed: _busy ? null : () => _download(item),
                       ),
                       IconButton(
                         icon: const Icon(Icons.delete_outline, size: 18),
-                        tooltip: '删除',
+                        tooltip: l.remoteTab_delete,
                         visualDensity: VisualDensity.compact,
                         onPressed: _busy ? null : () => _delete(item),
                       ),
@@ -692,11 +702,12 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
 
   /// 开始备份：节点端压缩根目录 → 流式下载到本地。
   Future<void> _startBackup() async {
+    final l = AppLocalizations.of(context);
     if (_busy) return;
     setState(() {
       _busy = true;
       _error = null;
-      _status = '获取实例根目录列表…';
+      _status = l.remoteTab_statusListRoot;
     });
     try {
       // 1. 根目录顶层条目（压缩目标排除压缩包自身，避免自包含）。
@@ -716,7 +727,7 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
 
       // 2. 节点端压缩（压缩目标不含压缩包本身）。
       if (!mounted) return;
-      setState(() => _status = '节点端压缩实例目录…（大实例可能较慢）');
+      setState(() => _status = l.remoteTab_statusCompressing);
       await widget.client.compress(
         daemonId: widget.daemonId,
         uuid: widget.uuid,
@@ -727,7 +738,7 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
 
       // 3. 选择保存位置。
       final savePath = await FilePicker.platform.saveFile(
-        dialogTitle: '保存备份',
+        dialogTitle: l.remoteTab_saveBackup,
         fileName: zipName,
       );
       if (savePath == null) {
@@ -740,7 +751,7 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
       // 4. 流式下载（Rust 下载器写盘，不占内存）。
       if (!mounted) return;
       setState(() {
-        _status = '下载备份…';
+        _status = l.remoteTab_statusDownloading;
         _progress = 0;
       });
       final ticket = await widget.client.downloadTicket(
@@ -766,7 +777,7 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
       });
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('备份已保存到 $savePath')));
+      ).showSnackBar(SnackBar(content: Text(l.remoteTab_backupSaved(savePath))));
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -781,9 +792,10 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
 
   /// 恢复备份：本地 .zip → 上传到实例根目录 → 节点端解压。
   Future<void> _restore() async {
+    final l = AppLocalizations.of(context);
     if (_busy) return;
     final result = await FilePicker.platform.pickFiles(
-      dialogTitle: '选择要恢复的备份 (.zip)',
+      dialogTitle: l.remoteTab_selectRestoreZip,
       type: FileType.custom,
       allowedExtensions: ['zip'],
     );
@@ -792,16 +804,16 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
     final confirmed = await showAppDialog<bool>(
       context,
       (_) => AlertDialog(
-        title: const Text('恢复备份？'),
-        content: const Text('将把压缩包上传到实例根目录并解压，同名文件会被覆盖。建议先停止实例再恢复。'),
+        title: Text(l.remoteTab_restoreBackupTitle),
+        content: Text(l.remoteTab_restoreBackupContent),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('取消'),
+            child: Text(l.common_cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('恢复'),
+            child: Text(l.remoteTab_restore),
           ),
         ],
       ),
@@ -810,7 +822,7 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
     setState(() {
       _busy = true;
       _error = null;
-      _status = '上传备份…';
+      _status = l.remoteTab_uploadingBackup;
     });
     try {
       final fileName = p.basename(localPath);
@@ -826,7 +838,7 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
         timeout: _longTimeout,
       );
       if (!mounted) return;
-      setState(() => _status = '节点端解压中…');
+      setState(() => _status = l.remoteTab_unzippingOnNode);
       await widget.client.unzip(
         daemonId: widget.daemonId,
         uuid: widget.uuid,
@@ -851,7 +863,7 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
       });
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('备份已恢复')));
+      ).showSnackBar(SnackBar(content: Text(l.remoteTab_backupRestored)));
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -865,10 +877,11 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
 
   /// 下载节点上的备份压缩包到本地。
   Future<void> _download(RemoteFileEntry entry) async {
+    final l = AppLocalizations.of(context);
     setState(() {
       _busy = true;
       _error = null;
-      _status = '下载 ${entry.name}…';
+      _status = l.remoteTab_statusDownloadingEntry(entry.name);
     });
     try {
       final ticket = await widget.client.downloadTicket(
@@ -878,7 +891,7 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
         timeout: _longTimeout,
       );
       final savePath = await FilePicker.platform.saveFile(
-        dialogTitle: '保存文件',
+        dialogTitle: l.remoteTab_saveFile,
         fileName: entry.name,
       );
       if (savePath != null) {
@@ -894,7 +907,7 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
         if (!mounted) return;
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('已下载到 $savePath')));
+        ).showSnackBar(SnackBar(content: Text(l.remoteTab_downloadedTo(savePath))));
       }
     } catch (e) {
       if (!mounted) return;
@@ -912,19 +925,20 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
 
   /// 删除节点上的备份压缩包。
   Future<void> _delete(RemoteFileEntry entry) async {
+    final l = AppLocalizations.of(context);
     final confirmed = await showAppDialog<bool>(
       context,
       (_) => AlertDialog(
-        title: Text('删除 ${entry.name}？'),
-        content: const Text('将从节点实例中删除该压缩包。'),
+        title: Text(l.remoteTab_deleteZip(entry.name)),
+        content: Text(l.remoteTab_deleteZipHint),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('取消'),
+            child: Text(l.common_cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('删除'),
+            child: Text(l.common_delete),
           ),
         ],
       ),
@@ -981,12 +995,13 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
 
   /// 创建快照：发起任务并轮询进度（snapshot-progress）。
   Future<void> _createSnapshot() async {
+    final l = AppLocalizations.of(context);
     if (_snapshotBusy) return;
     _cancelSnapshotPoll();
     setState(() {
       _snapshotBusy = true;
       _snapshotProgress = 0;
-      _snapshotStatus = '创建快照中…';
+      _snapshotStatus = l.remoteTab_statusCreatingSnapshot;
       _snapshotError = null;
     });
     try {
@@ -1018,7 +1033,7 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
               _snapshotBusy = false;
               _snapshotProgress = null;
               _snapshotStatus = null;
-              _snapshotError = '快照失败';
+              _snapshotError = l.remoteTab_snapshotFailed;
             });
           }
         } catch (e) {
@@ -1045,22 +1060,23 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
 
   /// 恢复快照：先确认，再发起任务并轮询进度。
   Future<void> _restoreSnapshot(BackupItem item) async {
+    final l = AppLocalizations.of(context);
     if (_snapshotBusy) return;
     final confirmed = await showAppDialog<bool>(
       context,
       (_) => AlertDialog(
-        title: const Text('恢复快照？'),
+        title: Text(l.remoteTab_restoreSnapshotTitle),
         content: Text(
-          '将停止实例并解压覆盖「${item.fileName}」到实例目录，恢复后实例保持停止。',
+          l.remoteTab_restoreSnapshotContent(item.fileName),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('取消'),
+            child: Text(l.common_cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('恢复'),
+            child: Text(l.remoteTab_restore),
           ),
         ],
       ),
@@ -1070,7 +1086,7 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
     setState(() {
       _snapshotBusy = true;
       _snapshotProgress = 0;
-      _snapshotStatus = '恢复快照中…';
+      _snapshotStatus = l.remoteTab_statusRestoringSnapshot;
       _snapshotError = null;
     });
     try {
@@ -1103,7 +1119,7 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
               _snapshotBusy = false;
               _snapshotProgress = null;
               _snapshotStatus = null;
-              _snapshotError = '恢复失败';
+              _snapshotError = l.remoteTab_restoreFailed;
             });
           }
         } catch (e) {
@@ -1130,6 +1146,7 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
 
   /// 下载快照到本地（直连票据下载）。
   Future<void> _downloadSnapshot(BackupItem item) async {
+    final l = AppLocalizations.of(context);
     if (_snapshotBusy) return;
     setState(() => _snapshotError = null);
     try {
@@ -1139,7 +1156,7 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
         timeout: _longTimeout,
       );
       final savePath = await FilePicker.platform.saveFile(
-        dialogTitle: '保存快照',
+        dialogTitle: l.remoteTab_saveSnapshot,
         fileName: item.fileName,
       );
       if (savePath == null || !mounted) return;
@@ -1147,7 +1164,7 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
         if (!mounted) return;
         setState(() {
           _snapshotProgress = total > 0 ? done / total : 0;
-          _snapshotStatus = '下载快照中…';
+          _snapshotStatus = l.remoteTab_statusDownloadingSnapshot;
         });
       });
       if (!mounted) return;
@@ -1157,7 +1174,7 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
       });
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('已下载到 $savePath')));
+      ).showSnackBar(SnackBar(content: Text(l.remoteTab_downloadedTo(savePath))));
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -1170,19 +1187,20 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
 
   /// 删除快照（节点侧备份区删除，不可恢复）。
   Future<void> _deleteSnapshot(BackupItem item) async {
+    final l = AppLocalizations.of(context);
     final confirmed = await showAppDialog<bool>(
       context,
       (_) => AlertDialog(
-        title: Text('删除快照 ${item.fileName}？'),
-        content: const Text('将从节点快照区永久删除，不可恢复。'),
+        title: Text(l.remoteTab_deleteSnapshot(item.fileName)),
+        content: Text(l.remoteTab_deleteSnapshotHint),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('取消'),
+            child: Text(l.common_cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('删除'),
+            child: Text(l.common_delete),
           ),
         ],
       ),
@@ -1209,6 +1227,7 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -1225,10 +1244,10 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('实例备份', style: theme.textTheme.titleSmall),
+                Text(l.remoteTab_instanceBackup, style: theme.textTheme.titleSmall),
                 const SizedBox(height: 4),
                 Text(
-                  '备份在节点端压缩整个实例目录后下载到本地；恢复会覆盖同名文件，建议先停止实例。',
+                  l.remoteTab_instanceBackupDesc,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -1238,13 +1257,13 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
                   children: [
                     FilledButton.icon(
                       icon: const Icon(Icons.backup, size: 18),
-                      label: const Text('开始备份'),
+                      label: Text(l.remoteTab_startBackup),
                       onPressed: _busy ? null : _startBackup,
                     ),
                     const SizedBox(width: 12),
                     OutlinedButton.icon(
                       icon: const Icon(Icons.settings_backup_restore, size: 18),
-                      label: const Text('恢复备份'),
+                      label: Text(l.remoteTab_restoreBackup),
                       onPressed: _busy ? null : _restore,
                     ),
                   ],
@@ -1261,7 +1280,7 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          _status ?? '处理中…',
+                          _status ?? l.remoteTab_statusProcessing,
                           style: theme.textTheme.bodySmall,
                         ),
                       ),
@@ -1316,11 +1335,11 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
                       ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: Text('节点端快照', style: theme.textTheme.titleSmall),
+                        child: Text(l.remoteTab_nodeSnapshot, style: theme.textTheme.titleSmall),
                       ),
                       IconButton(
                         icon: const Icon(Icons.refresh, size: 20),
-                        tooltip: '刷新',
+                        tooltip: l.common_refresh,
                         onPressed:
                             _snapshotBusy ? null : () => _loadSnapshots(),
                       ),
@@ -1328,7 +1347,7 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '快照由节点在 {data}/backups/<实例> 保管，恢复会先停止实例再覆盖。',
+                    l.remoteTab_nodeSnapshotDesc('{data}'),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -1336,7 +1355,7 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
                   const SizedBox(height: 12),
                   FilledButton.icon(
                     icon: const Icon(Icons.camera, size: 18),
-                    label: const Text('创建快照'),
+                    label: Text(l.remoteTab_createSnapshot),
                     onPressed: _snapshotBusy ? null : _createSnapshot,
                   ),
                   if (_snapshotBusy) ...[
@@ -1351,7 +1370,7 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            _snapshotStatus ?? '处理中…',
+                            _snapshotStatus ?? l.remoteTab_statusProcessing,
                             style: theme.textTheme.bodySmall,
                           ),
                         ),
@@ -1374,7 +1393,7 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       child: Text(
-                        '（暂无快照）',
+                        l.remoteTab_noSnapshots,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -1412,21 +1431,21 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
                             ),
                             IconButton(
                               icon: const Icon(Icons.restore, size: 18),
-                              tooltip: '恢复',
+                              tooltip: l.remoteTab_restore,
                               visualDensity: VisualDensity.compact,
                               onPressed:
                                   _snapshotBusy ? null : () => _restoreSnapshot(item),
                             ),
                             IconButton(
                               icon: const Icon(Icons.download, size: 18),
-                              tooltip: '下载',
+                              tooltip: l.remoteTab_download,
                               visualDensity: VisualDensity.compact,
                               onPressed:
                                   _snapshotBusy ? null : () => _downloadSnapshot(item),
                             ),
                             IconButton(
                               icon: const Icon(Icons.delete_outline, size: 18),
-                              tooltip: '删除',
+                              tooltip: l.remoteTab_delete,
                               visualDensity: VisualDensity.compact,
                               onPressed:
                                   _snapshotBusy ? null : () => _deleteSnapshot(item),
@@ -1471,11 +1490,11 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text('节点端备份文件', style: theme.textTheme.titleSmall),
+                      child: Text(l.remoteTab_nodeBackupFiles, style: theme.textTheme.titleSmall),
                     ),
                     IconButton(
                       icon: const Icon(Icons.refresh, size: 20),
-                      tooltip: '刷新',
+                      tooltip: l.common_refresh,
                       onPressed: _busy ? null : _load,
                     ),
                   ],
@@ -1490,7 +1509,7 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     child: Text(
-                      '（暂无 .zip 备份文件）',
+                      l.remoteTab_noZipBackups,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -1519,13 +1538,13 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
                           ),
                           IconButton(
                             icon: const Icon(Icons.download, size: 18),
-                            tooltip: '下载',
+                            tooltip: l.remoteTab_download,
                             visualDensity: VisualDensity.compact,
                             onPressed: _busy ? null : () => _download(entry),
                           ),
                           IconButton(
                             icon: const Icon(Icons.delete_outline, size: 18),
-                            tooltip: '删除',
+                            tooltip: l.remoteTab_delete,
                             visualDensity: VisualDensity.compact,
                             onPressed: _busy ? null : () => _delete(entry),
                           ),

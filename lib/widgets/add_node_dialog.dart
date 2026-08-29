@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/node.dart';
 import '../services/node_api_client.dart';
 import '../state/node_state.dart';
@@ -34,6 +35,9 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
 
   bool _testing = false;
   String? _testResult;
+
+  /// 最近一次测试连接是否成功（用于结果图标/着色，与语言无关）。
+  bool _testOk = false;
 
   /// API Key 是否隐藏（默认隐藏，眼睛按钮切换显示）。
   bool _obscureKey = true;
@@ -68,9 +72,10 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
   }
 
   Future<void> _testConnection() async {
+    final l = AppLocalizations.of(context);
     final address = _addressController.text.trim();
     if (address.isEmpty) {
-      setState(() => _testResult = '请先填写地址');
+      setState(() => _testResult = l.addNode_fillAddressFirst);
       return;
     }
     setState(() {
@@ -85,7 +90,8 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
     if (!mounted) return;
     setState(() {
       _testing = false;
-      _testResult = ok ? '连接成功' : '连接失败，请检查地址与 API Key';
+      _testOk = ok;
+      _testResult = ok ? l.addNode_connectSuccess : l.addNode_connectFailed;
     });
   }
 
@@ -98,21 +104,22 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
   }
 
   Future<void> _finish() async {
+    final l = AppLocalizations.of(context);
     final address = _addressController.text.trim();
     if (address.isEmpty) {
-      setState(() => _testResult = '请填写节点地址');
+      setState(() => _testResult = l.addNode_fillNodeAddress);
       return;
     }
     final name = _nameController.text.trim();
     final apiKey = _apiKeyController.text.trim();
     if (_type == NodeType.mcsm && apiKey.isEmpty) {
-      setState(() => _testResult = 'MCSM 节点需要填写 API Key');
+      setState(() => _testResult = l.addNode_mcsmApiKeyRequired);
       return;
     }
     // H-6：远程 IriX 节点必须配置密钥，否则守护进程端口暴露即形成
     // 未认证的远程文件读写 + 命令执行面；仅本机回环允许留空。
     if (_type == NodeType.node && apiKey.isEmpty && !_isLoopback(address)) {
-      setState(() => _testResult = '远程 Node 节点必须填写密钥（仅本机回环地址可留空）');
+      setState(() => _testResult = l.addNode_remoteNodeKeyRequired);
       return;
     }
     // H-6：远程明文 HTTP 警告（凭证与全部控制流量可被窃听篡改）。
@@ -125,26 +132,22 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
       final proceed = await showAppDialog<bool>(
         context,
         (ctx) => AlertDialog(
-          title: const Text('明文连接警告'),
-          content: const Text(
-            '该节点地址使用明文 HTTP（非 https），API 密钥与全部控制流量'
-            '（含文件读写、命令执行）可被同网段窃听或篡改。\n\n'
-            '建议：节点启用 HTTPS 后再连接；确属可信内网环境可继续。',
-          ),
+          title: Text(l.addNode_plaintextWarningTitle),
+          content: Text(l.addNode_plaintextWarningContent),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('取消'),
+              child: Text(l.common_cancel),
             ),
             FilledButton(
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('仍然继续'),
+              child: Text(l.addNode_continueAnyway),
             ),
           ],
         ),
       );
       if (proceed != true) {
-        setState(() => _testResult = '已取消：请为节点启用 HTTPS');
+        setState(() => _testResult = l.addNode_cancelledEnableHttps);
         return;
       }
     }
@@ -161,8 +164,9 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return AlertDialog(
-      title: Text('添加节点'),
+      title: Text(l.addNode_title),
       content: SizedBox(
         width: 460,
         child: Column(
@@ -190,7 +194,7 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
                   _testResult = null;
                 })
               : () => Navigator.of(context).pop(),
-          child: Text(_step > 0 ? '上一步' : '取消'),
+          child: Text(_step > 0 ? l.addNode_prevStep : l.common_cancel),
         ),
         if (_step < 2)
           FilledButton(
@@ -201,7 +205,7 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
               _step++;
               _testResult = null;
             }),
-            child: const Text('下一步'),
+            child: Text(l.addNode_nextStep),
           )
         else ...[
           TextButton(
@@ -212,9 +216,9 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
                     height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text('测试连接'),
+                : Text(l.addNode_testConnection),
           ),
-          FilledButton(onPressed: _finish, child: const Text('完成')),
+          FilledButton(onPressed: _finish, child: Text(l.addNode_finish)),
         ],
       ],
     );
@@ -222,6 +226,7 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
 
   /// 步骤指示器。
   Widget _buildStepper(ThemeData theme) {
+    final l = AppLocalizations.of(context);
     return Row(
       children: List.generate(3, (i) {
         final active = i == _step;
@@ -246,7 +251,11 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
               ),
               const SizedBox(width: 8),
               Text(
-                ['类型', '名称', 'Key'][i],
+                [
+                  l.addNode_stepType,
+                  l.addNode_stepName,
+                  l.addNode_stepKey,
+                ][i],
                 style: theme.textTheme.bodySmall?.copyWith(
                   fontWeight: active ? FontWeight.bold : FontWeight.normal,
                   color: active
@@ -273,11 +282,12 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
 
   /// 步骤 1：节点类型。
   Widget _buildTypeStep(ThemeData theme) {
+    final l = AppLocalizations.of(context);
     return Column(
       key: const ValueKey('step-type'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('选择节点类型', style: theme.textTheme.titleMedium),
+        Text(l.addNode_selectType, style: theme.textTheme.titleMedium),
         const SizedBox(height: 12),
         Row(
           children: [
@@ -285,7 +295,7 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
               child: _TypeCard(
                 icon: Icons.dns,
                 title: 'MCSM',
-                subtitle: '连接远程 MCSManager 面板\n需填写面板 API Key',
+                subtitle: l.addNode_mcsmSubtitle,
                 selected: _type == NodeType.mcsm,
                 onTap: () => setState(() {
                   _type = NodeType.mcsm;
@@ -298,7 +308,7 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
               child: _TypeCard(
                 icon: Icons.terminal,
                 title: 'Node',
-                subtitle: 'IriX 本地 Go 语言节点\n本机回环可免密钥，远程必须配置密钥',
+                subtitle: l.addNode_nodeSubtitle,
                 selected: _type == NodeType.node,
                 onTap: () => setState(() {
                   _type = NodeType.node;
@@ -314,22 +324,23 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
 
   /// 步骤 2：名称与地址。
   Widget _buildNameStep(ThemeData theme) {
+    final l = AppLocalizations.of(context);
     return Column(
       key: const ValueKey('step-name'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('节点名称', style: theme.textTheme.titleMedium),
+        Text(l.common_name, style: theme.textTheme.titleMedium),
         const SizedBox(height: 8),
         TextField(
           controller: _nameController,
-          decoration: const InputDecoration(
-            hintText: '例如：我的面板 / 本地节点',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            hintText: l.addNode_nameHint,
+            border: const OutlineInputBorder(),
           ),
           onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 16),
-        Text('节点地址', style: theme.textTheme.titleMedium),
+        Text(l.addNode_address, style: theme.textTheme.titleMedium),
         const SizedBox(height: 8),
         TextField(
           controller: _addressController,
@@ -339,8 +350,8 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
                 : 'http://127.0.0.1:12346',
             border: const OutlineInputBorder(),
             helperText: _type == NodeType.mcsm
-                ? 'MCSManager 面板地址（含端口，如 23333）；远程建议使用 https'
-                : '本地节点守护进程地址（默认 12346 端口）',
+                ? l.addNode_mcsmAddressHelper
+                : l.addNode_nodeAddressHelper,
           ),
           onChanged: (_) => setState(() {}),
         ),
@@ -350,11 +361,12 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
 
   /// 步骤 3：API Key。
   Widget _buildKeyStep(ThemeData theme) {
+    final l = AppLocalizations.of(context);
     return Column(
       key: const ValueKey('step-key'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('节点 Key / API Key', style: theme.textTheme.titleMedium),
+        Text(l.addNode_keyTitle, style: theme.textTheme.titleMedium),
         const SizedBox(height: 8),
         TextField(
           controller: _apiKeyController,
@@ -363,21 +375,21 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
           autocorrect: false,
           decoration: InputDecoration(
             hintText: _type == NodeType.mcsm
-                ? 'MCSManager 用户 API Key'
-                : '本地节点密钥（本机回环可留空）',
+                ? l.addNode_mcsmKeyHint
+                : l.addNode_nodeKeyHint,
             border: const OutlineInputBorder(),
             suffixIcon: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
                   icon: const Icon(Icons.copy, size: 18),
-                  tooltip: '复制',
+                  tooltip: l.common_copy,
                   onPressed: () {
                     Clipboard.setData(
                       ClipboardData(text: _apiKeyController.text),
                     );
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('已复制 API Key')),
+                      SnackBar(content: Text(l.addNode_copiedApiKey)),
                     );
                   },
                 ),
@@ -386,14 +398,14 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
                     _obscureKey ? Icons.visibility : Icons.visibility_off,
                     size: 18,
                   ),
-                  tooltip: _obscureKey ? '显示' : '隐藏',
+                  tooltip: _obscureKey ? l.addNode_show : l.addNode_hide,
                   onPressed: () => setState(() => _obscureKey = !_obscureKey),
                 ),
               ],
             ),
             helperText: _type == NodeType.mcsm
-                ? '在 MCSManager 面板「用户信息」中生成并复制'
-                : '远程节点必须填写密钥；仅 127.0.0.1 本机回环可留空',
+                ? l.addNode_mcsmKeyHelper
+                : l.addNode_nodeKeyHelper,
           ),
           onChanged: (_) => setState(() {}),
         ),
@@ -402,11 +414,9 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
           Row(
             children: [
               Icon(
-                _testResult!.contains('成功')
-                    ? Icons.check_circle
-                    : Icons.error_outline,
+                _testOk ? Icons.check_circle : Icons.error_outline,
                 size: 18,
-                color: _testResult!.contains('成功')
+                color: _testOk
                     ? Colors.green
                     : theme.colorScheme.error,
               ),
@@ -415,7 +425,7 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
                 child: Text(
                   _testResult!,
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: _testResult!.contains('成功')
+                    color: _testOk
                         ? Colors.green
                         : theme.colorScheme.error,
                   ),

@@ -7,6 +7,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import '../l10n/app_localizations.dart';
 import '../services/config_annotation_service.dart';
 import '../services/config_service.dart';
 import '../services/font_settings.dart';
@@ -165,9 +166,10 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
       });
       _resetGutterScroll();
       if (mounted) {
+        final l = AppLocalizations.of(context);
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('解析失败，已切换到文本模式：$e')));
+        ).showSnackBar(SnackBar(content: Text('${l.configEditor_parseFailedTextMode}: $e')));
       }
     }
   }
@@ -175,6 +177,7 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
   /// 保存当前配置。
   void _save() {
     if (_files.isEmpty) return;
+    final l = AppLocalizations.of(context);
     final file = _files[_selectedIndex];
     try {
       if (_textMode) {
@@ -186,13 +189,13 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('已保存 ${file.name}')));
+        ).showSnackBar(SnackBar(content: Text(l.configEditor_saved(file.name))));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('保存失败：$e')));
+        ).showSnackBar(SnackBar(content: Text('${l.configEditor_saveFailed}: $e')));
       }
     }
   }
@@ -241,6 +244,7 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
   /// CSV 格式：`key,description` (第一行可为表头)。
   /// 导入后覆盖硬编码注释，持久化到本地文件。
   Future<void> _importCsv() async {
+    final l = AppLocalizations.of(context);
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['csv', 'txt'],
@@ -255,31 +259,32 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
       setState(() {});
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('已导入 $count 条注释')));
+      ).showSnackBar(SnackBar(content: Text(l.configEditor_importedAnnotations(count))));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('导入失败：$e')));
+      ).showSnackBar(SnackBar(content: Text('${l.configEditor_importFailed}: $e')));
     }
   }
 
   /// 切换文件时的未保存提示。
   Future<bool> _confirmDiscard() async {
     if (!_dirty) return true;
+    final l = AppLocalizations.of(context);
     final result = await showAppDialog<bool>(
       context,
       (ctx) => AlertDialog(
-        title: const Text('未保存的修改'),
-        content: const Text('当前文件有未保存的修改，是否丢弃？'),
+        title: Text(l.configEditor_unsavedChanges),
+        content: Text(l.configEditor_discardConfirm),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消'),
+            child: Text(l.common_cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('丢弃'),
+            child: Text(l.configEditor_discard),
           ),
         ],
       ),
@@ -298,6 +303,7 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     if (_files.isEmpty) {
       return Center(
         child: Column(
@@ -305,9 +311,9 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
           children: [
             const Icon(Icons.folder_off, size: 64, color: Colors.grey),
             const SizedBox(height: 16),
-            Text('该目录中暂无配置文件', style: Theme.of(context).textTheme.titleMedium),
+            Text(l.configEditor_noConfigFiles, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
-            const Text('启动服务器后会生成配置文件'),
+            Text(l.configEditor_configGeneratedAfterStart),
             const SizedBox(height: 16),
             if (widget.onBack != null)
               Padding(
@@ -315,13 +321,13 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
                 child: FilledButton.tonalIcon(
                   onPressed: widget.onBack,
                   icon: const Icon(Icons.arrow_back),
-                  label: const Text('返回'),
+                  label: Text(l.common_back),
                 ),
               ),
             FilledButton.icon(
               onPressed: _loadFiles,
               icon: const Icon(Icons.refresh),
-              label: const Text('重新扫描'),
+              label: Text(l.common_refresh),
             ),
           ],
         ),
@@ -345,20 +351,20 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          '配置文件',
+                          l.configEditor_configFiles,
                           style: Theme.of(context).textTheme.titleSmall,
                         ),
                       ),
                       IconButton(
                         icon: const Icon(Icons.refresh, size: 18),
-                        tooltip: '重新扫描',
+                        tooltip: l.common_refresh,
                         onPressed: () async {
                           if (await _confirmDiscard()) _loadFiles();
                         },
                       ),
                       IconButton(
                         icon: const Icon(Icons.upload_file, size: 18),
-                        tooltip: '导入CSV注释',
+                        tooltip: l.configEditor_importCsv,
                         onPressed: _importCsv,
                       ),
                     ],
@@ -409,7 +415,7 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
                       if (widget.onBack != null)
                         IconButton(
                           icon: const Icon(Icons.arrow_back, size: 20),
-                          tooltip: '返回',
+                          tooltip: l.common_back,
                           onPressed: () async {
                             if (await _confirmDiscard()) widget.onBack!();
                           },
@@ -456,7 +462,7 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
                       const SizedBox(width: 8),
                       IconButton(
                         icon: const Icon(Icons.undo, size: 20),
-                        tooltip: '撤销',
+                        tooltip: l.configEditor_undo,
                         onPressed: _textMode && _undoStack.isNotEmpty
                             ? _undo
                             : null,
@@ -465,7 +471,7 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
                       FilledButton.icon(
                         onPressed: _dirty ? _save : null,
                         icon: const Icon(Icons.save, size: 18),
-                        label: const Text('保存'),
+                        label: Text(l.common_save),
                       ),
                     ],
                   ),
@@ -488,7 +494,7 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
                                   setState(() => _searchQuery = '');
                                 },
                               ),
-                        hintText: '搜索配置项（中英文均可）',
+                        hintText: l.configEditor_searchHint,
                         border: const OutlineInputBorder(),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 8,
@@ -588,8 +594,9 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
 
   /// 图形表单编辑模式。
   Widget _buildFormEditor() {
+    final l = AppLocalizations.of(context);
     if (_configData.isEmpty) {
-      return const Center(child: Text('该文件为空或无法解析为表单，请切换到文本模式编辑'));
+      return Center(child: Text(l.configEditor_emptyOrUnparseable));
     }
     // 搜索模式：递归收集匹配的叶节点，扁平化展示。
     if (_searchQuery.isNotEmpty) {
@@ -609,7 +616,7 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
             children: [
               const Icon(Icons.search_off, size: 48, color: Colors.grey),
               const SizedBox(height: 8),
-              Text('未找到匹配「$_searchQuery」的配置项'),
+              Text(l.configEditor_noMatch(_searchQuery)),
             ],
           ),
         );

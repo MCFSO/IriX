@@ -8,6 +8,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/node.dart';
 import '../models/remote.dart';
 import '../services/cluster_allocator.dart';
@@ -72,11 +73,12 @@ class _ClusterHomeScreenState extends State<ClusterHomeScreen> {
   Widget build(BuildContext context) {
     return Consumer2<NodeState, ClusterState>(
       builder: (context, nodeState, cluster, _) {
+        final l = AppLocalizations.of(context);
         final nodes = nodeState.nodes;
         return CustomScrollView(
           slivers: [
             SliverAppBar(
-              title: const Text('主页'),
+              title: Text(l.clusterHome_title),
               floating: true,
               actions: [
                 IconButton(
@@ -87,17 +89,17 @@ class _ClusterHomeScreenState extends State<ClusterHomeScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.refresh),
-                  tooltip: '刷新状态',
+                  tooltip: l.clusterHome_refreshStatus,
                   onPressed: _refreshing ? null : _refresh,
                 ),
                 IconButton(
                   icon: const Icon(Icons.add),
-                  tooltip: '添加节点',
+                  tooltip: l.clusterHome_addNode,
                   onPressed: _addNode,
                 ),
                 IconButton(
                   icon: const Icon(Icons.settings_outlined),
-                  tooltip: '设置',
+                  tooltip: l.common_settings,
                   onPressed: () => showSettingsDialog(context),
                 ),
                 const SizedBox(width: 4),
@@ -116,12 +118,12 @@ class _ClusterHomeScreenState extends State<ClusterHomeScreen> {
                         color: Theme.of(context).colorScheme.outline,
                       ),
                       const SizedBox(height: 16),
-                      const Text('还没有节点，点击右上角 + 添加'),
+                      Text(l.clusterHome_noNodes),
                       const SizedBox(height: 8),
-                      const Text(
-                        '多机模式需要至少 2 个节点（MCSM 面板或 IriX 本地节点）',
+                      Text(
+                        l.clusterHome_noNodesHint,
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12),
+                        style: const TextStyle(fontSize: 12),
                       ),
                     ],
                   ),
@@ -164,14 +166,15 @@ class _ClusterHomeScreenState extends State<ClusterHomeScreen> {
   /// 底部监控策略提示。
   Widget _monitorHint(List<NodeInfo> nodes, ClusterState cluster) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     final role = deriveMonitorRole(nodes);
     final String text = switch (role.strategy) {
       ClusterMonitorStrategy.monitor =>
-        '已指定监控节点：${_nodeName(nodes, role.monitorNodeId)}',
-      ClusterMonitorStrategy.mutual => '节点互相监控',
+        l.clusterHome_monitorAssigned(_nodeName(nodes, role.monitorNodeId)),
+      ClusterMonitorStrategy.mutual => l.clusterHome_monitorMutual,
       ClusterMonitorStrategy.noEligibleMonitor =>
-        '节点 ≥3 台，但均为 MCSM，无可用监控节点（MCSM 不支持节点互联）',
-      ClusterMonitorStrategy.insufficient => '至少需要 2 个节点才能形成集群',
+        l.clusterHome_monitorNoEligible,
+      ClusterMonitorStrategy.insufficient => l.clusterHome_monitorInsufficient,
     };
     return Text(
       text,
@@ -199,6 +202,7 @@ class _NetworkChartCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     final latest = history.isNotEmpty ? history.last : null;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
@@ -215,7 +219,7 @@ class _NetworkChartCard extends StatelessWidget {
                   color: theme.colorScheme.primary,
                 ),
                 const SizedBox(width: 8),
-                Text('网络吞吐（所有节点）', style: theme.textTheme.titleSmall),
+                Text(l.clusterHome_networkThroughput, style: theme.textTheme.titleSmall),
                 const Spacer(),
                 if (latest != null)
                   Text(
@@ -252,6 +256,7 @@ class _ResourceOverviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
 
     // 跨节点合计（内存 / 磁盘可累加；CPU 只做简单平均）。
     var totalMem = 0;
@@ -284,10 +289,10 @@ class _ResourceOverviewCard extends StatelessWidget {
                 color: theme.colorScheme.primary,
               ),
               const SizedBox(width: 8),
-              Text('节点资源总览', style: theme.textTheme.titleSmall),
+              Text(l.clusterHome_resourceOverview, style: theme.textTheme.titleSmall),
               const Spacer(),
               Text(
-                '${nodes.length} 台节点',
+                l.clusterHome_nodeCount(nodes.length),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -298,13 +303,13 @@ class _ResourceOverviewCard extends StatelessWidget {
           // 表头
           Row(
             children: [
-              Expanded(flex: 5, child: _headerLabel(theme, '节点')),
+              Expanded(flex: 5, child: _headerLabel(theme, l.clusterHome_colNode)),
               const SizedBox(width: 12),
-              Expanded(flex: 4, child: _headerLabel(theme, 'CPU')),
+              Expanded(flex: 4, child: _headerLabel(theme, l.clusterHome_colCpu)),
               const SizedBox(width: 12),
-              Expanded(flex: 4, child: _headerLabel(theme, '内存')),
+              Expanded(flex: 4, child: _headerLabel(theme, l.clusterHome_colMemory)),
               const SizedBox(width: 12),
-              Expanded(flex: 4, child: _headerLabel(theme, '磁盘')),
+              Expanded(flex: 4, child: _headerLabel(theme, l.clusterHome_colDisk)),
             ],
           ),
           _rowDivider(theme),
@@ -326,7 +331,7 @@ class _ResourceOverviewCard extends StatelessWidget {
                 Expanded(
                   flex: 5,
                   child: Text(
-                    '合计',
+                    l.clusterHome_total,
                     style: theme.textTheme.bodySmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -413,6 +418,7 @@ class _NodeResourceRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     final sys = system;
     final hasData = online && sys != null;
 
@@ -466,7 +472,7 @@ class _NodeResourceRow extends StatelessWidget {
                     const SizedBox(width: 6),
                     _badge(
                       theme,
-                      '监控',
+                      l.clusterHome_monitor,
                       theme.colorScheme.primary,
                       theme.colorScheme.onPrimary,
                     ),
@@ -476,8 +482,11 @@ class _NodeResourceRow extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 online
-                    ? '系统：$systemName${systemVersion.isEmpty ? '' : ' · $systemVersion'}'
-                    : (error ?? '离线'),
+                    ? l.clusterHome_systemInfo(
+                        systemName,
+                        systemVersion.isEmpty ? '' : ' · $systemVersion',
+                      )
+                    : (error ?? l.node_offline),
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: online
@@ -496,7 +505,9 @@ class _NodeResourceRow extends StatelessWidget {
           child: _metricCell(
             theme,
             cpu,
-            tooltip: cpu == null ? null : 'CPU ${cpu.toStringAsFixed(1)}%',
+            tooltip: cpu == null
+                ? null
+                : l.clusterHome_cpuTooltip(cpu.toStringAsFixed(1)),
           ),
         ),
         const SizedBox(width: 12),
@@ -508,7 +519,10 @@ class _NodeResourceRow extends StatelessWidget {
             detail: _memDetail(sys),
             tooltip: mem == null
                 ? null
-                : '内存 ${mem.toStringAsFixed(1)}%（${_memDetail(sys)}）',
+                : l.clusterHome_memoryTooltip(
+                    mem.toStringAsFixed(1),
+                    _memDetail(sys),
+                  ),
           ),
         ),
         const SizedBox(width: 12),
@@ -520,7 +534,10 @@ class _NodeResourceRow extends StatelessWidget {
             detail: _diskDetail(sys),
             tooltip: disk == null
                 ? null
-                : '磁盘 ${disk.toStringAsFixed(1)}%（${_diskDetail(sys)}）',
+                : l.clusterHome_diskTooltip(
+                    disk.toStringAsFixed(1),
+                    _diskDetail(sys),
+                  ),
           ),
         ),
       ],
