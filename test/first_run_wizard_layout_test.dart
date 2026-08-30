@@ -4,9 +4,11 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
+import 'package:irix/l10n/app_localizations.dart';
 import 'package:irix/services/database_manager.dart';
 import 'package:irix/widgets/first_run_wizard.dart';
 
@@ -28,20 +30,34 @@ void main() {
     }
   });
 
+  // 用带本地化代理的 MaterialApp 包裹向导，使其可解析 AppLocalizations。
+  // 显式指定 zh，使测试断言的中文文案可匹配。
+  Widget wizardApp({required VoidCallback onSkip, required void Function(bool) onFinish}) {
+    return MaterialApp(
+      locale: const Locale('zh'),
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ],
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: Scaffold(
+        body: FirstRunWizardOverlay(
+          onSkip: onSkip,
+          onFinish: onFinish,
+        ),
+      ),
+    );
+  }
+
   Future<void> pumpWizard(WidgetTester tester, Size size) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: FirstRunWizardOverlay(
-            onSkip: () {},
-            onFinish: (_) {},
-          ),
-        ),
-      ),
+      wizardApp(onSkip: () {}, onFinish: (_) {}),
     );
     // 等 initState 的 JDK 已装检测完成
     await tester.pumpAndSettle();
@@ -80,14 +96,7 @@ void main() {
     expect(opacityFinder, findsOneWidget);
     var skipped = false;
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: FirstRunWizardOverlay(
-            onSkip: () => skipped = true,
-            onFinish: (_) {},
-          ),
-        ),
-      ),
+      wizardApp(onSkip: () => skipped = true, onFinish: (_) {}),
     );
     await tester.pumpAndSettle();
     await tester.tap(find.text('跳过'));
