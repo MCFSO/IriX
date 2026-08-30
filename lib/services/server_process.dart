@@ -18,6 +18,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 import '../models/server_instance.dart';
+import 'dev_log.dart';
 import 'log_persistence.dart';
 import 'log_tailer.dart';
 import 'logger_ffi.dart';
@@ -191,6 +192,11 @@ class ServerProcessManager {
       throw StateError('服务器实例 ${instance.name} 已在运行');
     }
 
+    DevLog.instance.devAction(
+      'server',
+      '启动实例 ${instance.name} (id=${instance.id}) cmd="${instance.startCommand}"',
+    );
+
     // 完成器先行创建：进程可能瞬间退出（如启动参数错误），
     // 避免退出回调先于完成器触发导致 onExit 永久悬挂。
     _exitCompleter = Completer<int>();
@@ -209,6 +215,10 @@ class ServerProcessManager {
         await _startPipeFallback(executable, args);
       }
     } catch (e) {
+      DevLog.instance.devError(
+        'server',
+        '启动实例 ${instance.name} 失败: $e',
+      );
       _completeExit(-1);
       rethrow;
     }
@@ -383,6 +393,10 @@ class ServerProcessManager {
   /// 仅发送停止指令，不强制 kill 进程，依赖服务器自行处理。
   /// 接管的外部进程 stdin 不可用，为空操作（UI 会直接提供强制停止）。
   Future<void> stop() async {
+    DevLog.instance.devAction(
+      'server',
+      '停止实例 ${instance.name} (id=${instance.id})',
+    );
     _writeStdin('stop');
   }
 
@@ -391,6 +405,10 @@ class ServerProcessManager {
   /// 优先经 Rust 托管句柄终止；接管进程（非本会话启动）直接用 killPid。
   /// Windows 上等价于 TerminateProcess 的硬终止。
   Future<void> forceStop() async {
+    DevLog.instance.devAction(
+      'server',
+      '强制停止实例 ${instance.name} (id=${instance.id})',
+    );
     final currentPid = _pid;
     if (currentPid != null) {
       if (_nativeSpawnAvailable && !_attached) {

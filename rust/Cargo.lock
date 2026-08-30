@@ -3297,6 +3297,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "xmc_devlog"
+version = "0.1.0"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "xmc_downloader"
 version = "0.1.0"
 dependencies = [

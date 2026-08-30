@@ -12,6 +12,7 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
+import 'dev_log.dart';
 import 'rust_lib.dart';
 
 /// FFI 函数签名定义
@@ -129,6 +130,10 @@ class HttpFfiService {
   }) async {
     final responsePort = ReceivePort();
     final completer = Completer<HttpFfiResponse>();
+    final stopwatch = Stopwatch()..start();
+
+    final host = Uri.tryParse(url)?.host ?? url;
+    DevLog.instance.devHttp('REQ $method $url');
 
     late StreamSubscription sub;
     sub = responsePort.listen((msg) {
@@ -155,13 +160,25 @@ class HttpFfiService {
       );
       // Dart 层硬超时兜底：Rust 侧 SO_RCVTIMEO 在个别平台/环境下可能失效，
       // 这里保证调用方总能按预期超时返回，并尽力终止后台 isolate。
-      return await completer.future.timeout(
+      final response = await completer.future.timeout(
         timeout,
         onTimeout: () {
           isolate?.kill(priority: Isolate.immediate);
+          DevLog.instance.devHttp(
+            'TIMEOUT $method $host (${stopwatch.elapsedMilliseconds}ms)',
+          );
           throw HttpFfiException('请求超时: $timeout');
         },
       );
+      DevLog.instance.devHttp(
+        'RES $method $host ${response.statusCode} (${stopwatch.elapsedMilliseconds}ms)',
+      );
+      return response;
+    } on HttpFfiException catch (e) {
+      DevLog.instance.devHttp(
+        'ERR $method $host (${stopwatch.elapsedMilliseconds}ms) $e',
+      );
+      rethrow;
     } finally {
       await sub.cancel();
       responsePort.close();

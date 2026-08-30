@@ -163,6 +163,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Off: vault capabilities are hidden (node must run with -vault and configure TLS)';
 
   @override
+  String get settings_developer => 'Developer mode';
+
+  @override
+  String get settings_developerOn =>
+      'On: records app runtime, operations, network and crash logs to the program directory logs/';
+
+  @override
+  String get settings_developerOff => 'Off: developer logs are not recorded';
+
+  @override
+  String get settings_developerHint =>
+      'When enabled, everything (runtime logs, operation traces, network request details, startup and crash stacks) is written to a session log file under the program directory logs/, to help troubleshoot issues.';
+
+  @override
   String settings_downloadThreads(int count) {
     return 'Download threads: $count';
   }

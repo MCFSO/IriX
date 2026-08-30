@@ -11,6 +11,7 @@ import 'dart:isolate';
 
 import 'package:ffi/ffi.dart';
 
+import 'dev_log.dart';
 import 'rust_lib.dart';
 
 /// FFI 函数签名定义
@@ -88,6 +89,10 @@ class DbClientFfi {
   }) async {
     final responsePort = ReceivePort();
     final completer = Completer<Map<String, dynamic>>();
+    final stopwatch = Stopwatch()..start();
+
+    // 开发者日志：记录操作类型与目标（不含密码明文）。
+    DevLog.instance.devDb('REQ $dbType op=$op $host:$port db=$database');
 
     late StreamSubscription sub;
     sub = responsePort.listen((msg) {
@@ -120,13 +125,25 @@ class DbClientFfi {
         ),
       );
       // Dart 层硬超时兜底：超时后尽力终止后台 isolate。
-      return await completer.future.timeout(
+      final result = await completer.future.timeout(
         timeout,
         onTimeout: () {
           isolate?.kill(priority: Isolate.immediate);
+          DevLog.instance.devDb(
+            'TIMEOUT $dbType op=$op $host:$port (${stopwatch.elapsedMilliseconds}ms)',
+          );
           throw DbClientFfiException('数据库操作超时: $timeout');
         },
       );
+      DevLog.instance.devDb(
+        'RES $dbType op=$op $host:$port ok (${stopwatch.elapsedMilliseconds}ms)',
+      );
+      return result;
+    } on DbClientFfiException catch (e) {
+      DevLog.instance.devDb(
+        'ERR $dbType op=$op $host:$port (${stopwatch.elapsedMilliseconds}ms) $e',
+      );
+      rethrow;
     } finally {
       await sub.cancel();
       responsePort.close();

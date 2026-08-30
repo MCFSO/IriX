@@ -16,6 +16,7 @@ import 'package:path/path.dart' as p;
 
 import '../models/server_instance.dart';
 import '../services/ai_settings.dart';
+import '../services/dev_log.dart';
 import '../services/http_ffi.dart';
 import '../services/knowledge_service.dart';
 import '../services/locale_settings.dart';
@@ -413,13 +414,23 @@ class AiAssistantService {
       'tool_choice': 'auto',
     });
 
+    final endpoint = _endpoint(model.baseUrl);
+    final host = Uri.tryParse(endpoint)?.host ?? endpoint;
+    DevLog.instance.devAction(
+      'ai',
+      'AI 请求 model=${model.name} host=$host',
+    );
     final res = await HttpFfiService.instance.post(
-      _endpoint(model.baseUrl),
+      endpoint,
       headers: _headers(model.apiKey),
       body: body,
       timeout: const Duration(seconds: 120),
     );
     if (res.statusCode != 200) {
+      DevLog.instance.devError(
+        'ai',
+        'AI 请求失败 model=${model.name} host=$host status=${res.statusCode}',
+      );
       throw Exception('API ${res.statusCode}: ${_snippet(res.body)}');
     }
     final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;

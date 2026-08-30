@@ -13,6 +13,7 @@ import 'dart:isolate';
 import 'package:cryptography/cryptography.dart';
 import 'package:ffi/ffi.dart';
 
+import 'dev_log.dart';
 import 'rust_lib.dart';
 
 /// 下载进度信息。
@@ -224,6 +225,11 @@ class Downloader {
     });
 
     final useThreads = (threads ?? 1) > 1 ? threads : null;
+    final threadInfo = useThreads != null ? ' threads=$useThreads' : '';
+    DevLog.instance.devInfo(
+      'download',
+      'START $url -> $targetFilePath$threadInfo',
+    );
 
     await Isolate.spawn(
       _downloadIsolate,
@@ -243,6 +249,10 @@ class Downloader {
       if (sha256 != null || sha512 != null) {
         final ok = await _verifyHashes(targetFilePath, sha256, sha512);
         if (!ok) {
+          DevLog.instance.devWarn(
+            'download',
+            'HASH_MISMATCH $url (SHA-256/SHA-512 不匹配)，已删除文件',
+          );
           try {
             File(targetFilePath).deleteSync();
           } catch (_) {}
@@ -251,7 +261,11 @@ class Downloader {
           );
         }
       }
+      DevLog.instance.devInfo('download', 'DONE $url -> $targetFilePath');
       return result;
+    } on Exception catch (e) {
+      DevLog.instance.devError('download', 'FAIL $url: $e');
+      rethrow;
     } finally {
       await sub.cancel();
       responsePort.close();

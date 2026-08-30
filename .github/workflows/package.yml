@@ -43,6 +43,7 @@ jobs:
           Copy-Item rust/target/release/xmc_vector_store.dll windows/runner/ -Force
           Copy-Item rust/target/release/xmc_orchestrator.dll windows/runner/ -Force
           Copy-Item rust/target/release/xmc_nbt.dll windows/runner/ -Force
+          Copy-Item rust/target/release/xmc_devlog.dll windows/runner/ -Force
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -68,6 +69,7 @@ jobs:
           Copy-Item windows/runner/xmc_vector_store.dll build/windows/x64/runner/Release/ -Force
           Copy-Item windows/runner/xmc_orchestrator.dll build/windows/x64/runner/Release/ -Force
           Copy-Item windows/runner/xmc_nbt.dll build/windows/x64/runner/Release/ -Force
+          Copy-Item windows/runner/xmc_devlog.dll build/windows/x64/runner/Release/ -Force
 
       - name: Install Fastforge
         run: dart pub global activate fastforge
@@ -132,6 +134,7 @@ jobs:
           cp rust/target/release/libxmc_vector_store.so linux/
           cp rust/target/release/libxmc_orchestrator.so linux/
           cp rust/target/release/libxmc_nbt.so linux/
+          cp rust/target/release/libxmc_devlog.so linux/
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -158,6 +161,7 @@ jobs:
           cp linux/libxmc_vector_store.so build/linux/x64/release/bundle/lib/
           cp linux/libxmc_orchestrator.so build/linux/x64/release/bundle/lib/
           cp linux/libxmc_nbt.so build/linux/x64/release/bundle/lib/
+          cp linux/libxmc_devlog.so build/linux/x64/release/bundle/lib/
 
       - name: Install Fastforge
         run: dart pub global activate fastforge
@@ -247,6 +251,10 @@ jobs:
             rust/target/x86_64-apple-darwin/release/libxmc_nbt.dylib \
             rust/target/aarch64-apple-darwin/release/libxmc_nbt.dylib \
             -output macos/libxmc_nbt.dylib
+          lipo -create \
+            rust/target/x86_64-apple-darwin/release/libxmc_devlog.dylib \
+            rust/target/aarch64-apple-darwin/release/libxmc_devlog.dylib \
+            -output macos/libxmc_devlog.dylib
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -273,6 +281,7 @@ jobs:
           cp macos/libxmc_vector_store.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
           cp macos/libxmc_orchestrator.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
           cp macos/libxmc_nbt.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
+          cp macos/libxmc_devlog.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
 
       - name: Install Fastforge
         run: dart pub global activate fastforge

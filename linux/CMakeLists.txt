@@ -124,6 +124,7 @@ set(XMC_RUST_LIBS
   "${CMAKE_CURRENT_SOURCE_DIR}/libxmc_vector_store.so"
   "${CMAKE_CURRENT_SOURCE_DIR}/libxmc_orchestrator.so"
   "${CMAKE_CURRENT_SOURCE_DIR}/libxmc_nbt.so"
+  "${CMAKE_CURRENT_SOURCE_DIR}/libxmc_devlog.so"
 )
 foreach(rust_lib ${XMC_RUST_LIBS})
   if(EXISTS "${rust_lib}")

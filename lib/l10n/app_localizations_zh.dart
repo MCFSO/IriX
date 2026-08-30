@@ -158,6 +158,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settings_vaultOff => '关闭：不展示保险库相关能力（节点需以 -vault 开启并配置 TLS）';
 
   @override
+  String get settings_developer => '开发者模式';
+
+  @override
+  String get settings_developerOn => '已开启：记录应用运行、操作、网络与崩溃日志到程序目录 logs/';
+
+  @override
+  String get settings_developerOff => '关闭：不记录开发者日志';
+
+  @override
+  String get settings_developerHint =>
+      '开启后把一切（运行日志流、操作轨迹、网络请求明细、启动与崩溃堆栈）记录到程序所在目录 logs/ 下的会话日志文件，便于排查问题。';
+
+  @override
   String settings_downloadThreads(int count) {
     return '下载线程数: $count';
   }

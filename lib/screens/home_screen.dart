@@ -12,6 +12,8 @@ import '../models/server_instance.dart';
 import '../services/cluster_monitor.dart';
 import '../services/database_manager.dart';
 import '../services/db_page_settings.dart';
+import '../services/developer_settings.dart';
+import '../services/dev_log.dart';
 import '../services/download_settings.dart';
 import '../services/font_settings.dart';
 import '../services/locale_settings.dart';
@@ -530,6 +532,7 @@ class SettingsDialogState extends State<SettingsDialog> {
   late double _pageSize;
   late bool _multi;
   late bool _vaultEnabled;
+  late bool _devEnabled;
   late String _uiFont;
   late String _terminalFont;
   late AppLanguage _language;
@@ -543,19 +546,22 @@ class SettingsDialogState extends State<SettingsDialog> {
     _pageSize = DbPageSettings.pageSize.toDouble();
     _multi = context.read<ClusterState>().mode == ManagementMode.multi;
     _vaultEnabled = VaultSettings.defaultEnabled;
+    _devEnabled = false;
     final fonts = FontSettings.instance;
     _uiFont = fonts.uiFamily;
     _terminalFont = fonts.terminalFamily;
     _language = LocaleSettings.instance.language;
-    unawaited(_loadVaultEnabled());
+    unawaited(_loadToggles());
   }
 
-  /// 异步加载 Vault 开关状态（SQLite settings 表）。
-  Future<void> _loadVaultEnabled() async {
-    final enabled = await VaultSettings.isEnabled();
+  /// 异步加载 Vault 与开发者模式开关状态（SQLite settings 表）。
+  Future<void> _loadToggles() async {
+    final vault = await VaultSettings.isEnabled();
+    final dev = await DeveloperSettings.isEnabled();
     if (!mounted) return;
     setState(() {
-      _vaultEnabled = enabled;
+      _vaultEnabled = vault;
+      _devEnabled = dev;
       _loading = false;
     });
   }
@@ -669,6 +675,44 @@ class SettingsDialogState extends State<SettingsDialog> {
                   },
                 ),
               ],
+            ),
+            const Divider(height: 24),
+            // 开发者模式（记录全部日志到程序目录 logs/）
+            Row(
+              children: [
+                const Icon(Icons.bug_report_outlined, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        l.settings_developer,
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      Text(
+                        _devEnabled
+                            ? l.settings_developerOn
+                            : l.settings_developerOff,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                AppleSwitch(
+                  value: _devEnabled,
+                  onChanged: (v) async {
+                    setState(() => _devEnabled = v);
+                    await DeveloperSettings.setEnabled(v);
+                    await DevLog.instance.refreshEnabled();
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              l.settings_developerHint,
+              style: Theme.of(context).textTheme.bodySmall,
             ),
             const Divider(height: 24),
             // 下载线程数

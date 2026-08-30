@@ -6,10 +6,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
+import 'dart:async';
+
 import 'l10n/app_localizations.dart';
 import 'screens/home_screen.dart';
 import 'services/config_annotation_service.dart';
 import 'services/database_manager.dart';
+import 'services/dev_log.dart';
 import 'services/font_settings.dart';
 import 'services/locale_settings.dart';
 import 'state/app_state.dart';
@@ -24,7 +27,27 @@ void main() async {
   await FontSettings.instance.load();
   // 界面语言偏好在构建 UI 前加载。
   await LocaleSettings.instance.load();
-  runApp(const MyApp());
+
+  // 开发者日志：开启时新建会话日志文件并接入全局崩溃兜底。
+  await DevLog.instance.init();
+  final devLog = DevLog.instance;
+  if (devLog.enabled) {
+    devLog.devAction('app', '应用启动：绑定初始化完成');
+  }
+
+  // 全局未捕获异常兜底：Flutter 框架错误 + Zone 内异步异常写入开发者日志。
+  FlutterError.onError = (details) {
+    devLog.devError(
+      'flutter_error',
+      '${details.exception}\n${details.stack ?? ""}'.trim(),
+    );
+  };
+  runZonedGuarded(
+    () => runApp(const MyApp()),
+    (error, stack) {
+      devLog.devError('uncaught', '$error\n$stack'.trim());
+    },
+  );
 }
 
 /// 应用根组件。
