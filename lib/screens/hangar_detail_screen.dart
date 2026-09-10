@@ -1,7 +1,6 @@
 // Hangar 项目详情页面
 // 展示项目图标、描述、版本列表，支持安装到本地实例或节点实例的
 // plugins/ 目录
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
@@ -9,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../l10n/app_localizations.dart';
 import '../models/hangar.dart';
+import '../services/app_paths.dart';
 import '../services/downloader.dart';
 import '../services/hangar_api_service.dart';
 import '../state/app_state.dart';
@@ -109,7 +109,8 @@ class _HangarDetailScreenState extends State<HangarDetailScreen> {
     try {
       if (target.isRemote) {
         // 下载到临时目录后上传到节点实例 plugins/ 目录。
-        final tempDir = await Directory.systemTemp.createTemp('irix_install_');
+        // 下载数据根目录下的临时目录（Windows 下避免占用系统盘）。
+        final tempDir = await AppPaths.instance.createTempDir('irix_install_');
         final tempPath = p.join(tempDir.path, filename);
         try {
           await _downloader.downloadFile(

@@ -1,21 +1,20 @@
 // 开发者日志服务
 //
-// 仅在开发者模式开启时记录。日志写入「可执行文件所在目录 / logs」下的
-// 会话日志文件：每次应用启动且开发者模式开启（或运行期开启开发者模式）
-// 时新建一个带精确时间戳的文件 dev-YYYYMMDD-HHMMSS.log，无限增长，
-// 每个开启时段一个独立文件，便于按次排查。
+// 仅在开发者模式开启时记录。日志写入数据根目录（AppPaths，Windows 下
+// 优先非系统盘）下 logs/ 中的会话日志文件：每次应用启动且开发者模式开启
+// （或运行期开启开发者模式）时新建一个带精确时间戳的文件
+// dev-YYYYMMDD-HHMMSS.log，无限增长，每个开启时段一个独立文件，
+// 便于按次排查。
 //
 // 落盘由 Rust 侧 xmc_devlog 动态库的后台线程负责（不阻塞 Dart/UI），
 // 本服务只负责开关判断与调用 FFI。Rust 端为每行加时间戳并写盘。
 //
 // 记录内容：应用操作轨迹、网络请求明细、启动流程与崩溃堆栈
-// （运行日志流由 Rust logger 写入文档目录 logs/<id>.log，与此并存）。
-
-import 'dart:io';
+// （运行日志流由 Rust logger 写入数据根目录 logs/<id>.log，与此并存）。
 
 import 'package:ffi/ffi.dart';
-import 'package:path/path.dart' as p;
 
+import 'app_paths.dart';
 import 'devlog_ffi.dart';
 import 'developer_settings.dart';
 
@@ -51,7 +50,7 @@ class DevLog {
     _ensureFfi();
     _enabled = await DeveloperSettings.isEnabled();
     if (_enabled) {
-      _startSession();
+      await _startSession();
     }
   }
 
@@ -74,7 +73,7 @@ class DevLog {
     if (next == _enabled) return;
     _enabled = next;
     if (_enabled) {
-      _startSession();
+      await _startSession();
       devAction('developer_mode', '开发者模式已开启');
     } else {
       _stopSession();
@@ -84,12 +83,13 @@ class DevLog {
   /// 开发者模式当前是否启用。
   bool get enabled => _enabled;
 
-  /// 调用 Rust app_log_init：在 exe 目录下的 logs 子目录新建会话文件并启动写线程。
-  void _startSession() {
+  /// 调用 Rust app_log_init：在数据根目录下的 logs 子目录新建会话文件并启动写线程。
+  Future<void> _startSession() async {
     if (!_ffiOk) return;
     if (_rustReady) return;
     try {
-      final dir = p.dirname(Platform.resolvedExecutable);
+      // 日志随数据根目录（Windows 下避免写在系统盘）。
+      final dir = await AppPaths.instance.root();
       final nativeDir = dir.toNativeUtf8();
       try {
         final rc = DevLogNative.instance.appLogInit(nativeDir);

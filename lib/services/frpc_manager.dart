@@ -14,8 +14,8 @@ import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
+import '../services/app_paths.dart';
 import '../services/downloader.dart';
 import '../services/http_ffi.dart';
 import '../services/ofrp_service.dart';
@@ -60,13 +60,12 @@ class FrpcManager extends ChangeNotifier {
   /// 内存中保留的日志上限（约 200KB），超出后丢弃最旧内容。
   static const int maxOutputChars = 200 * 1024;
 
-  /// 日志持久化目录（APP 根目录/logs）。
+  /// 日志持久化目录（数据根目录/logs，Windows 下通常在非系统盘）。
   String? _logsDir;
 
   Future<String> _ensureLogsDir() async {
     if (_logsDir != null) return _logsDir!;
-    final appRoot = p.dirname(Platform.resolvedExecutable);
-    final dir = Directory(p.join(appRoot, 'logs'));
+    final dir = Directory(p.join(await AppPaths.instance.root(), 'logs'));
     if (!dir.existsSync()) {
       dir.createSync(recursive: true);
     }
@@ -130,9 +129,9 @@ class FrpcManager extends ChangeNotifier {
     if (cached != null && File(cached).existsSync()) {
       return cached;
     }
-    final appDir = await getApplicationDocumentsDirectory();
+    final frpcRoot = await AppPaths.instance.frpcRoot();
     final frpcDir = Directory(
-      p.join(appDir.path, 'ofrp', switch (flavor) {
+      p.join(frpcRoot, switch (flavor) {
         'chmlfrp' => 'frpc-chml',
         'sakurafrp' => 'frpc-sakura',
         'standard' => 'frpc-standard',
@@ -429,7 +428,8 @@ class FrpcManager extends ChangeNotifier {
     Directory targetDir, {
     String? sha256,
   }) async {
-    final tmpDir = await Directory.systemTemp.createTemp('irix-frpc-');
+    // 下载数据根目录下的临时目录（Windows 下避免占用系统盘）。
+    final tmpDir = await AppPaths.instance.createTempDir('irix-frpc-');
     final archivePath = p.join(tmpDir.path, 'archive');
     try {
       await Downloader().downloadFile(url, archivePath, (_) {}, sha256: sha256);
@@ -505,8 +505,9 @@ class FrpcManager extends ChangeNotifier {
     String key, {
     String flavor = 'openfrp',
   }) => _spawn(key, flavor, (path) async {
-    final appDir = await getApplicationDocumentsDirectory();
-    final configDir = Directory(p.join(appDir.path, 'ofrp', 'configs'));
+    final configDir = Directory(
+      p.join(await AppPaths.instance.frpcRoot(), 'configs'),
+    );
     if (!configDir.existsSync()) {
       configDir.createSync(recursive: true);
     }

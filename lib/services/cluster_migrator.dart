@@ -8,11 +8,11 @@
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
 import '../models/cluster_instance.dart';
 import '../models/node.dart';
 import '../models/remote.dart';
+import '../services/app_paths.dart';
 import '../services/database_manager.dart';
 import '../services/node_api_client.dart';
 import '../state/cluster_state.dart';
@@ -35,10 +35,11 @@ class ClusterMigrator {
     return null;
   }
 
-  /// 本地镜像根目录（协调器应用文档目录下的 `cluster_mirrors/<instanceId>`）。
+  /// 本地镜像根目录（数据根目录下的 `cluster_mirrors/<instanceId>`，
+  /// Windows 下通常在非系统盘）。
   Future<Directory> _mirrorDir(String instanceId) async {
-    final docs = await getApplicationDocumentsDirectory();
-    return Directory(p.join(docs.path, 'cluster_mirrors', instanceId));
+    final root = await AppPaths.instance.clusterMirrorRoot();
+    return Directory(p.join(root, instanceId));
   }
 
   /// 解析节点的守护进程 id（优先可用守护进程，否则首个）。

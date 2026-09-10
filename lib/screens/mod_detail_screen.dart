@@ -1,7 +1,6 @@
 // Mod/插件详情页面
 // 展示项目图标、描述、版本列表，支持安装到本地实例或节点实例的
 // mods/ 或 plugins/ 目录
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
@@ -10,6 +9,7 @@ import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../models/modrinth.dart';
 import '../models/server_instance.dart';
+import '../services/app_paths.dart';
 import '../services/downloader.dart';
 import '../services/modrinth_api_service.dart';
 import '../state/app_state.dart';
@@ -210,8 +210,8 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
     required String progressKey,
   }) async {
     final l = AppLocalizations.of(context);
-    // 下载到系统临时目录，安装完成后清理。
-    final tempDir = await Directory.systemTemp.createTemp('irix_install_');
+    // 下载数据根目录下的临时目录（Windows 下避免占用系统盘），安装完成后清理。
+    final tempDir = await AppPaths.instance.createTempDir('irix_install_');
     final tempPath = p.join(tempDir.path, safeName);
     try {
       await _downloader.downloadFile(

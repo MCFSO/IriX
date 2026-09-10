@@ -10,6 +10,7 @@ import 'dart:async';
 
 import 'l10n/app_localizations.dart';
 import 'screens/home_screen.dart';
+import 'services/app_paths.dart';
 import 'services/config_annotation_service.dart';
 import 'services/database_manager.dart';
 import 'services/dev_log.dart';
@@ -21,8 +22,13 @@ import 'state/node_state.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await DatabaseManager.instance.init();
+  // 解析数据根目录（Windows 下优先非系统盘，避免占用 C 盘）并同步迁移
+  // 数据库等小文件，必须在数据库初始化前完成。
+  await AppPaths.instance.ensureInitialized();
+  await DatabaseManager.instance.init(dataDir: AppPaths.instance.rootSync);
   await ConfigAnnotationService.instance.init();
+  // 旧文档目录下的大数据（日志 / JDK / frpc / 集群镜像）后台搬迁到数据根目录。
+  AppPaths.instance.startBackgroundMigration();
   // 字体设置（UI / 终端分开管理）在构建 UI 前加载。
   await FontSettings.instance.load();
   // 界面语言偏好在构建 UI 前加载。

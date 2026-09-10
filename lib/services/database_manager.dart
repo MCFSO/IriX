@@ -635,6 +635,25 @@ class DatabaseManager {
     await setSetting(key, value.toString());
   }
 
+  /// 返回所有以 [prefix] 开头的设置项（key → value）。
+  Future<Map<String, String>> getSettingsWithPrefix(String prefix) async {
+    try {
+      final db = await _database;
+      final rows = await db.query(
+        'settings',
+        where: 'key LIKE ?',
+        whereArgs: ['$prefix%'],
+      );
+      return {
+        for (final row in rows)
+          (row['key'] as String): (row['value'] as String),
+      };
+    } catch (e) {
+      debugPrint('Failed to query settings with prefix $prefix: $e');
+      return {};
+    }
+  }
+
   // === 旧数据迁移 ===
 
   Future<void> migrateFromJsonIfNeeded() async {

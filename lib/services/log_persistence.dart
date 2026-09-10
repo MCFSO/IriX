@@ -1,6 +1,6 @@
 // 服务器日志持久化服务
 // 服务器进程的 stdout/stderr 由 Rust 侧直接重定向到日志文件
-// （<应用文档目录>/logs/<instanceId>.log，见 log_tailer.dart），
+// （<数据根目录>/logs/<instanceId>.log，见 log_tailer.dart），
 // 本服务负责该文件的路径解析、读取（AI 上下文等）与删除。
 //
 // 保留 Rust logger 的 startWatching/stopWatching 仅为兼容旧调用方；
@@ -11,8 +11,8 @@ import 'dart:io';
 
 import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
-import 'package:path_provider/path_provider.dart';
 
+import '../services/app_paths.dart';
 import '../services/logger_ffi.dart';
 import '../utils/ansi_color.dart';
 
@@ -20,22 +20,14 @@ class LogPersistence {
   static final LogPersistence instance = LogPersistence._();
   LogPersistence._();
 
-  static String? _docsDir;
-
   final Map<String, StreamSubscription<String>> _subscriptions = {};
   bool _initialized = false;
 
   /// Rust 日志库是否可用；库加载失败（如未构建 DLL）时降级为不写日志。
   bool _loggerAvailable = false;
 
-  /// 日志目录路径（惰性获取并缓存）。
-  static Future<String> _logDirPath() async {
-    if (_docsDir == null) {
-      final appDir = await getApplicationDocumentsDirectory();
-      _docsDir = appDir.path;
-    }
-    return '$_docsDir/logs';
-  }
+  /// 日志目录路径（数据根目录下的 logs，Windows 下通常在非系统盘）。
+  static Future<String> _logDirPath() => AppPaths.instance.logsDir();
 
   /// 指定实例的日志文件路径（确保目录存在）。
   static Future<String> logFilePath(String instanceId) async {

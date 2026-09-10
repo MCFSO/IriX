@@ -80,6 +80,7 @@ flutter test test/knowledge_ffi_test.dart
 - **所有远程数据库操作统一走 Rust**：通过 `lib/services/db_client_ffi.dart`（`DbClientFfi`）调用 `xmc_db_client` 动态库的 `db_request` 入口（MySQL/MariaDB/PostgreSQL/Redis 连接测试、浏览、查询、管理）；禁止在 Dart 侧新增数据库客户端依赖；`remote_db_service.dart` 是唯一业务入口
 - 状态管理统一走 `lib/state/`（Provider），不在 widget 内直接持有全局状态
 - 持久化数据统一用 SQLite（`instance_store.dart`、`node_store.dart`、`trash_store.dart`、`ai_settings.dart` 等，设置存 settings 表）；无 SharedPreferences
+- **所有应用落盘目录统一走 `lib/services/app_paths.dart`（AppPaths）**：Windows 数据根目录优先非系统盘（exe 目录 → D:-Z: 盘符扫描 → 文档目录兜底），首次启动自动把旧文档目录数据（数据库/日志/JDK/frpc/镜像）迁移到新根目录；新增落盘路径禁止直接 `getApplicationDocumentsDirectory()` / `Directory.systemTemp`，临时文件用 `AppPaths.instance.createTempDir`
 - 新增页面放 `lib/screens/`，新增 API 服务放 `lib/services/`，命名遵循现有 `*_api_service.dart` / `*_provider.dart` 模式
 - 全局暗色主题，UI 组件参考 `lib/utils/apple_widgets.dart`
 - 勿编辑 `rust/target/`、`build/`、`dist/` 等生成目录

@@ -12,13 +12,13 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
 import '../models/node.dart';
 import '../models/orchestration.dart';
 import '../models/remote.dart';
 import '../state/cluster_state.dart';
 import '../state/node_state.dart';
+import 'app_paths.dart';
 import 'container/container_backend.dart';
 import 'container/node_container_backend.dart';
 import 'node_api_client.dart';
@@ -81,11 +81,10 @@ class OrchestratorService {
     _timer = null;
   }
 
-  /// 解析引擎数据库路径（应用文档目录 / xmc_orchestrator.db）。
+  /// 解析引擎数据库路径（数据根目录 / xmc_orchestrator.db）。
   Future<String> resolveDbPath() async {
     if (dbPath != null && dbPath!.isNotEmpty) return dbPath!;
-    final dir = await getApplicationDocumentsDirectory();
-    dbPath = p.join(dir.path, 'xmc_orchestrator.db');
+    dbPath = p.join(await AppPaths.instance.root(), 'xmc_orchestrator.db');
     return dbPath!;
   }
 

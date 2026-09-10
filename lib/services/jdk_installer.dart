@@ -14,8 +14,8 @@ import 'dart:isolate';
 
 import 'package:archive/archive.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
+import 'app_paths.dart';
 import 'database_manager.dart';
 import 'downloader.dart';
 import 'http_ffi.dart';
@@ -29,10 +29,9 @@ class JdkInstaller {
   /// 首次引导默认安装的大版本序列。
   static const defaultVersions = ['8', '17', '21', '25'];
 
-  /// 安装根目录（应用文档目录 / irix / java）。
+  /// 安装根目录（数据根目录 / java，Windows 下通常在非系统盘）。
   Future<Directory> _rootDir() async {
-    final docs = await getApplicationDocumentsDirectory();
-    return Directory(p.join(docs.path, 'irix', 'java'));
+    return Directory(await AppPaths.instance.javaRoot());
   }
 
   /// 版本对应的安装目录。
@@ -117,7 +116,8 @@ class JdkInstaller {
     final info = await _resolveDownload(featureVersion);
     final url = info.url;
     final sha256 = info.sha256;
-    final tmpDir = await Directory.systemTemp.createTemp('irix-jdk-');
+    // 下载数据根目录下的临时目录（Windows 下避免占用系统盘）。
+    final tmpDir = await AppPaths.instance.createTempDir('irix-jdk-');
     final archivePath = p.join(tmpDir.path, 'jdk-archive');
     try {
       await Downloader().downloadFile(url, archivePath, (progress) {

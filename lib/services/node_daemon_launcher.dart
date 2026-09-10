@@ -7,6 +7,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
+import 'app_paths.dart';
+
 /// 本地节点守护进程启动结果。
 class NodeDaemonLaunchResult {
   final bool launched;
@@ -77,7 +79,7 @@ class NodeDaemonLauncher {
         '-port',
         '$port',
         '-data',
-        _dataDir(),
+        await _dataDir(),
       ], mode: ProcessStartMode.normal);
       _process!.stdout.listen((_) {});
       _process!.stderr.listen((_) {});
@@ -94,13 +96,16 @@ class NodeDaemonLauncher {
     }
   }
 
-  /// 守护进程数据目录（应用文档目录下，避免污染工作目录）。
-  static String _dataDir() {
-    final dir = Directory(
-      Platform.environment['APPDATA'] != null
-          ? '${Platform.environment['APPDATA']}\\irix-node'
-          : '.irix-node',
-    );
+  /// 守护进程数据目录（Windows 下随数据根目录，避免占用系统盘
+  /// %APPDATA%；其他平台沿用工作目录下 .irix-node）。旧 %APPDATA% 中的
+  /// 数据由 AppPaths 在后台复制到新位置。
+  static Future<String> _dataDir() async {
+    final Directory dir;
+    if (Platform.isWindows) {
+      dir = Directory(p.join(await AppPaths.instance.root(), 'irix-node'));
+    } else {
+      dir = Directory('.irix-node');
+    }
     if (!dir.existsSync()) {
       try {
         dir.createSync(recursive: true);
