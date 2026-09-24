@@ -79,6 +79,17 @@ When adding a crate, update ALL of these:
 5. `macos/Runner.xcodeproj/project.pbxproj` — dylib copy + code sign
 6. `.github/workflows/build-and-test.yml` and `.github/workflows/package.yml`
 
+Then run `dart tool/ffi_dlls.dart lists` — it checks every list above against
+`rust/Cargo.toml` (CI runs the same check). Missing an entry is how v1.2.0 shipped
+a Windows installer with only 3 of 8 `xmc_*.dll`, breaking the marketplace with
+"Rust http_client library not found".
+
+Release builds also fail loudly on a missing FFI library (`windows/runner/check_rust_dlls.cmake`,
+`linux/CMakeLists.txt`), and each packaging job re-checks the built bundle with
+`dart tool/ffi_dlls.dart bundle <bundle dir> --ext .dll`. Note that `fastforge package`
+runs `flutter clean` + rebuild, so manually copying libs into `build/` has no effect —
+CMake / the Xcode build phase own that copy.
+
 ### Key UI conventions
 
 - Dark theme only (`Brightness.dark`, green seed color, Material 3)
