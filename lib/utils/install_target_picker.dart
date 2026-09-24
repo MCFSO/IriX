@@ -297,7 +297,13 @@ class _NodeTargetPickerState extends State<_NodeTargetPicker> {
     return AlertDialog(
       title: Text(_title()),
       content: body,
+      // 「取消」居左、「上一步」居右，避免误触取消整轮选择。
+      actionsAlignment: MainAxisAlignment.spaceBetween,
       actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
         if (_node != null)
           TextButton(
             onPressed: () => setState(() {
@@ -309,10 +315,6 @@ class _NodeTargetPickerState extends State<_NodeTargetPicker> {
             }),
             child: const Text('上一步'),
           ),
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
-        ),
       ],
     );
   }
