@@ -186,40 +186,53 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
           ],
         ),
       ),
+      // 「取消」固定在最左侧，与右侧的「上一步/下一步」拉开距离，避免误触。
+      actionsAlignment: MainAxisAlignment.spaceBetween,
       actions: [
         TextButton(
-          onPressed: _step > 0
-              ? () => setState(() {
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l.common_cancel),
+        ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_step > 0) ...[
+              TextButton(
+                onPressed: () => setState(() {
                   _step--;
                   _testResult = null;
-                })
-              : () => Navigator.of(context).pop(),
-          child: Text(_step > 0 ? l.addNode_prevStep : l.common_cancel),
+                }),
+                child: Text(l.addNode_prevStep),
+              ),
+              const SizedBox(width: 8),
+            ],
+            if (_step < 2)
+              FilledButton(
+                onPressed: () => setState(() {
+                  if (_step == 0) {
+                    _applyTypeDefaults();
+                  }
+                  _step++;
+                  _testResult = null;
+                }),
+                child: Text(l.addNode_nextStep),
+              )
+            else ...[
+              TextButton(
+                onPressed: _testing ? null : _testConnection,
+                child: _testing
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(l.addNode_testConnection),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(onPressed: _finish, child: Text(l.addNode_finish)),
+            ],
+          ],
         ),
-        if (_step < 2)
-          FilledButton(
-            onPressed: () => setState(() {
-              if (_step == 0) {
-                _applyTypeDefaults();
-              }
-              _step++;
-              _testResult = null;
-            }),
-            child: Text(l.addNode_nextStep),
-          )
-        else ...[
-          TextButton(
-            onPressed: _testing ? null : _testConnection,
-            child: _testing
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(l.addNode_testConnection),
-          ),
-          FilledButton(onPressed: _finish, child: Text(l.addNode_finish)),
-        ],
       ],
     );
   }
