@@ -25,6 +25,7 @@ import '../services/sakurafrp_provider.dart';
 import '../services/font_settings.dart';
 import '../state/app_state.dart';
 import '../utils/apple_widgets.dart';
+import '../widgets/frp_provider_switcher.dart';
 
 class FrpScreen extends StatefulWidget {
   const FrpScreen({super.key});
@@ -276,30 +277,9 @@ class _FrpScreenState extends State<FrpScreen> {
             Text(l.frp_title),
             const SizedBox(width: 12),
             // 提供商切换
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest.withValues(
-                  alpha: 0.6,
-                ),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: _providerId,
-                  isDense: true,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface,
-                  ),
-                  items: [
-                    for (final kind in FrpProviderKind.values)
-                      DropdownMenuItem(value: kind.id, child: Text(kind.label)),
-                  ],
-                  onChanged: (v) {
-                    if (v != null) _switchProvider(v);
-                  },
-                ),
-              ),
+            FrpProviderSwitcher(
+              providerId: _providerId,
+              onChanged: _switchProvider,
             ),
           ],
         ),
