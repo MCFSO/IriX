@@ -58,19 +58,6 @@ jobs:
       - name: Build Windows
         run: flutter build windows --release
 
-      - name: Copy Rust DLL to build output
-        run: |
-          Copy-Item windows/runner/xmc_backup.dll build/windows/x64/runner/Release/ -Force
-          Copy-Item windows/runner/xmc_downloader.dll build/windows/x64/runner/Release/ -Force
-          Copy-Item windows/runner/xmc_file_ops.dll build/windows/x64/runner/Release/ -Force
-          Copy-Item windows/runner/xmc_logger.dll build/windows/x64/runner/Release/ -Force
-          Copy-Item windows/runner/xmc_http_client.dll build/windows/x64/runner/Release/ -Force
-          Copy-Item windows/runner/xmc_db_client.dll build/windows/x64/runner/Release/ -Force
-          Copy-Item windows/runner/xmc_vector_store.dll build/windows/x64/runner/Release/ -Force
-          Copy-Item windows/runner/xmc_orchestrator.dll build/windows/x64/runner/Release/ -Force
-          Copy-Item windows/runner/xmc_nbt.dll build/windows/x64/runner/Release/ -Force
-          Copy-Item windows/runner/xmc_devlog.dll build/windows/x64/runner/Release/ -Force
-
       - name: Install Fastforge
         run: dart pub global activate fastforge
 
@@ -82,6 +69,14 @@ jobs:
 
       - name: Package MSIX
         run: fastforge package --platform windows --targets msix
+
+      # fastforge 打包前会先 flutter clean 再重建（--[no-]skip-clean 默认 clean），
+      # 所以往 build 目录里手工补动态库是无效的：产物里的 xmc_*.dll 完全由
+      # windows/runner/CMakeLists.txt 的复制规则决定。这里在打包之后校验一次，
+      # 缺任何一个都让流水线失败，避免又发出“能装但缺功能”的安装包
+      # （v1.2.0 只带了 3 个 xmc_*.dll，市场页面直接报 Rust http_client library not found）。
+      - name: Verify FFI DLLs in packaged bundle
+        run: dart tool/ffi_dlls.dart bundle build/windows/x64/runner/Release --ext .dll
 
       - name: Upload Windows packages
         uses: actions/upload-artifact@v5
@@ -149,20 +144,6 @@ jobs:
       - name: Build Linux
         run: flutter build linux --release
 
-      - name: Copy Rust so to build output
-        run: |
-          mkdir -p build/linux/x64/release/bundle/lib
-          cp linux/libxmc_backup.so build/linux/x64/release/bundle/lib/
-          cp linux/libxmc_downloader.so build/linux/x64/release/bundle/lib/
-          cp linux/libxmc_file_ops.so build/linux/x64/release/bundle/lib/
-          cp linux/libxmc_logger.so build/linux/x64/release/bundle/lib/
-          cp linux/libxmc_http_client.so build/linux/x64/release/bundle/lib/
-          cp linux/libxmc_db_client.so build/linux/x64/release/bundle/lib/
-          cp linux/libxmc_vector_store.so build/linux/x64/release/bundle/lib/
-          cp linux/libxmc_orchestrator.so build/linux/x64/release/bundle/lib/
-          cp linux/libxmc_nbt.so build/linux/x64/release/bundle/lib/
-          cp linux/libxmc_devlog.so build/linux/x64/release/bundle/lib/
-
       - name: Install Fastforge
         run: dart pub global activate fastforge
 
@@ -174,6 +155,12 @@ jobs:
 
       - name: Package RPM
         run: fastforge package --platform linux --targets rpm
+
+      # 同 Windows：fastforge 会先 flutter clean 再重建，bundle/lib 里的
+      # libxmc_*.so 由 linux/CMakeLists.txt 的安装规则决定（缺库直接构建失败）。
+      # 这里在打包后复核产物，缺任何一个都让流水线失败。
+      - name: Verify FFI libraries in packaged bundle
+        run: dart tool/ffi_dlls.dart bundle build/linux/x64/release/bundle/lib --ext .so --prefix libxmc_
 
       - name: Upload Linux packages
         uses: actions/upload-artifact@v5
@@ -269,20 +256,6 @@ jobs:
       - name: Build macOS
         run: flutter build macos --release
 
-      - name: Copy Rust dylib to app bundle
-        run: |
-          mkdir -p build/macos/Build/Products/Release/lrix.app/Contents/Frameworks
-          cp macos/libxmc_backup.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
-          cp macos/libxmc_downloader.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
-          cp macos/libxmc_file_ops.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
-          cp macos/libxmc_logger.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
-          cp macos/libxmc_http_client.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
-          cp macos/libxmc_db_client.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
-          cp macos/libxmc_vector_store.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
-          cp macos/libxmc_orchestrator.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
-          cp macos/libxmc_nbt.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
-          cp macos/libxmc_devlog.dylib build/macos/Build/Products/Release/lrix.app/Contents/Frameworks/
-
       - name: Install Fastforge
         run: dart pub global activate fastforge
 
@@ -291,6 +264,12 @@ jobs:
 
       - name: Package DMG
         run: fastforge package --platform macos --targets dmg
+
+      # 同 Windows：fastforge 会先 flutter clean 再重建，app 包里的 dylib 由
+      # macos/Runner.xcodeproj 的 “Copy Rust FFI dylibs” 构建阶段决定。
+      # 这里在打包后复核产物，缺任何一个都让流水线失败。
+      - name: Verify FFI libraries in packaged bundle
+        run: dart tool/ffi_dlls.dart bundle build/macos/Build/Products/Release/lrix.app/Contents/MacOS --ext .dylib --prefix libxmc_
 
       - name: Upload macOS packages
         uses: actions/upload-artifact@v5

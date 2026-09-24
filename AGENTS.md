@@ -73,7 +73,8 @@ flutter test test/knowledge_ffi_test.dart
 ## 关键约定
 
 - **修改 Rust 代码后**必须先重新编译并复制动态库到平台目录（Windows `windows/runner/`、Linux `linux/`、macOS `macos/`），否则运行的是旧动态库
-- **新增 Rust crate 时**需同步更新：`rust/Cargo.toml` members、`build_rust.bat` / `build_rust.sh`、`linux/CMakeLists.txt`、`windows/runner/CMakeLists.txt`、`macos/Runner.xcodeproj/project.pbxproj`（dylib 复制+签名脚本），以及 **两个** CI workflow：`.github/workflows/build-and-test.yml` 和 `.github/workflows/package.yml`（后者极易漏改）
+- **新增 Rust crate 时**需同步更新：`rust/Cargo.toml` members、`build_rust.bat` / `build_rust.sh`、`linux/CMakeLists.txt`、`windows/runner/CMakeLists.txt`、`macos/Runner.xcodeproj/project.pbxproj`（dylib 复制+签名脚本），以及 **两个** CI workflow：`.github/workflows/build-and-test.yml` 和 `.github/workflows/package.yml`（后者极易漏改）；改完跑 `dart tool/ffi_dlls.dart lists` 自检（以 `rust/Cargo.toml` members 为准，CI 同样会校验）
+- **发布包里的 FFI 动态库只由 CMake / Xcode 构建阶段决定**：`fastforge package` 打包前会先 `flutter clean` 再重建，往里手工补动态库是无效的；Release 缺库时构建会直接失败（Windows：`windows/runner/check_rust_dlls.cmake`，Linux：`linux/CMakeLists.txt`），三个平台的打包 job 在打包后还会用 `dart tool/ffi_dlls.dart bundle <产物目录> --ext .dll` 复核产物
 - **FFI 集成测试**（`test/*_ffi_test.dart`）需要动态库已编译并复制到 `windows/runner/` 或项目根目录（`build_rust.bat` 会复制到两处）；本地回环 HTTP 测试（http_ffi 等）用 `dart:io HttpServer` 自起服务，无需外部依赖
 - Rust 导出函数通过 FFI 调用，Dart 侧封装在 `lib/services/*_ffi.dart`（如 `backup_ffi.dart`、`file_ops_ffi.dart`、`logger_ffi.dart`）
 - **所有 HTTP 请求统一走 Rust**：通用请求用 `lib/services/http_ffi.dart`（`HttpFfiService`，小/中响应），大文件下载用 `lib/services/downloader.dart`（`Downloader.downloadFile`，流式写盘）；新增 API 服务禁止使用 `package:http`，本地回环 HTTP 服务端（OAuth 回调、MCP）例外
