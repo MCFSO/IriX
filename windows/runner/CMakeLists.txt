@@ -46,36 +46,10 @@ target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)
 
-# 旧版局部 DLL 复制规则（保留兼容；完整列表见文件末尾全量同步）
-
-if(FALSE) # 旧规则已由文件末尾的全量列表取代
-  add_custom_command(TARGET ${BINARY_NAME} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${CMAKE_CURRENT_SOURCE_DIR}/xmc_backup.dll"
-      "$<TARGET_FILE_DIR:${BINARY_NAME}>/xmc_backup.dll"
-    COMMENT "Copying xmc_backup.dll to output directory"
-  )
-endif()
-
-if(FALSE) # 旧规则已由文件末尾的全量列表取代
-  add_custom_command(TARGET ${BINARY_NAME} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${CMAKE_CURRENT_SOURCE_DIR}/xmc_vector_store.dll"
-      "$<TARGET_FILE_DIR:${BINARY_NAME}>/xmc_vector_store.dll"
-    COMMENT "Copying xmc_vector_store.dll to output directory"
-  )
-endif()
-
-if(FALSE) # 旧规则已由文件末尾的全量列表取代
-  add_custom_command(TARGET ${BINARY_NAME} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-      "${CMAKE_CURRENT_SOURCE_DIR}/xmc_orchestrator.dll"
-      "$<TARGET_FILE_DIR:${BINARY_NAME}>/xmc_orchestrator.dll"
-    COMMENT "Copying xmc_orchestrator.dll to output directory"
-  )
-endif()
-
-# 按 Rust workspace 成员全量同步所有 FFI DLL（新增 crate 时只需更新下方列表）
+# 按 Rust workspace 成员全量同步所有 FFI DLL（与 rust/Cargo.toml 的 members 保持一致，
+# 新增 crate 时三处都要加：本列表、rust/Cargo.toml、build_rust.bat/sh）。
+# 注意：打包流程（fastforge）会先 flutter clean 再重建，构建产物里的 xmc_*.dll 完全
+# 由这里的复制规则决定，因此列表必须完整，缺一个就会打出“能装但缺功能”的安装包。
 set(XMC_RUST_DLLS
   xmc_backup
   xmc_downloader
@@ -96,7 +70,19 @@ foreach(XMC_DLL ${XMC_RUST_DLLS})
         "$<TARGET_FILE_DIR:${BINARY_NAME}>/${XMC_DLL}.dll"
       COMMENT "Copying ${XMC_DLL}.dll to output directory"
     )
-  else()
-    message(WARNING "缺少 Rust FFI DLL: ${XMC_DLL}.dll，请先运行 build_rust.bat")
   endif()
 endforeach()
+
+# 每次构建都校验 FFI 动态库是否齐全：Release / Profile 缺失直接构建失败，
+# Debug 只警告（见 check_rust_dlls.cmake 顶部说明）。
+string(REPLACE ";" "," XMC_RUST_DLLS_CSV "${XMC_RUST_DLLS}")
+add_custom_target(xmc_rust_dll_check ALL
+  COMMAND ${CMAKE_COMMAND}
+    "-DXMC_CONFIG=$<CONFIG>"
+    "-DXMC_DLL_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+    "-DXMC_DLLS=${XMC_RUST_DLLS_CSV}"
+    -P "${CMAKE_CURRENT_SOURCE_DIR}/check_rust_dlls.cmake"
+  COMMENT "Checking Rust FFI DLLs"
+  VERBATIM
+)
+add_dependencies(${BINARY_NAME} xmc_rust_dll_check)

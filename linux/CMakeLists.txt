@@ -113,7 +113,10 @@ install(DIRECTORY "${NATIVE_ASSETS_DIR}"
    COMPONENT Runtime)
 
 # IriX Rust FFI 动态库（由 build_rust.sh 编译后放入 linux/）。
-# 未构建时跳过安装，运行期 FFI 加载会给出更明确的提示。
+# 注意：打包流程（fastforge）会先 flutter clean 再重建，bundle 里的 libxmc_*.so
+# 完全由这里的安装规则决定；静默跳过会让发布包缺失功能（运行期报
+# “Rust xxx library not found”）。因此 Release / Profile 缺库直接构建失败，
+# Debug 仅警告，方便只改 UI 的本地调试。
 set(XMC_RUST_LIBS
   "${CMAKE_CURRENT_SOURCE_DIR}/libxmc_backup.so"
   "${CMAKE_CURRENT_SOURCE_DIR}/libxmc_downloader.so"
@@ -126,13 +129,31 @@ set(XMC_RUST_LIBS
   "${CMAKE_CURRENT_SOURCE_DIR}/libxmc_nbt.so"
   "${CMAKE_CURRENT_SOURCE_DIR}/libxmc_devlog.so"
 )
+set(XMC_RUST_LIBS_MISSING "")
 foreach(rust_lib ${XMC_RUST_LIBS})
   if(EXISTS "${rust_lib}")
     install(FILES "${rust_lib}"
       DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
       COMPONENT Runtime)
+  else()
+    get_filename_component(rust_lib_name "${rust_lib}" NAME)
+    list(APPEND XMC_RUST_LIBS_MISSING "${rust_lib_name}")
   endif()
 endforeach(rust_lib)
+
+if(XMC_RUST_LIBS_MISSING)
+  string(REPLACE ";" " " XMC_RUST_LIBS_MISSING_TEXT "${XMC_RUST_LIBS_MISSING}")
+  # 用 string(CONCAT) 拼接：CMake 中相邻字符串会被当成列表（插值时多出分号）。
+  string(CONCAT XMC_RUST_LIBS_MISSING_MSG
+    "缺少 Rust FFI 动态库：${XMC_RUST_LIBS_MISSING_TEXT}\n"
+    "请先运行 ./build_rust.sh（cargo build --release 并复制 .so 到 linux/）。\n"
+    "缺少这些库时打出的包会缺失对应功能（运行期表现为 Rust xxx library not found）。")
+  if(CMAKE_BUILD_TYPE MATCHES "Debug")
+    message(WARNING "${XMC_RUST_LIBS_MISSING_MSG}")
+  else()
+    message(FATAL_ERROR "${XMC_RUST_LIBS_MISSING_MSG}")
+  endif()
+endif()
 
 # Fully re-copy the assets directory on each build to avoid having stale files
 # from a previous install.
