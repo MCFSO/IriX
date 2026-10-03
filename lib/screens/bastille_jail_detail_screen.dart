@@ -19,9 +19,11 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart' hide ImageInfo;
+import 'package:path/path.dart' as p;
 
 import '../l10n/app_localizations.dart';
 import '../models/remote.dart';
+import '../services/app_paths.dart';
 import '../services/container/container_backend.dart';
 import '../services/database_manager.dart';
 import '../services/font_settings.dart';
@@ -62,6 +64,7 @@ class JailDetailScreen extends StatefulWidget {
 class _JailDetailScreenState extends State<JailDetailScreen> {
   static const Duration _sessionPollInterval = Duration(milliseconds: 1500);
   static const Duration _consolePollInterval = Duration(seconds: 2);
+  static const int _maxVisibleSessionLog = 2 * 1024 * 1024;
 
   // ==================== 共享状态 ====================
 
@@ -84,8 +87,11 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
   /// 运行会话。
   String? _sessionId;
   bool _sessionRunning = false;
+  bool _runMemoryLoading = true;
   String _sessionLog = '';
   int _logOffset = 0;
+  bool _sessionPolling = false;
+  Future<void> _logFileWrite = Future<void>.value();
   Timer? _sessionTimer;
   final ScrollController _sessionScroll = ScrollController();
   late final TextEditingController _sessionInput;
@@ -244,11 +250,11 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
 
   // ==================== 运行记忆（settings 表）====================
 
-  /// 读取上次的启动命令 / 运行目录 / 挂载路径，回填表单。
+  /// 读取上次的运行配置和会话，恢复控制台历史与轮询。
   Future<void> _loadRunMemory() async {
-    final raw = await DatabaseManager.instance.getSetting(_runMemoryKey);
-    if (raw == null || raw.isEmpty || !mounted) return;
     try {
+      final raw = await DatabaseManager.instance.getSetting(_runMemoryKey);
+      if (raw == null || raw.isEmpty || !mounted) return;
       final map = jsonDecode(raw) as Map<String, dynamic>;
       if (!mounted) return;
       setState(() {
@@ -258,12 +264,32 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
         _jailPath.text = map['jailPath'] as String? ?? _jailPath.text;
         _watch = map['watch'] as bool? ?? _watch;
       });
+      final session = map['sessionId'] as String?;
+      if (session == null || session.isEmpty) return;
+      String? log;
+      try {
+        log = await _readSessionLog(session);
+      } catch (_) {
+        // 日志缓存不可读时仍尝试从节点恢复会话。
+      }
+      if (!mounted || _sessionId != null) return;
+      setState(() {
+        _sessionId = session;
+        _sessionRunning = map['sessionRunning'] as bool? ?? false;
+        _sessionLog = log ?? '';
+        _logOffset = log == null ? 0 : (map['logOffset'] as num?)?.toInt() ?? 0;
+      });
+      // 先向节点核对会话状态，再继续增量轮询；已结束的会话仍保留历史。
+      await _pollSession();
+      if (mounted && _sessionRunning) _startSessionPolling();
     } catch (_) {
       // 记忆损坏时忽略，按默认空表单。
+    } finally {
+      if (mounted) setState(() => _runMemoryLoading = false);
     }
   }
 
-  /// 保存启动命令 / 运行目录 / 挂载路径（下次进入自动回填）。
+  /// 保存运行配置、会话 ID 和日志游标（下次进入继续读取）。
   Future<void> _saveRunMemory() async {
     await DatabaseManager.instance.setSetting(
       _runMemoryKey,
@@ -273,8 +299,71 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
         'hostPath': _hostPath.text.trim(),
         'jailPath': _jailPath.text.trim(),
         'watch': _watch,
+        'sessionId': _sessionId,
+        'sessionRunning': _sessionRunning,
+        'logOffset': _logOffset,
       }),
     );
+  }
+
+  /// 会话日志放在 AppPaths 的日志目录中，按节点、jail 和会话分开保存。
+  Future<File> _sessionLogFile(String session) async {
+    final key = utf8.encode('$_runMemoryKey:$session');
+    var first = 0x811c9dc5;
+    var second = 0x811c9dc5;
+    for (final byte in key) {
+      first = ((first ^ byte) * 0x01000193) & 0xffffffff;
+      second = ((second ^ (byte + 1)) * 0x01000193) & 0xffffffff;
+    }
+    final dir = Directory(
+      p.join(await AppPaths.instance.logsDir(), 'jail_sessions'),
+    );
+    await dir.create(recursive: true);
+    return File(
+      p.join(
+        dir.path,
+        '${first.toRadixString(16)}-${second.toRadixString(16)}.log',
+      ),
+    );
+  }
+
+  Future<String?> _readSessionLog(String session) async {
+    final file = await _sessionLogFile(session);
+    if (!await file.exists()) return null;
+    final input = await file.open();
+    try {
+      final size = await input.length();
+      await input.setPosition(
+        size > _maxVisibleSessionLog ? size - _maxVisibleSessionLog : 0,
+      );
+      return utf8.decode(
+        await input.read(_maxVisibleSessionLog),
+        allowMalformed: true,
+      );
+    } finally {
+      await input.close();
+    }
+  }
+
+  /// 序列化“追加”和“清空”，避免轮询输出与清空操作互相覆盖。
+  Future<void> _writeSessionLog(String session, String log, FileMode mode) {
+    final write = _logFileWrite.onError((_, _) {}).then((_) async {
+      final file = await _sessionLogFile(session);
+      await file.writeAsString(log, mode: mode, flush: true);
+    });
+    _logFileWrite = write;
+    return write;
+  }
+
+  Future<void> _clearSessionLog() async {
+    final session = _sessionId;
+    setState(() => _sessionLog = '');
+    if (session == null) return;
+    try {
+      await _writeSessionLog(session, '', FileMode.write);
+    } catch (_) {
+      // 清空磁盘缓存失败时仍可清空当前控制台。
+    }
   }
 
   // ==================== 运行 Tab ====================
@@ -399,11 +488,25 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
         _sessionLog = '';
         _logOffset = 0;
       });
+      // 会话 ID 必须先落盘，退出页面后才能重新连接同一个进程。
+      try {
+        await _writeSessionLog(session, '', FileMode.write);
+      } catch (_) {
+        // 本地缓存写入失败不应中断已经启动的服务器会话。
+      }
+      try {
+        await _saveRunMemory();
+      } catch (_) {
+        // 设置保存失败时仍允许当前页面继续连接运行会话。
+      }
+      if (!mounted) return;
       _startSessionPolling();
-      unawaited(_saveRunMemory());
-      _snack(_watch
-          ? '${l.jailDetail_runStartedWatch}${l.jailDetail_watchdogSuffix}'
-          : l.jailDetail_runStartedWatch);
+      unawaited(_pollSession());
+      _snack(
+        _watch
+            ? '${l.jailDetail_runStartedWatch}${l.jailDetail_watchdogSuffix}'
+            : l.jailDetail_runStartedWatch,
+      );
     } catch (e) {
       _snackError(e, prefix: l.jailDetail_startFailed);
     } finally {
@@ -419,34 +522,69 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
   }
 
   Future<void> _pollSession() async {
+    if (_sessionPolling) return;
     final l = AppLocalizations.of(context);
     final session = _sessionId;
     if (session == null) return;
+    _sessionPolling = true;
     try {
       final status = await widget.backend.jailRunStatus(
         _name,
         session,
         since: _logOffset,
       );
-      if (!mounted) return;
+      if (!mounted || _sessionId != session) return;
+      try {
+        if (status.log.isNotEmpty) {
+          await _writeSessionLog(session, status.log, FileMode.append);
+        }
+      } catch (_) {
+        // 本地缓存故障时仍展示从节点收到的输出。
+      }
+      if (!mounted || _sessionId != session) return;
+      final wasRunning = _sessionRunning;
       setState(() {
-        _sessionLog += status.log;
-        _logOffset = status.offset;
+        final nextLog = _sessionLog + status.log;
+        _sessionLog = nextLog.length > _maxVisibleSessionLog
+            ? nextLog.substring(nextLog.length - _maxVisibleSessionLog)
+            : nextLog;
+        if (status.offset >= _logOffset) _logOffset = status.offset;
         _sessionRunning = status.running;
       });
+      try {
+        await _saveRunMemory();
+      } catch (_) {
+        // 节点轮询不依赖本地设置写入成功。
+      }
+      if (!mounted || _sessionId != session) return;
       _scrollSessionToBottom();
       if (!status.running) {
         _sessionTimer?.cancel();
-        if (_watch) unawaited(_stopJailAfterExit(status.exitCode));
-        _snack(
-          _watch
-              ? '${l.jailDetail_processExited((status.exitCode ?? '?').toString())}${l.jailDetail_jailStoppedSuffix}'
-              : l.jailDetail_processExited((status.exitCode ?? '?').toString()),
-        );
+        if (wasRunning) {
+          if (_watch) unawaited(_stopJailAfterExit(status.exitCode));
+          _snack(
+            _watch
+                ? '${l.jailDetail_processExited((status.exitCode ?? '?').toString())}${l.jailDetail_jailStoppedSuffix}'
+                : l.jailDetail_processExited(
+                    (status.exitCode ?? '?').toString(),
+                  ),
+          );
+        }
       }
+    } on NodeApiException catch (e) {
+      if (e.statusCode == 404 && mounted && _sessionId == session) {
+        // 节点已清理旧会话，保留已缓存的日志，但不再显示运行中。
+        setState(() => _sessionRunning = false);
+        _sessionTimer?.cancel();
+        try {
+          await _saveRunMemory();
+        } catch (_) {}
+      }
+      // 暂时离线时保留会话和日志，下轮继续尝试连接。
     } catch (_) {
-      // 会话可能已过期或节点重启，停止轮询。
-      _sessionTimer?.cancel();
+      // 暂时离线时保留会话和日志，下轮继续尝试连接。
+    } finally {
+      _sessionPolling = false;
     }
   }
 
@@ -1549,13 +1687,19 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
         const SizedBox(height: 12),
         _ConsolePanel(
           title: l.jailDetail_sessionConsole,
-          log: _sessionLog.isEmpty ? l.jailDetail_sessionNoOutput : _sessionLog,
+          log: _sessionLog.isEmpty
+              ? (_runMemoryLoading
+                    ? l.common_loading
+                    : _sessionId == null
+                    ? l.jailDetail_sessionNoOutput
+                    : l.jailDetail_noLogOutput)
+              : _sessionLog,
           inputController: _sessionInput,
           inputEnabled: _sessionRunning,
           inputHint: l.jailDetail_commandInputHint,
           scrollController: _sessionScroll,
           onSend: _sendSessionCommand,
-          onClear: () => setState(() => _sessionLog = ''),
+          onClear: () => unawaited(_clearSessionLog()),
         ),
         const SizedBox(height: 16),
       ],
