@@ -7,7 +7,7 @@ import '../services/trash_store.dart';
 import '../utils/apple_widgets.dart';
 import 'archive_viewer_screen.dart';
 import 'nbt_editor_screen.dart';
-import 'text_editor_dialog.dart';
+import 'workspace_editor_screen.dart';
 import 'trash_view.dart';
 
 class FileManagerScreen extends StatefulWidget {
@@ -309,7 +309,7 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
       await File(filePath).create();
       if (!mounted) return;
       _refresh();
-      showTextEditor(context, filePath);
+      _openTextEditor(filePath);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -378,7 +378,13 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
   }
 
   void _openTextEditor(String filePath) {
-    showTextEditor(context, filePath);
+    pushPage(
+      context,
+      (_) =>
+          WorkspaceEditorScreen(rootPath: _rootPath, initialFilePath: filePath),
+    ).then((_) {
+      if (mounted) _refresh();
+    });
   }
 
   void _showProperties(FileSystemEntity entity) {
@@ -508,41 +514,6 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
     }
   }
 
-  /// 判断是否为二进制文件（不可用文本编辑器打开）。
-  bool _isBinaryFile(String path) {
-    final ext = p.extension(path).toLowerCase();
-    return const {
-      '.png',
-      '.jpg',
-      '.jpeg',
-      '.gif',
-      '.bmp',
-      '.ico',
-      '.webp',
-      '.db',
-      '.sqlite',
-      '.dat',
-      '.bin',
-      '.class',
-      '.nbt',
-      '.mca',
-      '.mcr',
-      '.gz',
-      '.tar',
-      '.rar',
-      '.7z',
-      '.mp3',
-      '.wav',
-      '.ogg',
-      '.mp4',
-      '.avi',
-      '.dll',
-      '.so',
-      '.dylib',
-      '.exe',
-    }.contains(ext);
-  }
-
   List<String> _pathSegments() {
     final rel = p.relative(_currentPath, from: _rootPath);
     if (rel == '.') return [p.basename(_rootPath)];
@@ -581,10 +552,10 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
           child: _menuItem(Icons.delete, '删除', color: Colors.red),
         ),
         PopupMenuItem(value: 'rename', child: _menuItem(Icons.edit, '重命名')),
-        if (target is! Directory && !_isBinaryFile(target.path))
+        if (target is! Directory)
           PopupMenuItem(
             value: 'editConfig',
-            child: _menuItem(Icons.text_snippet, '编辑'),
+            child: _menuItem(Icons.text_snippet, '在编辑器中打开'),
           ),
         const PopupMenuDivider(),
         PopupMenuItem(
@@ -653,9 +624,9 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
             );
           } catch (e) {
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('打开 NBT 失败：$e')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text('打开 NBT 失败：$e')));
             }
           }
         case 'properties':
@@ -831,6 +802,17 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
             onPressed: _handleNewFile,
           ),
           IconButton(
+            icon: const Icon(Icons.code),
+            tooltip: '打开文件编辑器',
+            onPressed: () =>
+                pushPage(
+                  context,
+                  (_) => WorkspaceEditorScreen(rootPath: _rootPath),
+                ).then((_) {
+                  if (mounted) _refresh();
+                }),
+          ),
+          IconButton(
             icon: const Icon(Icons.info_outline),
             tooltip: '属性',
             onPressed: selectedCount == 1
@@ -981,7 +963,7 @@ class _FileManagerScreenState extends State<FileManagerScreen> {
                   builder: (_) => ArchiveViewerScreen(filePath: entity.path),
                 ),
               );
-            } else if (!_isBinaryFile(entity.path)) {
+            } else {
               _openTextEditor(entity.path);
             }
           }
