@@ -3,6 +3,7 @@ members = ["backup", "downloader", "file_ops", "logger", "http_client", "db_clie
 resolver = "2"
 
 [profile.release]
+debug = "line-tables-only"
 opt-level = 3
 lto = true
 
