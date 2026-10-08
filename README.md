@@ -20,6 +20,7 @@ AI作品轻喷
 - **AI 助手** —— 本地 Ollama 对话，内置 MCP 服务器（可查看/操作实例、备份等）
 - **知识库（RAG）** —— 导入 .txt/.md 文档，向量存入远程 Milvus 库，AI 对话自动检索相关内容作答
 - **开发者模式** —— 开发者日志（devlog）全量落盘，记录运行日志流、操作轨迹、网络明细与崩溃堆栈
+- **原生插件系统** —— 从 zip 安装预编译原生动态库插件（`.dll`/`.so`/`.dylib`），插件按 **C ABI** 与宿主通信、跨界数据走 JSON；支持清单校验与版本兼容、平台库自动选择、按权限门控的事件分发、`catch_unwind` 崩溃隔离，以及启用/禁用/卸载（卸载重启后生效）。详见 [docs/native-plugin-system.md](docs/native-plugin-system.md)
 - **多语言** —— 简体中文 / English（gen-l10n）
 - **暗色主题** —— 全局暗色 UI
 
@@ -37,6 +38,7 @@ AI作品轻喷
 | NBT | 纯 Rust 编解码（gzip 大端二进制 + SNBT，nbt FFI） |
 | 编排 | orchestrator crate（K8s 风格期望状态对账、弹性扩缩容、跨机迁移） |
 | 开发者日志 | devlog crate（后台线程全量落盘） |
+| 插件宿主 | plugin_host crate（libloading 加载 C ABI 原生插件 + catch_unwind 隔离 + 事件分发 + 权限检查） |
 
 ## 构建
 
@@ -69,6 +71,10 @@ flutter run
 flutter test            # FFI 集成测试（*_ffi_test.dart）需先编译并复制 Rust 动态库
 flutter test test/knowledge_ffi_test.dart   # 只跑单个 FFI 测试
 ```
+
+> `test/plugin_ffi_test.dart`（原生插件系统端到端测试）除动态库外，还需要先生成示例插件包：
+> `.\plugins\example_plugin\build_and_package.ps1`（Windows）或 `./plugins/example_plugin/build_and_package.sh`（Linux/macOS），
+> 产物为 `plugins/irix-example-plugin.zip`。
 
 ### 构建发行版
 
@@ -107,7 +113,10 @@ irix/
 │   ├── orchestrator/        # K8s 风格 MC 服务器编排引擎
 │   ├── nbt/                 # NBT 编解码与树编辑
 │   ├── devlog/              # 开发者日志落盘
+│   ├── plugin_host/         # 原生插件宿主（C ABI 加载 + 事件分发 + 权限检查）
 │   └── logger/              # 日志
+├── plugins/                 # 示例原生插件（独立 crate，打包为 zip 分发，非 FFI 库）
+├── docs/                    # 设计文档（编排、容器、Vault、原生插件系统等）
 ├── windows/                 # Windows 平台代码
 ├── macos/                   # macOS 平台代码
 ├── linux/                   # Linux 平台代码
