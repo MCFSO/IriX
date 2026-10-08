@@ -33,11 +33,32 @@ try {
     # 协议文件名：<entry>.<platform>.dll
     Copy-Item $out "$pkg/lib/plugin.windows-x64.dll"
 
-    # 打成 zip
-    $zip = "../irix-example-plugin.zip"
-    if (Test-Path $zip) { Remove-Item -Force $zip }
-    Compress-Archive -Path "$pkg/*" -DestinationPath $zip
-    Write-Host "插件包已生成: $zip" -ForegroundColor Green
+    # 打成 zip。用 .NET 逐条目写入并把分隔符统一成 '/'：Compress-Archive 会写成
+    # 反斜杠（zip 惯例是正斜杠，跨平台更通用）。目标路径固定为脚本目录的上一级
+    # （仓库 plugins/ 下），与 build_and_package.sh 保持一致。
+    $zipAbs = [System.IO.Path]::GetFullPath(
+        (Join-Path (Get-Location).Path "../irix-example-plugin.zip"))
+    if (Test-Path $zipAbs) { Remove-Item -Force $zipAbs }
+
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $pkgFull = (Resolve-Path $pkg).Path
+    $archive = [System.IO.Compression.ZipFile]::Open($zipAbs, 'Create')
+    try {
+        foreach ($f in Get-ChildItem -Recurse -File $pkgFull) {
+            $rel = $f.FullName.Substring($pkgFull.Length + 1).Replace('\', '/')
+            [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+                $archive, $f.FullName, $rel) | Out-Null
+        }
+    }
+    finally {
+        $archive.Dispose()
+    }
+
+    if (-not (Test-Path $zipAbs)) {
+        Write-Host "打包失败：未生成 $zipAbs" -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "插件包已生成: $zipAbs" -ForegroundColor Green
 }
 finally {
     Pop-Location

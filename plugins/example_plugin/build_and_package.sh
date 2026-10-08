@@ -26,12 +26,16 @@ cp README.md "$pkg/README.md"
 cp "$src" "$pkg/lib/$dst"
 
 zip="../irix-example-plugin.zip"
-rm -f "$zip"
+# 统一成绝对路径：zip 分支在 (cd "$pkg") 子 shell 内执行，相对的 "../" 会少一级
+# （落到插件目录而不是仓库 plugins/ 下），必须先把目标路径固定下来。
+zip_abs="$(cd "$(dirname "$zip")" && pwd)/$(basename "$zip")"
+rm -f "$zip_abs"
+
 if command -v zip >/dev/null 2>&1; then
-  (cd "$pkg" && zip -r "../irix-example-plugin.zip" .) >/dev/null
+  (cd "$pkg" && zip -r "$zip_abs" .) >/dev/null
 else
   # 回退：部分环境没有 zip 命令，用 python3 的 zipfile 生成等价包。
-  python3 - "$pkg" "$zip" <<'PY'
+  python3 - "$pkg" "$zip_abs" <<'PY'
 import os, sys, zipfile
 pkg, out = sys.argv[1], sys.argv[2]
 with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
@@ -41,4 +45,9 @@ with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
             z.write(full, os.path.relpath(full, pkg))
 PY
 fi
-echo "插件包已生成: $zip"
+
+if [ ! -f "$zip_abs" ]; then
+  echo "打包失败：未生成 $zip_abs" >&2
+  exit 1
+fi
+echo "插件包已生成: $zip_abs"
