@@ -57,8 +57,12 @@ jobs:
       # 动态库；插件按平台选择 lib/<entry>.<platform>.<ext>，所以这里为当前 runner
       # 平台重新构建并打包，让 test/plugin_ffi_test.dart 在 Linux 上真正加载 .so、
       # 走完整的安装→加载→事件分发→权限过滤链路（而非降级为 not_supported 分支）。
+      # 末尾显式断言产物落在测试读取的路径：脚本内部用绝对路径计算目标，这里独立
+      # 复核一次，避免"脚本说成功、包却落在别处"（曾导致夹具被删且未重建）。
       - name: Build example plugin package (for plugin FFI test)
-        run: bash plugins/example_plugin/build_and_package.sh
+        run: |
+          bash plugins/example_plugin/build_and_package.sh
+          test -f plugins/irix-example-plugin.zip
 
       - name: Get dependencies
         run: flutter pub get
