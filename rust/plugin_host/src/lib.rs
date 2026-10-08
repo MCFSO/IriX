@@ -215,7 +215,8 @@ pub extern "C" fn plg_readme(id: *const libc::c_char) -> *mut libc::c_char {
 
 // ==================== 安装 / 卸载 / 启用禁用 ====================
 
-/// 安装插件：zip 包路径，返回 JSON {ok, id?, message}。
+/// 安装插件：zip 包路径，返回 JSON {ok, id?, message, warning?}。
+/// `warning` 表示包已安装但加载失败（如当前平台缺对应动态库）。
 #[no_mangle]
 pub extern "C" fn plg_install(zip_path: *const libc::c_char) -> *mut libc::c_char {
     let zip_path = match read_param(zip_path, "zip_path") {
@@ -227,12 +228,17 @@ pub extern "C" fn plg_install(zip_path: *const libc::c_char) -> *mut libc::c_cha
         Err(()) => return std::ptr::null_mut(),
     };
     let json = match result {
-        Ok(id) => serde_json::json!({
-            "ok": true,
-            "id": id,
-            "message": "安装成功",
-        })
-        .to_string(),
+        Ok((id, warning)) => {
+            let mut obj = serde_json::json!({
+                "ok": true,
+                "id": id,
+                "message": "安装成功",
+            });
+            if let Some(w) = warning {
+                obj["warning"] = serde_json::Value::String(w);
+            }
+            obj.to_string()
+        }
         Err(e) => {
             set_last_error(&e);
             serde_json::json!({"ok": false, "message": e}).to_string()

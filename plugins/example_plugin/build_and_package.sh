@@ -27,5 +27,18 @@ cp "$src" "$pkg/lib/$dst"
 
 zip="../irix-example-plugin.zip"
 rm -f "$zip"
-(cd "$pkg" && zip -r "../irix-example-plugin.zip" .) >/dev/null
+if command -v zip >/dev/null 2>&1; then
+  (cd "$pkg" && zip -r "../irix-example-plugin.zip" .) >/dev/null
+else
+  # 回退：部分环境没有 zip 命令，用 python3 的 zipfile 生成等价包。
+  python3 - "$pkg" "$zip" <<'PY'
+import os, sys, zipfile
+pkg, out = sys.argv[1], sys.argv[2]
+with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+    for root, _, files in os.walk(pkg):
+        for name in files:
+            full = os.path.join(root, name)
+            z.write(full, os.path.relpath(full, pkg))
+PY
+fi
 echo "插件包已生成: $zip"

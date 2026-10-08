@@ -72,9 +72,11 @@ flutter test            # FFI 集成测试（*_ffi_test.dart）需先编译并�
 flutter test test/knowledge_ffi_test.dart   # 只跑单个 FFI 测试
 ```
 
-> `test/plugin_ffi_test.dart`（原生插件系统端到端测试）除动态库外，还需要先生成示例插件包：
-> `.\plugins\example_plugin\build_and_package.ps1`（Windows）或 `./plugins/example_plugin/build_and_package.sh`（Linux/macOS），
-> 产物为 `plugins/irix-example-plugin.zip`。
+> `test/plugin_ffi_test.dart`（原生插件系统端到端测试）用仓库里的示例插件包
+> `plugins/irix-example-plugin.zip` 作夹具（已入库，也可直接安装试用）。该包内置的是
+> Windows 版动态库；在 Linux/macOS 上重新生成后即可走完整加载链路：
+> `./plugins/example_plugin/build_and_package.sh`（Windows 用 `.\plugins\example_plugin\build_and_package.ps1`）。
+> 包内没有当前平台动态库时，宿主会把插件标记为 `not_supported`，测试对该降级路径同样有断言。
 
 ### 构建发行版
 

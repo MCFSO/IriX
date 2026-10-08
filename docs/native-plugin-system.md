@@ -140,7 +140,7 @@ myplugin.zip
 | `plg_list() -> *mut c_char` | 插件列表 JSON 数组（不含 README 正文） |
 | `plg_detail(id) -> *mut c_char` | 单个插件详情 JSON |
 | `plg_readme(id) -> *mut c_char` | 插件 `README.md` 内容 |
-| `plg_install(zip_path) -> *mut c_char` | 安装插件包，返回 `{ok, id?, message}` |
+| `plg_install(zip_path) -> *mut c_char` | 安装插件包，返回 `{ok, id?, message, warning?}`（`warning` 表示已装好但加载失败，如平台缺库） |
 | `plg_uninstall(id) -> i32` | 卸载 |
 | `plg_toggle(id, enabled) -> i32` | 启用 / 禁用 |
 | `plg_dispatch(event_type, payload) -> *mut c_char` | 向所有启用插件派发事件，返回结果数组 |
@@ -158,10 +158,14 @@ Dart 侧封装：`lib/services/plugin_ffi.dart`（`PluginHostNative`）、`lib/s
   └─ 解压到 <root>/.install-<ts>（逐条目安全校验，拒绝 ../ 与绝对路径）
      → 读 manifest.json → 校验 id/name/version/type/entry → semver 兼容检查
      → 重命名为 <root>/<id> → 写 state.json{enabled:true} → 载入
+  ├─ 包本身无效（zip 损坏 / manifest 非法 / 版本不兼容）→ 安装失败（ok=false），不落盘
+  └─ 包有效但加载失败（当前平台无对应动态库 / plugin_init 失败）
+     → 仍算安装成功（ok=true），原因作为 warning 返回，并记为插件 status/error
 
 加载 load
   └─ 选平台库 lib/<entry>.<platform>.<ext> → libloading::Library::new
      → 解析 5 个符号 → plugin_init()（catch_unwind）
+     └─ 缺当前平台的库 → status = not_supported（列表可见，不加载）
 
 启用 / 禁用 toggle
   └─ 写 state.json → 启用时按需载入；禁用仅标记 disabled，不再派发事件
@@ -172,6 +176,10 @@ Dart 侧封装：`lib/services/plugin_ffi.dart`（`PluginHostNative`）、`lib/s
   └─ 已加载：标记 pending_restart + 写入 <root>/.pending-delete.json
              → 下次 plg_init 时（进程重启、插件未加载）真正删除目录
 ```
+
+> 「安装成功」与「加载成功」是两件事：包只要结构合法就会落盘并在列表中可见，
+> 加载结果用状态徽章（`已启用` / `平台不支持` / `错误`）与错误文本呈现，
+> 便于用户判断是包的问题还是当前平台/版本的问题。
 
 插件根目录：`AppPaths.pluginsRoot()` = `<数据根目录>/plugins/native`（Windows 下优先非系统盘）。
 
@@ -262,6 +270,10 @@ lib/plugin.windows-x64.dll   # 由 target/release/<crate>.dll 改名而来
 
 完整可运行示例见 [`plugins/example_plugin/`](../plugins/example_plugin/)，其构建与打包脚本为 `build_and_package.ps1`（Windows）/ `build_and_package.sh`（Linux/macOS）。
 
+仓库根还**入库**了一个可直接安装试用的示例包 `plugins/irix-example-plugin.zip`（内置 Windows 版动态库）；
+它同时是 `test/plugin_ffi_test.dart` 的测试夹具。CI 会在跑测试前用 `build_and_package.sh`
+按 runner 平台重新打包，从而在 Linux 上真正加载 `.so` 走完安装→加载→分发→权限过滤链路。
+
 ---
 
 ## 8. 前端界面
@@ -288,6 +300,7 @@ lib/plugin.windows-x64.dll   # 由 target/release/<crate>.dll 改名而来
 | `lib/services/plugin_service.dart` | Dart 业务入口（`PluginService`） |
 | `lib/screens/plugins_screen.dart` | 插件列表页与详情页 |
 | `plugins/example_plugin/` | 示例插件（cdylib）+ 打包脚本 |
+| `plugins/irix-example-plugin.zip` | 已入库的示例插件包（可直接安装试用；同时是 FFI 测试夹具） |
 | `test/plugin_ffi_test.dart` | 端到端 FFI 集成测试 |
 
 新增 crates 时需同步的构建清单（`rust/Cargo.toml`、`build_rust.*`、各平台 CMake/Xcode、两个 CI workflow）见 `CLAUDE.md` 的 “Adding a new Rust crate”，并用 `dart tool/ffi_dlls.dart lists` 自检。

@@ -91,11 +91,17 @@ class _PluginManagerScreenState extends State<PluginManagerScreen> {
     if (confirmed != true || !mounted) return;
 
     try {
-      final id = await PluginService.instance.install(path);
+      final result = await PluginService.instance.install(path);
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('插件安装成功: $id')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.warning == null
+                ? '插件安装成功: ${result.id}'
+                : '已安装 ${result.id}，但加载失败: ${result.warning}',
+          ),
+        ),
+      );
       await _load();
     } on Exception catch (e) {
       if (!mounted) return;

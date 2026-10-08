@@ -62,14 +62,16 @@ class PluginService {
 
   /// 安装插件包（zip 路径）。
   ///
-  /// 成功返回插件 id；失败抛出 [PluginHostException]。
-  Future<String> install(String zipPath) async {
+  /// 成功返回 `(插件 id, 可选加载告警)`；包本身无效（zip 损坏、manifest 非法、
+  /// 版本不兼容）时抛出 [PluginHostException]。加载告警表示包已装好但当前无法
+  /// 加载（如平台缺少对应动态库），调用方应把原因提示给用户。
+  Future<({String id, String? warning})> install(String zipPath) async {
     await init();
     final result = PluginHostNative.instance.install(zipPath);
     if (!result.ok) {
       throw PluginHostException(result.message);
     }
-    return result.id!;
+    return (id: result.id!, warning: result.warning);
   }
 
   /// 卸载插件。已加载插件会被标记为“重启后生效”。

@@ -218,8 +218,13 @@ class PluginHostNative {
     }
   }
 
-  /// 安装插件包。返回 (ok, id, message)。
-  ({bool ok, String? id, String message}) install(String zipPath) {
+  /// 安装插件包。返回 (ok, id, message, warning)。
+  ///
+  /// [warning] 非空表示包已安装但加载失败（如当前平台缺少对应动态库），
+  /// 此时插件仍会出现在列表中，以状态徽章与错误文本提示原因。
+  ({bool ok, String? id, String message, String? warning}) install(
+    String zipPath,
+  ) {
     final zipPtr = zipPath.toNativeUtf8();
     try {
       final ptr = _plgInstall(zipPtr);
@@ -232,6 +237,7 @@ class PluginHostNative {
           ok: decoded['ok'] as bool? ?? false,
           id: decoded['id'] as String?,
           message: decoded['message'] as String? ?? '',
+          warning: decoded['warning'] as String?,
         );
       } finally {
         freeRustString(_lib, ptr);

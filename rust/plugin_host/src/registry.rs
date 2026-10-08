@@ -252,8 +252,12 @@ impl PluginRegistry {
     }
 
     /// 安装：解压 zip → 校验 manifest → 落目录 → 写 state → 加载。
-    /// 返回插件 id。
-    pub fn install(&mut self, zip_path: &str) -> Result<String, String> {
+    ///
+    /// 返回 `(插件 id, 可选加载告警)`。只要**包本身有效**（zip 可解、manifest 合法、
+    /// 版本兼容）就算安装成功；若随后加载失败（当前平台缺对应动态库、plugin_init
+    /// 失败等），不视为安装失败，而是把原因作为 warning 返回并记录在插件的
+    /// status/error 上——UI 用状态徽章展示，也便于用户排查。
+    pub fn install(&mut self, zip_path: &str) -> Result<(String, Option<String>), String> {
         let zip_file = Path::new(zip_path);
         if !zip_file.exists() {
             return Err("安装包不存在".into());
@@ -307,17 +311,15 @@ impl PluginRegistry {
         // 4. 写状态（默认启用）。
         write_state_enabled(&target, true)?;
 
-        // 5. 更新注册表并尝试加载。
+        // 5. 更新注册表并尝试加载。加载失败只作为 warning 返回（包已装好，
+        //    状态/原因记录在 entry 上，UI 用状态徽章展示）。
         let mut entry = Self::make_entry(target, m, None, PluginStatus::Disabled, None);
         entry.enabled = true;
         Self::try_load(&mut entry);
-        let error = entry.error.clone();
+        let warning = entry.error.clone();
         self.plugins.insert(id.clone(), entry);
 
-        if let Some(e) = error {
-            return Err(e);
-        }
-        Ok(id)
+        Ok((id, warning))
     }
 
     /// 安全解压：逐条目读取，遇到越出目标目录的路径直接拒绝。

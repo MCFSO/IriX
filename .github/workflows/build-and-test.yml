@@ -53,6 +53,13 @@ jobs:
           cp rust/target/release/libxmc_devlog.so linux/
           cp rust/target/release/libxmc_plugin_host.so linux/
 
+      # 示例插件包（plugins/irix-example-plugin.zip）已入库，但其中内置的是 Windows
+      # 动态库；插件按平台选择 lib/<entry>.<platform>.<ext>，所以这里为当前 runner
+      # 平台重新构建并打包，让 test/plugin_ffi_test.dart 在 Linux 上真正加载 .so、
+      # 走完整的安装→加载→事件分发→权限过滤链路（而非降级为 not_supported 分支）。
+      - name: Build example plugin package (for plugin FFI test)
+        run: bash plugins/example_plugin/build_and_package.sh
+
       - name: Get dependencies
         run: flutter pub get
 

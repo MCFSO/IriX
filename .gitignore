@@ -52,10 +52,11 @@ windows/runner/xmc_*.dll
 # 第三方参考源码（AnkiNBT mod 反编译参考，不属于本项目）
 AnkiNBT-main/
 
-# 示例插件构建产物（cargo target、打包暂存目录与插件 zip，由 build_and_package.* 生成）
+# 示例插件构建中间产物（cargo target 与打包暂存目录，由 build_and_package.* 生成）
+# 注意：plugins/irix-example-plugin.zip 是**特意入库**的示例插件包 + FFI 测试夹具，
+# 不要忽略它（CI 会在测试前按 runner 平台重新打包覆盖）。
 plugins/example_plugin/target/
 plugins/example_plugin/package/
-plugins/*.zip
 
 # Fastforge output
 /dist/
