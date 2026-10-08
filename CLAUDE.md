@@ -53,7 +53,7 @@ All persistence goes through `DatabaseManager` (singleton, `sqflite_common_ffi`)
 
 ### Rust FFI layer
 
-Seven Rust crates compiled as separate `.dll`/`.so`/`.dylib` files. Dart FFI wrappers in `lib/services/`:
+Ten Rust crates compiled as separate `.dll`/`.so`/`.dylib` files. Dart FFI wrappers in `lib/services/`:
 
 | Crate | Dart wrapper | Purpose |
 |-------|-------------|---------|
@@ -64,6 +64,9 @@ Seven Rust crates compiled as separate `.dll`/`.so`/`.dylib` files. Dart FFI wra
 | `db_client` | `db_client_ffi.dart` | MySQL/MariaDB/PostgreSQL/Redis remote DB |
 | `logger` | `logger_ffi.dart` | Rust-side logging |
 | `vector_store` | `knowledge_ffi.dart` | Milvus vector embeddings store (milvus-sdk-rust) |
+| `nbt` | `nbt_ffi.dart` | Minecraft NBT encode/decode + tree editing |
+| `devlog` | `devlog_ffi.dart` | Developer-mode full log persistence |
+| `plugin_host` | `plugin_ffi.dart` | Native plugin host: C ABI loader, event dispatch, permission checks |
 
 **All HTTP goes through Rust** — `HttpFfiService` for general requests, `Downloader.downloadFile` for large files. Do NOT add `package:http` in Dart. Exception: local loopback servers (OAuth callback, MCP server) use `dart:io HttpServer`.
 
@@ -89,6 +92,36 @@ Release builds also fail loudly on a missing FFI library (`windows/runner/check_
 `dart tool/ffi_dlls.dart bundle <bundle dir> --ext .dll`. Note that `fastforge package`
 runs `flutter clean` + rebuild, so manually copying libs into `build/` has no effect —
 CMake / the Xcode build phase own that copy.
+
+### Native plugin system
+
+`plugin_host` (`xmc_plugin_host`) lets IriX load **precompiled native plugins** shipped
+as zip packages; the UI is `lib/screens/plugins_screen.dart` (entry: "插件" tool tile on
+the instance page), backed by `plugin_service.dart` → `plugin_ffi.dart`.
+
+- **Package format**: `manifest.json` + `README.md` + `lib/<entry>.<platform>.<ext>`
+  (e.g. `lib/plugin.windows-x64.dll`). `entry` defaults to `plugin`.
+- **C ABI** (plugins must export): `plugin_init() -> i32`, `plugin_name()`,
+  `plugin_version()`, `plugin_handle_event(type, payload) -> *const c_char`,
+  `plugin_shutdown()`. All cross-boundary data is JSON strings — never structs.
+- **String ownership**: plugins allocate returned strings with `libc::malloc`; the host
+  frees them with `libc::free` (host-allocated strings returned to Dart use the usual
+  `free_string`).
+- **FFI exports**: `plg_init(base_dir, host_version)`, `plg_list`, `plg_detail`,
+  `plg_readme`, `plg_install(zip_path)`, `plg_uninstall`, `plg_toggle(id, enabled)`,
+  `plg_dispatch(event_type, payload)`, `plg_shutdown`.
+- **Lifecycle**: a loaded native library is never safely unloadable, so *disable* only
+  flags state (no more events); *uninstall* marks `pending_restart` and queues real file
+  deletion for the next startup (`.pending-delete.json`).
+- **Security**: `manifest.permissions` is checked by the host before dispatch; events map
+  to required permissions in `registry.rs::event_required_permissions`. Native plugins run
+  in-process with **no sandbox** — the install UI shows a risk confirmation. Plugin
+  signatures are future work.
+- **Isolation**: every plugin call is wrapped in `catch_unwind`; a panicking/erroring
+  plugin is marked `crashed` and never called again, without affecting others.
+- **Example plugin**: `plugins/example_plugin/` (standalone crate, not a workspace member
+  since it is shipped as a zip rather than bundled as an FFI lib); package with
+  `build_and_package.ps1`. FFI flow test: `test/plugin_ffi_test.dart`.
 
 ### Key UI conventions
 

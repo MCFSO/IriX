@@ -128,6 +128,7 @@ set(XMC_RUST_LIBS
   "${CMAKE_CURRENT_SOURCE_DIR}/libxmc_orchestrator.so"
   "${CMAKE_CURRENT_SOURCE_DIR}/libxmc_nbt.so"
   "${CMAKE_CURRENT_SOURCE_DIR}/libxmc_devlog.so"
+  "${CMAKE_CURRENT_SOURCE_DIR}/libxmc_plugin_host.so"
 )
 set(XMC_RUST_LIBS_MISSING "")
 foreach(rust_lib ${XMC_RUST_LIBS})

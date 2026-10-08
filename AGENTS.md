@@ -7,9 +7,9 @@ IriX（X Minecraft Server Launcher）—— Minecraft 服务器管理工具。Fl
 ## 技术栈
 
 - **UI**: Flutter 3.x (Dart SDK >= 3.12), Provider 状态管理
-- **Rust**: workspace（backup / downloader / http_client / file_ops / logger / db_client / vector_store / nbt / devlog），release profile 开启 `opt-level = 3` + `lto`
+- **Rust**: workspace（backup / downloader / http_client / file_ops / logger / db_client / vector_store / nbt / devlog / plugin_host），release profile 开启 `opt-level = 3` + `lto`
 - **存储**: SQLite（sqflite_common_ffi，settings 表统一存设置）
-- **FFI**: `package:ffi` 调用 `xmc_backup.dll`、`xmc_downloader.dll`、`xmc_http_client.dll`、`xmc_file_ops.dll`、`xmc_logger.dll`、`xmc_db_client.dll`、`xmc_vector_store.dll`、`xmc_nbt.dll`、`xmc_devlog.dll`
+- **FFI**: `package:ffi` 调用 `xmc_backup.dll`、`xmc_downloader.dll`、`xmc_http_client.dll`、`xmc_file_ops.dll`、`xmc_logger.dll`、`xmc_db_client.dll`、`xmc_vector_store.dll`、`xmc_nbt.dll`、`xmc_devlog.dll`、`xmc_plugin_host.dll`
 - **数据库**: 远程数据库（MySQL/MariaDB/PostgreSQL/Redis）连接与操作由 Rust 执行（`db_client` crate，mysql/postgres/redis 纯 Rust 驱动，无 OpenSSL）；本地持久化用 SQLite（sqflite_common_ffi，`DatabaseManager`）
 - **网络**: 全部 HTTP 请求由 Rust 处理（`http_client` crate 通用请求 + `downloader` crate 流式/分片下载，均为 ureq + rustls，无 OpenSSL）；Dart 侧不再使用 `package:http`（仅测试用例保留），本地回环 HTTP 服务（OAuth 回调、MCP 服务端）仍用 `dart:io HttpServer`
 - **知识库（RAG）**: `vector_store` crate（milvus-sdk-rust 官方 SDK，纯 rustls、无 OpenSSL）只负责远程 Milvus 向量存取与相似检索，不做 embedding；embedding 请求走 Rust `HttpFfiService`（http_client crate）调 AI 模型 API，`knowledge_service.dart` 组装请求并传入向量，维度需与建库时一致；Milvus 连接配置（uri/token/collection）作为独立 AI 设置项（`AiSettings.getMilvusConfig`/`setMilvusConfig`，key=`kb_milvus_config`），不进入远程数据库连接列表
@@ -36,7 +36,8 @@ rust/
 ├── db_client/             # 远程数据库客户端（MySQL/MariaDB/PostgreSQL/Redis，统一 db_request 入口）
 ├── logger/                # 日志
 ├── vector_store/          # 向量知识库（milvus-sdk-rust，远程 Milvus 存取与相似检索）
-└── nbt/                   # NBT 编解码与树编辑（gzip 大端二进制 + SNBT，复刻 AnkiNBT 编辑能力）
+├── nbt/                   # NBT 编解码与树编辑（gzip 大端二进制 + SNBT，复刻 AnkiNBT 编辑能力）
+└── plugin_host/           # 原生插件宿主（C ABI 加载器 + 事件分发 + 权限检查，libloading + catch_unwind）
 test/                      # Flutter 测试（FFI 集成测试需先编译并复制 Rust 动态库）
 windows/ linux/ macos/     # 平台代码（FFI 动态库：windows/runner/、linux/、macos/）
 dist/ build/               # 打包产物，勿修改
@@ -83,5 +84,6 @@ flutter test test/knowledge_ffi_test.dart
 - 持久化数据统一用 SQLite（`instance_store.dart`、`node_store.dart`、`trash_store.dart`、`ai_settings.dart` 等，设置存 settings 表）；无 SharedPreferences
 - **所有应用落盘目录统一走 `lib/services/app_paths.dart`（AppPaths）**：Windows 数据根目录优先非系统盘（exe 目录 → D:-Z: 盘符扫描 → 文档目录兜底），首次启动自动把旧文档目录数据（数据库/日志/JDK/frpc/镜像）迁移到新根目录；新增落盘路径禁止直接 `getApplicationDocumentsDirectory()` / `Directory.systemTemp`，临时文件用 `AppPaths.instance.createTempDir`
 - 新增页面放 `lib/screens/`，新增 API 服务放 `lib/services/`，命名遵循现有 `*_api_service.dart` / `*_provider.dart` 模式
+- **原生插件系统统一走 Rust `plugin_host`**：`lib/services/plugin_ffi.dart`（`PluginHostNative`，`plg_init`/`plg_list`/`plg_install`/`plg_toggle`/`plg_dispatch` 等）+ `plugin_service.dart`（业务入口）+ `lib/screens/plugins_screen.dart`（UI）。插件包为 zip（`manifest.json` + `README.md` + `lib/<entry>.<platform>.<ext>`），插件按 C ABI 导出 `plugin_init`/`plugin_name`/`plugin_version`/`plugin_handle_event`/`plugin_shutdown`，跨边界数据一律 JSON；插件返回字符串用 `libc::malloc` 分配、宿主用 `libc::free` 释放；每次调用 `catch_unwind` 隔离，禁用只标记状态、卸载重启后生效；示例插件见 `plugins/example_plugin/`，集成测试 `test/plugin_ffi_test.dart`
 - 全局暗色主题，UI 组件参考 `lib/utils/apple_widgets.dart`
 - 勿编辑 `rust/target/`、`build/`、`dist/` 等生成目录

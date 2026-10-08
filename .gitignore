@@ -52,6 +52,11 @@ windows/runner/xmc_*.dll
 # 第三方参考源码（AnkiNBT mod 反编译参考，不属于本项目）
 AnkiNBT-main/
 
+# 示例插件构建产物（cargo target、打包暂存目录与插件 zip，由 build_and_package.* 生成）
+plugins/example_plugin/target/
+plugins/example_plugin/package/
+plugins/*.zip
+
 # Fastforge output
 /dist/
 

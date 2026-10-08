@@ -44,6 +44,7 @@ jobs:
           Copy-Item rust/target/release/xmc_orchestrator.dll windows/runner/ -Force
           Copy-Item rust/target/release/xmc_nbt.dll windows/runner/ -Force
           Copy-Item rust/target/release/xmc_devlog.dll windows/runner/ -Force
+          Copy-Item rust/target/release/xmc_plugin_host.dll windows/runner/ -Force
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -130,6 +131,7 @@ jobs:
           cp rust/target/release/libxmc_orchestrator.so linux/
           cp rust/target/release/libxmc_nbt.so linux/
           cp rust/target/release/libxmc_devlog.so linux/
+          cp rust/target/release/libxmc_plugin_host.so linux/
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -242,6 +244,10 @@ jobs:
             rust/target/x86_64-apple-darwin/release/libxmc_devlog.dylib \
             rust/target/aarch64-apple-darwin/release/libxmc_devlog.dylib \
             -output macos/libxmc_devlog.dylib
+          lipo -create \
+            rust/target/x86_64-apple-darwin/release/libxmc_plugin_host.dylib \
+            rust/target/aarch64-apple-darwin/release/libxmc_plugin_host.dylib \
+            -output macos/libxmc_plugin_host.dylib
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2

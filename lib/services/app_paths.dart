@@ -74,6 +74,9 @@ class AppPaths {
   Future<String> clusterMirrorRoot() async =>
       p.join(await root(), 'cluster_mirrors');
 
+  /// 原生插件根目录（插件包解压后按插件 id 分目录存放）。
+  Future<String> pluginsRoot() async => p.join(await root(), 'plugins', 'native');
+
   /// 临时目录根：Windows 数据根目录不在系统盘时用 `<root>/temp`，
   /// 其余情况（回退文档目录或非 Windows 平台）沿用系统临时目录。
   Future<String> tempRoot() async {

@@ -37,6 +37,7 @@ import 'marketplace_screen.dart';
 import 'nbt_editor_screen.dart';
 import 'nodes_screen.dart';
 import 'onboarding_screen.dart';
+import 'plugins_screen.dart';
 
 /// 主页 — 左侧 NavigationRail + 右侧内容区。
 class HomeScreen extends StatefulWidget {
@@ -398,6 +399,11 @@ class _ToolsRow extends StatelessWidget {
             icon: Icons.edit_note,
             label: l.home_nbtEditor,
             onTap: () => pushPage(context, (_) => const NbtEditorScreen()),
+          ),
+          _ToolTile(
+            icon: Icons.extension,
+            label: '插件',
+            onTap: () => pushPage(context, (_) => const PluginManagerScreen()),
           ),
         ],
       ),

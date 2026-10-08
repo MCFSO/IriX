@@ -1,0 +1,22 @@
+[package]
+name = "xmc_plugin_host"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# 原生插件动态库加载（不依赖具体 Rust ABI，插件按 C ABI 导出符号）
+libloading = "0.8"
+# zip 解包（安装插件包用），配合安全路径校验防 zip-slip
+zip = "2"
+# manifest.json 解析与插件元数据序列化
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# 插件返回字符串按 libc::malloc 分配，宿主用 libc::free 释放
+libc = "0.2"
+# 扫描插件目录
+walkdir = "2.5"
+# min_app_version 版本兼容性比较
+semver = "1"

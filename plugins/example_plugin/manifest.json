@@ -1,0 +1,11 @@
+{
+  "id": "com.example.irix.example",
+  "name": "示例插件",
+  "version": "1.0.0",
+  "author": "IriX",
+  "description": "演示原生插件系统的基础功能：接收宿主事件并以 JSON 回显。",
+  "type": "native",
+  "entry": "plugin",
+  "min_app_version": "0.1.0",
+  "permissions": ["instance.read", "backup.read"]
+}
