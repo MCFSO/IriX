@@ -165,8 +165,13 @@ IMPLEMENTOR="OpenJDK BSD Porting Team"
     });
 
     test('javaHome 为可执行文件上两级目录', () {
-      final r = make(version: '17', binary: r'C:\jdk-17\bin\java.exe');
-      expect(r.javaHome, r'C:\jdk-17');
+      // 两种分隔符风格都要通过，且结果与运行平台无关：
+      // 早期实现用默认 p.dirname，在 Linux CI 上解析 Windows 路径会得到 '.'。
+      final win = make(version: '17', binary: r'C:\jdk-17\bin\java.exe');
+      expect(win.javaHome, r'C:\jdk-17');
+
+      final nix = make(version: '17', binary: '/usr/lib/jvm/jdk-17/bin/java');
+      expect(nix.javaHome, '/usr/lib/jvm/jdk-17');
     });
   });
 

@@ -318,7 +318,14 @@ class JavaRuntime implements Comparable<JavaRuntime> {
   String get id => binary;
 
   /// java home（可执行文件的上级的上级）。
-  String get javaHome => p.dirname(p.dirname(binary));
+  ///
+  /// 按路径自身的分隔符风格解析，而非按当前运行平台：
+  /// 在 Linux CI 上校验 Windows 路径（或反之）时 `p.dirname` 会因
+  /// 平台风格不符而返回 `.`，故显式选用 [p.windows] / [p.posix]。
+  String get javaHome {
+    final ctx = binary.contains(r'\') ? p.windows : p.posix;
+    return ctx.dirname(ctx.dirname(binary));
+  }
 
   /// 列表标题：`厂商 JDK/JRE 版本`（HMCL JavaItemCell 的拼装方式）。
   String get displayTitle {
