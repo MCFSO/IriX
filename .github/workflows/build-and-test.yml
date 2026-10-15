@@ -179,6 +179,13 @@ jobs:
       - name: Verify FFI DLLs in build output
         run: dart tool/ffi_dlls.dart bundle build/windows/x64/runner/Release --ext .dll
 
+      # 动态库齐全 ≠ 能启动。曾出现 windows-build artifact 缺 data/app.so（AOT 快照）
+      # 的情况：构建、打包、上传全部成功，用户双击却毫无反应，只有实机运行才报
+      # “Can't load AOT data ... Failed to create view controller.”。故在上传前
+      # 复核运行时必需文件，缺任何一个都让本 job 失败。
+      - name: Verify Windows runtime files
+        run: dart tool/ffi_dlls.dart runtime build/windows/x64/runner/Release --platform windows
+
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v5
         with:
@@ -267,6 +274,10 @@ jobs:
       # （Release 缺库会直接构建失败）；这里复核产物，缺库即让本 job 失败。
       - name: Verify FFI libraries in build output
         run: dart tool/ffi_dlls.dart bundle build/linux/x64/release/bundle/lib --ext .so --prefix libxmc_
+
+      # 同 Windows：动态库齐全 ≠ 能启动，上传前复核 data/app.so 等运行时文件。
+      - name: Verify Linux runtime files
+        run: dart tool/ffi_dlls.dart runtime build/linux/x64/release/bundle --platform linux
 
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v5
@@ -391,6 +402,10 @@ jobs:
       # 构建阶段复制到 Contents/MacOS；这里复核产物，缺库即让本 job 失败。
       - name: Verify FFI libraries in build output
         run: dart tool/ffi_dlls.dart bundle build/macos/Build/Products/Release/lrix.app/Contents/MacOS --ext .dylib --prefix libxmc_
+
+      # 同 Windows：动态库齐全 ≠ 能启动，上传前复核 App.framework 内的引擎资源。
+      - name: Verify macOS runtime files
+        run: dart tool/ffi_dlls.dart runtime build/macos/Build/Products/Release/lrix.app --platform macos
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v5

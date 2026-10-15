@@ -79,6 +79,11 @@ jobs:
       - name: Verify FFI DLLs in packaged bundle
         run: dart tool/ffi_dlls.dart bundle build/windows/x64/runner/Release --ext .dll
 
+      # 动态库齐全 ≠ 能启动：缺 data/app.so（AOT 快照）时构建与打包均成功，用户
+      # 双击却毫无反应（引擎报 “Failed to create view controller.”）。
+      - name: Verify Windows runtime files
+        run: dart tool/ffi_dlls.dart runtime build/windows/x64/runner/Release --platform windows
+
       - name: Upload Windows packages
         uses: actions/upload-artifact@v5
         with:
@@ -163,6 +168,10 @@ jobs:
       # 这里在打包后复核产物，缺任何一个都让流水线失败。
       - name: Verify FFI libraries in packaged bundle
         run: dart tool/ffi_dlls.dart bundle build/linux/x64/release/bundle/lib --ext .so --prefix libxmc_
+
+      # 同 Windows：动态库齐全 ≠ 能启动，打包后复核 data/app.so 等运行时文件。
+      - name: Verify Linux runtime files
+        run: dart tool/ffi_dlls.dart runtime build/linux/x64/release/bundle --platform linux
 
       - name: Upload Linux packages
         uses: actions/upload-artifact@v5
@@ -276,6 +285,10 @@ jobs:
       # 这里在打包后复核产物，缺任何一个都让流水线失败。
       - name: Verify FFI libraries in packaged bundle
         run: dart tool/ffi_dlls.dart bundle build/macos/Build/Products/Release/lrix.app/Contents/MacOS --ext .dylib --prefix libxmc_
+
+      # 同 Windows：动态库齐全 ≠ 能启动，打包后复核 App.framework 内的引擎资源。
+      - name: Verify macOS runtime files
+        run: dart tool/ffi_dlls.dart runtime build/macos/Build/Products/Release/lrix.app --platform macos
 
       - name: Upload macOS packages
         uses: actions/upload-artifact@v5
