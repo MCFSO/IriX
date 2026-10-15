@@ -15,14 +15,10 @@ import 'package:ffi/ffi.dart';
 import 'rust_lib.dart';
 
 // ===== FFI 函数签名 typedef =====
-typedef PlgInitC = Int32 Function(
-  Pointer<Utf8> baseDir,
-  Pointer<Utf8> hostVersion,
-);
-typedef PlgInitDart = int Function(
-  Pointer<Utf8> baseDir,
-  Pointer<Utf8> hostVersion,
-);
+typedef PlgInitC =
+    Int32 Function(Pointer<Utf8> baseDir, Pointer<Utf8> hostVersion);
+typedef PlgInitDart =
+    int Function(Pointer<Utf8> baseDir, Pointer<Utf8> hostVersion);
 
 typedef PlgShutdownC = Void Function();
 typedef PlgShutdownDart = void Function();
@@ -106,8 +102,7 @@ class PluginInfo {
   }
 
   /// 状态是否可交互（正常可启用/禁用）。
-  bool get isInteractive =>
-      status != 'pending_restart' && status != 'crashed';
+  bool get isInteractive => status != 'pending_restart' && status != 'crashed';
 }
 
 /// 插件宿主动态库 FFI 单例。
@@ -126,19 +121,26 @@ class PluginHostNative {
 
   PluginHostNative._(this._lib) {
     _plgInit = _lib.lookupFunction<PlgInitC, PlgInitDart>('plg_init');
-    _plgShutdown =
-        _lib.lookupFunction<PlgShutdownC, PlgShutdownDart>('plg_shutdown');
+    _plgShutdown = _lib.lookupFunction<PlgShutdownC, PlgShutdownDart>(
+      'plg_shutdown',
+    );
     _plgList = _lib.lookupFunction<PlgListC, PlgListDart>('plg_list');
-    _plgDetail = _lib.lookupFunction<PlgStringFnC, PlgStringFnDart>('plg_detail');
-    _plgReadme =
-        _lib.lookupFunction<PlgStringFnC, PlgStringFnDart>('plg_readme');
-    _plgInstall =
-        _lib.lookupFunction<PlgInstallC, PlgInstallDart>('plg_install');
-    _plgUninstall =
-        _lib.lookupFunction<PlgUninstallC, PlgUninstallDart>('plg_uninstall');
+    _plgDetail = _lib.lookupFunction<PlgStringFnC, PlgStringFnDart>(
+      'plg_detail',
+    );
+    _plgReadme = _lib.lookupFunction<PlgStringFnC, PlgStringFnDart>(
+      'plg_readme',
+    );
+    _plgInstall = _lib.lookupFunction<PlgInstallC, PlgInstallDart>(
+      'plg_install',
+    );
+    _plgUninstall = _lib.lookupFunction<PlgUninstallC, PlgUninstallDart>(
+      'plg_uninstall',
+    );
     _plgToggle = _lib.lookupFunction<PlgToggleC, PlgToggleDart>('plg_toggle');
-    _plgDispatch =
-        _lib.lookupFunction<PlgDispatchC, PlgDispatchDart>('plg_dispatch');
+    _plgDispatch = _lib.lookupFunction<PlgDispatchC, PlgDispatchDart>(
+      'plg_dispatch',
+    );
   }
 
   /// 单例（首次访问时加载动态库）。

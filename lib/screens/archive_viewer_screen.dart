@@ -54,9 +54,9 @@ class _ArchiveViewerScreenState extends State<ArchiveViewerScreen> {
       ).showSnackBar(SnackBar(content: Text(l.archive_extracted(entry.name))));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l.archive_extractFailed(e.toString()))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.archive_extractFailed(e.toString()))),
+      );
     }
   }
 
@@ -93,7 +93,7 @@ class _ArchiveViewerScreenState extends State<ArchiveViewerScreen> {
         Rect.fromLTWH(position.dx, position.dy, 1, 1),
         overlayRect,
       ),
-        items: [
+      items: [
         PopupMenuItem(
           value: 'extract',
           child: Row(
@@ -361,7 +361,12 @@ class _ArchiveViewerScreenState extends State<ArchiveViewerScreen> {
         ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
       ),
       child: Row(
-        children: [Text(l.archive_entryCount(count), style: const TextStyle(fontSize: 12))],
+        children: [
+          Text(
+            l.archive_entryCount(count),
+            style: const TextStyle(fontSize: 12),
+          ),
+        ],
       ),
     );
   }

@@ -112,9 +112,9 @@ class _ClusterInstancesScreenState extends State<ClusterInstancesScreen> {
         .where((n) => n.id != instance.nodeId)
         .toList();
     if (candidates.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l.clusterInstances_noNodeToMigrate)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.clusterInstances_noNodeToMigrate)),
+      );
       return;
     }
     String? targetId = candidates.first.id;
@@ -155,9 +155,11 @@ class _ClusterInstancesScreenState extends State<ClusterInstancesScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l.clusterInstances_cannotOpenDetail(e.toString()))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l.clusterInstances_cannotOpenDetail(e.toString())),
+        ),
+      );
       return;
     }
     // 取节点平台（决定详情页是否展示容器 Tab：Docker / Bastille）。

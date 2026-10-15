@@ -17,16 +17,12 @@ class VaultSettings {
 
   /// 是否启用客户端 Vault 能力。
   static Future<bool> isEnabled() => SettingsRepository.instance.getBoolString(
-        _keyEnabled,
-        defaultValue: defaultEnabled,
-        label: 'vault enabled',
-      );
+    _keyEnabled,
+    defaultValue: defaultEnabled,
+    label: 'vault enabled',
+  );
 
   /// 设置客户端 Vault 能力开关。
-  static Future<void> setEnabled(bool enabled) =>
-      SettingsRepository.instance.setBoolString(
-        _keyEnabled,
-        enabled,
-        label: 'vault enabled',
-      );
+  static Future<void> setEnabled(bool enabled) => SettingsRepository.instance
+      .setBoolString(_keyEnabled, enabled, label: 'vault enabled');
 }

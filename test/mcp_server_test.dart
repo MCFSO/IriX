@@ -174,7 +174,9 @@ void main() {
   test('无鉴权请求被拒绝（H-3）', () async {
     final request = await client.postUrl(uri('/mcp'))
       ..headers.set('Content-Type', 'application/json')
-      ..add(utf8.encode(jsonEncode({'jsonrpc': '2.0', 'id': 1, 'method': 'ping'})));
+      ..add(
+        utf8.encode(jsonEncode({'jsonrpc': '2.0', 'id': 1, 'method': 'ping'})),
+      );
     final response = await request.close();
     final body = await utf8.decodeStream(response);
     expect(response.statusCode, HttpStatus.unauthorized);
@@ -185,7 +187,9 @@ void main() {
     final request = await client.postUrl(uri('/mcp'))
       ..headers.set('Content-Type', 'application/json')
       ..headers.set('Authorization', 'Bearer wrong-token')
-      ..add(utf8.encode(jsonEncode({'jsonrpc': '2.0', 'id': 1, 'method': 'ping'})));
+      ..add(
+        utf8.encode(jsonEncode({'jsonrpc': '2.0', 'id': 1, 'method': 'ping'})),
+      );
     final response = await request.close();
     expect(response.statusCode, HttpStatus.unauthorized);
   });
@@ -195,7 +199,9 @@ void main() {
       ..headers.set('Content-Type', 'application/json')
       ..headers.set('Authorization', 'Bearer ${server.token}')
       ..headers.set('Origin', 'https://evil.example.com')
-      ..add(utf8.encode(jsonEncode({'jsonrpc': '2.0', 'id': 1, 'method': 'ping'})));
+      ..add(
+        utf8.encode(jsonEncode({'jsonrpc': '2.0', 'id': 1, 'method': 'ping'})),
+      );
     final response = await request.close();
     expect(response.statusCode, HttpStatus.unauthorized);
   });
@@ -205,7 +211,9 @@ void main() {
       ..headers.set('Content-Type', 'application/json')
       ..headers.set('Authorization', 'Bearer ${server.token}')
       ..headers.set('Origin', 'http://127.0.0.1:8080')
-      ..add(utf8.encode(jsonEncode({'jsonrpc': '2.0', 'id': 1, 'method': 'ping'})));
+      ..add(
+        utf8.encode(jsonEncode({'jsonrpc': '2.0', 'id': 1, 'method': 'ping'})),
+      );
     final response = await request.close();
     expect(response.statusCode, 200);
   });

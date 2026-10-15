@@ -195,9 +195,9 @@ class _AiChatPanelState extends State<AiChatPanel> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l.ai_logParseFailed(e.toString()))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.ai_logParseFailed(e.toString()))),
+      );
     }
   }
 
@@ -366,9 +366,7 @@ class _AiChatPanelState extends State<AiChatPanel> {
             ),
             const SizedBox(height: 6),
             Text(
-              hasModel
-                  ? l.ai_emptyHintHasModel
-                  : l.ai_emptyHintNoModel,
+              hasModel ? l.ai_emptyHintHasModel : l.ai_emptyHintNoModel,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -490,8 +488,9 @@ class _AiChatPanelState extends State<AiChatPanel> {
         return _buildToolChip(
           icon: Icons.compress,
           color: theme.colorScheme.tertiary,
-          text:
-              l.ai_compressedHistory(summary.length > 120 ? '${summary.substring(0, 120)}…' : summary),
+          text: l.ai_compressedHistory(
+            summary.length > 120 ? '${summary.substring(0, 120)}…' : summary,
+          ),
         );
       case AiEventKind.error:
         return Container(
@@ -873,10 +872,9 @@ class _ModelsDialogState extends State<_ModelsDialog> {
       final config = MilvusConfig(
         uri: _milvusUriController.text.trim(),
         token: _milvusTokenController.text.trim(),
-        collection:
-            _milvusCollectionController.text.trim().isEmpty
-                ? 'xmc_knowledge'
-                : _milvusCollectionController.text.trim(),
+        collection: _milvusCollectionController.text.trim().isEmpty
+            ? 'xmc_knowledge'
+            : _milvusCollectionController.text.trim(),
       );
       await AiSettings.setMilvusConfig(config);
       setState(() => _milvus = config);
@@ -914,7 +912,10 @@ class _ModelsDialogState extends State<_ModelsDialog> {
         hintText: hint,
         isDense: true,
         border: const OutlineInputBorder(),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
       ),
     );
   }
@@ -941,18 +942,18 @@ class _ModelsDialogState extends State<_ModelsDialog> {
     final milvus = await AiSettings.getMilvusConfig();
     if (!milvus.isValid) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l.ai_configMilvusFirst)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l.ai_configMilvusFirst)));
       }
       return;
     }
     final model = await AiSettings.getActiveModel();
     if (model == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l.ai_addModelForEmbedding)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l.ai_addModelForEmbedding)));
       }
       return;
     }
@@ -970,9 +971,9 @@ class _ModelsDialogState extends State<_ModelsDialog> {
       content = await File(path).readAsString();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l.ai_readFileFailed(e.toString()))));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l.ai_readFileFailed(e.toString()))),
+        );
       }
       return;
     }
@@ -992,9 +993,9 @@ class _ModelsDialogState extends State<_ModelsDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l.ai_importFailed(e.toString()))));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l.ai_importFailed(e.toString()))),
+        );
       }
     } finally {
       if (mounted) setState(() => _importing = false);
@@ -1003,38 +1004,35 @@ class _ModelsDialogState extends State<_ModelsDialog> {
 
   Future<void> _deleteKnowledge(KnowledgeDocument doc) async {
     final l = AppLocalizations.of(context);
-    final confirmed = await showAppDialog<bool>(
-      context,
-      (ctx) {
-        final l = AppLocalizations.of(ctx);
-        return AlertDialog(
-          title: Text(l.ai_deleteDocumentTitle),
-          content: Text(l.ai_deleteDocumentConfirm(doc.title)),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(l.common_cancel),
+    final confirmed = await showAppDialog<bool>(context, (ctx) {
+      final l = AppLocalizations.of(ctx);
+      return AlertDialog(
+        title: Text(l.ai_deleteDocumentTitle),
+        content: Text(l.ai_deleteDocumentConfirm(doc.title)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l.common_cancel),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
             ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(ctx).colorScheme.error,
-              ),
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text(l.common_delete),
-            ),
-          ],
-        );
-      },
-    );
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l.common_delete),
+          ),
+        ],
+      );
+    });
     if (confirmed != true) return;
     try {
       await KnowledgeService.instance.deleteDocument(doc.id);
       await _loadKnowledge();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l.ai_deleteFailed(e.toString()))));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l.ai_deleteFailed(e.toString()))),
+        );
       }
     }
   }
@@ -1074,29 +1072,26 @@ class _ModelsDialogState extends State<_ModelsDialog> {
   }
 
   Future<void> _deleteModel(AiModelConfig model) async {
-    final confirmed = await showAppDialog<bool>(
-      context,
-      (ctx) {
-        final l = AppLocalizations.of(ctx);
-        return AlertDialog(
-          title: Text(l.ai_deleteModelTitle),
-          content: Text(l.ai_deleteModelConfirm(model.name)),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(l.common_cancel),
+    final confirmed = await showAppDialog<bool>(context, (ctx) {
+      final l = AppLocalizations.of(ctx);
+      return AlertDialog(
+        title: Text(l.ai_deleteModelTitle),
+        content: Text(l.ai_deleteModelConfirm(model.name)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l.common_cancel),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
             ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(ctx).colorScheme.error,
-              ),
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text(l.common_delete),
-            ),
-          ],
-        );
-      },
-    );
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l.common_delete),
+          ),
+        ],
+      );
+    });
     if (confirmed != true) return;
     await AiSettings.removeModel(model.id);
     await _load();
@@ -1119,9 +1114,9 @@ class _ModelsDialogState extends State<_ModelsDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l.ai_mcpStartFailed(e.toString()))));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l.ai_mcpStartFailed(e.toString()))),
+        );
       }
     }
   }
@@ -1217,7 +1212,10 @@ class _ModelsDialogState extends State<_ModelsDialog> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         subtitle: Text(
-                          l.ai_modelSubtitle(model.baseUrl, model.contextWindow),
+                          l.ai_modelSubtitle(
+                            model.baseUrl,
+                            model.contextWindow,
+                          ),
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.outline,
                           ),
@@ -1292,11 +1290,27 @@ class _ModelsDialogState extends State<_ModelsDialog> {
                 ),
               ),
               const SizedBox(height: 8),
-              _milvusField(theme, l.ai_milvusAddress, 'http://localhost:19530', _milvusUriController),
+              _milvusField(
+                theme,
+                l.ai_milvusAddress,
+                'http://localhost:19530',
+                _milvusUriController,
+              ),
               const SizedBox(height: 8),
-              _milvusField(theme, l.ai_milvusToken, l.ai_milvusTokenHint, _milvusTokenController, obscure: true),
+              _milvusField(
+                theme,
+                l.ai_milvusToken,
+                l.ai_milvusTokenHint,
+                _milvusTokenController,
+                obscure: true,
+              ),
               const SizedBox(height: 8),
-              _milvusField(theme, l.ai_milvusCollection, 'xmc_knowledge', _milvusCollectionController),
+              _milvusField(
+                theme,
+                l.ai_milvusCollection,
+                'xmc_knowledge',
+                _milvusCollectionController,
+              ),
               const SizedBox(height: 8),
               Align(
                 alignment: Alignment.centerRight,
@@ -1309,7 +1323,9 @@ class _ModelsDialogState extends State<_ModelsDialog> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.save_outlined, size: 18),
-                  label: Text(_savingMilvus ? l.ai_saving : l.ai_saveConnection),
+                  label: Text(
+                    _savingMilvus ? l.ai_saving : l.ai_saveConnection,
+                  ),
                 ),
               ),
               const SizedBox(height: 6),
@@ -1766,7 +1782,10 @@ class _ModelEditDialogState extends State<_ModelEditDialog> {
               TextField(
                 controller: _nameController,
                 autofocus: !_isEdit,
-                style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
+                style: TextStyle(
+                  fontFamily: FontSettings.instance.terminalFamily,
+                  fontSize: 13,
+                ),
                 decoration: InputDecoration(
                   labelText: '模型名称',
                   hintText: 'deepseek-chat',
@@ -1778,7 +1797,10 @@ class _ModelEditDialogState extends State<_ModelEditDialog> {
               const SizedBox(height: 12),
               TextField(
                 controller: _baseUrlController,
-                style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
+                style: TextStyle(
+                  fontFamily: FontSettings.instance.terminalFamily,
+                  fontSize: 13,
+                ),
                 decoration: InputDecoration(
                   labelText: '服务地址 (Base URL)',
                   hintText: 'https://api.deepseek.com/v1',
@@ -1793,7 +1815,10 @@ class _ModelEditDialogState extends State<_ModelEditDialog> {
                 obscureText: _obscureKey,
                 enableSuggestions: false,
                 autocorrect: false,
-                style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
+                style: TextStyle(
+                  fontFamily: FontSettings.instance.terminalFamily,
+                  fontSize: 13,
+                ),
                 decoration: InputDecoration(
                   labelText: 'API 密钥',
                   hintText: '本地 Ollama 可留空',
@@ -1814,7 +1839,10 @@ class _ModelEditDialogState extends State<_ModelEditDialog> {
                 controller: _contextController,
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
+                style: TextStyle(
+                  fontFamily: FontSettings.instance.terminalFamily,
+                  fontSize: 13,
+                ),
                 decoration: InputDecoration(
                   labelText: '上下文窗口（token）',
                   hintText: '例如 8192 / 32768 / 65536',
@@ -1826,7 +1854,10 @@ class _ModelEditDialogState extends State<_ModelEditDialog> {
               const SizedBox(height: 12),
               TextField(
                 controller: _embeddingController,
-                style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
+                style: TextStyle(
+                  fontFamily: FontSettings.instance.terminalFamily,
+                  fontSize: 13,
+                ),
                 decoration: const InputDecoration(
                   labelText: 'Embedding 模型（可选，知识库用）',
                   hintText: '如 text-embedding-3-small；留空则用模型本身',

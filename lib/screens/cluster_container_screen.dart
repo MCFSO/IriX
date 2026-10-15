@@ -214,8 +214,10 @@ class _ClusterContainerScreenState extends State<ClusterContainerScreen> {
               ListTile(
                 dense: true,
                 leading: const Icon(Icons.add, size: 20),
-                title: Text(l.clusterContainer_addNode,
-                    style: const TextStyle(fontSize: 13)),
+                title: Text(
+                  l.clusterContainer_addNode,
+                  style: const TextStyle(fontSize: 13),
+                ),
                 onTap: _addNode,
               ),
             ],
@@ -247,8 +249,8 @@ class _ClusterContainerScreenState extends State<ClusterContainerScreen> {
             ? (runtime == ContainerRuntime.bastille
                   ? Colors.redAccent
                   : runtime == ContainerRuntime.docker
-                        ? Colors.lightBlue
-                        : Colors.green)
+                  ? Colors.lightBlue
+                  : Colors.green)
             : Colors.grey,
       ),
       title: Text(
@@ -403,10 +405,7 @@ class _RuntimeBadge extends StatelessWidget {
         color: color.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(10),
       ),
-      child: Text(
-        runtime.label,
-        style: TextStyle(fontSize: 11, color: color),
-      ),
+      child: Text(runtime.label, style: TextStyle(fontSize: 11, color: color)),
     );
   }
 }

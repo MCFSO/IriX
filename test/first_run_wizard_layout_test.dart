@@ -32,7 +32,10 @@ void main() {
 
   // 用带本地化代理的 MaterialApp 包裹向导，使其可解析 AppLocalizations。
   // 显式指定 zh，使测试断言的中文文案可匹配。
-  Widget wizardApp({required VoidCallback onSkip, required void Function(bool) onFinish}) {
+  Widget wizardApp({
+    required VoidCallback onSkip,
+    required void Function(bool) onFinish,
+  }) {
     return MaterialApp(
       locale: const Locale('zh'),
       localizationsDelegates: const [
@@ -43,10 +46,7 @@ void main() {
       ],
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
-        body: FirstRunWizardOverlay(
-          onSkip: onSkip,
-          onFinish: onFinish,
-        ),
+        body: FirstRunWizardOverlay(onSkip: onSkip, onFinish: onFinish),
       ),
     );
   }
@@ -56,9 +56,7 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(
-      wizardApp(onSkip: () {}, onFinish: (_) {}),
-    );
+    await tester.pumpWidget(wizardApp(onSkip: () {}, onFinish: (_) {}));
     // 等 initState 的 JDK 已装检测完成
     await tester.pumpAndSettle();
   }
@@ -81,17 +79,12 @@ void main() {
     await pumpWizard(tester, const Size(800, 600));
     // 阻断层存在
     expect(
-      find.byWidgetPredicate(
-        (w) => w is AbsorbPointer && w.absorbing == true,
-      ),
+      find.byWidgetPredicate((w) => w is AbsorbPointer && w.absorbing == true),
       findsWidgets,
     );
     // 左上角跳过按钮：Opacity 0.5 包裹的 TextButton
     final opacityFinder = find.byWidgetPredicate(
-      (w) =>
-          w is Opacity &&
-          w.opacity == 0.5 &&
-          w.child is TextButton,
+      (w) => w is Opacity && w.opacity == 0.5 && w.child is TextButton,
     );
     expect(opacityFinder, findsOneWidget);
     var skipped = false;

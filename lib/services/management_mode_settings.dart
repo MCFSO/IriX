@@ -45,12 +45,9 @@ class ManagementModeSettings {
   }
 
   /// 设置当前管理模式。
-  static Future<void> setMode(ManagementMode mode) =>
-      SettingsRepository.instance.setString(
-        _keyMode,
-        mode.id,
-        label: 'management mode',
-      );
+  static Future<void> setMode(ManagementMode mode) => SettingsRepository
+      .instance
+      .setString(_keyMode, mode.id, label: 'management mode');
 
   /// 获取多机模式的监控节点 id（可空）。
   static Future<String?> getMonitorNodeId() async {

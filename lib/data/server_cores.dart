@@ -30,8 +30,9 @@ enum CoreCategory {
   final String displayNameEn;
 
   /// 根据当前界面语言返回展示名称。
-  String get displayName =>
-      LocaleSettings.instance.localeCode == 'en' ? displayNameEn : displayNameZh;
+  String get displayName => LocaleSettings.instance.localeCode == 'en'
+      ? displayNameEn
+      : displayNameZh;
 }
 
 /// 单个核心版本的下载信息。
@@ -235,7 +236,8 @@ const List<ServerCore> serverCores = [
     name: 'Mint',
     category: CoreCategory.plugin,
     scenarioZh: '多核高性能服务器，追求原版特性还原的大型服',
-    scenarioEn: 'Multi-core high-performance server, large vanilla-faithful server',
+    scenarioEn:
+        'Multi-core high-performance server, large vanilla-faithful server',
     versions: [],
   ),
   ServerCore(

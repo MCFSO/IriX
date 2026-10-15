@@ -214,7 +214,11 @@ class HangarVersion {
               .toList() ??
           const <String>[];
       platformDownloads.add(
-        HangarPlatformDownload.fromJson(platformJson, platformKey, gameVersions),
+        HangarPlatformDownload.fromJson(
+          platformJson,
+          platformKey,
+          gameVersions,
+        ),
       );
     }
     return HangarVersion(

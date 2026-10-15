@@ -265,9 +265,9 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
       _refreshCurrent();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l.dbDetail_connectionFailed(e.toString()))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.dbDetail_connectionFailed(e.toString()))),
+      );
     }
   }
 
@@ -299,17 +299,15 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
         password: creds.password,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l.dbDetail_databaseCreated(creds.database))),
       );
       _loadDatabases();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l.dbDetail_createFailed(e.toString()))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.dbDetail_createFailed(e.toString()))),
+      );
     }
   }
 
@@ -339,9 +337,7 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
     try {
       await _service.dropDatabase(_connection, database);
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l.dbDetail_databaseDeleted(database))),
       );
       if (_selectedDb == database) {
@@ -351,9 +347,9 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
       _loadDatabases();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l.dbDetail_deleteFailed(e.toString()))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.dbDetail_deleteFailed(e.toString()))),
+      );
     }
   }
 
@@ -408,9 +404,9 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
       _loadRedisKeys();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l.dbDetail_deleteFailed(e.toString()))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.dbDetail_deleteFailed(e.toString()))),
+      );
     }
   }
 
@@ -453,17 +449,15 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
         host: creds.host,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l.dbDetail_userCreated(creds.username))),
       );
       _loadUsers();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l.dbDetail_createFailed(e.toString()))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.dbDetail_createFailed(e.toString()))),
+      );
     }
   }
 
@@ -498,17 +492,15 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
         host: user.host,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l.dbDetail_userDeleted(user.username))),
       );
       _loadUsers();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l.dbDetail_deleteFailed(e.toString()))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.dbDetail_deleteFailed(e.toString()))),
+      );
     }
   }
 
@@ -571,7 +563,10 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
                   color: theme.colorScheme.primary,
                 ),
                 const SizedBox(width: 8),
-                Text(l.dbDetail_connectionInfo, style: theme.textTheme.titleMedium),
+                Text(
+                  l.dbDetail_connectionInfo,
+                  style: theme.textTheme.titleMedium,
+                ),
                 const Spacer(),
                 Container(
                   width: 8,
@@ -590,9 +585,15 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
             ),
             const SizedBox(height: 12),
             _infoRow(l.dbDetail_type, _connection.type.label),
-            _infoRow(l.dbDetail_address, '${_connection.host}:${_connection.port}'),
+            _infoRow(
+              l.dbDetail_address,
+              '${_connection.host}:${_connection.port}',
+            ),
             _infoRow(l.dbDetail_user, _connection.username ?? '-'),
-            _infoRow(l.dbDetail_database, _connection.databaseName ?? l.dbDetail_none),
+            _infoRow(
+              l.dbDetail_database,
+              _connection.databaseName ?? l.dbDetail_none,
+            ),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -661,7 +662,10 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
                   color: theme.colorScheme.primary,
                 ),
                 const SizedBox(width: 8),
-                Text(l.dbDetail_userManagement, style: theme.textTheme.titleMedium),
+                Text(
+                  l.dbDetail_userManagement,
+                  style: theme.textTheme.titleMedium,
+                ),
                 const Spacer(),
                 if (!_isRedis)
                   FilledButton.tonalIcon(
@@ -1028,9 +1032,9 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
       if (affected > 0) _loadRows();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l.dbDetail_saveFailed(e.toString()))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.dbDetail_saveFailed(e.toString()))),
+      );
     }
   }
 
@@ -1053,9 +1057,9 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
       _loadRows();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l.dbDetail_addFailed(e.toString()))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.dbDetail_addFailed(e.toString()))),
+      );
     }
   }
 
@@ -1088,15 +1092,15 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
     try {
       final affected = await _service.deleteRow(_connection, db, table, row);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.dbDetail_rowsDeleted(affected))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l.dbDetail_rowsDeleted(affected))));
       _loadRows();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l.dbDetail_deleteFailed(e.toString()))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.dbDetail_deleteFailed(e.toString()))),
+      );
     }
   }
 
@@ -1194,7 +1198,10 @@ class _DatabaseDetailScreenState extends State<DatabaseDetailScreen> {
         leading: Icon(Icons.key, color: Theme.of(context).colorScheme.primary),
         title: Text(
           key,
-          style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
+          style: TextStyle(
+            fontFamily: FontSettings.instance.terminalFamily,
+            fontSize: 13,
+          ),
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1622,7 +1629,10 @@ class _SqlDialogState extends State<_SqlDialog> {
             TextField(
               controller: _sqlController,
               maxLines: 6,
-              style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
+              style: TextStyle(
+                fontFamily: FontSettings.instance.terminalFamily,
+                fontSize: 13,
+              ),
               onChanged: (_) => setState(() {}),
               decoration: const InputDecoration(
                 hintText: 'SELECT * FROM table_name WHERE ...',
@@ -1679,7 +1689,10 @@ class _SqlDialogState extends State<_SqlDialog> {
         isDense: true,
       ),
       items: [
-        DropdownMenuItem<String?>(value: null, child: Text(l.dbDetail_selectDatabase)),
+        DropdownMenuItem<String?>(
+          value: null,
+          child: Text(l.dbDetail_selectDatabase),
+        ),
         for (final db in widget.databases)
           DropdownMenuItem<String?>(value: db, child: Text(db)),
       ],
@@ -1779,9 +1792,9 @@ class _RedisValueDialogState extends State<_RedisValueDialog> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _deleting = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l.dbDetail_deleteFailed(e.toString()))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.dbDetail_deleteFailed(e.toString()))),
+      );
     }
   }
 
@@ -1792,7 +1805,10 @@ class _RedisValueDialogState extends State<_RedisValueDialog> {
     return AlertDialog(
       title: Text(
         widget.keyName,
-        style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 14),
+        style: TextStyle(
+          fontFamily: FontSettings.instance.terminalFamily,
+          fontSize: 14,
+        ),
         overflow: TextOverflow.ellipsis,
       ),
       content: SizedBox(width: 480, height: 320, child: _buildContent(theme)),
@@ -1908,7 +1924,10 @@ class _RedisAddKeyDialogState extends State<_RedisAddKeyDialog> {
           TextField(
             controller: _keyController,
             autofocus: true,
-            style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
+            style: TextStyle(
+              fontFamily: FontSettings.instance.terminalFamily,
+              fontSize: 13,
+            ),
             decoration: InputDecoration(
               labelText: l.dbDetail_keyName,
               border: const OutlineInputBorder(),
@@ -1919,7 +1938,10 @@ class _RedisAddKeyDialogState extends State<_RedisAddKeyDialog> {
           TextField(
             controller: _valueController,
             maxLines: 3,
-            style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
+            style: TextStyle(
+              fontFamily: FontSettings.instance.terminalFamily,
+              fontSize: 13,
+            ),
             decoration: InputDecoration(
               labelText: l.dbDetail_value,
               border: const OutlineInputBorder(),
@@ -2025,7 +2047,10 @@ class _CreateUserDialogState extends State<_CreateUserDialog> {
               TextField(
                 controller: _usernameController,
                 autofocus: true,
-                style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
+                style: TextStyle(
+                  fontFamily: FontSettings.instance.terminalFamily,
+                  fontSize: 13,
+                ),
                 decoration: InputDecoration(
                   labelText: l.dbDetail_username,
                   border: const OutlineInputBorder(),
@@ -2046,7 +2071,10 @@ class _CreateUserDialogState extends State<_CreateUserDialog> {
                 const SizedBox(height: 12),
                 TextField(
                   controller: _hostController,
-                  style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
+                  style: TextStyle(
+                    fontFamily: FontSettings.instance.terminalFamily,
+                    fontSize: 13,
+                  ),
                   decoration: InputDecoration(
                     labelText: l.dbDetail_loginHost,
                     hintText: l.dbDetail_loginHostHint,
@@ -2212,7 +2240,10 @@ class _CreateDatabaseDialogState extends State<_CreateDatabaseDialog> {
                 ),
               ),
               const SizedBox(height: 16),
-              Text(l.dbDetail_databaseAccount, style: theme.textTheme.titleSmall),
+              Text(
+                l.dbDetail_databaseAccount,
+                style: theme.textTheme.titleSmall,
+              ),
               const SizedBox(height: 8),
               SegmentedButton<bool>(
                 segments: [
@@ -2242,7 +2273,11 @@ class _CreateDatabaseDialogState extends State<_CreateDatabaseDialog> {
                 Row(
                   children: [
                     Expanded(
-                      child: _readOnlyField(l.dbDetail_password, _generatedPassword, true),
+                      child: _readOnlyField(
+                        l.dbDetail_password,
+                        _generatedPassword,
+                        true,
+                      ),
                     ),
                     const SizedBox(width: 8),
                     IconButton(
@@ -2358,17 +2393,15 @@ class _DbUserManagementDialogState extends State<_DbUserManagementDialog> {
         host: creds.host,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l.dbDetail_userCreated(creds.username))),
       );
       _loadUsers();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l.dbDetail_createFailed(e.toString()))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.dbDetail_createFailed(e.toString()))),
+      );
     }
   }
 
@@ -2403,17 +2436,15 @@ class _DbUserManagementDialogState extends State<_DbUserManagementDialog> {
         host: user.host,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l.dbDetail_userDeleted(user.username))),
       );
       _loadUsers();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l.dbDetail_deleteFailed(e.toString()))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.dbDetail_deleteFailed(e.toString()))),
+      );
     }
   }
 

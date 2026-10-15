@@ -15,16 +15,12 @@ class DeveloperSettings {
 
   /// 读取开发者模式开关；未设置时返回 false。
   static Future<bool> isEnabled() => SettingsRepository.instance.getBoolInt(
-        _keyEnabled,
-        defaultValue: false,
-        label: 'developer mode',
-      );
+    _keyEnabled,
+    defaultValue: false,
+    label: 'developer mode',
+  );
 
   /// 设置开发者模式开关。
-  static Future<void> setEnabled(bool enabled) =>
-      SettingsRepository.instance.setBoolInt(
-        _keyEnabled,
-        enabled,
-        label: 'developer mode',
-      );
+  static Future<void> setEnabled(bool enabled) => SettingsRepository.instance
+      .setBoolInt(_keyEnabled, enabled, label: 'developer mode');
 }

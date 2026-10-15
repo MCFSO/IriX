@@ -406,9 +406,7 @@ class _PluginDetailScreenState extends State<PluginDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          _plugin?.name.isNotEmpty == true ? _plugin!.name : '插件详情',
-        ),
+        title: Text(_plugin?.name.isNotEmpty == true ? _plugin!.name : '插件详情'),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())

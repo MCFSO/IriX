@@ -150,26 +150,23 @@ class _FrpScreenState extends State<FrpScreen> {
   }
 
   Future<void> _logout() async {
-    final confirmed = await showAppDialog<bool>(
-      context,
-      (ctx) {
-        final l = AppLocalizations.of(ctx);
-        return AlertDialog(
-          title: Text(l.frp_logoutTitle),
-          content: Text(l.frp_logoutConfirm),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(l.common_cancel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text(l.frp_logout),
-            ),
-          ],
-        );
-      },
-    );
+    final confirmed = await showAppDialog<bool>(context, (ctx) {
+      final l = AppLocalizations.of(ctx);
+      return AlertDialog(
+        title: Text(l.frp_logoutTitle),
+        content: Text(l.frp_logoutConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l.common_cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l.frp_logout),
+          ),
+        ],
+      );
+    });
     if (confirmed != true) return;
     await _provider.logout();
     if (!mounted) return;
@@ -207,29 +204,26 @@ class _FrpScreenState extends State<FrpScreen> {
 
   Future<void> _deleteTunnel(FrpTunnel tunnel) async {
     final l = AppLocalizations.of(context);
-    final confirmed = await showAppDialog<bool>(
-      context,
-      (ctx) {
-        final l = AppLocalizations.of(ctx);
-        return AlertDialog(
-          title: Text(l.frp_deleteTunnelTitle),
-          content: Text(l.frp_deleteTunnelConfirm(tunnel.name)),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(l.common_cancel),
+    final confirmed = await showAppDialog<bool>(context, (ctx) {
+      final l = AppLocalizations.of(ctx);
+      return AlertDialog(
+        title: Text(l.frp_deleteTunnelTitle),
+        content: Text(l.frp_deleteTunnelConfirm(tunnel.name)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l.common_cancel),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
             ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(ctx).colorScheme.error,
-              ),
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text(l.common_delete),
-            ),
-          ],
-        );
-      },
-    );
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l.common_delete),
+          ),
+        ],
+      );
+    });
     if (confirmed != true) return;
     try {
       await _provider.deleteTunnel(tunnel.id);
@@ -255,9 +249,9 @@ class _FrpScreenState extends State<FrpScreen> {
         await _provider.startTunnel(tunnel.id);
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l.frp_startFailed(e.toString()))));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l.frp_startFailed(e.toString()))),
+        );
       }
     }
     if (!mounted) return;
@@ -490,7 +484,11 @@ class _FrpScreenState extends State<FrpScreen> {
             FilledButton.icon(
               onPressed: _login,
               icon: const Icon(Icons.login, size: 18),
-              label: Text(isCustom ? l.frp_configFrps : '${l.frp_login} ${_provider.label}'),
+              label: Text(
+                isCustom
+                    ? l.frp_configFrps
+                    : '${l.frp_login} ${_provider.label}',
+              ),
             ),
             if (isChmlFrp) ...[
               const SizedBox(height: 4),
@@ -766,7 +764,11 @@ class _FrpScreenState extends State<FrpScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                l.frp_localMapping(tunnel.localAddr, tunnel.localPort, remoteText),
+                l.frp_localMapping(
+                  tunnel.localAddr,
+                  tunnel.localPort,
+                  remoteText,
+                ),
                 style: theme.textTheme.bodySmall,
               ),
               if (tunnel.remoteAddress.isNotEmpty) ...[
@@ -1089,7 +1091,10 @@ class _CustomLoginDialogState extends State<_CustomLoginDialog> {
               TextField(
                 controller: _serverController,
                 autofocus: true,
-                style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
+                style: TextStyle(
+                  fontFamily: FontSettings.instance.terminalFamily,
+                  fontSize: 13,
+                ),
                 decoration: InputDecoration(
                   labelText: l.frp_serverAddress,
                   hintText: 'frps.example.com:7000',
@@ -1102,7 +1107,10 @@ class _CustomLoginDialogState extends State<_CustomLoginDialog> {
               TextField(
                 controller: _tokenController,
                 obscureText: true,
-                style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
+                style: TextStyle(
+                  fontFamily: FontSettings.instance.terminalFamily,
+                  fontSize: 13,
+                ),
                 decoration: InputDecoration(
                   labelText: l.frp_authToken,
                   hintText: l.frp_authTokenHint,
@@ -1278,7 +1286,10 @@ class _ChmlFrpLoginDialogState extends State<_ChmlFrpLoginDialog> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                     const SizedBox(width: 8),
-                    Text(l.frp_waitingBrowserAuth, style: theme.textTheme.bodySmall),
+                    Text(
+                      l.frp_waitingBrowserAuth,
+                      style: theme.textTheme.bodySmall,
+                    ),
                   ],
                 ),
               ],
@@ -1372,7 +1383,10 @@ class _SakuraFrpLoginDialogState extends State<_SakuraFrpLoginDialog> {
                 obscureText: _obscureToken,
                 enableSuggestions: false,
                 autocorrect: false,
-                style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 12),
+                style: TextStyle(
+                  fontFamily: FontSettings.instance.terminalFamily,
+                  fontSize: 12,
+                ),
                 decoration: InputDecoration(
                   labelText: l.frp_accessToken,
                   hintText: l.frp_accessTokenHint,
@@ -1486,7 +1500,10 @@ class _HayFrpLoginDialogState extends State<_HayFrpLoginDialog> {
               TextField(
                 controller: _usernameController,
                 autofocus: true,
-                style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
+                style: TextStyle(
+                  fontFamily: FontSettings.instance.terminalFamily,
+                  fontSize: 13,
+                ),
                 decoration: InputDecoration(
                   labelText: l.frp_usernameOrEmail,
                   border: const OutlineInputBorder(),
@@ -1498,7 +1515,10 @@ class _HayFrpLoginDialogState extends State<_HayFrpLoginDialog> {
               TextField(
                 controller: _passwordController,
                 obscureText: true,
-                style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
+                style: TextStyle(
+                  fontFamily: FontSettings.instance.terminalFamily,
+                  fontSize: 13,
+                ),
                 onSubmitted: (_) => _login(),
                 decoration: InputDecoration(
                   labelText: l.frp_password,
@@ -1699,7 +1719,10 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
             children: [
               TextField(
                 controller: _nameController,
-                style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
+                style: TextStyle(
+                  fontFamily: FontSettings.instance.terminalFamily,
+                  fontSize: 13,
+                ),
                 decoration: InputDecoration(
                   labelText: l.frp_tunnelName,
                   hintText: l.frp_tunnelNameHint,
@@ -1722,10 +1745,7 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
                   DropdownMenuItem(value: 'udp', child: Text('UDP')),
                   if (widget.provider.supportsWebTunnels) ...[
                     DropdownMenuItem(value: 'http', child: Text('HTTP')),
-                    DropdownMenuItem(
-                      value: 'https',
-                      child: Text('HTTPS'),
-                    ),
+                    DropdownMenuItem(value: 'https', child: Text('HTTPS')),
                   ],
                 ],
                 onChanged: (v) {
@@ -1735,7 +1755,10 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
               const SizedBox(height: 12),
               TextField(
                 controller: _localAddrController,
-                style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
+                style: TextStyle(
+                  fontFamily: FontSettings.instance.terminalFamily,
+                  fontSize: 13,
+                ),
                 decoration: InputDecoration(
                   labelText: l.frp_localAddress,
                   border: OutlineInputBorder(),
@@ -1768,7 +1791,10 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
                   controller: _localPortController,
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
+                  style: TextStyle(
+                    fontFamily: FontSettings.instance.terminalFamily,
+                    fontSize: 13,
+                  ),
                   decoration: InputDecoration(
                     labelText: l.frp_localPort,
                     hintText: l.frp_localPortExample,
@@ -1781,7 +1807,10 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
                 TextField(
                   controller: _localPortController,
                   readOnly: true,
-                  style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
+                  style: TextStyle(
+                    fontFamily: FontSettings.instance.terminalFamily,
+                    fontSize: 13,
+                  ),
                   decoration: InputDecoration(
                     labelText: l.frp_localPortAuto,
                     border: OutlineInputBorder(),
@@ -1795,7 +1824,10 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
                   controller: _remotePortController,
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
+                  style: TextStyle(
+                    fontFamily: FontSettings.instance.terminalFamily,
+                    fontSize: 13,
+                  ),
                   decoration: InputDecoration(
                     labelText: l.frp_remotePortLabel,
                     hintText: l.frp_remotePortHint,
@@ -1807,7 +1839,10 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
                 const SizedBox(height: 12),
                 TextField(
                   controller: _domainController,
-                  style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
+                  style: TextStyle(
+                    fontFamily: FontSettings.instance.terminalFamily,
+                    fontSize: 13,
+                  ),
                   decoration: InputDecoration(
                     labelText: l.frp_bindDomain,
                     border: OutlineInputBorder(),
@@ -1822,7 +1857,10 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
                     child: CheckboxListTile(
                       value: _encrypt,
                       onChanged: (v) => setState(() => _encrypt = v ?? false),
-                      title: Text(l.frp_encrypt, style: const TextStyle(fontSize: 13)),
+                      title: Text(
+                        l.frp_encrypt,
+                        style: const TextStyle(fontSize: 13),
+                      ),
                       dense: true,
                       contentPadding: EdgeInsets.zero,
                       controlAffinity: ListTileControlAffinity.leading,
@@ -1832,7 +1870,10 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
                     child: CheckboxListTile(
                       value: _gzip,
                       onChanged: (v) => setState(() => _gzip = v ?? false),
-                      title: Text(l.frp_compress, style: const TextStyle(fontSize: 13)),
+                      title: Text(
+                        l.frp_compress,
+                        style: const TextStyle(fontSize: 13),
+                      ),
                       dense: true,
                       contentPadding: EdgeInsets.zero,
                       controlAffinity: ListTileControlAffinity.leading,
@@ -1883,7 +1924,10 @@ class _NewTunnelDialogState extends State<_NewTunnelDialog> {
     }
     final nodes = _nodes!;
     if (nodes.isEmpty) {
-      return Text(l.frp_noAvailableNodes, style: TextStyle(color: theme.colorScheme.error));
+      return Text(
+        l.frp_noAvailableNodes,
+        style: TextStyle(color: theme.colorScheme.error),
+      );
     }
     return DropdownButtonFormField<String>(
       initialValue: _selectedNodeId,

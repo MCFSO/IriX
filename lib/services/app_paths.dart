@@ -75,7 +75,8 @@ class AppPaths {
       p.join(await root(), 'cluster_mirrors');
 
   /// 原生插件根目录（插件包解压后按插件 id 分目录存放）。
-  Future<String> pluginsRoot() async => p.join(await root(), 'plugins', 'native');
+  Future<String> pluginsRoot() async =>
+      p.join(await root(), 'plugins', 'native');
 
   /// 临时目录根：Windows 数据根目录不在系统盘时用 `<root>/temp`，
   /// 其余情况（回退文档目录或非 Windows 平台）沿用系统临时目录。
@@ -259,7 +260,10 @@ class AppPaths {
       // 守护进程数据为小文件：复制到新位置，原目录保留作备份。
       final appData = Platform.environment['APPDATA'];
       if (appData != null && appData.isNotEmpty) {
-        await _copyTree(p.join(appData, 'irix-node'), p.join(root, 'irix-node'));
+        await _copyTree(
+          p.join(appData, 'irix-node'),
+          p.join(root, 'irix-node'),
+        );
       }
       // 清理搬空的旧目录（仍有占用文件时删除失败，下次启动重试）。
       try {
@@ -277,16 +281,16 @@ class AppPaths {
   /// 新根目录下的对应路径。
   Future<void> _remapJdkSettings(String legacyJavaRoot) async {
     try {
-      final settings =
-          await DatabaseManager.instance.getSettingsWithPrefix('jdk_home_');
+      final settings = await DatabaseManager.instance.getSettingsWithPrefix(
+        'jdk_home_',
+      );
       final legacyNorm = p.normalize(legacyJavaRoot);
       for (final entry in settings.entries) {
         final norm = p.normalize(entry.value);
         if (norm != legacyNorm && !p.isWithin(legacyNorm, norm)) continue;
         final rel = p.relative(norm, from: legacyNorm);
         final base = await javaRoot();
-        final newPath =
-            (rel == '.' || rel.isEmpty) ? base : p.join(base, rel);
+        final newPath = (rel == '.' || rel.isEmpty) ? base : p.join(base, rel);
         await DatabaseManager.instance.setSetting(entry.key, newPath);
       }
     } catch (e) {

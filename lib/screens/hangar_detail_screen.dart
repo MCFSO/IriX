@@ -91,14 +91,14 @@ class _HangarDetailScreenState extends State<HangarDetailScreen> {
     // 拒绝含路径分隔符/../ 的名称，防止越出实例目录写任意路径。
     final rawName = '${project.slug}-${version.name}-${pd.platform}.jar';
     final filename = p.basename(rawName);
-      if (filename.isEmpty ||
+    if (filename.isEmpty ||
         filename.contains('..') ||
         filename.contains('/') ||
         filename.contains(r'\')) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l.hangar_downloadRejected)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l.hangar_downloadRejected)));
       }
       return;
     }
@@ -172,9 +172,9 @@ class _HangarDetailScreenState extends State<HangarDetailScreen> {
               action: SnackBarAction(
                 label: l.hangar_viewPath,
                 onPressed: () {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text(l.hangar_directory(targetDir))));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(l.hangar_directory(targetDir))),
+                  );
                 },
               ),
             ),
@@ -184,9 +184,9 @@ class _HangarDetailScreenState extends State<HangarDetailScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _downloadProgress.remove(progressKey));
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l.hangar_downloadFailed(e.toString()))));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l.hangar_downloadFailed(e.toString()))),
+        );
       }
     }
   }
@@ -229,7 +229,10 @@ class _HangarDetailScreenState extends State<HangarDetailScreen> {
         const SizedBox(height: 16),
         _buildStats(project),
         const SizedBox(height: 16),
-        Text(l.hangar_description, style: Theme.of(context).textTheme.titleMedium),
+        Text(
+          l.hangar_description,
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
         const SizedBox(height: 8),
         Text(project.description),
         const SizedBox(height: 24),
@@ -288,9 +291,15 @@ class _HangarDetailScreenState extends State<HangarDetailScreen> {
     final l = AppLocalizations.of(context);
     return Row(
       children: [
-        _statItem(Icons.download, '${_formatNumber(project.downloads)} ${l.hangar_downloads}'),
+        _statItem(
+          Icons.download,
+          '${_formatNumber(project.downloads)} ${l.hangar_downloads}',
+        ),
         const SizedBox(width: 16),
-        _statItem(Icons.star, '${_formatNumber(project.stars)} ${l.hangar_stars}'),
+        _statItem(
+          Icons.star,
+          '${_formatNumber(project.stars)} ${l.hangar_stars}',
+        ),
       ],
     );
   }

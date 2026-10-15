@@ -242,11 +242,13 @@ class AiConversation {
 
     final model = await AiSettings.getActiveModel();
     if (model == null) {
-      emit(AiEvent.error(
-        LocaleSettings.instance.localeCode == 'en'
-            ? 'No AI model added yet. Click the top-left button to add one first.'
-            : '尚未添加 AI 模型，请先点击左上角添加模型',
-      ));
+      emit(
+        AiEvent.error(
+          LocaleSettings.instance.localeCode == 'en'
+              ? 'No AI model added yet. Click the top-left button to add one first.'
+              : '尚未添加 AI 模型，请先点击左上角添加模型',
+        ),
+      );
       _running = false;
       return;
     }
@@ -260,11 +262,13 @@ class AiConversation {
         emit(const AiEvent.thinking());
         final message = await service._chatCompletion(_messages, model);
         if (message == null) {
-          emit(AiEvent.error(
-            LocaleSettings.instance.localeCode == 'en'
-                ? 'The model did not respond (empty choices).'
-                : '模型无响应（choices 为空）',
-          ));
+          emit(
+            AiEvent.error(
+              LocaleSettings.instance.localeCode == 'en'
+                  ? 'The model did not respond (empty choices).'
+                  : '模型无响应（choices 为空）',
+            ),
+          );
           break;
         }
         // 保留完整 assistant 消息（含 tool_calls）作为上下文。
@@ -292,12 +296,14 @@ class AiConversation {
               'tool_call_id': tc['id'],
               'content': '未知工具: $name',
             });
-            emit(AiEvent.toolResult(
-              name,
-              LocaleSettings.instance.localeCode == 'en'
-                  ? 'Unknown tool, ignored.'
-                  : '未知工具，已忽略',
-            ));
+            emit(
+              AiEvent.toolResult(
+                name,
+                LocaleSettings.instance.localeCode == 'en'
+                    ? 'Unknown tool, ignored.'
+                    : '未知工具，已忽略',
+              ),
+            );
             continue;
           }
 
@@ -329,9 +335,11 @@ class AiConversation {
         }
       }
       if (_cancelled) {
-        emit(AiEvent.text(
-          LocaleSettings.instance.localeCode == 'en' ? 'Stopped.' : '已停止。',
-        ));
+        emit(
+          AiEvent.text(
+            LocaleSettings.instance.localeCode == 'en' ? 'Stopped.' : '已停止。',
+          ),
+        );
       } else {
         // 根据上下文窗口压缩过长的对话历史。
         await _compressIfNeeded(emit);
@@ -416,10 +424,7 @@ class AiAssistantService {
 
     final endpoint = _endpoint(model.baseUrl);
     final host = Uri.tryParse(endpoint)?.host ?? endpoint;
-    DevLog.instance.devAction(
-      'ai',
-      'AI 请求 model=${model.name} host=$host',
-    );
+    DevLog.instance.devAction('ai', 'AI 请求 model=${model.name} host=$host');
     final res = await HttpFfiService.instance.post(
       endpoint,
       headers: _headers(model.apiKey),

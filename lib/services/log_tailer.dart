@@ -97,8 +97,7 @@ class LogFileTailer {
       final raf = await file.open(mode: FileMode.read);
       try {
         final length = await raf.length();
-        final start =
-            length > _maxHistoryBytes ? length - _maxHistoryBytes : 0;
+        final start = length > _maxHistoryBytes ? length - _maxHistoryBytes : 0;
         await raf.setPosition(start);
         final bytes = await raf.read(length - start);
         var text = utf8.decode(bytes, allowMalformed: true);
@@ -111,7 +110,11 @@ class LogFileTailer {
         }
         final lines = text
             .split('\n')
-            .map((line) => line.endsWith('\r') ? line.substring(0, line.length - 1) : line)
+            .map(
+              (line) => line.endsWith('\r')
+                  ? line.substring(0, line.length - 1)
+                  : line,
+            )
             .toList();
         // 去除文件末尾换行符产生的空行。
         if (lines.isNotEmpty && lines.last.isEmpty) {

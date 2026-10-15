@@ -187,13 +187,12 @@ class _ImportCoreScreenState extends State<ImportCoreScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.add_box),
-              label: Text(_creating ? l.importCore_creating : l.importCore_createInstance),
+              label: Text(
+                _creating ? l.importCore_creating : l.importCore_createInstance,
+              ),
             ),
             const SizedBox(height: 8),
-            Text(
-              l.importCore_desc,
-              style: theme.textTheme.bodySmall,
-            ),
+            Text(l.importCore_desc, style: theme.textTheme.bodySmall),
           ],
         ),
       ),

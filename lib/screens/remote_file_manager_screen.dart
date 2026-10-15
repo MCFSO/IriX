@@ -149,7 +149,10 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
 
   Future<void> _mkdir() async {
     final l = AppLocalizations.of(context);
-    final name = await _promptText(l.remoteFile_newFolder, l.remoteFile_folderName);
+    final name = await _promptText(
+      l.remoteFile_newFolder,
+      l.remoteFile_folderName,
+    );
     if (name == null || !mounted) return;
     try {
       await widget.client.mkdir(
@@ -271,7 +274,10 @@ class _RemoteFileManagerScreenState extends State<RemoteFileManagerScreen> {
             maxLines: null,
             expands: true,
             textAlignVertical: TextAlignVertical.top,
-            style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 12),
+            style: TextStyle(
+              fontFamily: FontSettings.instance.terminalFamily,
+              fontSize: 12,
+            ),
             decoration: const InputDecoration(border: OutlineInputBorder()),
           ),
         ),
@@ -936,57 +942,57 @@ class _RemoteTrashViewState extends State<RemoteTrashView> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Text(
-                      _error!,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.error,
-                      ),
-                    ),
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  _error!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.error,
                   ),
-                )
-              : _items.isEmpty
-                  ? Center(
-                      child: Text(
-                        '（回收站为空）',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+                ),
+              ),
+            )
+          : _items.isEmpty
+          ? Center(
+              child: Text(
+                '（回收站为空）',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            )
+          : ListView.separated(
+              padding: const EdgeInsets.all(12),
+              itemCount: _items.length,
+              separatorBuilder: (_, _) => const Divider(height: 1),
+              itemBuilder: (_, i) {
+                final item = _items[i];
+                return ListTile(
+                  leading: const Icon(Icons.delete_outline),
+                  title: Text(item.name),
+                  subtitle: Text(
+                    '原路径：${item.originalPath} · '
+                    '${_formatSize(item.size)}',
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.restore),
+                        tooltip: '恢复',
+                        onPressed: () => _restore([item.id]),
                       ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.all(12),
-                      itemCount: _items.length,
-                      separatorBuilder: (_, _) => const Divider(height: 1),
-                      itemBuilder: (_, i) {
-                        final item = _items[i];
-                        return ListTile(
-                          leading: const Icon(Icons.delete_outline),
-                          title: Text(item.name),
-                          subtitle: Text(
-                            '原路径：${item.originalPath} · '
-                            '${_formatSize(item.size)}',
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.restore),
-                                tooltip: '恢复',
-                                onPressed: () => _restore([item.id]),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.delete_forever),
-                                tooltip: '永久删除',
-                                onPressed: () => _empty([item.id]),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_forever),
+                        tooltip: '永久删除',
+                        onPressed: () => _empty([item.id]),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
     );
   }
 

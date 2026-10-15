@@ -70,13 +70,15 @@ class _TrashViewState extends State<TrashView> {
       await _refresh();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.trash_restored(p.basename(item.originalPath)))),
+        SnackBar(
+          content: Text(l.trash_restored(p.basename(item.originalPath))),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l.trash_restoreFailed(e.toString()))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.trash_restoreFailed(e.toString()))),
+      );
     }
   }
 
@@ -87,13 +89,17 @@ class _TrashViewState extends State<TrashView> {
       await _refresh();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.trash_permanentlyDeleted(p.basename(item.originalPath)))),
+        SnackBar(
+          content: Text(
+            l.trash_permanentlyDeleted(p.basename(item.originalPath)),
+          ),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l.trash_deleteFailed(e.toString()))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.trash_deleteFailed(e.toString()))),
+      );
     }
   }
 
@@ -115,7 +121,10 @@ class _TrashViewState extends State<TrashView> {
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(l.trash_purge, style: const TextStyle(color: Colors.red)),
+            child: Text(
+              l.trash_purge,
+              style: const TextStyle(color: Colors.red),
+            ),
           ),
         ],
       ),
@@ -135,9 +144,9 @@ class _TrashViewState extends State<TrashView> {
       ).showSnackBar(SnackBar(content: Text(l.trash_purged)));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l.trash_purgeFailed(e.toString()))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.trash_purgeFailed(e.toString()))),
+      );
     }
   }
 
@@ -219,7 +228,10 @@ class _TrashViewState extends State<TrashView> {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    l.trash_groupHeader(_instanceLabel(entry.key), entry.value.length),
+                    l.trash_groupHeader(
+                      _instanceLabel(entry.key),
+                      entry.value.length,
+                    ),
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -331,7 +343,11 @@ class _TrashEntryCard extends StatelessWidget {
                   value: 'delete',
                   child: Row(
                     children: [
-                      const Icon(Icons.delete_forever, color: Colors.red, size: 20),
+                      const Icon(
+                        Icons.delete_forever,
+                        color: Colors.red,
+                        size: 20,
+                      ),
                       const SizedBox(width: 8),
                       Text(l.trash_permanentlyDelete),
                     ],

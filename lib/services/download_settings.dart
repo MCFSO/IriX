@@ -20,12 +20,12 @@ class DownloadSettings {
 
   /// 获取下载线程数，未设置时返回 [defaultThreads]。
   static Future<int> getThreads() => SettingsRepository.instance.getIntClamped(
-        _keyThreads,
-        defaultValue: defaultThreads,
-        min: minThreads,
-        max: maxThreads,
-        label: 'threads',
-      );
+    _keyThreads,
+    defaultValue: defaultThreads,
+    min: minThreads,
+    max: maxThreads,
+    label: 'threads',
+  );
 
   /// 设置下载线程数，自动 clamp 到合法区间。
   static Future<void> setThreads(int threads) =>

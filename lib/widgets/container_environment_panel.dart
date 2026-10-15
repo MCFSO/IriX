@@ -333,7 +333,10 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
                 ),
                 child: SelectableText(
                   path,
-                  style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 13),
+                  style: TextStyle(
+                    fontFamily: FontSettings.instance.terminalFamily,
+                    fontSize: 13,
+                  ),
                 ),
               ),
             ],
@@ -476,7 +479,8 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    _env!.errorMessage ?? l.container_envLabel(widget.backend.displayName),
+                    _env!.errorMessage ??
+                        l.container_envLabel(widget.backend.displayName),
                     style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                   ),
                 ),
@@ -492,16 +496,40 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
           controller: _tabController,
           tabs: _isBastille
               ? [
-                  Tab(icon: const Icon(Icons.inventory_2), text: l.container_tabContainers),
-                  Tab(icon: const Icon(Icons.image), text: l.container_tabRelease),
-                  Tab(icon: const Icon(Icons.swap_horiz), text: l.container_tabForward),
-                  Tab(icon: const Icon(Icons.settings), text: l.container_tabSettings),
+                  Tab(
+                    icon: const Icon(Icons.inventory_2),
+                    text: l.container_tabContainers,
+                  ),
+                  Tab(
+                    icon: const Icon(Icons.image),
+                    text: l.container_tabRelease,
+                  ),
+                  Tab(
+                    icon: const Icon(Icons.swap_horiz),
+                    text: l.container_tabForward,
+                  ),
+                  Tab(
+                    icon: const Icon(Icons.settings),
+                    text: l.container_tabSettings,
+                  ),
                 ]
               : [
-                  Tab(icon: const Icon(Icons.inventory_2), text: l.container_tabContainers),
-                  Tab(icon: const Icon(Icons.image), text: l.container_tabImages),
-                  Tab(icon: const Icon(Icons.storage), text: l.container_tabVolumes),
-                  Tab(icon: const Icon(Icons.hub), text: l.container_tabNetworks),
+                  Tab(
+                    icon: const Icon(Icons.inventory_2),
+                    text: l.container_tabContainers,
+                  ),
+                  Tab(
+                    icon: const Icon(Icons.image),
+                    text: l.container_tabImages,
+                  ),
+                  Tab(
+                    icon: const Icon(Icons.storage),
+                    text: l.container_tabVolumes,
+                  ),
+                  Tab(
+                    icon: const Icon(Icons.hub),
+                    text: l.container_tabNetworks,
+                  ),
                 ],
         ),
         Expanded(
@@ -578,7 +606,11 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
               FilledButton.icon(
                 onPressed: _openCreateDialog,
                 icon: const Icon(Icons.add, size: 18),
-                label: Text(_isBastille ? l.container_createJail : l.container_createContainer),
+                label: Text(
+                  _isBastille
+                      ? l.container_createJail
+                      : l.container_createContainer,
+                ),
               ),
             ],
           ),
@@ -588,7 +620,13 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
           child: _containersLoading
               ? const Center(child: CircularProgressIndicator())
               : _containers.isEmpty
-              ? Center(child: Text(_isBastille ? l.container_noJails : l.container_noContainers))
+              ? Center(
+                  child: Text(
+                    _isBastille
+                        ? l.container_noJails
+                        : l.container_noContainers,
+                  ),
+                )
               : ListView.builder(
                   itemCount: _containers.length,
                   itemBuilder: (context, index) {
@@ -639,7 +677,9 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
           child: Row(
             children: [
               Text(
-                isBastille ? l.container_bootstrappedReleases : l.container_imageList,
+                isBastille
+                    ? l.container_bootstrappedReleases
+                    : l.container_imageList,
                 style: Theme.of(context).textTheme.titleSmall,
               ),
               const Spacer(),
@@ -651,7 +691,9 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
               FilledButton.tonalIcon(
                 onPressed: _openPullImageDialog,
                 icon: const Icon(Icons.download, size: 18),
-                label: Text(isBastille ? l.container_bootstrap : l.container_pull),
+                label: Text(
+                  isBastille ? l.container_bootstrap : l.container_pull,
+                ),
               ),
               if (!isBastille) ...[
                 const SizedBox(width: 8),
@@ -671,9 +713,7 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
               : _images.isEmpty
               ? Center(
                   child: Text(
-                    isBastille
-                        ? l.container_noReleases
-                        : l.container_noImages,
+                    isBastille ? l.container_noReleases : l.container_noImages,
                   ),
                 )
               : ListView.builder(
@@ -746,9 +786,13 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
     final name = await showAppDialog<String>(
       context,
       (_) => _TextInputDialog(
-        title: isBastille ? l.container_bootstrapRelease : l.container_pullImage,
+        title: isBastille
+            ? l.container_bootstrapRelease
+            : l.container_pullImage,
         label: isBastille ? l.container_releaseName : l.container_imageName,
-        hint: isBastille ? l.container_releaseNameHint : l.container_imageNameHint,
+        hint: isBastille
+            ? l.container_releaseNameHint
+            : l.container_imageNameHint,
       ),
     );
     if (name == null || name.trim().isEmpty || !mounted) return;
@@ -919,7 +963,12 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
           title: l.container_setupFirewallTitle,
           description: l.container_setupFirewallDesc,
           fields: [
-            ('extIf', l.container_setupFieldExtIf, l.container_setupFieldExtIfHint, ''),
+            (
+              'extIf',
+              l.container_setupFieldExtIf,
+              l.container_setupFieldExtIfHint,
+              '',
+            ),
           ],
           runLabel: l.container_setupFirewallRun,
         ),
@@ -931,9 +980,24 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
           title: l.container_setupVnetTitle,
           description: l.container_setupVnetDesc,
           fields: [
-            ('extIf', l.container_setupFieldExtIf, l.container_setupFieldExtIfHint, ''),
-            ('tunIf', l.container_setupFieldTunIf, l.container_setupFieldTunIfHint, 'bastille0'),
-            ('addr', l.container_setupFieldAddr, l.container_setupFieldAddrHint, '10.99.0.0/24'),
+            (
+              'extIf',
+              l.container_setupFieldExtIf,
+              l.container_setupFieldExtIfHint,
+              '',
+            ),
+            (
+              'tunIf',
+              l.container_setupFieldTunIf,
+              l.container_setupFieldTunIfHint,
+              'bastille0',
+            ),
+            (
+              'addr',
+              l.container_setupFieldAddr,
+              l.container_setupFieldAddrHint,
+              '10.99.0.0/24',
+            ),
           ],
           runLabel: l.container_setupVnetRun,
         ),
@@ -955,7 +1019,12 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
           title: l.container_setupSharedTitle,
           description: l.container_setupSharedDesc,
           fields: [
-            ('extIf', l.container_setupFieldNic, l.container_setupFieldExtIfHint, ''),
+            (
+              'extIf',
+              l.container_setupFieldNic,
+              l.container_setupFieldExtIfHint,
+              '',
+            ),
           ],
           runLabel: l.container_setupSharedRun,
         ),
@@ -983,7 +1052,10 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
           child: Row(
             children: [
-              Text(l.container_volumeList, style: Theme.of(context).textTheme.titleSmall),
+              Text(
+                l.container_volumeList,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
               const Spacer(),
               IconButton(
                 icon: const Icon(Icons.refresh),
@@ -1015,7 +1087,9 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
                             context,
                             (_) => AlertDialog(
                               title: Text(l.container_deleteVolume),
-                              content: Text(l.container_deleteVolumeConfirm(volume.name)),
+                              content: Text(
+                                l.container_deleteVolumeConfirm(volume.name),
+                              ),
                               actions: [
                                 TextButton(
                                   onPressed: () =>
@@ -1059,7 +1133,10 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
           child: Row(
             children: [
-              Text(l.container_networkList, style: Theme.of(context).textTheme.titleSmall),
+              Text(
+                l.container_networkList,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
               const Spacer(),
               IconButton(
                 icon: const Icon(Icons.refresh),
@@ -1198,11 +1275,20 @@ class _ContainerTile extends StatelessWidget {
             itemBuilder: (context) => [
               PopupMenuItem(value: 'restart', child: Text(l.container_restart)),
               PopupMenuItem(value: 'clone', child: Text(l.container_clone)),
-              PopupMenuItem(value: 'limits', child: Text(l.container_resourceLimit)),
+              PopupMenuItem(
+                value: 'limits',
+                child: Text(l.container_resourceLimit),
+              ),
               if (onManage != null)
-                PopupMenuItem(value: 'manage', child: Text(l.container_manageDetail)),
+                PopupMenuItem(
+                  value: 'manage',
+                  child: Text(l.container_manageDetail),
+                ),
               if (onExport != null)
-                PopupMenuItem(value: 'export', child: Text(l.container_exportArchive)),
+                PopupMenuItem(
+                  value: 'export',
+                  child: Text(l.container_exportArchive),
+                ),
               PopupMenuItem(value: 'remove', child: Text(l.common_delete)),
             ],
           ),
@@ -1521,7 +1607,11 @@ class _CreateContainerDialogState extends State<_CreateContainerDialog> {
     if (name.isEmpty || (!isEmptyJail && image.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(isEmptyJail ? l.container_enterJailName : l.container_nameAndImageRequired),
+          content: Text(
+            isEmptyJail
+                ? l.container_enterJailName
+                : l.container_nameAndImageRequired,
+          ),
         ),
       );
       return;
@@ -1530,23 +1620,23 @@ class _CreateContainerDialogState extends State<_CreateContainerDialog> {
       // Bastille 的 jail 名不允许含点号与斜杠等字符，且不能为纯数字
       // （纯数字会被 jail(8) 当作 jid 解析）。
       if (!RegExp(r'^(?=.*[a-zA-Z])[a-zA-Z0-9_-]+$').hasMatch(name)) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l.container_jailNameRule)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l.container_jailNameRule)));
         return;
       }
       // Bastille 的 NAME / RELEASE / IP 需显式声明（empty 仅 NAME；VNET 另有 --no-ip）。
       if (!isEmptyJail && _ipController.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l.container_jailIpRequired)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l.container_jailIpRequired)));
         return;
       }
       // Linux Jail 与任何 VNET 模式互斥。
       if (_jailType == 'linux' && _vnetMode != 'none') {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l.container_linuxVnetConflict)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l.container_linuxVnetConflict)));
         return;
       }
       if (_vnetMode != 'none') {
@@ -1554,16 +1644,18 @@ class _CreateContainerDialogState extends State<_CreateContainerDialog> {
         if (_interfaceController.text.trim().isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(_vnetMode == 'bridge' ? l.container_enterBridgeNic : l.container_enterPhysicalNic),
+              content: Text(
+                _vnetMode == 'bridge'
+                    ? l.container_enterBridgeNic
+                    : l.container_enterPhysicalNic,
+              ),
             ),
           );
           return;
         }
         if (!_ipController.text.contains('/')) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(l.container_vnetIpMustContainMask),
-            ),
+            SnackBar(content: Text(l.container_vnetIpMustContainMask)),
           );
           return;
         }
@@ -1572,9 +1664,9 @@ class _CreateContainerDialogState extends State<_CreateContainerDialog> {
     final ports = _splitList(_portsController.text);
     for (final port in ports) {
       if (!RegExp(r'^\d+:\d+$').hasMatch(port)) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l.container_portFormatError(port))));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l.container_portFormatError(port))),
+        );
         return;
       }
     }
@@ -1619,7 +1711,9 @@ class _CreateContainerDialogState extends State<_CreateContainerDialog> {
     final theme = Theme.of(context);
     final isBastille = widget.isBastille;
     return AlertDialog(
-      title: Text(isBastille ? l.container_createJail : l.container_createContainer),
+      title: Text(
+        isBastille ? l.container_createJail : l.container_createContainer,
+      ),
       content: SizedBox(
         width: 520,
         child: SingleChildScrollView(
@@ -1639,7 +1733,9 @@ class _CreateContainerDialogState extends State<_CreateContainerDialog> {
                     : null,
                 decoration: InputDecoration(
                   labelText: l.common_name,
-                  helperText: isBastille ? l.container_nameHelperBastille : null,
+                  helperText: isBastille
+                      ? l.container_nameHelperBastille
+                      : null,
                   isDense: true,
                   border: const OutlineInputBorder(),
                 ),
@@ -1648,7 +1744,9 @@ class _CreateContainerDialogState extends State<_CreateContainerDialog> {
               TextField(
                 controller: _imageController,
                 decoration: InputDecoration(
-                  labelText: isBastille ? l.container_release : l.container_image,
+                  labelText: isBastille
+                      ? l.container_release
+                      : l.container_image,
                   helperText: isBastille
                       ? l.container_releaseHelper
                       : l.container_imageHelper,
@@ -1796,7 +1894,9 @@ class _CreateContainerDialogState extends State<_CreateContainerDialog> {
               TextField(
                 controller: _volumesController,
                 decoration: InputDecoration(
-                  labelText: isBastille ? l.container_dataMount : l.container_volumeMount,
+                  labelText: isBastille
+                      ? l.container_dataMount
+                      : l.container_volumeMount,
                   helperText: isBastille
                       ? l.container_dataMountHelper
                       : l.container_volumeMountHelper,
@@ -1826,7 +1926,10 @@ class _CreateContainerDialogState extends State<_CreateContainerDialog> {
                     border: const OutlineInputBorder(),
                   ),
                   items: [
-                    DropdownMenuItem(value: 'no', child: Text(l.container_restartNo)),
+                    DropdownMenuItem(
+                      value: 'no',
+                      child: Text(l.container_restartNo),
+                    ),
                     DropdownMenuItem(
                       value: 'unless-stopped',
                       child: Text(l.container_restartUnlessStopped),
@@ -1926,7 +2029,9 @@ class _CreateContainerDialogState extends State<_CreateContainerDialog> {
         FilledButton.icon(
           onPressed: _submit,
           icon: const Icon(Icons.add),
-          label: Text(isBastille ? l.container_createJail : l.container_createContainer),
+          label: Text(
+            isBastille ? l.container_createJail : l.container_createContainer,
+          ),
         ),
       ],
     );
@@ -1992,7 +2097,9 @@ class _CloneDialogState extends State<_CloneDialog> {
                   : null,
               decoration: InputDecoration(
                 labelText: l.container_newName,
-                helperText: widget.isBastille ? l.container_notPureNumber : null,
+                helperText: widget.isBastille
+                    ? l.container_notPureNumber
+                    : null,
                 isDense: true,
                 border: const OutlineInputBorder(),
               ),
@@ -2023,9 +2130,9 @@ class _CloneDialogState extends State<_CloneDialog> {
             if (name.isEmpty) return;
             if (widget.isBastille &&
                 !RegExp(r'^(?=.*[a-zA-Z])[a-zA-Z0-9_-]+$').hasMatch(name)) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(l.container_jailNameRule)),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(l.container_jailNameRule)));
               return;
             }
             Navigator.pop(
@@ -2476,7 +2583,9 @@ class _SetupCardState extends State<_SetupCard> {
       final l = AppLocalizations.of(context);
       setState(() {
         _resultOk = result.ok;
-        _result = result.detail ?? (result.ok ? l.container_initDone : l.container_initFailed);
+        _result =
+            result.detail ??
+            (result.ok ? l.container_initDone : l.container_initFailed);
       });
     } on ContainerBackendException catch (e) {
       if (!mounted) return;
@@ -2657,7 +2766,10 @@ class _BuildImageDialogState extends State<_BuildImageDialog> {
             TextField(
               controller: _dockerfileController,
               maxLines: 12,
-              style: TextStyle(fontFamily: FontSettings.instance.terminalFamily, fontSize: 12),
+              style: TextStyle(
+                fontFamily: FontSettings.instance.terminalFamily,
+                fontSize: 12,
+              ),
               decoration: InputDecoration(
                 labelText: l.container_dockerfile,
                 alignLabelWithHint: true,

@@ -337,7 +337,10 @@ class _ClusterOrchestrationScreenState
                       ),
                     if (_migrations.isNotEmpty) ...[
                       const SizedBox(height: 16),
-                      Text(l.clusterOrch_migrationTasks, style: theme.textTheme.titleSmall),
+                      Text(
+                        l.clusterOrch_migrationTasks,
+                        style: theme.textTheme.titleSmall,
+                      ),
                       const SizedBox(height: 8),
                       for (final job in _migrations)
                         _MigrationTile(
@@ -478,10 +481,16 @@ class _ServiceCard extends StatelessWidget {
             Row(
               children: [
                 Switch(value: service.autoHeal, onChanged: onToggleAutoHeal),
-                Text(l.clusterOrch_autoHeal, style: const TextStyle(fontSize: 13)),
+                Text(
+                  l.clusterOrch_autoHeal,
+                  style: const TextStyle(fontSize: 13),
+                ),
                 const SizedBox(width: 16),
                 Switch(value: service.autoscale, onChanged: onToggleAutoscale),
-                Text(l.clusterOrch_autoscale, style: const TextStyle(fontSize: 13)),
+                Text(
+                  l.clusterOrch_autoscale,
+                  style: const TextStyle(fontSize: 13),
+                ),
                 if (service.autoscale) ...[
                   const SizedBox(width: 8),
                   Flexible(
@@ -667,9 +676,9 @@ class _ServiceDialogState extends State<_ServiceDialog> {
     final name = _nameController.text.trim();
     final image = _imageController.text.trim();
     if (name.isEmpty || image.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l.clusterOrch_nameAndImageRequired)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.clusterOrch_nameAndImageRequired)),
+      );
       return;
     }
     final target = int.tryParse(_targetController.text.trim()) ?? 20;

@@ -193,8 +193,10 @@ class _FirstRunWizardOverlayState extends State<FirstRunWizardOverlay> {
     // 小窗口适配：按可用空间限制卡片尺寸，内容可滚动，避免纵向溢出
     return LayoutBuilder(
       builder: (context, constraints) {
-        final maxHeight =
-            (constraints.maxHeight - 64).clamp(0.0, double.infinity);
+        final maxHeight = (constraints.maxHeight - 64).clamp(
+          0.0,
+          double.infinity,
+        );
         return SingleChildScrollView(
           child: ConstrainedBox(
             constraints: BoxConstraints(
@@ -266,8 +268,8 @@ class _FirstRunWizardOverlayState extends State<FirstRunWizardOverlay> {
                         : (_step > _jdkSteps.length
                               ? _StepState.done
                               : _step == _jdkSteps.length
-                                  ? _StepState.active
-                                  : _StepState.pending),
+                              ? _StepState.active
+                              : _StepState.pending),
                   ),
               ],
             ),
@@ -276,9 +278,7 @@ class _FirstRunWizardOverlayState extends State<FirstRunWizardOverlay> {
         const VerticalDivider(width: 32),
         // 右侧步骤内容
         // 步骤内容可纵向滚动，小窗口/长错误信息时不溢出
-        Expanded(
-          child: SingleChildScrollView(child: _buildStepContent(theme)),
-        ),
+        Expanded(child: SingleChildScrollView(child: _buildStepContent(theme))),
       ],
     );
   }
@@ -291,10 +291,7 @@ class _FirstRunWizardOverlayState extends State<FirstRunWizardOverlay> {
   }
 
   /// JDK 步骤内容。
-  Widget _buildJdkStep(
-    ThemeData theme,
-    ({String version, String title}) step,
-  ) {
+  Widget _buildJdkStep(ThemeData theme, ({String version, String title}) step) {
     final l = AppLocalizations.of(context);
     final status = _statuses[step.version] ?? _JdkStatus.pending;
     final progress = _progress[step.version] ?? 0.0;
@@ -447,9 +444,7 @@ class _FirstRunWizardOverlayState extends State<FirstRunWizardOverlay> {
         ),
         const SizedBox(height: 12),
         Text(
-          result.needsFrp
-              ? l.wizard_frpNeeded
-              : l.wizard_frpNotNeeded,
+          result.needsFrp ? l.wizard_frpNeeded : l.wizard_frpNotNeeded,
           style: const TextStyle(fontSize: 13),
         ),
         const SizedBox(height: 20),

@@ -109,8 +109,7 @@ class HttpFfiService {
   HttpFfiService._();
 
   /// 打开动态库（尝试多个可能的路径）。
-  static DynamicLibrary _openLibrary() =>
-      openRustLibrary('http_client');
+  static DynamicLibrary _openLibrary() => openRustLibrary('http_client');
 
   /// 发送 HTTP 请求（后台 isolate 执行，不阻塞 UI）。
   ///

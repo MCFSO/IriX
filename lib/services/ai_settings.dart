@@ -87,11 +87,7 @@ class MilvusConfig {
   /// 连接是否完整可用（uri 与 collection 均非空）。
   bool get isValid => uri.trim().isNotEmpty && collection.trim().isNotEmpty;
 
-  MilvusConfig copyWith({
-    String? uri,
-    String? token,
-    String? collection,
-  }) =>
+  MilvusConfig copyWith({String? uri, String? token, String? collection}) =>
       MilvusConfig(
         uri: uri ?? this.uri,
         token: token ?? this.token,
@@ -197,12 +193,8 @@ class AiSettings {
   }
 
   /// 设置当前使用的模型。
-  static Future<void> setActiveModel(String id) =>
-      SettingsRepository.instance.setString(
-        _keyActiveModelId,
-        id,
-        label: 'active model',
-      );
+  static Future<void> setActiveModel(String id) => SettingsRepository.instance
+      .setString(_keyActiveModelId, id, label: 'active model');
 
   /// 添加新模型并设为当前使用。
   static Future<void> addModel(AiModelConfig model) async {
@@ -248,27 +240,23 @@ class AiSettings {
 
   /// 获取 MCP 服务器是否启用。
   static Future<bool> getMcpEnabled() => SettingsRepository.instance.getBoolInt(
-        _keyMcpEnabled,
-        defaultValue: false,
-        label: 'MCP enabled',
-      );
+    _keyMcpEnabled,
+    defaultValue: false,
+    label: 'MCP enabled',
+  );
 
   /// 设置 MCP 服务器开关。
-  static Future<void> setMcpEnabled(bool enabled) =>
-      SettingsRepository.instance.setBoolInt(
-        _keyMcpEnabled,
-        enabled,
-        label: 'MCP enabled',
-      );
+  static Future<void> setMcpEnabled(bool enabled) => SettingsRepository.instance
+      .setBoolInt(_keyMcpEnabled, enabled, label: 'MCP enabled');
 
   /// 获取 MCP 端口，未设置时返回 [defaultMcpPort]。
   static Future<int> getMcpPort() => SettingsRepository.instance.getIntClamped(
-        _keyMcpPort,
-        defaultValue: defaultMcpPort,
-        min: 1024,
-        max: 65535,
-        label: 'MCP port',
-      );
+    _keyMcpPort,
+    defaultValue: defaultMcpPort,
+    min: 1024,
+    max: 65535,
+    label: 'MCP port',
+  );
 
   /// 设置 MCP 端口，自动 clamp 到 1024-65535。
   static Future<void> setMcpPort(int port) =>
@@ -292,9 +280,7 @@ class AiSettings {
         label: 'Milvus config',
       );
       if (raw == null) return MilvusConfig.empty();
-      return MilvusConfig.fromJson(
-        jsonDecode(raw) as Map<String, dynamic>,
-      );
+      return MilvusConfig.fromJson(jsonDecode(raw) as Map<String, dynamic>);
     } catch (e) {
       debugPrint('Failed to get Milvus config: $e');
       return MilvusConfig.empty();
@@ -302,10 +288,7 @@ class AiSettings {
   }
 
   /// 保存知识库 Milvus 连接配置。
-  static Future<void> setMilvusConfig(MilvusConfig config) =>
-      SettingsRepository.instance.setJson(
-        _keyMilvus,
-        jsonEncode(config.toJson()),
-        label: 'Milvus config',
-      );
+  static Future<void> setMilvusConfig(MilvusConfig config) => SettingsRepository
+      .instance
+      .setJson(_keyMilvus, jsonEncode(config.toJson()), label: 'Milvus config');
 }

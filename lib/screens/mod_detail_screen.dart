@@ -117,9 +117,9 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
         safeName.contains('/') ||
         safeName.contains(r'\')) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l.mod_downloadRejected)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l.mod_downloadRejected)));
       }
       return;
     }
@@ -151,9 +151,9 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _downloadProgress.remove(version.id));
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l.mod_downloadFailed(e.toString()))));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l.mod_downloadFailed(e.toString()))),
+        );
       }
     }
   }
@@ -236,7 +236,9 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
       if (mounted) {
         setState(() => _downloadProgress.remove(progressKey));
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l.mod_installedToNode(target.displayName, subdir))),
+          SnackBar(
+            content: Text(l.mod_installedToNode(target.displayName, subdir)),
+          ),
         );
       }
     } finally {
@@ -352,9 +354,15 @@ class _ModDetailScreenState extends State<ModDetailScreen> {
     final l = AppLocalizations.of(context);
     return Row(
       children: [
-        _statItem(Icons.download, '${_formatNumber(project.downloads)} ${l.mod_downloads}'),
+        _statItem(
+          Icons.download,
+          '${_formatNumber(project.downloads)} ${l.mod_downloads}',
+        ),
         const SizedBox(width: 16),
-        _statItem(Icons.star, '${_formatNumber(project.followers)} ${l.mod_follows}'),
+        _statItem(
+          Icons.star,
+          '${_formatNumber(project.followers)} ${l.mod_follows}',
+        ),
       ],
     );
   }

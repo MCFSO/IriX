@@ -239,9 +239,7 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
   /// 统一错误提示：容器后端异常直接展示消息；其余（如旧节点 404）展示原始错误。
   void _snackError(Object error, {String? prefix}) {
     final p = prefix ?? AppLocalizations.of(context).jailDetail_operationFailed;
-    _snack(
-      error is ContainerBackendException ? error.message : '$p：$error',
-    );
+    _snack(error is ContainerBackendException ? error.message : '$p：$error');
   }
 
   void _setBusy(bool value) {
@@ -670,7 +668,8 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
       final out = await widget.backend.execOutput(_name, cmd);
       if (!mounted) return;
       setState(() {
-        _consoleCmdOut += '\n\$ $cmd\n${out.trim().isEmpty ? l.jailDetail_noOutput : out}';
+        _consoleCmdOut +=
+            '\n\$ $cmd\n${out.trim().isEmpty ? l.jailDetail_noOutput : out}';
       });
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_consoleScroll.hasClients) {
@@ -724,8 +723,9 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(
-        () =>
-            _pkgOutput = e is ContainerBackendException ? e.message : l.jailDetail_execFailedDetail(e.toString()),
+        () => _pkgOutput = e is ContainerBackendException
+            ? e.message
+            : l.jailDetail_execFailedDetail(e.toString()),
       );
     } finally {
       if (mounted) setState(() => _pkgBusy = false);
@@ -745,8 +745,9 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(
-        () =>
-            _pkgOutput = e is ContainerBackendException ? e.message : l.jailDetail_detectFailedDetail(e.toString()),
+        () => _pkgOutput = e is ContainerBackendException
+            ? e.message
+            : l.jailDetail_detectFailedDetail(e.toString()),
       );
     } finally {
       if (mounted) setState(() => _pkgBusy = false);
@@ -920,7 +921,10 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
 
   Future<void> _jailMkdir() async {
     final l = AppLocalizations.of(context);
-    final name = await _promptJailFileName(l.jailDetail_newFolder, l.jailDetail_folderName);
+    final name = await _promptJailFileName(
+      l.jailDetail_newFolder,
+      l.jailDetail_folderName,
+    );
     if (name == null || !mounted) return;
     setState(() => _filesBusy = true);
     try {
@@ -935,7 +939,10 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
 
   Future<void> _jailTouch() async {
     final l = AppLocalizations.of(context);
-    final name = await _promptJailFileName(l.jailDetail_newFile, l.jailDetail_fileName);
+    final name = await _promptJailFileName(
+      l.jailDetail_newFile,
+      l.jailDetail_fileName,
+    );
     if (name == null || !mounted) return;
     setState(() => _filesBusy = true);
     try {
@@ -1100,14 +1107,11 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
       context,
       (_) => AlertDialog(
         title: Text(
-          l.jailDetail_deleteConfirm(entry.isDir ? l.jailDetail_folder : l.jailDetail_file),
-        ),
-        content: Text(
-          l.jailDetail_deletePathConfirm(
-            entry.path,
-            entry.isDir,
+          l.jailDetail_deleteConfirm(
+            entry.isDir ? l.jailDetail_folder : l.jailDetail_file,
           ),
         ),
+        content: Text(l.jailDetail_deletePathConfirm(entry.path, entry.isDir)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -1341,12 +1345,27 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
               isScrollable: true,
               tabAlignment: TabAlignment.start,
               tabs: [
-                Tab(icon: const Icon(Icons.play_circle_outline), text: l.jailDetail_tabRun),
-                Tab(icon: const Icon(Icons.folder_outlined), text: l.jailDetail_tabFiles),
-                Tab(icon: const Icon(Icons.terminal), text: l.jailDetail_tabConsole),
-                Tab(icon: const Icon(Icons.inventory_outlined), text: l.jailDetail_tabPackages),
+                Tab(
+                  icon: const Icon(Icons.play_circle_outline),
+                  text: l.jailDetail_tabRun,
+                ),
+                Tab(
+                  icon: const Icon(Icons.folder_outlined),
+                  text: l.jailDetail_tabFiles,
+                ),
+                Tab(
+                  icon: const Icon(Icons.terminal),
+                  text: l.jailDetail_tabConsole,
+                ),
+                Tab(
+                  icon: const Icon(Icons.inventory_outlined),
+                  text: l.jailDetail_tabPackages,
+                ),
                 Tab(icon: const Icon(Icons.link), text: l.jailDetail_tabMounts),
-                Tab(icon: const Icon(Icons.tune), text: l.jailDetail_tabSettings),
+                Tab(
+                  icon: const Icon(Icons.tune),
+                  text: l.jailDetail_tabSettings,
+                ),
               ],
             ),
             Expanded(
@@ -1507,7 +1526,9 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
                   labelText: l.jailDetail_selectInstance,
                   border: const OutlineInputBorder(),
                   isDense: true,
-                  helperText: _instancesLoading ? l.jailDetail_loadingInstances : null,
+                  helperText: _instancesLoading
+                      ? l.jailDetail_loadingInstances
+                      : null,
                 ),
                 items: [
                   DropdownMenuItem<String?>(
@@ -1736,7 +1757,10 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
                       children: [
                         ActionChip(
                           avatar: const Icon(Icons.home, size: 14),
-                          label: const Text('/', style: TextStyle(fontSize: 12)),
+                          label: const Text(
+                            '/',
+                            style: TextStyle(fontSize: 12),
+                          ),
                           visualDensity: VisualDensity.compact,
                           onPressed: () => _gotoFilesPath('/'),
                         ),
@@ -2118,7 +2142,9 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.download, size: 16),
-                  label: Text(_pkgBusy ? l.jailDetail_executing : l.jailDetail_execute),
+                  label: Text(
+                    _pkgBusy ? l.jailDetail_executing : l.jailDetail_execute,
+                  ),
                 ),
                 const SizedBox(width: 8),
                 OutlinedButton.icon(
@@ -2149,7 +2175,11 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
               trailing: FilledButton.tonalIcon(
                 onPressed: _busy ? null : _mountProc,
                 icon: const Icon(Icons.link, size: 16),
-                label: Text(_isMounted('/proc') ? l.jailDetail_mounted : l.jailDetail_mountButton),
+                label: Text(
+                  _isMounted('/proc')
+                      ? l.jailDetail_mounted
+                      : l.jailDetail_mountButton,
+                ),
               ),
             ),
             const Divider(height: 1),
@@ -2493,8 +2523,9 @@ class _ConsolePanel extends StatelessWidget {
                     controller: inputController,
                     enabled: inputEnabled,
                     decoration: InputDecoration(
-                      hintText:
-                          inputEnabled ? inputHint : l.jailDetail_noRunningSessionInput,
+                      hintText: inputEnabled
+                          ? inputHint
+                          : l.jailDetail_noRunningSessionInput,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),

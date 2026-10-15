@@ -67,9 +67,7 @@ void main() {
     final tailer = LogFileTailer(logPath);
     await tailer.start();
     final future = collectLines(tailer.stream, 1);
-    await File(
-      logPath,
-    ).writeAsString('服务器输出 ✦ 你好\n', mode: FileMode.append);
+    await File(logPath).writeAsString('服务器输出 ✦ 你好\n', mode: FileMode.append);
     final lines = await future;
     expect(lines, equals(['服务器输出 ✦ 你好']));
     tailer.dispose();

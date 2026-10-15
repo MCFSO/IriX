@@ -57,9 +57,9 @@ class OrchestratorFfi {
 
   /// 打开动态库（尝试多个可能的路径）。
   static DynamicLibrary _openLibrary() => openRustLibrary(
-        'orchestrator',
-        notFoundHint: '请先运行 build_rust.bat / build_rust.sh 编译并复制动态库。',
-      );
+    'orchestrator',
+    notFoundHint: '请先运行 build_rust.bat / build_rust.sh 编译并复制动态库。',
+  );
 
   /// 执行一次编排操作（后台 isolate，不阻塞 UI）。
   ///

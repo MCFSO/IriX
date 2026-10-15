@@ -211,7 +211,12 @@ void main() {
 
     test('addJailMount 抛异常', () {
       expect(
-        () => backend.addJailMount('mc', src: '/x', dst: '/data', fstype: 'nullfs'),
+        () => backend.addJailMount(
+          'mc',
+          src: '/x',
+          dst: '/data',
+          fstype: 'nullfs',
+        ),
         throwsA(isA<ContainerBackendException>()),
       );
     });
@@ -277,11 +282,7 @@ void main() {
     });
 
     test('fstab 持久化标记', () {
-      const mount = JailMount(
-        src: '/data/mc',
-        dst: '/data',
-        permanent: true,
-      );
+      const mount = JailMount(src: '/data/mc', dst: '/data', permanent: true);
       expect(mount.display, 'nullfs /data/mc -> /data（fstab）');
     });
   });

@@ -167,9 +167,9 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
       _resetGutterScroll();
       if (mounted) {
         final l = AppLocalizations.of(context);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('${l.configEditor_parseFailedTextMode}: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${l.configEditor_parseFailedTextMode}: $e')),
+        );
       }
     }
   }
@@ -187,15 +187,15 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
       }
       setState(() => _dirty = false);
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l.configEditor_saved(file.name))));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l.configEditor_saved(file.name))),
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('${l.configEditor_saveFailed}: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${l.configEditor_saveFailed}: $e')),
+        );
       }
     }
   }
@@ -257,14 +257,14 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
       if (!mounted) return;
       // 刷新表单以显示新注释
       setState(() {});
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l.configEditor_importedAnnotations(count))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.configEditor_importedAnnotations(count))),
+      );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('${l.configEditor_importFailed}: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${l.configEditor_importFailed}: $e')),
+      );
     }
   }
 
@@ -311,7 +311,10 @@ class _ConfigEditorScreenState extends State<ConfigEditorScreen> {
           children: [
             const Icon(Icons.folder_off, size: 64, color: Colors.grey),
             const SizedBox(height: 16),
-            Text(l.configEditor_noConfigFiles, style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              l.configEditor_noConfigFiles,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 8),
             Text(l.configEditor_configGeneratedAfterStart),
             const SizedBox(height: 16),

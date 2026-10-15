@@ -33,16 +33,18 @@ typedef FreeStringNative = Void Function(Pointer<Utf8> s);
 typedef FreeStringDart = void Function(Pointer<Utf8> s);
 
 // 服务器进程托管（stdout/stderr 重定向到日志文件，stdin 保留管道）。
-typedef SpawnWithLogNative = Int64 Function(
-  Pointer<Utf8> command,
-  Pointer<Utf8> cwd,
-  Pointer<Utf8> logPath,
-);
-typedef SpawnWithLogDart = int Function(
-  Pointer<Utf8> command,
-  Pointer<Utf8> cwd,
-  Pointer<Utf8> logPath,
-);
+typedef SpawnWithLogNative =
+    Int64 Function(
+      Pointer<Utf8> command,
+      Pointer<Utf8> cwd,
+      Pointer<Utf8> logPath,
+    );
+typedef SpawnWithLogDart =
+    int Function(
+      Pointer<Utf8> command,
+      Pointer<Utf8> cwd,
+      Pointer<Utf8> logPath,
+    );
 
 typedef SpawnSendStdinNative = Int32 Function(Uint32 pid, Pointer<Utf8> line);
 typedef SpawnSendStdinDart = int Function(int pid, Pointer<Utf8> line);
@@ -96,10 +98,10 @@ class LoggerNative {
       _spawnWithLog = _lib.lookupFunction<SpawnWithLogNative, SpawnWithLogDart>(
         'spawn_with_log',
       );
-      _spawnSendStdin = _lib.lookupFunction<
-        SpawnSendStdinNative,
-        SpawnSendStdinDart
-      >('spawn_send_stdin');
+      _spawnSendStdin = _lib
+          .lookupFunction<SpawnSendStdinNative, SpawnSendStdinDart>(
+            'spawn_send_stdin',
+          );
       _spawnTryReap = _lib.lookupFunction<SpawnTryReapNative, SpawnTryReapDart>(
         'spawn_try_reap',
       );

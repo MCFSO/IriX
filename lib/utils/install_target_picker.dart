@@ -45,17 +45,19 @@ class InstallTarget {
     required NodeApiClient client,
     required String daemonId,
     required RemoteInstance instance,
-  }) =>
-      InstallTarget._(
-        node: node,
-        client: client,
-        daemonId: daemonId,
-        remoteInstance: instance,
-      );
+  }) => InstallTarget._(
+    node: node,
+    client: client,
+    daemonId: daemonId,
+    remoteInstance: instance,
+  );
 
   /// 是否安装到节点实例。
   bool get isRemote =>
-      node != null && client != null && daemonId != null && remoteInstance != null;
+      node != null &&
+      client != null &&
+      daemonId != null &&
+      remoteInstance != null;
 
   /// 目标显示名。
   String get displayName => isRemote
@@ -217,9 +219,7 @@ class _NodeTargetPickerState extends State<_NodeTargetPicker> {
             final node = widget.nodeState.nodes[index];
             final online = widget.nodeState.isOnline(node.id);
             return ListTile(
-              leading: Icon(
-                node.type == NodeType.mcsm ? Icons.dns : Icons.lan,
-              ),
+              leading: Icon(node.type == NodeType.mcsm ? Icons.dns : Icons.lan),
               title: Text(node.name),
               subtitle: Text(
                 '${node.type.label} · ${node.address}${online ? '' : '（离线？仍可尝试）'}',
@@ -280,14 +280,14 @@ class _NodeTargetPickerState extends State<_NodeTargetPicker> {
                           : instance.config.nickname,
                     ),
                     subtitle: Text(instance.config.cwd),
-                    onTap: () => Navigator.of(
-                      context,
-                    ).pop(InstallTarget.remote(
-                      node: _node!,
-                      client: _client!,
-                      daemonId: _daemonId!,
-                      instance: instance,
-                    )),
+                    onTap: () => Navigator.of(context).pop(
+                      InstallTarget.remote(
+                        node: _node!,
+                        client: _client!,
+                        daemonId: _daemonId!,
+                        instance: instance,
+                      ),
+                    ),
                   );
                 },
               ),

@@ -60,7 +60,9 @@ class JdkInstaller {
   ///
   /// Adoptium API 的 `package.checksum` 形如 `sha256:<hex>`，
   /// 下载完成后用其校验归档完整性（H-1）。
-  Future<({String url, String? sha256})> _resolveDownload(String featureVersion) async {
+  Future<({String url, String? sha256})> _resolveDownload(
+    String featureVersion,
+  ) async {
     final os = switch (Platform.operatingSystem) {
       'windows' => 'windows',
       'macos' => 'mac',
@@ -93,8 +95,7 @@ class JdkInstaller {
       final sep = checksum.indexOf(':');
       final algo = sep > 0 ? checksum.substring(0, sep).toLowerCase() : '';
       final hex = sep > 0 ? checksum.substring(sep + 1) : checksum;
-      if (algo == 'sha256' &&
-          RegExp(r'^[0-9a-fA-F]{64}$').hasMatch(hex)) {
+      if (algo == 'sha256' && RegExp(r'^[0-9a-fA-F]{64}$').hasMatch(hex)) {
         sha256 = hex;
       }
       return (url: link, sha256: sha256);

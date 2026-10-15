@@ -99,8 +99,14 @@ void main() {
     expect(tester.getTopLeft(inkWellFinder), tester.getTopLeft(pillFinder));
 
     const radius = Radius.circular(FrpProviderSwitcher.radius);
-    expect(tester.widget<Material>(pillFinder).borderRadius, const BorderRadius.all(radius));
-    expect(tester.widget<InkWell>(inkWellFinder).borderRadius, const BorderRadius.all(radius));
+    expect(
+      tester.widget<Material>(pillFinder).borderRadius,
+      const BorderRadius.all(radius),
+    );
+    expect(
+      tester.widget<InkWell>(inkWellFinder).borderRadius,
+      const BorderRadius.all(radius),
+    );
   });
 
   testWidgets('鼠标悬浮时高亮铺满整块胶囊（含左右内边距）', (tester) async {

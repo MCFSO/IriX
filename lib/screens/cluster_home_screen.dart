@@ -169,8 +169,9 @@ class _ClusterHomeScreenState extends State<ClusterHomeScreen> {
     final l = AppLocalizations.of(context);
     final role = deriveMonitorRole(nodes);
     final String text = switch (role.strategy) {
-      ClusterMonitorStrategy.monitor =>
-        l.clusterHome_monitorAssigned(_nodeName(nodes, role.monitorNodeId)),
+      ClusterMonitorStrategy.monitor => l.clusterHome_monitorAssigned(
+        _nodeName(nodes, role.monitorNodeId),
+      ),
       ClusterMonitorStrategy.mutual => l.clusterHome_monitorMutual,
       ClusterMonitorStrategy.noEligibleMonitor =>
         l.clusterHome_monitorNoEligible,
@@ -219,7 +220,10 @@ class _NetworkChartCard extends StatelessWidget {
                   color: theme.colorScheme.primary,
                 ),
                 const SizedBox(width: 8),
-                Text(l.clusterHome_networkThroughput, style: theme.textTheme.titleSmall),
+                Text(
+                  l.clusterHome_networkThroughput,
+                  style: theme.textTheme.titleSmall,
+                ),
                 const Spacer(),
                 if (latest != null)
                   Text(
@@ -289,7 +293,10 @@ class _ResourceOverviewCard extends StatelessWidget {
                 color: theme.colorScheme.primary,
               ),
               const SizedBox(width: 8),
-              Text(l.clusterHome_resourceOverview, style: theme.textTheme.titleSmall),
+              Text(
+                l.clusterHome_resourceOverview,
+                style: theme.textTheme.titleSmall,
+              ),
               const Spacer(),
               Text(
                 l.clusterHome_nodeCount(nodes.length),
@@ -303,13 +310,25 @@ class _ResourceOverviewCard extends StatelessWidget {
           // 表头
           Row(
             children: [
-              Expanded(flex: 5, child: _headerLabel(theme, l.clusterHome_colNode)),
+              Expanded(
+                flex: 5,
+                child: _headerLabel(theme, l.clusterHome_colNode),
+              ),
               const SizedBox(width: 12),
-              Expanded(flex: 4, child: _headerLabel(theme, l.clusterHome_colCpu)),
+              Expanded(
+                flex: 4,
+                child: _headerLabel(theme, l.clusterHome_colCpu),
+              ),
               const SizedBox(width: 12),
-              Expanded(flex: 4, child: _headerLabel(theme, l.clusterHome_colMemory)),
+              Expanded(
+                flex: 4,
+                child: _headerLabel(theme, l.clusterHome_colMemory),
+              ),
               const SizedBox(width: 12),
-              Expanded(flex: 4, child: _headerLabel(theme, l.clusterHome_colDisk)),
+              Expanded(
+                flex: 4,
+                child: _headerLabel(theme, l.clusterHome_colDisk),
+              ),
             ],
           ),
           _rowDivider(theme),

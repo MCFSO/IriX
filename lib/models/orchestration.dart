@@ -4,6 +4,7 @@
 // MigrationJob ≈ 跨物理机迁移工作流、OrchestrationAction ≈ 对账动作。
 
 import '../services/locale_settings.dart';
+
 /// 服务组（Deployment）：期望状态与弹性/自愈策略。
 class McService {
   const McService({

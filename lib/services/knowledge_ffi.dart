@@ -65,8 +65,7 @@ class VectorStoreFfi {
   VectorStoreFfi._();
 
   /// 打开动态库（尝试多个可能的路径）。
-  static DynamicLibrary _openLibrary() =>
-      openRustLibrary('vector_store');
+  static DynamicLibrary _openLibrary() => openRustLibrary('vector_store');
 
   /// 执行一次向量库操作（后台 isolate，不阻塞 UI）。
   ///

@@ -130,12 +130,12 @@ class NbtNode {
   }
 
   NbtNode clone() => NbtNode(
-        type: type,
-        name: name,
-        value: value,
-        elemType: elemType,
-        children: [for (final c in children) c.clone()],
-      );
+    type: type,
+    name: name,
+    value: value,
+    elemType: elemType,
+    children: [for (final c in children) c.clone()],
+  );
 }
 
 /// NBT 编辑服务（单例）。
@@ -147,13 +147,19 @@ class NbtService {
 
   /// 解析 SNBT 文本，返回规整化后的 SNBT（用于校验/格式化）。
   Future<String> parseSnbt(String snbt) async {
-    final res = await NbtFfi.instance.request(op: 'parse_snbt', args: {'snbt': snbt});
+    final res = await NbtFfi.instance.request(
+      op: 'parse_snbt',
+      args: {'snbt': snbt},
+    );
     return res['snbt'] as String? ?? '';
   }
 
   /// 序列化为 SNBT。
   Future<String> toSnbt(String snbt) async {
-    final res = await NbtFfi.instance.request(op: 'to_snbt', args: {'snbt': snbt});
+    final res = await NbtFfi.instance.request(
+      op: 'to_snbt',
+      args: {'snbt': snbt},
+    );
     return res['snbt'] as String? ?? '';
   }
 
@@ -161,7 +167,10 @@ class NbtService {
   /// 返回 SNBT 文本。
   Future<String> parseBinary(Uint8List bytes) async {
     final b64 = base64Encode(bytes);
-    final res = await NbtFfi.instance.request(op: 'parse_binary', args: {'data': b64});
+    final res = await NbtFfi.instance.request(
+      op: 'parse_binary',
+      args: {'data': b64},
+    );
     return res['snbt'] as String? ?? '';
   }
 
@@ -180,14 +189,20 @@ class NbtService {
 
   /// 将 SNBT 转为 Dart 树（根节点为 Compound，无 name）。
   Future<NbtNode> toTree(String snbt) async {
-    final res = await NbtFfi.instance.request(op: 'to_tree', args: {'snbt': snbt});
+    final res = await NbtFfi.instance.request(
+      op: 'to_tree',
+      args: {'snbt': snbt},
+    );
     final tree = res['tree'] as Map<String, dynamic>? ?? {};
     return NbtNode.fromJson(tree);
   }
 
   /// 从 Dart 树重建 SNBT。
   Future<String> fromTree(NbtNode node) async {
-    final res = await NbtFfi.instance.request(op: 'from_tree', args: {'tree': node.toJson()});
+    final res = await NbtFfi.instance.request(
+      op: 'from_tree',
+      args: {'tree': node.toJson()},
+    );
     return res['snbt'] as String? ?? '';
   }
 
@@ -195,7 +210,10 @@ class NbtService {
 
   /// 取路径处节点的 SNBT。
   Future<String> get(String snbt, String path) async {
-    final res = await NbtFfi.instance.request(op: 'get', args: {'snbt': snbt, 'path': path});
+    final res = await NbtFfi.instance.request(
+      op: 'get',
+      args: {'snbt': snbt, 'path': path},
+    );
     return res['snbt'] as String? ?? '';
   }
 
@@ -210,12 +228,19 @@ class NbtService {
 
   /// 删除路径处节点，返回更新后的 SNBT。
   Future<String> delete(String snbt, String path) async {
-    final res = await NbtFfi.instance.request(op: 'delete', args: {'snbt': snbt, 'path': path});
+    final res = await NbtFfi.instance.request(
+      op: 'delete',
+      args: {'snbt': snbt, 'path': path},
+    );
     return res['snbt'] as String? ?? snbt;
   }
 
   /// 搜索包含 [query] 的路径列表。
-  Future<List<String>> search(String snbt, String query, {int limit = 200}) async {
+  Future<List<String>> search(
+    String snbt,
+    String query, {
+    int limit = 200,
+  }) async {
     final res = await NbtFfi.instance.request(
       op: 'search',
       args: {'snbt': snbt, 'query': query, 'limit': limit},
@@ -262,7 +287,12 @@ class NbtService {
       case NbtType.longArray:
         return NbtNode(type: type, name: name, value: <String>[]);
       case NbtType.list:
-        return NbtNode(type: type, name: name, elemType: NbtType.compound, children: []);
+        return NbtNode(
+          type: type,
+          name: name,
+          elemType: NbtType.compound,
+          children: [],
+        );
       case NbtType.compound:
       default:
         return NbtNode(type: NbtType.compound, name: name, children: []);

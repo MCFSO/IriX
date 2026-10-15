@@ -189,8 +189,7 @@ class McpServer {
     if (_token.isEmpty) return false;
     final auth = req.headers.value('authorization');
     final tokenOk =
-        auth == 'Bearer $_token' ||
-        req.uri.queryParameters['token'] == _token;
+        auth == 'Bearer $_token' || req.uri.queryParameters['token'] == _token;
     if (!tokenOk) return false;
     final origin = req.headers.value('origin');
     if (origin != null && origin.isNotEmpty) {

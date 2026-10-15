@@ -264,11 +264,7 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
               ),
               const SizedBox(width: 8),
               Text(
-                [
-                  l.addNode_stepType,
-                  l.addNode_stepName,
-                  l.addNode_stepKey,
-                ][i],
+                [l.addNode_stepType, l.addNode_stepName, l.addNode_stepKey][i],
                 style: theme.textTheme.bodySmall?.copyWith(
                   fontWeight: active ? FontWeight.bold : FontWeight.normal,
                   color: active
@@ -429,18 +425,14 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
               Icon(
                 _testOk ? Icons.check_circle : Icons.error_outline,
                 size: 18,
-                color: _testOk
-                    ? Colors.green
-                    : theme.colorScheme.error,
+                color: _testOk ? Colors.green : theme.colorScheme.error,
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   _testResult!,
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: _testOk
-                        ? Colors.green
-                        : theme.colorScheme.error,
+                    color: _testOk ? Colors.green : theme.colorScheme.error,
                   ),
                 ),
               ),

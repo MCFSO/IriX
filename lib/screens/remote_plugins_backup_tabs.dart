@@ -775,9 +775,9 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
         _progress = null;
         _status = null;
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l.remoteTab_backupSaved(savePath))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.remoteTab_backupSaved(savePath))),
+      );
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -905,9 +905,9 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
           });
         });
         if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l.remoteTab_downloadedTo(savePath))));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l.remoteTab_downloadedTo(savePath))),
+        );
       }
     } catch (e) {
       if (!mounted) return;
@@ -1009,7 +1009,9 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
         uuid: widget.uuid,
         daemonId: widget.daemonId,
       );
-      _snapshotPoll = Timer.periodic(const Duration(milliseconds: 800), (_) async {
+      _snapshotPoll = Timer.periodic(const Duration(milliseconds: 800), (
+        _,
+      ) async {
         try {
           final p = await widget.client.snapshotProgress(jobId);
           if (!mounted) return;
@@ -1066,9 +1068,7 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
       context,
       (_) => AlertDialog(
         title: Text(l.remoteTab_restoreSnapshotTitle),
-        content: Text(
-          l.remoteTab_restoreSnapshotContent(item.fileName),
-        ),
+        content: Text(l.remoteTab_restoreSnapshotContent(item.fileName)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -1095,7 +1095,9 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
         daemonId: widget.daemonId,
         archivePath: item.path,
       );
-      _snapshotPoll = Timer.periodic(const Duration(milliseconds: 800), (_) async {
+      _snapshotPoll = Timer.periodic(const Duration(milliseconds: 800), (
+        _,
+      ) async {
         try {
           final p = await widget.client.snapshotProgress(jobId);
           if (!mounted) return;
@@ -1172,9 +1174,9 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
         _snapshotProgress = null;
         _snapshotStatus = null;
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l.remoteTab_downloadedTo(savePath))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.remoteTab_downloadedTo(savePath))),
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -1244,7 +1246,10 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(l.remoteTab_instanceBackup, style: theme.textTheme.titleSmall),
+                Text(
+                  l.remoteTab_instanceBackup,
+                  style: theme.textTheme.titleSmall,
+                ),
                 const SizedBox(height: 4),
                 Text(
                   l.remoteTab_instanceBackupDesc,
@@ -1335,13 +1340,17 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
                       ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: Text(l.remoteTab_nodeSnapshot, style: theme.textTheme.titleSmall),
+                        child: Text(
+                          l.remoteTab_nodeSnapshot,
+                          style: theme.textTheme.titleSmall,
+                        ),
                       ),
                       IconButton(
                         icon: const Icon(Icons.refresh, size: 20),
                         tooltip: l.common_refresh,
-                        onPressed:
-                            _snapshotBusy ? null : () => _loadSnapshots(),
+                        onPressed: _snapshotBusy
+                            ? null
+                            : () => _loadSnapshots(),
                       ),
                     ],
                   ),
@@ -1421,8 +1430,9 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
                                       item.mtime,
                                       style: theme.textTheme.bodySmall
                                           ?.copyWith(
-                                            color:
-                                                theme.colorScheme.onSurfaceVariant,
+                                            color: theme
+                                                .colorScheme
+                                                .onSurfaceVariant,
                                             fontSize: 11,
                                           ),
                                     ),
@@ -1433,22 +1443,25 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
                               icon: const Icon(Icons.restore, size: 18),
                               tooltip: l.remoteTab_restore,
                               visualDensity: VisualDensity.compact,
-                              onPressed:
-                                  _snapshotBusy ? null : () => _restoreSnapshot(item),
+                              onPressed: _snapshotBusy
+                                  ? null
+                                  : () => _restoreSnapshot(item),
                             ),
                             IconButton(
                               icon: const Icon(Icons.download, size: 18),
                               tooltip: l.remoteTab_download,
                               visualDensity: VisualDensity.compact,
-                              onPressed:
-                                  _snapshotBusy ? null : () => _downloadSnapshot(item),
+                              onPressed: _snapshotBusy
+                                  ? null
+                                  : () => _downloadSnapshot(item),
                             ),
                             IconButton(
                               icon: const Icon(Icons.delete_outline, size: 18),
                               tooltip: l.remoteTab_delete,
                               visualDensity: VisualDensity.compact,
-                              onPressed:
-                                  _snapshotBusy ? null : () => _deleteSnapshot(item),
+                              onPressed: _snapshotBusy
+                                  ? null
+                                  : () => _deleteSnapshot(item),
                             ),
                           ],
                         ),
@@ -1490,7 +1503,10 @@ class _RemoteBackupTabState extends State<RemoteBackupTab> {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(l.remoteTab_nodeBackupFiles, style: theme.textTheme.titleSmall),
+                      child: Text(
+                        l.remoteTab_nodeBackupFiles,
+                        style: theme.textTheme.titleSmall,
+                      ),
                     ),
                     IconButton(
                       icon: const Icon(Icons.refresh, size: 20),

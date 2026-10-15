@@ -242,9 +242,9 @@ class _PluginsTabState extends State<PluginsTab> {
   void _openItem(_PluginItem item) {
     final l = AppLocalizations.of(context);
     if (!item.hasConfig) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l.pluginsUI_noConfigFiles(item.displayName))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.pluginsUI_noConfigFiles(item.displayName))),
+      );
       return;
     }
     setState(() => _selected = item);
@@ -281,7 +281,10 @@ class _PluginsTabState extends State<PluginsTab> {
           children: [
             const Icon(Icons.extension_off, size: 64, color: Colors.grey),
             const SizedBox(height: 16),
-            Text(l.pluginsUI_empty, style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              l.pluginsUI_empty,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 8),
             Text(l.pluginsUI_emptyHint),
             const SizedBox(height: 16),
@@ -301,7 +304,10 @@ class _PluginsTabState extends State<PluginsTab> {
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
             sliver: SliverToBoxAdapter(
-              child: _sectionHeader(l.pluginsUI_sectionPlugins, Icons.extension),
+              child: _sectionHeader(
+                l.pluginsUI_sectionPlugins,
+                Icons.extension,
+              ),
             ),
           ),
           SliverPadding(
@@ -427,8 +433,9 @@ class _PluginCardState extends State<_PluginCard> {
     final theme = Theme.of(context);
     final l = AppLocalizations.of(context);
     final hasIcon = item.meta.iconBytes != null;
-    final kindLabel =
-        item.kind == _ItemKind.plugin ? l.pluginsUI_kindPlugin : 'Mod';
+    final kindLabel = item.kind == _ItemKind.plugin
+        ? l.pluginsUI_kindPlugin
+        : 'Mod';
     final kindColor = item.kind == _ItemKind.plugin
         ? Colors.blue
         : Colors.deepPurple;
@@ -485,10 +492,16 @@ class _PluginCardState extends State<_PluginCard> {
                     _KindBadge(label: kindLabel, color: kindColor),
                     if (!item.hasConfig) ...[
                       const SizedBox(width: 6),
-                      _KindBadge(label: l.pluginsUI_noConfig, color: Colors.grey),
+                      _KindBadge(
+                        label: l.pluginsUI_noConfig,
+                        color: Colors.grey,
+                      ),
                     ] else if (item.orphan) ...[
                       const SizedBox(width: 6),
-                      _KindBadge(label: l.pluginsUI_configOnly, color: Colors.orange),
+                      _KindBadge(
+                        label: l.pluginsUI_configOnly,
+                        color: Colors.orange,
+                      ),
                     ],
                   ],
                 ),

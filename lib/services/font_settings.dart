@@ -126,9 +126,12 @@ class FontSettings extends ChangeNotifier {
     return [
       (
         bundledJetBrainsMono,
-        en ? 'JetBrains Mono (built-in, recommended)' : 'JetBrains Mono（内置，推荐）'
+        en ? 'JetBrains Mono (built-in, recommended)' : 'JetBrains Mono（内置，推荐）',
       ),
-      (bundledPixel, en ? 'Pixel font Fusion Pixel (built-in)' : '点阵字体 Fusion Pixel（内置）'),
+      (
+        bundledPixel,
+        en ? 'Pixel font Fusion Pixel (built-in)' : '点阵字体 Fusion Pixel（内置）',
+      ),
       ('monospace', en ? 'System monospace font' : '系统等宽字体'),
       (inheritTerminal, en ? 'Inherit UI font' : '跟随 UI 字体'),
       ('Consolas', 'Consolas'),

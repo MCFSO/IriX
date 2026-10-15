@@ -25,12 +25,18 @@ import 'package:path/path.dart' as p;
 import 'package:irix/services/plugin_ffi.dart';
 
 void main() {
-  final zipPath =
-      p.join(Directory.current.path, 'plugins', 'irix-example-plugin.zip');
+  final zipPath = p.join(
+    Directory.current.path,
+    'plugins',
+    'irix-example-plugin.zip',
+  );
 
   test('安装 / 列表 / 分发 / 权限过滤 / README / 禁用 / 卸载 全流程', () async {
-    expect(File(zipPath).existsSync(), isTrue,
-        reason: '示例插件包缺失: plugins/irix-example-plugin.zip');
+    expect(
+      File(zipPath).existsSync(),
+      isTrue,
+      reason: '示例插件包缺失: plugins/irix-example-plugin.zip',
+    );
 
     // 插件 DLL 常驻会锁住目录，临时目录在本测试内创建与清理。
     final tempDir = await Directory.systemTemp.createTemp('irix_plugin_test_');
@@ -58,13 +64,20 @@ void main() {
         // === 当前平台有对应动态库：走完整加载 + 分发链路 ===
 
         // 已授权事件（instance.read）：成功并回显
-        final payload = jsonEncode({'instance_id': 'demo', 'status': 'running'});
+        final payload = jsonEncode({
+          'instance_id': 'demo',
+          'status': 'running',
+        });
         final dispatch = native.dispatch('instance.started', payload);
         expect(dispatch.length, 1, reason: '至少一个已启用插件应收到事件');
-        expect(dispatch.first['ok'], isTrue,
-            reason: dispatch.first['error']?.toString());
-        final parsed = jsonDecode(dispatch.first['result'] as String)
-            as Map<String, dynamic>;
+        expect(
+          dispatch.first['ok'],
+          isTrue,
+          reason: dispatch.first['error']?.toString(),
+        );
+        final parsed =
+            jsonDecode(dispatch.first['result'] as String)
+                as Map<String, dynamic>;
         expect(parsed['plugin'], 'irix-example-plugin');
         expect(parsed['handled_event'], 'instance.started');
 

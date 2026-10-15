@@ -155,7 +155,11 @@ class _ImportInstanceScreenState extends State<ImportInstanceScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.download_for_offline),
-              label: Text(_creating ? l.importInstance_creating : l.importInstance_createInstance),
+              label: Text(
+                _creating
+                    ? l.importInstance_creating
+                    : l.importInstance_createInstance,
+              ),
             ),
             const SizedBox(height: 8),
             Text(l.importInstance_desc, style: theme.textTheme.bodySmall),

@@ -1,5 +1,5 @@
 // 实例列表主页 + 左侧导航栏
-// 左侧 NavigationRail 切换"实例列表"和"市场"
+// 左侧为自绘侧边栏（图标与文字并列），切换各功能页与全局设置
 
 import 'dart:async';
 import 'dart:io';
@@ -11,15 +11,8 @@ import '../l10n/app_localizations.dart';
 import '../models/server_instance.dart';
 import '../services/cluster_monitor.dart';
 import '../services/database_manager.dart';
-import '../services/db_page_settings.dart';
-import '../services/developer_settings.dart';
-import '../services/dev_log.dart';
-import '../services/download_settings.dart';
-import '../services/font_settings.dart';
-import '../services/locale_settings.dart';
 import '../services/management_mode_settings.dart';
 import '../services/mcp_server.dart';
-import '../services/vault_settings.dart';
 import '../state/app_state.dart';
 import '../state/cluster_state.dart';
 import '../state/node_state.dart';
@@ -38,6 +31,7 @@ import 'nbt_editor_screen.dart';
 import 'nodes_screen.dart';
 import 'onboarding_screen.dart';
 import 'plugins_screen.dart';
+import 'settings_screen.dart';
 
 /// 主页 — 左侧 NavigationRail + 右侧内容区。
 class HomeScreen extends StatefulWidget {
@@ -49,6 +43,9 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+
+  /// 内容区是否显示全局设置（侧边栏底部入口）。
+  bool _showSettings = false;
 
   /// 是否已弹出 MCP 权限对话框（防止重复弹窗）。
   bool _mcpDialogOpen = false;
@@ -135,28 +132,45 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final multi = context.watch<ClusterState>().mode == ManagementMode.multi;
     // 单机模式 6 项、多机模式 8 项（多出「容器」「编排」）：
-    // 从多机切回单机时把越界的选中索引收敛，避免 NavigationRail 越界。
+    // 从多机切回单机时把越界的选中索引收敛，避免索引越界。
     final index = multi ? _selectedIndex : _selectedIndex.clamp(0, 5);
+    final destinations = multi
+        ? _multiDestinations(context)
+        : _singleDestinations(context);
+
     return Scaffold(
       body: Stack(
         children: [
           Row(
             children: [
-              // 左侧导航栏
-              NavigationRail(
-                selectedIndex: index,
-                onDestinationSelected: (value) {
-                  setState(() => _selectedIndex = value);
+              // 左侧导航栏（自绘：图标与文字并列）
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  // 窄窗口收起文字，仅保留图标，避免内容区被挤压。
+                  final compact = constraints.maxWidth < 720;
+                  return _Sidebar(
+                    destinations: destinations,
+                    selectedIndex: index,
+                    showSettings: _showSettings,
+                    compact: compact,
+                    onSelect: (value) {
+                      setState(() {
+                        _showSettings = false;
+                        _selectedIndex = value;
+                      });
+                    },
+                    onOpenSettings: () => setState(() => _showSettings = true),
+                  );
                 },
-                labelType: NavigationRailLabelType.all,
-                destinations: multi
-                    ? _multiDestinations(context)
-                    : _singleDestinations(context),
               ),
               const VerticalDivider(thickness: 1, width: 1),
               // 右侧内容区
               Expanded(
-                child: multi ? _buildMultiContent(index) : _buildContent(index),
+                child: _showSettings
+                    ? const SettingsScreen()
+                    : (multi
+                          ? _buildMultiContent(index)
+                          : _buildContent(index)),
               ),
             ],
           ),
@@ -197,85 +211,85 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// 单机模式导航（默认 6 个标签）。
-  List<NavigationRailDestination> _singleDestinations(BuildContext context) {
+  List<NavItem> _singleDestinations(BuildContext context) {
     final l = AppLocalizations.of(context);
     return [
-      NavigationRailDestination(
-        icon: const Icon(Icons.storage_outlined),
-        selectedIcon: const Icon(Icons.storage),
-        label: Text(l.home_navInstances),
+      NavItem(
+        icon: Icons.storage_outlined,
+        selectedIcon: Icons.storage,
+        label: l.home_navInstances,
       ),
-      NavigationRailDestination(
-        icon: const Icon(Icons.lan_outlined),
-        selectedIcon: const Icon(Icons.lan),
-        label: Text(l.home_navNodes),
+      NavItem(
+        icon: Icons.lan_outlined,
+        selectedIcon: Icons.lan,
+        label: l.home_navNodes,
       ),
-      NavigationRailDestination(
-        icon: const Icon(Icons.store_outlined),
-        selectedIcon: const Icon(Icons.store),
-        label: Text(l.home_navMarket),
+      NavItem(
+        icon: Icons.store_outlined,
+        selectedIcon: Icons.store,
+        label: l.home_navMarket,
       ),
-      NavigationRailDestination(
-        icon: const Icon(Icons.dns_outlined),
-        selectedIcon: const Icon(Icons.dns),
-        label: Text(l.home_navDatabase),
+      NavItem(
+        icon: Icons.dns_outlined,
+        selectedIcon: Icons.dns,
+        label: l.home_navDatabase,
       ),
-      NavigationRailDestination(
-        icon: const Icon(Icons.smart_toy_outlined),
-        selectedIcon: const Icon(Icons.smart_toy),
-        label: Text(l.home_navAi),
+      NavItem(
+        icon: Icons.smart_toy_outlined,
+        selectedIcon: Icons.smart_toy,
+        label: l.home_navAi,
       ),
-      NavigationRailDestination(
-        icon: const Icon(Icons.hub_outlined),
-        selectedIcon: const Icon(Icons.hub),
-        label: Text(l.home_navFrp),
+      NavItem(
+        icon: Icons.hub_outlined,
+        selectedIcon: Icons.hub,
+        label: l.home_navFrp,
       ),
     ];
   }
 
   /// 多机模式导航（节点优先，8 项）。
-  List<NavigationRailDestination> _multiDestinations(BuildContext context) {
+  List<NavItem> _multiDestinations(BuildContext context) {
     final l = AppLocalizations.of(context);
     return [
-      NavigationRailDestination(
-        icon: const Icon(Icons.lan_outlined),
-        selectedIcon: const Icon(Icons.lan),
-        label: Text(l.home_navHome),
+      NavItem(
+        icon: Icons.lan_outlined,
+        selectedIcon: Icons.lan,
+        label: l.home_navHome,
       ),
-      NavigationRailDestination(
-        icon: const Icon(Icons.storage_outlined),
-        selectedIcon: const Icon(Icons.storage),
-        label: Text(l.home_navInstances),
+      NavItem(
+        icon: Icons.storage_outlined,
+        selectedIcon: Icons.storage,
+        label: l.home_navInstances,
       ),
-      NavigationRailDestination(
-        icon: const Icon(Icons.inventory_2_outlined),
-        selectedIcon: const Icon(Icons.inventory_2),
-        label: Text(l.home_navContainers),
+      NavItem(
+        icon: Icons.inventory_2_outlined,
+        selectedIcon: Icons.inventory_2,
+        label: l.home_navContainers,
       ),
-      NavigationRailDestination(
-        icon: const Icon(Icons.dashboard_customize_outlined),
-        selectedIcon: const Icon(Icons.dashboard_customize),
-        label: Text(l.home_navOrchestration),
+      NavItem(
+        icon: Icons.dashboard_customize_outlined,
+        selectedIcon: Icons.dashboard_customize,
+        label: l.home_navOrchestration,
       ),
-      NavigationRailDestination(
-        icon: const Icon(Icons.store_outlined),
-        selectedIcon: const Icon(Icons.store),
-        label: Text(l.home_navMarket),
+      NavItem(
+        icon: Icons.store_outlined,
+        selectedIcon: Icons.store,
+        label: l.home_navMarket,
       ),
-      NavigationRailDestination(
-        icon: const Icon(Icons.dns_outlined),
-        selectedIcon: const Icon(Icons.dns),
-        label: Text(l.home_navDatabase),
+      NavItem(
+        icon: Icons.dns_outlined,
+        selectedIcon: Icons.dns,
+        label: l.home_navDatabase,
       ),
-      NavigationRailDestination(
-        icon: const Icon(Icons.smart_toy_outlined),
-        selectedIcon: const Icon(Icons.smart_toy),
-        label: Text(l.home_navAi),
+      NavItem(
+        icon: Icons.smart_toy_outlined,
+        selectedIcon: Icons.smart_toy,
+        label: l.home_navAi,
       ),
-      NavigationRailDestination(
-        icon: const Icon(Icons.hub_outlined),
-        selectedIcon: const Icon(Icons.hub),
-        label: Text(l.home_navFrp),
+      NavItem(
+        icon: Icons.hub_outlined,
+        selectedIcon: Icons.hub,
+        label: l.home_navFrp,
       ),
     ];
   }
@@ -347,7 +361,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 IconButton(
                   icon: const Icon(Icons.settings_outlined),
                   tooltip: l.common_settings,
-                  onPressed: () => showSettingsDialog(context),
+                  // 跳转到左侧边栏的「设置」（保持侧边栏选中态一致）。
+                  onPressed: () => setState(() => _showSettings = true),
                 ),
                 const SizedBox(width: 4),
               ],
@@ -518,324 +533,183 @@ class _StatusChip extends StatelessWidget {
   }
 }
 
-/// 打开全局设置对话框（单机 / 多机模式通用）。
-Future<void> showSettingsDialog(BuildContext context) {
-  return showAppDialog<void>(context, (_) => const SettingsDialog());
-}
-
-/// 设置对话框 — 管理模式、下载线程数、数据库每页行数、字体。
+/// 打开全局设置页（单机 / 多机模式通用）。
 ///
-/// 修改即时生效并持久化到 SQLite `settings` 表。
-class SettingsDialog extends StatefulWidget {
-  const SettingsDialog({super.key});
-
-  @override
-  State<SettingsDialog> createState() => SettingsDialogState();
+/// 保留原函数名以兼容既有调用方（如 [ClusterHomeScreen]），
+/// 但行为由「弹出对话框」改为「跳转到设置页」。
+Future<void> showSettingsDialog(BuildContext context) {
+  return pushPage<void>(context, (_) => const SettingsScreen());
 }
 
-class SettingsDialogState extends State<SettingsDialog> {
-  late double _threads;
-  late double _pageSize;
-  late bool _multi;
-  late bool _vaultEnabled;
-  late bool _devEnabled;
-  late String _uiFont;
-  late String _terminalFont;
-  late AppLanguage _language;
-  bool _loading = true;
+/// 侧边栏导航项（图标 + 文字）。
+class NavItem {
+  const NavItem({
+    required this.icon,
+    required this.selectedIcon,
+    required this.label,
+  });
 
-  @override
-  void initState() {
-    super.initState();
-    final state = context.read<AppState>();
-    _threads = state.downloadThreads.toDouble();
-    _pageSize = DbPageSettings.pageSize.toDouble();
-    _multi = context.read<ClusterState>().mode == ManagementMode.multi;
-    _vaultEnabled = VaultSettings.defaultEnabled;
-    _devEnabled = false;
-    final fonts = FontSettings.instance;
-    _uiFont = fonts.uiFamily;
-    _terminalFont = fonts.terminalFamily;
-    _language = LocaleSettings.instance.language;
-    unawaited(_loadToggles());
-  }
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
+}
 
-  /// 异步加载 Vault 与开发者模式开关状态（SQLite settings 表）。
-  Future<void> _loadToggles() async {
-    final vault = await VaultSettings.isEnabled();
-    final dev = await DeveloperSettings.isEnabled();
-    if (!mounted) return;
-    setState(() {
-      _vaultEnabled = vault;
-      _devEnabled = dev;
-      _loading = false;
-    });
-  }
+/// 自绘左侧导航栏。
+///
+/// 与 [NavigationRail] 的关键差异：每项为横向 Row，
+/// **图标与文字并列**（而非图标在上、文字在下）；
+/// 底部固定「设置」入口，与其余功能项视觉一致。
+class _Sidebar extends StatelessWidget {
+  const _Sidebar({
+    required this.destinations,
+    required this.selectedIndex,
+    required this.showSettings,
+    required this.compact,
+    required this.onSelect,
+    required this.onOpenSettings,
+  });
 
-  /// 切换管理模式，并启停集群监控循环。
-  void _toggleMode(bool multi) {
-    final cluster = context.read<ClusterState>();
-    cluster.setMode(multi ? ManagementMode.multi : ManagementMode.single);
-    if (multi) {
-      ClusterMonitor.instance.start(context.read<NodeState>(), cluster);
-    } else {
-      ClusterMonitor.instance.stop();
-    }
-    setState(() => _multi = multi);
-  }
+  final List<NavItem> destinations;
+  final int selectedIndex;
+  final bool showSettings;
+  final bool compact;
+  final ValueChanged<int> onSelect;
+  final VoidCallback onOpenSettings;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final l = AppLocalizations.of(context);
-    if (_loading) {
-      return const AlertDialog(content: CircularProgressIndicator());
-    }
-    return AlertDialog(
-      title: Text(l.settings_title),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 界面语言
-            Text(l.common_language,
-                style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 4),
-            DropdownButtonFormField<AppLanguage>(
-              initialValue: _language,
-              decoration: InputDecoration(
-                border: const OutlineInputBorder(),
-                isDense: true,
-                labelText: l.common_language,
-              ),
-              items: [
-                for (final lang in LocaleSettings.options)
-                  DropdownMenuItem(
-                    value: lang,
-                    child: Text(_languageLabel(l, lang)),
-                  ),
-              ],
-              onChanged: (v) {
-                if (v == null) return;
-                setState(() => _language = v);
-                LocaleSettings.instance.setLanguage(v);
-              },
-            ),
-            const Divider(height: 24),
-            // 管理模式
-            Row(
+
+    return Container(
+      width: compact ? 64 : 200,
+      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.25),
+      child: Column(
+        children: [
+          // 顶部品牌区
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 18, 16, 12),
+            child: Row(
+              mainAxisAlignment: compact
+                  ? MainAxisAlignment.center
+                  : MainAxisAlignment.start,
               children: [
-                const Icon(Icons.lan_outlined, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        l.settings_multiMode,
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                      Text(
-                        _multi
-                            ? l.settings_multiModeOn
-                            : l.settings_singleMode,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
+                Icon(Icons.dns, size: 22, color: theme.colorScheme.primary),
+                if (!compact) ...[
+                  const SizedBox(width: 10),
+                  Text(
+                    'IriX',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
-                AppleSwitch(value: _multi, onChanged: _toggleMode),
+                ],
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              l.settings_multiModeHint,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const Divider(height: 24),
-            // Vault 加密保险库（客户端功能开关）
-            Row(
+          ),
+          const Divider(height: 1),
+          const SizedBox(height: 8),
+          // 功能项
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
               children: [
-                const Icon(Icons.shield_outlined, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        l.settings_vault,
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                      Text(
-                        _vaultEnabled ? l.settings_vaultOn : l.settings_vaultOff,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
+                for (var i = 0; i < destinations.length; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: _SidebarItem(
+                      icon: destinations[i].icon,
+                      selectedIcon: destinations[i].selectedIcon,
+                      label: destinations[i].label,
+                      selected: !showSettings && i == selectedIndex,
+                      compact: compact,
+                      onTap: () => onSelect(i),
+                    ),
                   ),
-                ),
-                AppleSwitch(
-                  value: _vaultEnabled,
-                  onChanged: (v) async {
-                    setState(() => _vaultEnabled = v);
-                    await VaultSettings.setEnabled(v);
-                  },
-                ),
               ],
             ),
-            const Divider(height: 24),
-            // 开发者模式（记录全部日志到程序目录 logs/）
-            Row(
-              children: [
-                const Icon(Icons.bug_report_outlined, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        l.settings_developer,
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                      Text(
-                        _devEnabled
-                            ? l.settings_developerOn
-                            : l.settings_developerOff,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                ),
-                AppleSwitch(
-                  value: _devEnabled,
-                  onChanged: (v) async {
-                    setState(() => _devEnabled = v);
-                    await DeveloperSettings.setEnabled(v);
-                    await DevLog.instance.refreshEnabled();
-                  },
-                ),
-              ],
+          ),
+          // 底部：全局设置入口（图标与文字并列）。
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
+            child: _SidebarItem(
+              icon: Icons.settings_outlined,
+              selectedIcon: Icons.settings,
+              label: l.common_settings,
+              selected: showSettings,
+              compact: compact,
+              onTap: onOpenSettings,
             ),
-            const SizedBox(height: 8),
-            Text(
-              l.settings_developerHint,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const Divider(height: 24),
-            // 下载线程数
-            Text(
-              l.settings_downloadThreads(_threads.round()),
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-            const SizedBox(height: 4),
-            Slider(
-              value: _threads,
-              min: DownloadSettings.minThreads.toDouble(),
-              max: DownloadSettings.maxThreads.toDouble(),
-              divisions:
-                  DownloadSettings.maxThreads - DownloadSettings.minThreads,
-              label: '${_threads.round()}',
-              onChanged: (v) => setState(() => _threads = v),
-              onChangeEnd: (v) =>
-                  context.read<AppState>().setDownloadThreads(v.round()),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              l.settings_downloadThreadsHint,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 16),
-            // 数据库表格每页行数
-            Text(
-              l.settings_dbPageSize(_pageSize.round()),
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-            const SizedBox(height: 4),
-            Slider(
-              value: _pageSize,
-              min: DbPageSettings.minPageSize.toDouble(),
-              max: DbPageSettings.maxPageSize.toDouble(),
-              divisions:
-                  DbPageSettings.maxPageSize - DbPageSettings.minPageSize,
-              label: '${_pageSize.round()}',
-              onChanged: (v) => setState(() => _pageSize = v),
-              onChangeEnd: (v) => DbPageSettings.setPageSize(v.round()),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              l.settings_dbPageSizeHint,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const Divider(height: 24),
-            // 字体（UI 与终端分开管理）
-            Text(l.settings_font,
-                style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 4),
-            Text(
-              l.settings_fontHint,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue: _uiFont,
-              decoration: InputDecoration(
-                labelText: l.settings_uiFont,
-                border: const OutlineInputBorder(),
-                isDense: true,
-              ),
-              items: [
-                for (final (value, label) in FontSettings.uiOptions)
-                  DropdownMenuItem(value: value, child: Text(label)),
-              ],
-              onChanged: (v) {
-                if (v == null) return;
-                setState(() => _uiFont = v);
-                FontSettings.instance.setUiFamily(v);
-              },
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue: _terminalFont,
-              decoration: InputDecoration(
-                labelText: l.settings_terminalFont,
-                border: const OutlineInputBorder(),
-                isDense: true,
-              ),
-              items: [
-                for (final (value, label) in FontSettings.terminalOptions)
-                  DropdownMenuItem(value: value, child: Text(label)),
-              ],
-              onChanged: (v) {
-                if (v == null) return;
-                setState(() => _terminalFont = v);
-                FontSettings.instance.setTerminalFamily(v);
-              },
-            ),
-            const SizedBox(height: 8),
-            Text(
-              l.settings_fontFallbackHint,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(l.common_close),
-        ),
-      ],
     );
   }
+}
 
-  /// 语言下拉项的显示名（复用 common_language* 键）。
-  String _languageLabel(AppLocalizations l, AppLanguage lang) {
-    switch (lang) {
-      case AppLanguage.system:
-        return l.common_languageSystem;
-      case AppLanguage.zh:
-        return l.common_languageChinese;
-      case AppLanguage.en:
-        return l.common_languageEnglish;
-    }
+/// 单个侧边栏项 —— 图标与文字横向并列。
+class _SidebarItem extends StatelessWidget {
+  const _SidebarItem({
+    required this.icon,
+    required this.selectedIcon,
+    required this.label,
+    required this.selected,
+    required this.compact,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
+  final bool selected;
+  final bool compact;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = selected
+        ? theme.colorScheme.primary
+        : theme.colorScheme.onSurfaceVariant;
+
+    return Material(
+      color: selected
+          ? theme.colorScheme.primary.withValues(alpha: 0.12)
+          : Colors.transparent,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 0 : 12,
+            vertical: 11,
+          ),
+          child: Row(
+            mainAxisAlignment: compact
+                ? MainAxisAlignment.center
+                : MainAxisAlignment.start,
+            children: [
+              Icon(selected ? selectedIcon : icon, size: 20, color: color),
+              // 图标与文字并列；紧凑模式（窄窗口）下仅显示图标。
+              if (!compact) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: color,
+                      fontWeight: selected ? FontWeight.w600 : null,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

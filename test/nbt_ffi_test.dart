@@ -40,7 +40,10 @@ void main() {
     test('SNBT 解析与往返', () async {
       // 注意：Compound 键按字母序规整化（BTreeMap），与原 mod 行为一致。
       const snbt = '{id:"minecraft:diamond",Count:1b,display:{Name:"hi"}}';
-      final res = await NbtFfi.instance.request(op: 'parse_snbt', args: {'snbt': snbt});
+      final res = await NbtFfi.instance.request(
+        op: 'parse_snbt',
+        args: {'snbt': snbt},
+      );
       expect(
         res['snbt'],
         '{Count:1b,display:{Name:"hi"},id:"minecraft:diamond"}',
@@ -80,7 +83,11 @@ void main() {
 
     test('search 搜索路径', () async {
       const snbt = '{Enchantments:[{id:"minecraft:sharpness"}],Name:"sword"}';
-      final hits = await NbtService.instance.search(snbt, 'sharpness', limit: 50);
+      final hits = await NbtService.instance.search(
+        snbt,
+        'sharpness',
+        limit: 50,
+      );
       expect(hits.any((h) => h.contains('Enchantments')), isTrue);
     }, skip: skipReason);
 

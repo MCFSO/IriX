@@ -49,9 +49,10 @@ class DevLogNative {
     appLogFlush = _lib.lookupFunction<AppLogFlushNative, AppLogFlushDart>(
       'app_log_flush',
     );
-    appLogShutdown = _lib.lookupFunction<AppLogShutdownNative, AppLogShutdownDart>(
-      'app_log_shutdown',
-    );
+    appLogShutdown = _lib
+        .lookupFunction<AppLogShutdownNative, AppLogShutdownDart>(
+          'app_log_shutdown',
+        );
     getLastError = _lib.lookupFunction<GetLastErrorNative, GetLastErrorDart>(
       'get_last_error',
     );

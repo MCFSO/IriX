@@ -385,12 +385,30 @@ class _RemoteInstanceDetailScreenState
                     isScrollable: true,
                     tabAlignment: TabAlignment.start,
                     tabs: [
-                      Tab(icon: const Icon(Icons.terminal), text: l.remoteInstance_tabConsole),
-                      Tab(icon: const Icon(Icons.settings_outlined), text: l.instanceDetail_tabConfig),
-                      Tab(icon: const Icon(Icons.folder), text: l.instanceDetail_tabFiles),
-                      Tab(icon: const Icon(Icons.extension), text: l.instanceDetail_tabPlugins),
-                      Tab(icon: const Icon(Icons.backup), text: l.instanceDetail_tabBackup),
-                      Tab(icon: const Icon(Icons.inventory_2), text: l.container_tabContainers),
+                      Tab(
+                        icon: const Icon(Icons.terminal),
+                        text: l.remoteInstance_tabConsole,
+                      ),
+                      Tab(
+                        icon: const Icon(Icons.settings_outlined),
+                        text: l.instanceDetail_tabConfig,
+                      ),
+                      Tab(
+                        icon: const Icon(Icons.folder),
+                        text: l.instanceDetail_tabFiles,
+                      ),
+                      Tab(
+                        icon: const Icon(Icons.extension),
+                        text: l.instanceDetail_tabPlugins,
+                      ),
+                      Tab(
+                        icon: const Icon(Icons.backup),
+                        text: l.instanceDetail_tabBackup,
+                      ),
+                      Tab(
+                        icon: const Icon(Icons.inventory_2),
+                        text: l.container_tabContainers,
+                      ),
                     ],
                   ),
                   Expanded(
@@ -602,16 +620,28 @@ class _RemoteInstanceDetailScreenState
     final rows = <(String, String)>[
       (l.remoteInstance_fInstanceId, _instance.uuid),
       (l.remoteInstance_fName, cfg.nickname),
-      (l.remoteInstance_fStartCommand, cfg.startCommand.isEmpty ? '—' : cfg.startCommand),
-      (l.remoteInstance_fStopCommand, cfg.stopCommand.isEmpty ? '—' : cfg.stopCommand),
+      (
+        l.remoteInstance_fStartCommand,
+        cfg.startCommand.isEmpty ? '—' : cfg.startCommand,
+      ),
+      (
+        l.remoteInstance_fStopCommand,
+        cfg.stopCommand.isEmpty ? '—' : cfg.stopCommand,
+      ),
       (l.remoteInstance_fWorkdir, cfg.cwd.isEmpty ? '—' : cfg.cwd),
       (l.remoteInstance_fType, cfg.type),
       (l.remoteInstance_fProcessType, cfg.processType),
       (l.remoteInstance_fFileEncoding, cfg.fileCode),
       (l.remoteInstance_fInputEncoding, cfg.ie),
       (l.remoteInstance_fOutputEncoding, cfg.oe),
-      (l.remoteInstance_fAutoStart, cfg.autoStart ? l.common_enabled : l.common_disabled),
-      (l.remoteInstance_fAutoRestart, cfg.autoRestart ? l.common_enabled : l.common_disabled),
+      (
+        l.remoteInstance_fAutoStart,
+        cfg.autoStart ? l.common_enabled : l.common_disabled,
+      ),
+      (
+        l.remoteInstance_fAutoRestart,
+        cfg.autoRestart ? l.common_enabled : l.common_disabled,
+      ),
       (l.remoteInstance_fStartCount, '${_instance.started}'),
       (l.remoteInstance_fPid, _instance.pid > 0 ? '${_instance.pid}' : '—'),
     ];
@@ -621,9 +651,15 @@ class _RemoteInstanceDetailScreenState
           l.remoteInstance_fContainerName,
           cfg.docker.containerName.isEmpty ? '—' : cfg.docker.containerName,
         ),
-        (l.remoteInstance_fImage, cfg.docker.image.isEmpty ? '—' : cfg.docker.image),
+        (
+          l.remoteInstance_fImage,
+          cfg.docker.image.isEmpty ? '—' : cfg.docker.image,
+        ),
         (l.remoteInstance_fMemoryLimit, '${cfg.docker.memory} MB'),
-        (l.remoteInstance_fPortMapping, cfg.docker.ports.isEmpty ? '—' : cfg.docker.ports.join(', ')),
+        (
+          l.remoteInstance_fPortMapping,
+          cfg.docker.ports.isEmpty ? '—' : cfg.docker.ports.join(', '),
+        ),
         (
           l.remoteInstance_fExtraVolumes,
           cfg.docker.extraVolumes.isEmpty

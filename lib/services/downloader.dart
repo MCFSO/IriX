@@ -256,9 +256,7 @@ class Downloader {
           try {
             File(targetFilePath).deleteSync();
           } catch (_) {}
-          throw Exception(
-            '文件完整性校验失败（SHA-256/SHA-512 不匹配），已删除下载文件',
-          );
+          throw Exception('文件完整性校验失败（SHA-256/SHA-512 不匹配），已删除下载文件');
         }
       }
       DevLog.instance.devInfo('download', 'DONE $url -> $targetFilePath');

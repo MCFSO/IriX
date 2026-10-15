@@ -115,7 +115,10 @@ class _TextEditorDialogState extends State<TextEditorDialog> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(l.textEditor_cannotRead, style: theme.textTheme.titleMedium),
+                    Text(
+                      l.textEditor_cannotRead,
+                      style: theme.textTheme.titleMedium,
+                    ),
                     const SizedBox(height: 8),
                     Text(_error!, style: theme.textTheme.bodySmall),
                   ],

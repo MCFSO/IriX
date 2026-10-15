@@ -443,7 +443,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   Widget _buildTypeFilterChip() {
     final l = AppLocalizations.of(context);
     return PopupMenuButton<_ProjectTypeFilter>(
-      child: _filterChip('${l.market_type}: ${_typeFilter.label(l)}', active: true),
+      child: _filterChip(
+        '${l.market_type}: ${_typeFilter.label(l)}',
+        active: true,
+      ),
       onSelected: (value) {
         setState(() {
           _typeFilter = value;
@@ -470,7 +473,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   Widget _buildSortChip() {
     final l = AppLocalizations.of(context);
     return PopupMenuButton<_SortIndex>(
-      child: _filterChip('${l.market_sort}: ${_sortIndex.label(l)}', active: true),
+      child: _filterChip(
+        '${l.market_sort}: ${_sortIndex.label(l)}',
+        active: true,
+      ),
       onSelected: (value) {
         setState(() => _sortIndex = value);
         _search();
@@ -519,7 +525,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     final l = AppLocalizations.of(context);
     return PopupMenuButton<String?>(
       child: _filterChip(
-        _gameVersionFilter == null ? l.market_gameVersion : 'MC $_gameVersionFilter',
+        _gameVersionFilter == null
+            ? l.market_gameVersion
+            : 'MC $_gameVersionFilter',
         active: _gameVersionFilter != null,
       ),
       onSelected: (value) {
@@ -681,7 +689,10 @@ class _SearchResultCard extends StatelessWidget {
                           '${_formatNumber(hit.downloads)} ${l.market_downloads}',
                           Icons.download,
                         ),
-                        _infoChip('${_formatNumber(hit.stars)} ${l.market_stars}', Icons.star),
+                        _infoChip(
+                          '${_formatNumber(hit.stars)} ${l.market_stars}',
+                          Icons.star,
+                        ),
                         _infoChip(hit.category, Icons.category),
                         _infoChip(hit.source.label, Icons.cloud),
                       ],

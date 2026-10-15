@@ -380,7 +380,9 @@ class FrpcManager extends ChangeNotifier {
           final hex = digest.startsWith('sha256:')
               ? digest.substring(7)
               : digest;
-          if (RegExp(r'^[0-9a-fA-F]{64}$').hasMatch(hex)) return hex.toLowerCase();
+          if (RegExp(r'^[0-9a-fA-F]{64}$').hasMatch(hex)) {
+            return hex.toLowerCase();
+          }
         }
       }
       return null;

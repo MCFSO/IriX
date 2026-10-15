@@ -71,7 +71,9 @@ class _NbtEditorScreenState extends State<NbtEditorScreen> {
     setState(() => _loading = true);
     try {
       if (widget.initialBytes != null) {
-        _root = await NbtService.instance.parseBinaryToTree(widget.initialBytes!);
+        _root = await NbtService.instance.parseBinaryToTree(
+          widget.initialBytes!,
+        );
       } else {
         // 默认空白根 Compound。
         _root = NbtNode(type: NbtType.compound, children: []);
@@ -145,7 +147,11 @@ class _NbtEditorScreenState extends State<NbtEditorScreen> {
     final l = AppLocalizations.of(context);
     try {
       final snbt = await NbtService.instance.fromTree(_root);
-      await _showSnbtDialog(title: l.nbt_currentSnbt, initial: snbt, readOnly: true);
+      await _showSnbtDialog(
+        title: l.nbt_currentSnbt,
+        initial: snbt,
+        readOnly: true,
+      );
     } catch (e) {
       if (mounted) _toast(l.nbt_generateSnbtFailed(e.toString()), error: true);
     }
@@ -185,8 +191,9 @@ class _NbtEditorScreenState extends State<NbtEditorScreen> {
     if (existing != null && !existing.isContainer) {
       existing.value = value;
     } else {
-      parent.children
-          .add(NbtNode(type: NbtType.string, name: key, value: value));
+      parent.children.add(
+        NbtNode(type: NbtType.string, name: key, value: value),
+      );
     }
   }
 
@@ -261,8 +268,8 @@ class _NbtEditorScreenState extends State<NbtEditorScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error
-              ? Center(child: Text(_errorMsg))
-              : _buildBody(),
+          ? Center(child: Text(_errorMsg))
+          : _buildBody(),
     );
   }
 
@@ -306,18 +313,16 @@ class _NbtEditorScreenState extends State<NbtEditorScreen> {
                   ButtonSegment(value: true, label: Text(l.nbt_simpleMode)),
                 ],
                 selected: {_simpleMode},
-                onSelectionChanged: (s) => setState(() => _simpleMode = s.first),
+                onSelectionChanged: (s) =>
+                    setState(() => _simpleMode = s.first),
               ),
               const Spacer(),
-              if (!_simpleMode)
-                _SearchButton(onSearch: (q) => _search(q)),
+              if (!_simpleMode) _SearchButton(onSearch: (q) => _search(q)),
             ],
           ),
         ),
         Expanded(
-          child: _simpleMode
-              ? _buildSimpleForm()
-              : _buildAdvancedTree(),
+          child: _simpleMode ? _buildSimpleForm() : _buildAdvancedTree(),
         ),
       ],
     );
@@ -375,11 +380,23 @@ class _NbtEditorScreenState extends State<NbtEditorScreen> {
     final l = AppLocalizations.of(context);
     switch (_domain) {
       case _Domain.item:
-        return _ItemSimpleForm(get: _field, set: _setField, onChanged: _rebuildFromTree);
+        return _ItemSimpleForm(
+          get: _field,
+          set: _setField,
+          onChanged: _rebuildFromTree,
+        );
       case _Domain.entity:
-        return _EntitySimpleForm(get: _field, set: _setField, onChanged: _rebuildFromTree);
+        return _EntitySimpleForm(
+          get: _field,
+          set: _setField,
+          onChanged: _rebuildFromTree,
+        );
       case _Domain.villager:
-        return _VillagerSimpleForm(get: _field, set: _setField, onChanged: _rebuildFromTree);
+        return _VillagerSimpleForm(
+          get: _field,
+          set: _setField,
+          onChanged: _rebuildFromTree,
+        );
       default:
         return Center(child: Text(l.nbt_treeOnlyAdvanced));
     }
@@ -507,7 +524,9 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
             children: [
               if (_node.isContainer)
                 IconButton(
-                  icon: Icon(_expanded ? Icons.expand_more : Icons.chevron_right),
+                  icon: Icon(
+                    _expanded ? Icons.expand_more : Icons.chevron_right,
+                  ),
                   iconSize: 18,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(maxWidth: 24),
@@ -525,7 +544,12 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
                   ),
                 )
               else
-                Expanded(child: Text(l.nbt_root, style: const TextStyle(color: Colors.grey))),
+                Expanded(
+                  child: Text(
+                    l.nbt_root,
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                ),
               // 类型标签。
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
@@ -535,7 +559,11 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
                 ),
                 child: Text(
                   _node.type,
-                  style: TextStyle(color: color, fontSize: 11, fontFamily: 'monospace'),
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 11,
+                    fontFamily: 'monospace',
+                  ),
                 ),
               ),
               const SizedBox(width: 6),
@@ -558,7 +586,9 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
               Padding(
                 padding: const EdgeInsets.only(left: 40),
                 child: Text(
-                  _node.type == NbtType.list ? l.nbt_emptyList : l.nbt_emptyCompound,
+                  _node.type == NbtType.list
+                      ? l.nbt_emptyList
+                      : l.nbt_emptyCompound,
                   style: const TextStyle(color: Colors.grey, fontSize: 12),
                 ),
               ),
@@ -669,7 +699,9 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
                     Text(l.nbt_keyName),
                     TextField(
                       controller: nameCtl,
-                      decoration: const InputDecoration(border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                   ],
                 ],
@@ -681,7 +713,10 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
                 child: Text(l.common_cancel),
               ),
               TextButton(
-                onPressed: () => Navigator.pop(ctx, (type ?? NbtType.compound, nameCtl.text.trim())),
+                onPressed: () => Navigator.pop(ctx, (
+                  type ?? NbtType.compound,
+                  nameCtl.text.trim(),
+                )),
                 child: Text(l.common_confirm),
               ),
             ],
@@ -702,14 +737,13 @@ class _TreeNodeWidgetState extends State<_TreeNodeWidget> {
     widget.onChanged();
   }
 
-
   void _delete(BuildContext context) {
     final l = AppLocalizations.of(context);
     // 从父容器移除自身（根不允许删除）。
     if (_node == widget.root) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l.nbt_rootUndeletable)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l.nbt_rootUndeletable)));
       return;
     }
     // 在 root 中递归查找父并移除。
@@ -764,21 +798,30 @@ class _SimpleForm extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(children: fields),
-      );
+    padding: const EdgeInsets.all(16),
+    child: Column(children: fields),
+  );
 }
 
 typedef _GetField = String Function(String path, String fallback);
 typedef _SetField = void Function(String path, String value);
 
-Widget _textField(String label, String path, _GetField get, _SetField set, VoidCallback onChanged) {
+Widget _textField(
+  String label,
+  String path,
+  _GetField get,
+  _SetField set,
+  VoidCallback onChanged,
+) {
   final c = TextEditingController(text: get(path, ''));
   return Padding(
     padding: const EdgeInsets.symmetric(vertical: 6),
     child: TextField(
       controller: c,
-      decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
+      decoration: InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
+      ),
       onChanged: (v) {
         set(path, v);
         onChanged();
@@ -787,7 +830,13 @@ Widget _textField(String label, String path, _GetField get, _SetField set, VoidC
   );
 }
 
-Widget _boolField(String label, String path, _GetField get, _SetField set, VoidCallback onChanged) {
+Widget _boolField(
+  String label,
+  String path,
+  _GetField get,
+  _SetField set,
+  VoidCallback onChanged,
+) {
   final v = get(path, 'false') == 'true';
   return SwitchListTile(
     title: Text(label),
@@ -803,21 +852,51 @@ class _ItemSimpleForm extends StatelessWidget {
   final _GetField get;
   final _SetField set;
   final VoidCallback onChanged;
-  const _ItemSimpleForm({required this.get, required this.set, required this.onChanged});
+  const _ItemSimpleForm({
+    required this.get,
+    required this.set,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    return _SimpleForm(fields: [
+    return _SimpleForm(
+      fields: [
         _textField(l.nbt_itemId, 'id', get, set, onChanged),
         _textField(l.nbt_itemCount, 'Count', get, set, onChanged),
-        _textField(l.nbt_itemCustomName, 'components/custom_name', get, set, onChanged),
+        _textField(
+          l.nbt_itemCustomName,
+          'components/custom_name',
+          get,
+          set,
+          onChanged,
+        ),
         _textField(l.nbt_itemLore, 'components/lore', get, set, onChanged),
-        _boolField(l.nbt_itemUnbreakable, 'components/unbreakable', get, set, onChanged),
-        _boolField(l.nbt_itemFireResistant, 'components/fire_resistant', get, set, onChanged),
-        _textField(l.nbt_itemEnchantments, 'components/enchantments', get, set, onChanged),
+        _boolField(
+          l.nbt_itemUnbreakable,
+          'components/unbreakable',
+          get,
+          set,
+          onChanged,
+        ),
+        _boolField(
+          l.nbt_itemFireResistant,
+          'components/fire_resistant',
+          get,
+          set,
+          onChanged,
+        ),
+        _textField(
+          l.nbt_itemEnchantments,
+          'components/enchantments',
+          get,
+          set,
+          onChanged,
+        ),
         _textField(l.nbt_itemDamage, 'components/damage', get, set, onChanged),
-      ]);
+      ],
+    );
   }
 }
 
@@ -825,20 +904,32 @@ class _EntitySimpleForm extends StatelessWidget {
   final _GetField get;
   final _SetField set;
   final VoidCallback onChanged;
-  const _EntitySimpleForm({required this.get, required this.set, required this.onChanged});
+  const _EntitySimpleForm({
+    required this.get,
+    required this.set,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    return _SimpleForm(fields: [
+    return _SimpleForm(
+      fields: [
         _textField(l.nbt_entityCustomName, 'CustomName', get, set, onChanged),
         _textField(l.nbt_entityHealth, 'Health', get, set, onChanged),
         _boolField(l.nbt_entitySilent, 'Silent', get, set, onChanged),
         _boolField(l.nbt_entityGlowing, 'Glowing', get, set, onChanged),
         _boolField(l.nbt_entityNoGravity, 'NoGravity', get, set, onChanged),
-        _boolField(l.nbt_entityInvulnerable, 'Invulnerable', get, set, onChanged),
+        _boolField(
+          l.nbt_entityInvulnerable,
+          'Invulnerable',
+          get,
+          set,
+          onChanged,
+        ),
         _textField(l.nbt_entityPoiCounted, 'Poicounted', get, set, onChanged),
-      ]);
+      ],
+    );
   }
 }
 
@@ -846,17 +937,23 @@ class _VillagerSimpleForm extends StatelessWidget {
   final _GetField get;
   final _SetField set;
   final VoidCallback onChanged;
-  const _VillagerSimpleForm({required this.get, required this.set, required this.onChanged});
+  const _VillagerSimpleForm({
+    required this.get,
+    required this.set,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    return _SimpleForm(fields: [
+    return _SimpleForm(
+      fields: [
         _textField(l.nbt_villagerProfession, 'profession', get, set, onChanged),
         _textField(l.nbt_villagerLevel, 'level', get, set, onChanged),
         _textField(l.nbt_villagerType, 'type', get, set, onChanged),
         _textField(l.nbt_villagerOffers, 'Offers', get, set, onChanged),
-      ]);
+      ],
+    );
   }
 }
 
@@ -867,12 +964,12 @@ class _RconPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            AppLocalizations.of(context).nbt_rconPlaceholder,
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Text(
+        AppLocalizations.of(context).nbt_rconPlaceholder,
+        textAlign: TextAlign.center,
+      ),
+    ),
+  );
 }

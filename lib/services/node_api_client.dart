@@ -1888,11 +1888,7 @@ class NodeApiClient {
     final data = await _request(
       'GET',
       '/api/instance/metrics',
-      query: {
-        'uuid': uuid,
-        'daemonId': daemonId,
-        'minutes': '$minutes',
-      },
+      query: {'uuid': uuid, 'daemonId': daemonId, 'minutes': '$minutes'},
     );
     final samples = <MetricSample>[];
     if (data is Map<String, dynamic>) {
@@ -2101,7 +2097,7 @@ class NodeApiClient {
   ///
   /// [default] 为可用版本号最高的运行时（无可用时为 null）。
   Future<({JavaRuntime? defaultRuntime, List<JavaRuntime> all})>
-      javaRuntimes() async {
+  javaRuntimes() async {
     final data = await _request('GET', '/api/runtime/java');
     final all = <JavaRuntime>[];
     if (data is Map<String, dynamic>) {
@@ -2111,8 +2107,9 @@ class NodeApiClient {
         }
       }
       final def = data['default'];
-      final defaultRuntime =
-          def is Map<String, dynamic> ? JavaRuntime.fromJson(def) : null;
+      final defaultRuntime = def is Map<String, dynamic>
+          ? JavaRuntime.fromJson(def)
+          : null;
       return (defaultRuntime: defaultRuntime, all: all);
     }
     return (defaultRuntime: null, all: all);
@@ -2142,11 +2139,7 @@ class NodeApiClient {
 
   /// 卸载指定版本 JDK（DELETE /api/runtime/java?major=，见 jdk_install.go）。
   Future<void> uninstallJava(int major) async {
-    await _request(
-      'DELETE',
-      '/api/runtime/java',
-      query: {'major': '$major'},
-    );
+    await _request('DELETE', '/api/runtime/java', query: {'major': '$major'});
   }
 
   // ==================== 实例级回收站（irix-node）====================
@@ -2233,8 +2226,8 @@ class NodeApiClient {
   // ==================== 节点端内网穿透 FRP（irix-node）====================
 
   /// frpc 二进制状态与隧道列表（GET /api/frp/status，见 frp.go）。
-  Future<({FrpcBinaryInfo binary, List<FrpTunnelInfo> tunnels})> frpStatus()
-      async {
+  Future<({FrpcBinaryInfo binary, List<FrpTunnelInfo> tunnels})>
+  frpStatus() async {
     final data = await _request('GET', '/api/frp/status');
     final tunnels = <FrpTunnelInfo>[];
     if (data is Map<String, dynamic>) {
@@ -2244,12 +2237,10 @@ class NodeApiClient {
         }
       }
       final bin = data['binary'];
-      final binary =
-          bin is Map<String, dynamic> ? FrpcBinaryInfo.fromJson(bin) : null;
-      return (
-        binary: binary ?? const FrpcBinaryInfo(),
-        tunnels: tunnels,
-      );
+      final binary = bin is Map<String, dynamic>
+          ? FrpcBinaryInfo.fromJson(bin)
+          : null;
+      return (binary: binary ?? const FrpcBinaryInfo(), tunnels: tunnels);
     }
     return (binary: const FrpcBinaryInfo(), tunnels: tunnels);
   }
@@ -2462,11 +2453,7 @@ class NodeApiClient {
 
   /// 删除账户（DELETE /api/accounts?username=，管理员；root 不可删）。
   Future<void> deleteAccount(String username) async {
-    await _request(
-      'DELETE',
-      '/api/accounts',
-      query: {'username': username},
-    );
+    await _request('DELETE', '/api/accounts', query: {'username': username});
   }
 
   /// 修改账户端点开关（PUT /api/accounts/permissions，管理员）。
@@ -2539,11 +2526,7 @@ class NodeApiClient {
     final data = await _request(
       'GET',
       '/api/cluster/files/list',
-      query: {
-        'path': path,
-        'page': '$page',
-        'page_size': '$pageSize',
-      },
+      query: {'path': path, 'page': '$page', 'page_size': '$pageSize'},
     );
     return data is Map<String, dynamic> ? data : {};
   }
@@ -2555,11 +2538,7 @@ class NodeApiClient {
 
   /// 同步区删除文件 / 目录（DELETE /api/cluster/files）。
   Future<void> clusterDelete(List<String> targets) async {
-    await _request(
-      'DELETE',
-      '/api/cluster/files',
-      body: {'targets': targets},
-    );
+    await _request('DELETE', '/api/cluster/files', body: {'targets': targets});
   }
 
   /// 同步区下载票据（POST /api/cluster/files/download，目录范围票据）。
@@ -2648,7 +2627,7 @@ class NodeConsoleExit extends NodeConsoleEvent {
 /// 实时控制台 WebSocket 连接封装（见 console_ws.go 文本帧协议）。
 class NodeConsoleConnection {
   NodeConsoleConnection._(this._ws)
-      : _controller = StreamController<NodeConsoleEvent>.broadcast() {
+    : _controller = StreamController<NodeConsoleEvent>.broadcast() {
     _startHeartbeat();
     _listen();
   }

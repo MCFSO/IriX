@@ -66,7 +66,8 @@ class InstanceStore extends EntityStore<ServerInstance> {
       DatabaseManager.instance.insertServer(row);
 
   @override
-  Future<void> deleteRow(String id) => DatabaseManager.instance.deleteServer(id);
+  Future<void> deleteRow(String id) =>
+      DatabaseManager.instance.deleteServer(id);
 
   @override
   Future<void> updateRow(String id, Map<String, dynamic> row) =>
@@ -91,8 +92,7 @@ class InstanceStore extends EntityStore<ServerInstance> {
   ///
   /// 将 [instance] 插入数据库，同时更新内存缓存。
   /// 返回被添加的实例，便于调用方链式使用。
-  Future<ServerInstance> addInstance(ServerInstance instance) =>
-      add(instance);
+  Future<ServerInstance> addInstance(ServerInstance instance) => add(instance);
 
   /// 按 [id] 删除实例并持久化。
   ///

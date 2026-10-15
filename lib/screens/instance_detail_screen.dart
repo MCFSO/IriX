@@ -226,9 +226,9 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
       await context.read<AppState>().startInstance(widget.instanceId);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l.instanceDetail_startFailed(e.toString()))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.instanceDetail_startFailed(e.toString()))),
+      );
     }
   }
 
@@ -239,9 +239,9 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
       await context.read<AppState>().restartInstance(widget.instanceId);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l.instanceDetail_restartFailed(e.toString()))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.instanceDetail_restartFailed(e.toString()))),
+      );
     }
   }
 
@@ -285,7 +285,9 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
             IconButton(
               icon: const Icon(Icons.smart_toy_outlined),
               isSelected: _showAi,
-              tooltip: _showAi ? l.instanceDetail_closeAi : l.instanceDetail_openAi,
+              tooltip: _showAi
+                  ? l.instanceDetail_closeAi
+                  : l.instanceDetail_openAi,
               onPressed: () => setState(() => _showAi = !_showAi),
             ),
             const SizedBox(width: 4),
@@ -293,13 +295,34 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
           bottom: TabBar(
             isScrollable: true,
             tabs: [
-              Tab(icon: const Icon(Icons.dashboard), text: l.instanceDetail_tabOverview),
-              Tab(icon: const Icon(Icons.description), text: l.instanceDetail_tabConfig),
-              Tab(icon: const Icon(Icons.extension), text: l.instanceDetail_tabPlugins),
-              Tab(icon: const Icon(Icons.folder), text: l.instanceDetail_tabFiles),
-              Tab(icon: const Icon(Icons.backup), text: l.instanceDetail_tabBackup),
-              Tab(icon: const Icon(Icons.settings), text: l.instanceDetail_tabSettings),
-              Tab(icon: const Icon(Icons.inventory_2), text: l.container_tabContainers),
+              Tab(
+                icon: const Icon(Icons.dashboard),
+                text: l.instanceDetail_tabOverview,
+              ),
+              Tab(
+                icon: const Icon(Icons.description),
+                text: l.instanceDetail_tabConfig,
+              ),
+              Tab(
+                icon: const Icon(Icons.extension),
+                text: l.instanceDetail_tabPlugins,
+              ),
+              Tab(
+                icon: const Icon(Icons.folder),
+                text: l.instanceDetail_tabFiles,
+              ),
+              Tab(
+                icon: const Icon(Icons.backup),
+                text: l.instanceDetail_tabBackup,
+              ),
+              Tab(
+                icon: const Icon(Icons.settings),
+                text: l.instanceDetail_tabSettings,
+              ),
+              Tab(
+                icon: const Icon(Icons.inventory_2),
+                text: l.container_tabContainers,
+              ),
             ],
           ),
         ),
@@ -505,7 +528,10 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(l.instanceDetail_currentStatus, style: theme.textTheme.labelSmall),
+                  Text(
+                    l.instanceDetail_currentStatus,
+                    style: theme.textTheme.labelSmall,
+                  ),
                   const SizedBox(height: 4),
                   Text(status.label, style: theme.textTheme.bodyLarge),
                   if (adopted) ...[
@@ -606,9 +632,9 @@ class _BackupTabState extends State<_BackupTab> {
   Future<void> _startBackup() async {
     final l = AppLocalizations.of(context);
     if (_selectedIndices.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l.instanceDetail_selectAtLeastOne)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.instanceDetail_selectAtLeastOne)),
+      );
       return;
     }
 
@@ -653,28 +679,30 @@ class _BackupTabState extends State<_BackupTab> {
       if (!mounted) return;
 
       if (result.isSuccess) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l.instanceDetail_backupSaved(outputPath))));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l.instanceDetail_backupSaved(outputPath))),
+        );
       } else if (result.isCancelled) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l.instanceDetail_backupCancelled)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l.instanceDetail_backupCancelled)),
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(l.instanceDetail_backupFailed(
-              result.error ?? l.instanceDetail_errorCode(result.code),
-            )),
+            content: Text(
+              l.instanceDetail_backupFailed(
+                result.error ?? l.instanceDetail_errorCode(result.code),
+              ),
+            ),
           ),
         );
       }
     } catch (e) {
       // isolate 启动失败等异常
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l.instanceDetail_backupFailed(e.toString()))));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l.instanceDetail_backupFailed(e.toString()))),
+        );
       }
     } finally {
       if (mounted) {
@@ -718,7 +746,12 @@ class _BackupTabState extends State<_BackupTab> {
           tristate: true,
           onChanged: _toggleSelectAll,
           title: Text(l.instanceDetail_selectAll),
-          subtitle: Text(l.instanceDetail_selectedCount(_selectedIndices.length, _files.length)),
+          subtitle: Text(
+            l.instanceDetail_selectedCount(
+              _selectedIndices.length,
+              _files.length,
+            ),
+          ),
         ),
         const Divider(),
         // 文件列表
@@ -739,7 +772,9 @@ class _BackupTabState extends State<_BackupTab> {
                         isDir ? Icons.folder : Icons.insert_drive_file,
                       ),
                       title: Text(name),
-                      subtitle: Text(isDir ? l.instanceDetail_folder : l.instanceDetail_file),
+                      subtitle: Text(
+                        isDir ? l.instanceDetail_folder : l.instanceDetail_file,
+                      ),
                     );
                   },
                 ),
@@ -771,7 +806,10 @@ class _BackupTabState extends State<_BackupTab> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(l.instanceDetail_backingUp, style: const TextStyle(fontSize: 18)),
+              Text(
+                l.instanceDetail_backingUp,
+                style: const TextStyle(fontSize: 18),
+              ),
               const SizedBox(height: 24),
               LinearProgressIndicator(value: _backupProgress),
               const SizedBox(height: 12),
@@ -780,7 +818,10 @@ class _BackupTabState extends State<_BackupTab> {
                 style: const TextStyle(fontSize: 16),
               ),
               const SizedBox(height: 24),
-              OutlinedButton(onPressed: _cancelBackup, child: Text(l.common_cancel)),
+              OutlinedButton(
+                onPressed: _cancelBackup,
+                child: Text(l.common_cancel),
+              ),
             ],
           ),
         ),
@@ -1065,16 +1106,16 @@ class _RunModeCardState extends State<_RunModeCard> {
         .firstOrNull;
     if (instance == null) return;
     if (instance.status.isActive) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l.instanceDetail_stopBeforeSwitch)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.instanceDetail_stopBeforeSwitch)),
+      );
       return;
     }
     await state.updateRunMode(widget.instanceId, mode, instance.container);
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(l.instanceDetail_switchedToMode(mode.label))));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l.instanceDetail_switchedToMode(mode.label))),
+    );
   }
 
   @override
@@ -1101,7 +1142,10 @@ class _RunModeCardState extends State<_RunModeCard> {
                 const Icon(Icons.layers_outlined),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: Text(l.instanceDetail_runMode, style: theme.textTheme.titleMedium),
+                  child: Text(
+                    l.instanceDetail_runMode,
+                    style: theme.textTheme.titleMedium,
+                  ),
                 ),
               ],
             ),
@@ -1277,9 +1321,9 @@ class _ContainerConfigCardState extends State<_ContainerConfigCard> {
     );
     if (!mounted) return;
     setState(() => _dirty = false);
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(l.instanceDetail_containerConfigSaved)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l.instanceDetail_containerConfigSaved)),
+    );
   }
 
   List<String> _splitList(String text) {
@@ -1313,7 +1357,12 @@ class _ContainerConfigCardState extends State<_ContainerConfigCard> {
           children: [
             const Icon(Icons.tune),
             const SizedBox(width: 16),
-            Expanded(child: Text(l.instanceDetail_containerConfig, style: theme.textTheme.titleSmall)),
+            Expanded(
+              child: Text(
+                l.instanceDetail_containerConfig,
+                style: theme.textTheme.titleSmall,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 12),
@@ -1386,7 +1435,10 @@ class _ContainerConfigCardState extends State<_ContainerConfigCard> {
               value: 'unless-stopped',
               child: Text(l.container_restartUnlessStopped),
             ),
-            DropdownMenuItem(value: 'always', child: Text(l.container_restartAlways)),
+            DropdownMenuItem(
+              value: 'always',
+              child: Text(l.container_restartAlways),
+            ),
             DropdownMenuItem(
               value: 'on-failure',
               child: Text(l.container_restartOnFailure),
@@ -1828,13 +1880,19 @@ class _EulaCardState extends State<_EulaCard> {
       });
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(value ? l.instanceDetail_eulaAccepted : l.instanceDetail_eulaRevoked)),
+        SnackBar(
+          content: Text(
+            value
+                ? l.instanceDetail_eulaAccepted
+                : l.instanceDetail_eulaRevoked,
+          ),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l.instanceDetail_eulaWriteFailed(e.toString()))));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.instanceDetail_eulaWriteFailed(e.toString()))),
+      );
     }
   }
 
@@ -1885,7 +1943,11 @@ class _EulaCardState extends State<_EulaCard> {
               value: _accepted,
               onChanged: (v) => _setEula(v),
               title: Text(l.instanceDetail_eulaAccept),
-              subtitle: Text(_accepted ? l.instanceDetail_eulaAcceptedSubtitle : l.instanceDetail_eulaNotAcceptedSubtitle),
+              subtitle: Text(
+                _accepted
+                    ? l.instanceDetail_eulaAcceptedSubtitle
+                    : l.instanceDetail_eulaNotAcceptedSubtitle,
+              ),
               contentPadding: EdgeInsets.zero,
             ),
             const SizedBox(height: 4),

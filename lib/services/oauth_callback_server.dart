@@ -36,9 +36,10 @@ class OAuthCallbackServer {
     _port = server.port;
     // 一次性随机 state（24 字节十六进制，H-5）。
     final rng = Random.secure();
-    _state = List<int>.generate(24, (_) => rng.nextInt(256))
-        .map((b) => b.toRadixString(16).padLeft(2, '0'))
-        .join();
+    _state = List<int>.generate(
+      24,
+      (_) => rng.nextInt(256),
+    ).map((b) => b.toRadixString(16).padLeft(2, '0')).join();
   }
 
   /// 等待浏览器回调，返回合并后的参数（query 优先，其次 fragment）。

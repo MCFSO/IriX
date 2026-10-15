@@ -14,14 +14,10 @@ import 'package:ffi/ffi.dart';
 import 'rust_lib.dart';
 
 /// FFI 函数签名定义（nbt_request 为 2 参：op + argsJson，无连接参数）。
-typedef NbtRequestC = Pointer<Utf8> Function(
-  Pointer<Utf8> op,
-  Pointer<Utf8> argsJson,
-);
-typedef NbtRequestDart = Pointer<Utf8> Function(
-  Pointer<Utf8> op,
-  Pointer<Utf8> argsJson,
-);
+typedef NbtRequestC =
+    Pointer<Utf8> Function(Pointer<Utf8> op, Pointer<Utf8> argsJson);
+typedef NbtRequestDart =
+    Pointer<Utf8> Function(Pointer<Utf8> op, Pointer<Utf8> argsJson);
 
 /// NBT 操作异常
 class NbtFfiException implements Exception {
@@ -115,8 +111,9 @@ class NbtFfi {
 
     try {
       final lib = _openLibrary();
-      final nbtRequest =
-          lib.lookupFunction<NbtRequestC, NbtRequestDart>('nbt_request');
+      final nbtRequest = lib.lookupFunction<NbtRequestC, NbtRequestDart>(
+        'nbt_request',
+      );
 
       opPtr = req.op.toNativeUtf8();
       argsPtr = req.argsJson.toNativeUtf8();

@@ -25,10 +25,10 @@ enum DevLogLevel {
   error;
 
   String get tag => switch (this) {
-        DevLogLevel.info => 'INFO',
-        DevLogLevel.warn => 'WARN',
-        DevLogLevel.error => 'ERROR',
-      };
+    DevLogLevel.info => 'INFO',
+    DevLogLevel.warn => 'WARN',
+    DevLogLevel.error => 'ERROR',
+  };
 }
 
 /// 开发者日志单例。
@@ -147,7 +147,8 @@ class DevLog {
   // === 便捷方法 ===
 
   /// 一般信息（操作轨迹 / 启动流程）。
-  void devInfo(String tag, String message) => log(DevLogLevel.info, tag, message);
+  void devInfo(String tag, String message) =>
+      log(DevLogLevel.info, tag, message);
 
   /// 警告（非致命异常 / 降级）。
   void devWarn(String tag, String message) =>

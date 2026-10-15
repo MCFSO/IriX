@@ -90,8 +90,7 @@ class ServerProcessManager {
   ServerProcessManager({required this.instance});
 
   /// 进程是否正在运行（已启动且尚未退出）。
-  bool get isRunning =>
-      _exitCompleter != null && !_exitCompleter!.isCompleted;
+  bool get isRunning => _exitCompleter != null && !_exitCompleter!.isCompleted;
 
   /// 当前托管进程的 PID；未运行时为 null。
   int? get pid => _pid;
@@ -215,10 +214,7 @@ class ServerProcessManager {
         await _startPipeFallback(executable, args);
       }
     } catch (e) {
-      DevLog.instance.devError(
-        'server',
-        '启动实例 ${instance.name} 失败: $e',
-      );
+      DevLog.instance.devError('server', '启动实例 ${instance.name} 失败: $e');
       _completeExit(-1);
       rethrow;
     }
@@ -244,10 +240,7 @@ class ServerProcessManager {
   }
 
   /// dart:io 管道启动回退：输出解码后转写日志文件（尾随器统一读取）。
-  Future<void> _startPipeFallback(
-    String executable,
-    List<String> args,
-  ) async {
+  Future<void> _startPipeFallback(String executable, List<String> args) async {
     // 启动进程，工作目录设为实例根目录；不做 shell 引号处理。
     final process = await Process.start(
       executable,
@@ -266,14 +259,13 @@ class ServerProcessManager {
     _logSink = logSink;
 
     void tee(Stream<List<int>> raw) {
-      raw
-          .transform(utf8.decoder)
-          .transform(const LineSplitter())
-          .listen((line) {
-            logSink.writeln(line);
-            // 逐行冲刷，避免 IOSink 缓冲导致控制台/日志文件滞后。
-            unawaited(logSink.flush());
-          });
+      raw.transform(utf8.decoder).transform(const LineSplitter()).listen((
+        line,
+      ) {
+        logSink.writeln(line);
+        // 逐行冲刷，避免 IOSink 缓冲导致控制台/日志文件滞后。
+        unawaited(logSink.flush());
+      });
     }
 
     tee(process.stdout);
@@ -281,11 +273,13 @@ class ServerProcessManager {
 
     // 退出码即时可用（存活轮询作为兜底）。
     unawaited(
-      process.exitCode.then((code) {
-        _completeExit(code);
-      }).catchError((_) {
-        _completeExit(-1);
-      }),
+      process.exitCode
+          .then((code) {
+            _completeExit(code);
+          })
+          .catchError((_) {
+            _completeExit(-1);
+          }),
     );
   }
 

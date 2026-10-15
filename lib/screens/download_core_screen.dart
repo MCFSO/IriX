@@ -2,7 +2,6 @@
 // 多步骤向导：选择核心与版本 → 下载核心文件 → 编辑启动命令并创建实例。
 // 通过 [AppState] 创建下载型实例，实例文件夹放在 APP 根目录的 instances/ 下。
 
-
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
@@ -350,7 +349,10 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
                   value: 'FastMirror',
                   child: Text('FastMirror'),
                 ),
-                DropdownMenuItem(value: 'MSL', child: Text(l.download_mslSource)),
+                DropdownMenuItem(
+                  value: 'MSL',
+                  child: Text(l.download_mslSource),
+                ),
               ],
               onChanged: _onDownloadSourceChanged,
             ),
@@ -477,13 +479,18 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(l.download_scenario, style: Theme.of(context).textTheme.labelSmall),
+            Text(
+              l.download_scenario,
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
             const SizedBox(height: 4),
             Text(
               core == null
                   ? l.download_selectCoreFirst
                   : l.download_scenarioWithCategory(
-                      core.scenario, core.category.displayName),
+                      core.scenario,
+                      core.category.displayName,
+                    ),
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ],
@@ -513,7 +520,10 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
           children: [
             const Icon(Icons.cloud_off, size: 48, color: Colors.orange),
             const SizedBox(height: 12),
-            Text(l.download_loadFailed, style: Theme.of(context).textTheme.titleSmall),
+            Text(
+              l.download_loadFailed,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
             const SizedBox(height: 4),
             Text(
               error,
@@ -684,7 +694,10 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
                 color: Colors.redAccent,
               ),
               const SizedBox(height: 16),
-              Text(l.download_downloadFailed, style: Theme.of(context).textTheme.titleMedium),
+              Text(
+                l.download_downloadFailed,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
               const SizedBox(height: 8),
               Text(
                 error,

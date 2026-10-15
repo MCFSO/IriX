@@ -29,8 +29,8 @@ typedef GetLastErrorDart = Pointer<Utf8> Function();
 String rustLibraryName(String baseName) => Platform.isWindows
     ? 'xmc_$baseName.dll'
     : Platform.isMacOS
-        ? 'libxmc_$baseName.dylib'
-        : 'libxmc_$baseName.so';
+    ? 'libxmc_$baseName.dylib'
+    : 'libxmc_$baseName.so';
 
 /// 打开指定 Rust 动态库，依次尝试多个常见路径。
 ///

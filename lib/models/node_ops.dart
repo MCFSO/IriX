@@ -32,8 +32,7 @@ class InstanceStatsData {
   });
 
   factory InstanceStatsData.fromJson(Map<String, dynamic> json) {
-    double numOr(Object? v, [double d = 0]) =>
-        (v as num?)?.toDouble() ?? d;
+    double numOr(Object? v, [double d = 0]) => (v as num?)?.toDouble() ?? d;
     return InstanceStatsData(
       pid: (json['pid'] as num?)?.toInt() ?? 0,
       cpuPercent: numOr(json['cpuPercent']),
@@ -71,8 +70,7 @@ class MetricSample {
   });
 
   factory MetricSample.fromJson(Map<String, dynamic> json) {
-    double numOr(Object? v, [double d = 0]) =>
-        (v as num?)?.toDouble() ?? d;
+    double numOr(Object? v, [double d = 0]) => (v as num?)?.toDouble() ?? d;
     return MetricSample(
       time: (json['time'] as num?)?.toInt() ?? 0,
       cpu: numOr(json['cpu']),
@@ -269,10 +267,7 @@ class PermissionGroup {
         list.add(PermissionEntry.fromJson(item));
       }
     }
-    return PermissionGroup(
-      name: json['name'] as String? ?? '',
-      entries: list,
-    );
+    return PermissionGroup(name: json['name'] as String? ?? '', entries: list);
   }
 }
 
@@ -323,8 +318,7 @@ class NodeTaskProgress {
   });
 
   factory NodeTaskProgress.fromJson(Map<String, dynamic> json) {
-    double numOr(Object? v, [double d = 0]) =>
-        (v as num?)?.toDouble() ?? d;
+    double numOr(Object? v, [double d = 0]) => (v as num?)?.toDouble() ?? d;
     return NodeTaskProgress(
       status: json['status'] as String? ?? '',
       percent: numOr(json['percent']),

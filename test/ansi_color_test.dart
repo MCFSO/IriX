@@ -25,10 +25,7 @@ void main() {
     });
 
     test('红色 + 加粗状态累积（\x1B[31m 后接 \x1B[1m）', () {
-      final spans = ansiSpans(
-        '\x1B[31mred \x1B[1mbold red\x1B[0m plain',
-        base,
-      );
+      final spans = ansiSpans('\x1B[31mred \x1B[1mbold red\x1B[0m plain', base);
       expect(spans.length, 3);
       expect(spans[0].text, 'red ');
       expect(spans[0].style?.color, isNot(Colors.white));
@@ -65,10 +62,7 @@ void main() {
 
   group('stripAnsi', () {
     test('去除颜色与样式序列', () {
-      expect(
-        stripAnsi('\x1B[31mred\x1B[0m \x1B[1mbold\x1B[0m'),
-        'red bold',
-      );
+      expect(stripAnsi('\x1B[31mred\x1B[0m \x1B[1mbold\x1B[0m'), 'red bold');
     });
 
     test('去除 256 色序列', () {

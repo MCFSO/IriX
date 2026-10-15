@@ -22,8 +22,7 @@ void main() {
   String connJsonFor(String name) =>
       '{"uri":"${uri ?? "http://localhost:19530"}","token":"","collection":"xmc_test_$name"}';
 
-  group('knowledge_ffi (Milvus)',
-      () {
+  group('knowledge_ffi (Milvus)', () {
     test('init & stats 基本操作', () async {
       final conn = connJsonFor('init');
       final r = await VectorStoreFfi.instance.request(
@@ -178,10 +177,7 @@ void main() {
     test('未知操作报错', () async {
       final conn = connJsonFor('unknown');
       expect(
-        () => VectorStoreFfi.instance.request(
-          connJson: conn,
-          op: 'unknown_op',
-        ),
+        () => VectorStoreFfi.instance.request(connJson: conn, op: 'unknown_op'),
         throwsA(
           isA<VectorStoreFfiException>().having(
             (e) => e.toString(),

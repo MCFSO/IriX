@@ -48,12 +48,9 @@ void main() async {
       '${details.exception}\n${details.stack ?? ""}'.trim(),
     );
   };
-  runZonedGuarded(
-    () => runApp(const MyApp()),
-    (error, stack) {
-      devLog.devError('uncaught', '$error\n$stack'.trim());
-    },
-  );
+  runZonedGuarded(() => runApp(const MyApp()), (error, stack) {
+    devLog.devError('uncaught', '$error\n$stack'.trim());
+  });
 }
 
 /// 应用根组件。
@@ -107,8 +104,8 @@ class MyApp extends StatelessWidget {
             locale: locale.localeCode == null
                 ? null
                 : (locale.localeCode == 'zh'
-                    ? const Locale('zh')
-                    : const Locale('en')),
+                      ? const Locale('zh')
+                      : const Locale('en')),
             supportedLocales: const [Locale('zh'), Locale('en')],
             localizationsDelegates: const [
               AppLocalizations.delegate,

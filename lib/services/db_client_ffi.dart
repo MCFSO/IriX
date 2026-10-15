@@ -66,8 +66,7 @@ class DbClientFfi {
   DbClientFfi._();
 
   /// 打开动态库（尝试多个可能的路径）。
-  static DynamicLibrary _openLibrary() =>
-      openRustLibrary('db_client');
+  static DynamicLibrary _openLibrary() => openRustLibrary('db_client');
 
   /// 执行一次数据库操作（后台 isolate，不阻塞 UI）。
   ///

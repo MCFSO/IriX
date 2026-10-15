@@ -1,4 +1,4 @@
-﻿// 节点管理界面
+// 节点管理界面
 // 点击节点卡片后进入的页面，按节点类型展示功能标签页：
 // - 概览：主机信息 / 资源占用 / 实例统计（两类型均有 API）
 // - 实例：实例列表与启动/停止/重启/强制终止（两类型均有 API）
@@ -251,7 +251,9 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
             child: Text(
               online
                   ? l.nodeDetail_onlineWithAddr(node.address)
-                  : l.nodeDetail_offlineWithError(_error ?? l.nodeDetail_cannotConnect),
+                  : l.nodeDetail_offlineWithError(
+                      _error ?? l.nodeDetail_cannotConnect,
+                    ),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: online ? Colors.green : theme.colorScheme.error,
               ),
@@ -370,7 +372,10 @@ class _OverviewTab extends StatelessWidget {
           icon: Icons.computer,
           rows: [
             (l.nodeDetail_hostname, sys.hostname.isEmpty ? '—' : sys.hostname),
-            (l.nodeDetail_system, sys.type.isEmpty ? '—' : '${sys.type} / ${sys.release}'),
+            (
+              l.nodeDetail_system,
+              sys.type.isEmpty ? '—' : '${sys.type} / ${sys.release}',
+            ),
             (l.nodeDetail_platform, sys.platform.isEmpty ? '—' : sys.platform),
             (l.nodeDetail_uptime, _formatUptime(uptime, l)),
           ],
@@ -396,7 +401,10 @@ class _OverviewTab extends StatelessWidget {
               l.nodeDetail_nodeProcessMemory,
               data.process.memory > 0 ? _formatBytes(data.process.memory) : '—',
             ),
-            (l.nodeDetail_nodeVersion, data.version.isEmpty ? '—' : data.version),
+            (
+              l.nodeDetail_nodeVersion,
+              data.version.isEmpty ? '—' : data.version,
+            ),
           ],
         ),
         const SizedBox(height: 12),
@@ -404,11 +412,19 @@ class _OverviewTab extends StatelessWidget {
           title: l.nodeDetail_instanceStats,
           icon: Icons.storage,
           rows: [
-            (l.nodeDetail_daemons, data.remote.isEmpty ? '—' : l.nodeDetail_daemonCount(data.remote.length)),
+            (
+              l.nodeDetail_daemons,
+              data.remote.isEmpty
+                  ? '—'
+                  : l.nodeDetail_daemonCount(data.remote.length),
+            ),
             for (final daemon in data.remote)
               (
                 daemon.displayName,
-                l.nodeDetail_runningTotal(daemon.runningInstances, daemon.totalInstances),
+                l.nodeDetail_runningTotal(
+                  daemon.runningInstances,
+                  daemon.totalInstances,
+                ),
               ),
           ],
         ),
@@ -423,7 +439,9 @@ class _OverviewTab extends StatelessWidget {
                   daemon.displayName,
                   l.nodeDetail_daemonListLine(
                     daemon.available ? l.node_online : l.node_offline,
-                    daemon.version.isEmpty ? l.nodeDetail_versionUnknown : daemon.version,
+                    daemon.version.isEmpty
+                        ? l.nodeDetail_versionUnknown
+                        : daemon.version,
                     daemon.ip.isNotEmpty ? daemon.ip : '—',
                     daemon.port,
                   ),
@@ -849,7 +867,9 @@ class _RemoteInstanceCard extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                instance.config.cwd.isEmpty ? l.nodeDetail_cwdUnknown : instance.config.cwd,
+                instance.config.cwd.isEmpty
+                    ? l.nodeDetail_cwdUnknown
+                    : instance.config.cwd,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
@@ -1102,7 +1122,9 @@ class _UsersTabState extends State<_UsersTab> {
     }
     final users = _users ?? [];
     if (users.isEmpty) {
-      return Center(child: Text(l.nodeDetail_noUsers, style: theme.textTheme.bodyMedium));
+      return Center(
+        child: Text(l.nodeDetail_noUsers, style: theme.textTheme.bodyMedium),
+      );
     }
     return ListView.separated(
       padding: const EdgeInsets.all(16),
@@ -1149,7 +1171,11 @@ class _UsersTabState extends State<_UsersTab> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    isBanned ? l.common_disabled : (isAdmin ? l.nodeDetail_admin : l.nodeDetail_normalUser),
+                    isBanned
+                        ? l.common_disabled
+                        : (isAdmin
+                              ? l.nodeDetail_admin
+                              : l.nodeDetail_normalUser),
                     style: TextStyle(
                       fontSize: 11,
                       color: isBanned
@@ -1177,17 +1203,32 @@ class _UsersTabState extends State<_UsersTab> {
                   },
                   itemBuilder: (_) => [
                     if (!isAdmin)
-                      PopupMenuItem(value: 'admin', child: Text(l.nodeDetail_setAdmin)),
+                      PopupMenuItem(
+                        value: 'admin',
+                        child: Text(l.nodeDetail_setAdmin),
+                      ),
                     if (isAdmin)
-                      PopupMenuItem(value: 'user', child: Text(l.nodeDetail_setNormalUser)),
+                      PopupMenuItem(
+                        value: 'user',
+                        child: Text(l.nodeDetail_setNormalUser),
+                      ),
                     if (!isBanned)
-                      PopupMenuItem(value: 'ban', child: Text(l.common_disabled)),
+                      PopupMenuItem(
+                        value: 'ban',
+                        child: Text(l.common_disabled),
+                      ),
                     if (isBanned)
-                      PopupMenuItem(value: 'unban', child: Text(l.nodeDetail_unban)),
+                      PopupMenuItem(
+                        value: 'unban',
+                        child: Text(l.nodeDetail_unban),
+                      ),
                     const PopupMenuDivider(),
                     PopupMenuItem(
                       value: 'delete',
-                      child: Text(l.common_delete, style: const TextStyle(color: Colors.red)),
+                      child: Text(
+                        l.common_delete,
+                        style: const TextStyle(color: Colors.red),
+                      ),
                     ),
                   ],
                 ),
@@ -1254,7 +1295,10 @@ class _CreateUserDialogState extends State<_CreateUserDialog> {
                 border: const OutlineInputBorder(),
               ),
               items: [
-                DropdownMenuItem(value: 1, child: Text(l.nodeDetail_normalUser)),
+                DropdownMenuItem(
+                  value: 1,
+                  child: Text(l.nodeDetail_normalUser),
+                ),
                 DropdownMenuItem(value: 10, child: Text(l.nodeDetail_admin)),
                 DropdownMenuItem(value: -1, child: Text(l.common_disabled)),
               ],
@@ -1609,46 +1653,47 @@ class _NodeOpsTabState extends State<NodeOpsTab> {
     });
     try {
       final jobId = await widget.client.installJava(major);
-      _javaInstallPoll = Timer.periodic(
-        const Duration(milliseconds: 800),
-        (_) async {
-          try {
-            final p = await widget.client.javaInstallProgress(jobId);
-            if (!mounted) return;
-            setState(() => _javaStatus = p.message.isEmpty ? p.status : p.message);
-            if (p.isDone) {
-              _cancelJavaPoll();
-              if (!mounted) return;
-              setState(() {
-                _javaBusy = false;
-                _javaStatus = null;
-              });
-              await _loadJavas();
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(l.nodeDetail_jdkInstalled(major))),
-                );
-              }
-            } else if (p.isFailed) {
-              _cancelJavaPoll();
-              if (!mounted) return;
-              setState(() {
-                _javaBusy = false;
-                _javaStatus = null;
-                _javaError = l.nodeDetail_jdkInstallFailed(major);
-              });
-            }
-          } catch (e) {
+      _javaInstallPoll = Timer.periodic(const Duration(milliseconds: 800), (
+        _,
+      ) async {
+        try {
+          final p = await widget.client.javaInstallProgress(jobId);
+          if (!mounted) return;
+          setState(
+            () => _javaStatus = p.message.isEmpty ? p.status : p.message,
+          );
+          if (p.isDone) {
             _cancelJavaPoll();
             if (!mounted) return;
             setState(() {
               _javaBusy = false;
               _javaStatus = null;
-              _javaError = e.toString();
+            });
+            await _loadJavas();
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(l.nodeDetail_jdkInstalled(major))),
+              );
+            }
+          } else if (p.isFailed) {
+            _cancelJavaPoll();
+            if (!mounted) return;
+            setState(() {
+              _javaBusy = false;
+              _javaStatus = null;
+              _javaError = l.nodeDetail_jdkInstallFailed(major);
             });
           }
-        },
-      );
+        } catch (e) {
+          _cancelJavaPoll();
+          if (!mounted) return;
+          setState(() {
+            _javaBusy = false;
+            _javaStatus = null;
+            _javaError = e.toString();
+          });
+        }
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -1733,10 +1778,9 @@ class _NodeOpsTabState extends State<NodeOpsTab> {
   Future<void> _downloadCore() async {
     final l = AppLocalizations.of(context);
     final result =
-        await showAppDialog<({String uuid, String url, String fileName, String? sha512})?>(
-      context,
-      (_) => const _DownloadCoreDialog(),
-    );
+        await showAppDialog<
+          ({String uuid, String url, String fileName, String? sha512})?
+        >(context, (_) => const _DownloadCoreDialog());
     if (result == null || !mounted) return;
     try {
       final jobId = await widget.client.downloadCore(
@@ -1797,10 +1841,7 @@ class _NodeOpsTabState extends State<NodeOpsTab> {
     try {
       final log = await widget.client.auditLog(tail: 200);
       if (!mounted) return;
-      await showAppDialog<void>(
-        context,
-        (_) => _AuditLogDialog(log: log),
-      );
+      await showAppDialog<void>(context, (_) => _AuditLogDialog(log: log));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1884,10 +1925,17 @@ class _NodeOpsTabState extends State<NodeOpsTab> {
           children: [
             Row(
               children: [
-                Icon(Icons.coffee_outlined, size: 18, color: theme.colorScheme.primary),
+                Icon(
+                  Icons.coffee_outlined,
+                  size: 18,
+                  color: theme.colorScheme.primary,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(l.nodeDetail_javaRuntime, style: theme.textTheme.titleSmall),
+                  child: Text(
+                    l.nodeDetail_javaRuntime,
+                    style: theme.textTheme.titleSmall,
+                  ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.refresh, size: 20),
@@ -1945,7 +1993,9 @@ class _NodeOpsTabState extends State<NodeOpsTab> {
                           icon: const Icon(Icons.delete_outline, size: 18),
                           tooltip: l.nodeDetail_uninstall,
                           visualDensity: VisualDensity.compact,
-                          onPressed: _javaBusy ? null : () => _uninstallJava(rt.major),
+                          onPressed: _javaBusy
+                              ? null
+                              : () => _uninstallJava(rt.major),
                         ),
                     ],
                   ),
@@ -2059,7 +2109,9 @@ class _ImportInstanceDialogState extends State<_ImportInstanceDialog> {
   void _submit() {
     final path = _pathController.text.trim();
     if (path.isEmpty) return;
-    Navigator.of(context).pop((path: path, nickname: _nameController.text.trim()));
+    Navigator.of(
+      context,
+    ).pop((path: path, nickname: _nameController.text.trim()));
   }
 
   @override
@@ -2191,7 +2243,10 @@ class _DownloadCoreDialogState extends State<_DownloadCoreDialog> {
           onPressed: () => Navigator.of(context).pop(null),
           child: Text(l.common_cancel),
         ),
-        FilledButton(onPressed: _submit, child: Text(l.nodeDetail_startDownload)),
+        FilledButton(
+          onPressed: _submit,
+          child: Text(l.nodeDetail_startDownload),
+        ),
       ],
     );
   }
@@ -2266,10 +2321,7 @@ class _AuditLogDialog extends StatelessWidget {
         child: SingleChildScrollView(
           child: SelectableText(
             log.isEmpty ? l.nodeDetail_noAuditLog : log,
-            style: const TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 11,
-            ),
+            style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
           ),
         ),
       ),
