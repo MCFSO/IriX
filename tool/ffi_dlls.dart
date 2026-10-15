@@ -175,16 +175,19 @@ int _checkBundle(List<String> args) {
 
 /// 各平台上「缺了就一定打不开」的运行时文件（相对产物根目录）。
 ///
-/// 判定依据：Flutter 引擎启动时依次需要 AOT 快照（data/app.so）、ICU 数据
-/// （data/icudtl.dat）与资源清单（data/flutter_assets/AssetManifest.*）。
-/// 缺失时 Windows 侧报 “Can't load AOT data ... Unable to start engine without
-/// AOT data.” / “Failed to create view controller.”，双击无任何窗口出现；
-/// 这类失败在构建阶段不会报错，只有真正启动才暴露。
+/// 判定依据：Flutter 引擎启动时依次需要 AOT 快照、ICU 数据（data/icudtl.dat）与
+/// 资源清单（data/flutter_assets/AssetManifest.*）。缺失时 Windows 侧报
+/// “Can't load AOT data ... Unable to start engine without AOT data.” /
+/// “Failed to create view controller.”，双击无任何窗口出现；这类失败在构建阶段
+/// 不会报错，只有真正启动才暴露。
 ///
-/// 说明：macOS 的路径以 `.app` 包根为基准（workflow 传入的是 lrix.app 本身）。
-/// 该布局在本机（Windows）无法实测，故只断言跨平台一致、且由 Flutter 官方
-/// 模板固定生成的部分；Frameworks 内的 App 可执行文件路径未做断言，
-/// 以免因 Flutter 版本差异产生误报。
+/// AOT 快照位置因平台而异（均取自 Flutter 3.44 flutter_tools 源码）：
+///   windows -> data/app.so
+///   linux   -> lib/libapp.so（linux.dart: outputs 为 lib/libapp.so；
+///              Linux 产物没有 data/app.so）
+///   macOS   -> App.framework/Versions/A/App（release；kernel_blob.bin 仅 debug
+///              构建生成，对 release 产物断言 kernel_blob.bin 属误报）
+/// macOS 的路径以 `.app` 包根为基准（workflow 传入的是 lrix.app 本身）。
 List<String> _requiredRuntimeFiles(String platform) {
   // 资源清单文件名随 Flutter 版本变化：3.44 起为 AssetManifest.bin（旧版为 .json），
   // 任一存在即可。
@@ -205,14 +208,13 @@ List<String> _requiredRuntimeFiles(String platform) {
       ...manifestCandidates,
     ],
     'linux' => <String>[
-      'data/app.so',
+      'lib/libapp.so',
       'data/icudtl.dat',
       'lib/libflutter_linux_gtk.so',
       ...manifestCandidates,
     ],
     'macos' => <String>[
-      'Contents/Frameworks/App.framework/Versions/A/Resources/flutter_assets/'
-          'kernel_blob.bin',
+      'Contents/Frameworks/App.framework/Versions/A/App',
       ...macManifestCandidates,
     ],
     _ => throw ArgumentError('不支持的平台: $platform'),
@@ -283,10 +285,11 @@ int _checkRuntime(List<String> args) {
     stderr.writeln('  - $name');
   }
   stderr.writeln(
-    '缺少 data/app.so 时应用无法启动：Flutter 引擎报 '
-    '"Can\'t load AOT data ... Unable to start engine without AOT data."，'
-    '双击后不会出现任何窗口。该文件由 `flutter build <平台> --release` 生成，'
-    '上传 artifact 时务必包含整个 Release/bundle 目录，不要只挑可执行文件与动态库。',
+    '缺少 AOT 快照（Windows 为 data/app.so，Linux 为 lib/libapp.so，'
+    'macOS 为 App.framework/Versions/A/App）或引擎数据时应用无法启动：'
+    'Flutter 引擎报 "Can\'t load AOT data ... Unable to start engine without '
+    'AOT data."，双击后不会出现任何窗口。该文件由 `flutter build <平台> --release` '
+    '生成，上传 artifact 时务必包含整个 Release/bundle 目录，不要只挑可执行文件与动态库。',
   );
   return 1;
 }
