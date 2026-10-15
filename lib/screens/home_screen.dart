@@ -131,12 +131,14 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final multi = context.watch<ClusterState>().mode == ManagementMode.multi;
-    // 单机模式 6 项、多机模式 8 项（多出「容器」「编排」）：
-    // 从多机切回单机时把越界的选中索引收敛，避免索引越界。
-    final index = multi ? _selectedIndex : _selectedIndex.clamp(0, 5);
+    // 单机 7 项 / 多机 9 项（多机多出「容器」「编排」，插件固定为最后一项）。
+    // 从多机切回单机时按「插件是否选中」重定位索引，避免同一索引指向不同页面。
     final destinations = multi
         ? _multiDestinations(context)
         : _singleDestinations(context);
+    final index = _resolveIndex(multi, destinations.length);
+    // 记录本次模式，供下次（可能已切换模式）的 _resolveIndex 推断索引含义。
+    _lastModeWasMulti = multi;
 
     return Scaffold(
       body: Stack(
@@ -185,7 +187,33 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// 首次启动判定：设置未记录且无实例 → 展示向导。
+  /// 把 [_selectedIndex] 收敛到当前模式的目的地范围内。
+  ///
+  /// 两种模式的项数与顺序不同（多机多出「容器」「编排」），但「插件」在两边
+  /// 都是最后一项。切换模式时按「是否选中最后一项（插件）」重定位，
+  /// 使插件页在切换后仍指向插件，而不是被 clamp 成别的页面。
+  int _resolveIndex(bool multi, int length) {
+    final maxIndex = length - 1;
+    if (multi) {
+      // 单机索引 6 = 插件 → 多机索引 8 = 插件。
+      // 其余单机索引（0..5）与多机前段不完全对应，只做越界收敛。
+      if (_lastIndexWasPlugin) return maxIndex;
+      return _selectedIndex.clamp(0, maxIndex);
+    }
+    // 切回单机：多机索引 8 是插件，映射到单机最后一项。
+    if (_selectedIndex == 8) return maxIndex;
+    return _selectedIndex.clamp(0, maxIndex);
+  }
+
+  /// 上一次 build 时是否选中了「插件」项（用于跨模式保持选中）。
+  bool get _lastIndexWasPlugin {
+    final wasMulti = _lastModeWasMulti;
+    return wasMulti ? _selectedIndex == 8 : _selectedIndex == 6;
+  }
+
+  /// 上一次 build 的管理模式（用于推断索引含义）。
+  bool _lastModeWasMulti = false;
+
   Future<void> _maybeShowFirstRunWizard() async {
     final done = await DatabaseManager.instance.getSetting('first_run_wizard');
     if (done != null || !mounted) return;
@@ -244,6 +272,11 @@ class _HomeScreenState extends State<HomeScreen> {
         selectedIcon: Icons.hub,
         label: l.home_navFrp,
       ),
+      NavItem(
+        icon: Icons.extension_outlined,
+        selectedIcon: Icons.extension,
+        label: '插件',
+      ),
     ];
   }
 
@@ -291,6 +324,11 @@ class _HomeScreenState extends State<HomeScreen> {
         selectedIcon: Icons.hub,
         label: l.home_navFrp,
       ),
+      NavItem(
+        icon: Icons.extension_outlined,
+        selectedIcon: Icons.extension,
+        label: '插件',
+      ),
     ];
   }
 
@@ -313,6 +351,8 @@ class _HomeScreenState extends State<HomeScreen> {
         return const AiScreen();
       case 7:
         return const FrpScreen();
+      case 8:
+        return const PluginManagerScreen(embedded: true);
       default:
         return const ClusterHomeScreen();
     }
@@ -332,6 +372,8 @@ class _HomeScreenState extends State<HomeScreen> {
         return const AiScreen();
       case 5:
         return const FrpScreen();
+      case 6:
+        return const PluginManagerScreen(embedded: true);
       default:
         return _buildInstancesPage();
     }
@@ -398,6 +440,8 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 /// 主页底部工具入口（NBT 编辑器等）。
+///
+/// 注：插件管理已移入左侧边栏，此处不再重复提供入口。
 class _ToolsRow extends StatelessWidget {
   const _ToolsRow();
 
@@ -414,11 +458,6 @@ class _ToolsRow extends StatelessWidget {
             icon: Icons.edit_note,
             label: l.home_nbtEditor,
             onTap: () => pushPage(context, (_) => const NbtEditorScreen()),
-          ),
-          _ToolTile(
-            icon: Icons.extension,
-            label: '插件',
-            onTap: () => pushPage(context, (_) => const PluginManagerScreen()),
           ),
         ],
       ),
