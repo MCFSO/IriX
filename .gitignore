@@ -86,3 +86,6 @@ node/data/
 
 # Go node daemon (IriX-Node) — kept out of this repo's tracking per user decision
 IriX-Node/
+
+# 项目工作记忆与本地数据（同 IriX-Node 仓库约定）
+.workbuddy/
