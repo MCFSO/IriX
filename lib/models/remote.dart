@@ -251,6 +251,12 @@ class RemoteInstance {
   final int currentPlayers;
   final int maxPlayers;
 
+  /// 实例属主账户名（irix-node 1.2.0+ 实例级授权，见 accounts-design.md §3.1）。
+  ///
+  /// 空串表示公共实例（所有账户可见）；非管理员账户只能看到自己拥有的
+  /// 实例与公共实例。MCSM 面板不返回该字段，此时为空串。
+  final String owner;
+
   const RemoteInstance({
     required this.uuid,
     required this.config,
@@ -260,6 +266,7 @@ class RemoteInstance {
     required this.pid,
     required this.currentPlayers,
     required this.maxPlayers,
+    this.owner = '',
   });
 
   factory RemoteInstance.fromJson(Map<String, dynamic> json) {
@@ -275,6 +282,7 @@ class RemoteInstance {
       pid: (proc['pid'] as num?)?.toInt() ?? 0,
       currentPlayers: (info['currentPlayers'] as num?)?.toInt() ?? -1,
       maxPlayers: (info['maxPlayers'] as num?)?.toInt() ?? -1,
+      owner: json['owner'] as String? ?? '',
     );
   }
 }

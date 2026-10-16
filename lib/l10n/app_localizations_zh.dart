@@ -227,6 +227,29 @@ class AppLocalizationsZh extends AppLocalizations {
   String get node_renameMenu => '重命名';
 
   @override
+  String get node_credentialsMenu => '账户登录';
+
+  @override
+  String get nodeCredentials_title => '节点账户凭据';
+
+  @override
+  String get nodeCredentials_description =>
+      'irix-node 自 v1.2.0 起已移除密钥通道，全部接口需账户会话 token。填写节点账户后应用会自动登录，并在会话过期时重新登录。节点首次启动日志中会显示一次随机生成的管理员账户。';
+
+  @override
+  String get nodeCredentials_saved => '凭据已保存';
+
+  @override
+  String get nodeCredentials_saveAnywayTitle => '登录校验未通过';
+
+  @override
+  String get nodeCredentials_saveAnywayContent =>
+      '以当前凭据登录节点失败（节点离线或凭据有误）。仍要保存该凭据吗？';
+
+  @override
+  String get nodeCredentials_saveAnyway => '仍然保存';
+
+  @override
   String get node_deleteMenu => '删除';
 
   @override
@@ -853,14 +876,42 @@ class AppLocalizationsZh extends AppLocalizations {
   String get addNode_mcsmApiKeyRequired => 'MCSM 节点需要填写 API Key';
 
   @override
-  String get addNode_remoteNodeKeyRequired => '远程 Node 节点必须填写密钥（仅本机回环地址可留空）';
+  String get addNode_accountRequired =>
+      '请填写节点账户用户名与密码（irix-node v1.2.0 起不再使用密钥）';
+
+  @override
+  String get addNode_accountTitle => '节点账户';
+
+  @override
+  String get addNode_accountUser => '账户用户名';
+
+  @override
+  String get addNode_accountUserHint => '节点首次启动日志中显示的管理员账户名';
+
+  @override
+  String get addNode_accountPassword => '账户密码';
+
+  @override
+  String get addNode_accountHelper =>
+      'irix-node v1.2.0 起已移除密钥通道，全部接口走账户会话 token；凭据可在节点端账户管理中修改，应用会自动登录并续期。';
+
+  @override
+  String get addNode_loginSuccess => '登录成功';
+
+  @override
+  String get addNode_loginSuccessAdmin => '登录成功（管理员账户）';
+
+  @override
+  String addNode_loginFailed(String message) {
+    return '登录失败：$message';
+  }
 
   @override
   String get addNode_plaintextWarningTitle => '明文连接警告';
 
   @override
   String get addNode_plaintextWarningContent =>
-      '该节点地址使用明文 HTTP（非 https），API 密钥与全部控制流量（含文件读写、命令执行）可被同网段窃听或篡改。';
+      '该节点地址使用明文 HTTP（非 https），节点凭据（API Key 或账户密码/会话 token）与全部控制流量（含文件读写、命令执行）可被同网段窃听或篡改。';
 
   @override
   String get addNode_continueAnyway => '仍然继续';
@@ -887,7 +938,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get addNode_stepName => '名称';
 
   @override
-  String get addNode_stepKey => 'Key';
+  String get addNode_stepKey => '凭据';
 
   @override
   String get addNode_selectType => '选择节点类型';
@@ -896,7 +947,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get addNode_mcsmSubtitle => '连接远程 MCSManager 面板\n需填写面板 API Key';
 
   @override
-  String get addNode_nodeSubtitle => 'IriX 本地 Go 语言节点\n本机回环可免密钥，远程必须配置密钥';
+  String get addNode_nodeSubtitle =>
+      'IriX 本地 Go 语言节点\n使用节点账户登录（v1.2.0 起不再使用密钥）';
 
   @override
   String get addNode_nameHint => '例如：我的面板 / 本地节点';
@@ -918,9 +970,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get addNode_mcsmKeyHint => 'MCSManager 用户 API Key';
 
   @override
-  String get addNode_nodeKeyHint => '本地节点密钥（本机回环可留空）';
-
-  @override
   String get addNode_copiedApiKey => '已复制 API Key';
 
   @override
@@ -931,9 +980,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get addNode_mcsmKeyHelper => '在 MCSManager 面板「用户信息」中生成并复制';
-
-  @override
-  String get addNode_nodeKeyHelper => '远程节点必须填写密钥；仅 127.0.0.1 本机回环可留空';
 
   @override
   String get wizard_title => '首次配置引导';

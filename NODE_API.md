@@ -16,13 +16,17 @@
 | 项 | 约定 |
 |----|------|
 | 基础地址 | `http://<host>:<port>`（如 `http://127.0.0.1:12346` / `http://192.168.1.5:23333`）；远程节点应启用 HTTPS |
-| 认证 | 请求头 `X-Api-Key: <key>`（**首选**，H-6：密钥不进 URL，避免进入代理/访问日志）；`apikey` 查询参数仅为 MCSM 面板兼容保留；请求头 `X-Requested-With: XMLHttpRequest`（MCSM 必需，irix-node 建议兼容） |
+| 认证 | **irix-node（v1.2.0+）**：账户会话 token。先 `POST /api/auth/login`（公开端点，body `{"username": "...", "password": "..."}`）取得 `token`，之后每个请求携带 `X-Auth-Token: <token>` 头（**首选**，token 不进 URL）/ `Authorization: Bearer <token>` 头 / `?token=<token>` 查询参数（三者选一；WebSocket 只能走查询参数）；token 30 天有效、剩余不足一半自动滑动续期，缺失或过期返回 `403 未认证或会话已过期（请先登录 POST /api/auth/login）`，权限不足返回 `403 权限不足: 当前账户无权访问 <端点模式>`。首次启动时若账户库无管理员，节点随机生成管理员用户名/密码并仅在启动日志显示一次。另有直连票据通道（`/download/`、`/upload/`）免会话认证。**MCSM 面板节点**仍使用 `X-Api-Key: <key>` 头（`apikey` 查询参数为 MCSM 兼容），该方式对 irix-node 已于 v1.2.0 移除、不再接受。请求头 `X-Requested-With: XMLHttpRequest`（MCSM 必需，irix-node 建议兼容） |
 | 请求体 | `application/json; charset=utf-8` |
 | 响应体 | 统一 `{ "status": 200, "data": <payload>, "time": <unix_ms> }`；`status != 200` 时 `data` 为错误消息字符串 |
 | 超时 | 应用侧默认 15s；连接失败 / 超时视为节点离线 |
 | 分页 | `page` / `page_size` 查询参数 |
 
 > 所有 HTTP 请求由应用内 Rust `http_client` FFI 发出（不经过 Dart `http` 包）。
+
+> **登录接口（irix-node）**：`POST /api/auth/login`，body `{"username": "...", "password": "..."}`，
+> 成功返回 `data: {token, username, isAdmin, expiresAt}`；失败 `401 用户名或密码错误`。
+> 退出登录 `POST /api/auth/logout`。响应信封 `{status, data, time}` 与 MCSM 一致，故客户端可复用同一套解析代码。
 
 ---
 
@@ -277,3 +281,11 @@ GET /api/container/info
 启动前物化）；已停止状态下文件 API 走加密层（列表/读写/删除/移动/复制/
 建目录/建文件），直连下载/上传与压缩/解压暂不支持（返回明确错误）。
 
+> **客户端实现（`lib/services/node_api_client.dart`）**：
+> - `NodeApiClient.of(node)` 按节点类型分流认证：MCSM 面板走 `X-Api-Key`（并附 `apikey` 查询参数），
+>   irix-node（v1.2.0+）走账户会话 token，**不发送** `X-Api-Key`；
+> - 节点保存的账户凭据存于 `nodes` 表的 `account_user` / `account_password` 列，会话 token 只缓存于
+>   进程内静态表（`NodeApiClient.sessions`），进程重启后自动重新登录，不落盘；
+> - 无有效会话时先 `POST /api/auth/login`；服务端返回 403「未认证或会话已过期」时自动重登并重试一次；
+>   `403 权限不足` / `403 vault *` 不触发重登，按业务错误抛出；
+> - 节点列表卡片的 ⋮ 菜单提供「账户登录」入口，用于为升级前创建的节点补录或更正凭据。

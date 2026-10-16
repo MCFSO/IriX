@@ -58,8 +58,20 @@ class NodeInfo {
   /// API 基地址，例如 `http://127.0.0.1:12346` 或 `http://192.168.1.5:23333`。
   String address;
 
-  /// API 密钥（MCSM 面板为用户 API Key；本地节点默认为空）。
+  /// API 密钥（MCSM 面板为用户 API Key；irix-node 自 v1.2.0 起不再接受，
+  /// 该类节点留空）。
   String apiKey;
+
+  /// 账户用户名（irix-node v1.2.0+ 账户会话认证，见 NODE_API.md §1）。
+  ///
+  /// MCSM 面板不使用账户体系，此字段留空。
+  String accountUser;
+
+  /// 账户密码（irix-node v1.2.0+ 账户会话认证）。
+  ///
+  /// 节点侧仅存 bcrypt 摘要，客户端凭它以 `POST /api/auth/login` 换取
+  /// 30 天有效的会话 token；token 只缓存在内存，进程重启后重新登录。
+  String accountPassword;
 
   /// 节点创建时间。
   final DateTime createdAt;
@@ -71,10 +83,22 @@ class NodeInfo {
     required this.type,
     required this.address,
     required this.apiKey,
+    this.accountUser = '',
+    this.accountPassword = '',
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now() {
     address = _normalizeAddress(address);
   }
+
+  /// 该节点是否走账户会话认证（irix-node v1.2.0+）。
+  ///
+  /// MCSM 面板使用 API Key（`X-Api-Key` / `apikey` 查询参数），
+  /// irix-node 自 v1.2.0 起移除该通道，只认账户会话 token。
+  bool get usesAccountAuth => type == NodeType.node;
+
+  /// 账户凭据是否可用（用于判断能否自动登录）。
+  bool get hasAccountCredentials =>
+      accountUser.trim().isNotEmpty && accountPassword.isNotEmpty;
 
   /// 去除地址末尾多余的斜杠。
   static String _normalizeAddress(String address) {
@@ -92,6 +116,8 @@ class NodeInfo {
     'type': type.name,
     'address': address,
     'apiKey': apiKey,
+    'accountUser': accountUser,
+    'accountPassword': accountPassword,
     'createdAt': createdAt.toIso8601String(),
   });
 
@@ -104,18 +130,28 @@ class NodeInfo {
       type: NodeType.fromString(map['type'] as String? ?? 'node'),
       address: map['address'] as String? ?? '',
       apiKey: map['apiKey'] as String? ?? '',
+      accountUser: map['accountUser'] as String? ?? '',
+      accountPassword: map['accountPassword'] as String? ?? '',
       createdAt: DateTime.parse(map['createdAt'] as String),
     );
   }
 
   /// 复制并覆盖部分字段。
-  NodeInfo copyWith({String? name, String? address, String? apiKey}) {
+  NodeInfo copyWith({
+    String? name,
+    String? address,
+    String? apiKey,
+    String? accountUser,
+    String? accountPassword,
+  }) {
     return NodeInfo(
       id: id,
       name: name ?? this.name,
       type: type,
       address: address ?? this.address,
       apiKey: apiKey ?? this.apiKey,
+      accountUser: accountUser ?? this.accountUser,
+      accountPassword: accountPassword ?? this.accountPassword,
       createdAt: createdAt,
     );
   }

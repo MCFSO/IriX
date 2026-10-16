@@ -19,6 +19,8 @@ class NodeStore extends EntityStore<NodeInfo> {
       type: NodeType.fromString(row['type'] as String? ?? 'node'),
       address: row['address'] as String? ?? '',
       apiKey: row['api_key'] as String? ?? '',
+      accountUser: row['account_user'] as String? ?? '',
+      accountPassword: row['account_password'] as String? ?? '',
       createdAt: DateTime.parse(row['created_at'] as String),
     );
   }
@@ -31,6 +33,8 @@ class NodeStore extends EntityStore<NodeInfo> {
       'type': node.type.name,
       'address': node.address,
       'api_key': node.apiKey,
+      'account_user': node.accountUser,
+      'account_password': node.accountPassword,
       'created_at': node.createdAt.toIso8601String(),
     };
   }

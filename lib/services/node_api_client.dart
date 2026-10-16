@@ -72,6 +72,51 @@ class UploadTicket {
       '${addr.contains('://') ? addr : 'http://$addr'}/upload/$password';
 }
 
+/// 节点账户会话（进程内缓存，见 [NodeApiClient.ensureSession]）。
+///
+/// irix-node v1.2.0+ 的会话 token 有效期为 30 天、剩余不足一半时服务端
+/// 自动滑动续期，因此客户端只需在内存中保留 token，进程重启后用保存的
+/// 账户凭据重新登录即可，无需将凭据之外的信息落盘。
+class NodeAccountSession {
+  /// 会话令牌（`X-Auth-Token`）。
+  final String token;
+
+  /// 账户用户名。
+  final String username;
+
+  /// 是否管理员账户（管理员不受逐端点权限开关限制）。
+  final bool isAdmin;
+
+  /// 过期时间（unix 毫秒）。
+  final int expiresAt;
+
+  const NodeAccountSession({
+    required this.token,
+    required this.username,
+    required this.isAdmin,
+    required this.expiresAt,
+  });
+
+  /// 会话是否仍在有效期内（留 60s 余量，避免边界请求被拒）。
+  bool get isValid =>
+      token.isNotEmpty &&
+      DateTime.now().millisecondsSinceEpoch < expiresAt - 60 * 1000;
+
+  /// 由登录响应构造。
+  factory NodeAccountSession.fromLogin(Map<String, dynamic> data) {
+    return NodeAccountSession(
+      token: data['token'] as String? ?? '',
+      username: data['username'] as String? ?? '',
+      isAdmin: data['isAdmin'] as bool? ?? false,
+      expiresAt:
+          (data['expiresAt'] as num?)?.toInt() ??
+          DateTime.now()
+              .add(const Duration(days: 30))
+              .millisecondsSinceEpoch,
+    );
+  }
+}
+
 /// 节点 API 客户端。
 class NodeApiClient {
   NodeApiClient({
@@ -79,13 +124,31 @@ class NodeApiClient {
     this.apiKey = '',
     this.timeout = const Duration(seconds: 15),
     this.apiKeyInQuery = false,
+    this.nodeId,
+    this.accountUser = '',
+    this.accountPassword = '',
   });
 
   /// API 基地址，例如 http://127.0.0.1:12346。
   final String baseUrl;
 
-  /// API 密钥（本地节点可为空）。
+  /// API 密钥（MCSM 面板的用户 API Key）。
+  ///
+  /// irix-node 自 v1.2.0 起已移除固定 apikey 通道，该类节点必须为空，
+  /// 改用 [accountUser] / [accountPassword] 走账户会话认证。
   final String apiKey;
+
+  /// 节点 id（用于在 [sessions] 中复用账户会话，可空）。
+  ///
+  /// 调用方通常每次请求新建客户端实例，会话必须跨实例复用，否则每个
+  /// 请求都会重新登录；为空时回退以 [baseUrl] 作为会话键。
+  final String? nodeId;
+
+  /// 账户用户名（irix-node v1.2.0+）。
+  final String accountUser;
+
+  /// 账户密码（irix-node v1.2.0+）。
+  final String accountPassword;
 
   /// 请求超时。
   final Duration timeout;
@@ -110,18 +173,54 @@ class NodeApiClient {
   ///
   /// 非空时所有请求自动附带 `X-Auth-Token` 请求头。与 [apiKey] 通道并存：
   /// apikey 直通 root 管理员，账户会话令牌走按端点开关鉴权的普通账户。
-  /// [accountLogin] 成功后由调用方写入；未启用账户系统的节点保持为空。
+  /// [accountLogin] / [ensureSession] 成功后自动写入。
   String authToken = '';
+
+  /// 是否配置了可自动登录的账户凭据。
+  bool get hasAccountCredentials =>
+      accountUser.trim().isNotEmpty && accountPassword.isNotEmpty;
+
+  /// 会话键：优先节点 id，回退基地址。
+  String get sessionKey => nodeId ?? baseUrl;
+
+  /// 进程内账户会话缓存（会话键 → 会话）。
+  ///
+  /// [NodeApiClient] 多为一次性实例（`NodeApiClient.of` 每次新建），
+  /// 故缓存必须是静态的，才能跨请求复用同一会话。
+  static final Map<String, NodeAccountSession> sessions = {};
+
+  /// 当前缓存的会话（未登录或已过期时为 null）。
+  NodeAccountSession? get session => sessions[sessionKey];
+
+  /// 当前会话是否为管理员账户。
+  bool get isAdminSession => session?.isAdmin ?? false;
+
+  /// 丢弃指定节点（或基地址）的缓存会话。
+  static void forgetSession(String nodeIdOrBaseUrl) {
+    sessions.remove(nodeIdOrBaseUrl);
+  }
+
+  /// 丢弃全部缓存会话。
+  static void forgetAllSessions() => sessions.clear();
 
   /// 便捷构造：由节点信息创建客户端。
   ///
-  /// MCSM 面板仅认查询参数形式的 apikey，因此该类节点保留查询参数
-  /// 兼容；IriX 本地节点走请求头（H-6）。
-  factory NodeApiClient.of(NodeInfo node) => NodeApiClient(
-    baseUrl: node.address,
-    apiKey: node.apiKey,
-    apiKeyInQuery: node.type == NodeType.mcsm,
-  );
+  /// 认证通道按节点类型分流（NODE_API.md §1）：
+  /// - MCSM 面板：`X-Api-Key` 请求头（该类节点仅认查询参数形式时附带
+  ///   `apikey` 查询参数）；
+  /// - irix-node（v1.2.0+）：账户会话 token（`X-Auth-Token`），apikey 通道
+  ///   已被服务端移除，因此**不**发送 `X-Api-Key`。
+  factory NodeApiClient.of(NodeInfo node) {
+    final usesAccount = node.type != NodeType.mcsm;
+    return NodeApiClient(
+      baseUrl: node.address,
+      nodeId: node.id,
+      apiKey: usesAccount ? '' : node.apiKey,
+      apiKeyInQuery: !usesAccount,
+      accountUser: usesAccount ? node.accountUser : '',
+      accountPassword: usesAccount ? node.accountPassword : '',
+    );
+  }
 
   static const Map<String, String> _headers = {
     'X-Requested-With': 'XMLHttpRequest',
@@ -164,6 +263,11 @@ class NodeApiClient {
   /// [timeout] 覆盖默认请求超时（大文件压缩 / 传输等长耗时操作使用）；
   /// [vaultToken] 覆盖 [vaultToken] 字段（一次性场景：initToken /
   /// 恢复会话令牌）。
+  ///
+  /// 认证：配置了账户凭据（irix-node v1.2.0+）时自动保证会话可用 ——
+  /// 无有效缓存会话则先登录，服务端返回「未认证或会话已过期」时
+  /// 丢弃会话、重新登录并重试一次（`allowReauth: false` 用于登录请求
+  /// 自身，避免递归）。
   Future<dynamic> _request(
     String method,
     String path, {
@@ -172,7 +276,12 @@ class NodeApiClient {
     bool retryOnce = true,
     Duration? timeout,
     String? vaultToken,
+    bool allowReauth = true,
   }) async {
+    // 进入请求前保证会话有效（首次登录 / 会话被服务端清理后重登）。
+    if (allowReauth && hasAccountCredentials) {
+      await ensureSession();
+    }
     final uri = _uri(path, query);
     final base = body != null
         ? _headers
@@ -194,24 +303,133 @@ class NodeApiClient {
       throw NodeApiException(0, '无法连接到节点 $baseUrl，请检查地址与网络 (${e.message})');
     }
 
-    if (resp.statusCode == 401 && retryOnce && apiKey.isEmpty) {
+    if (resp.statusCode == 401 &&
+        retryOnce &&
+        apiKey.isEmpty &&
+        !hasAccountCredentials) {
       throw NodeApiException(401, '节点需要 API 密钥');
     }
-    if (resp.statusCode >= 400) {
-      throw NodeApiException(
-        resp.statusCode,
-        'HTTP ${resp.statusCode}: ${resp.body}',
+
+    dynamic decoded;
+    try {
+      decoded = _decode(resp);
+    } catch (_) {
+      if (resp.statusCode >= 400) {
+        // 非 JSON 错误响应（反向代理 / 网关页）：保留状态码与正文摘要。
+        final body = utf8.decode(resp.bodyBytes, allowMalformed: true).trim();
+        final brief = body.length > 200 ? '${body.substring(0, 200)}…' : body;
+        throw NodeApiException(
+          resp.statusCode,
+          'HTTP ${resp.statusCode}: $brief',
+        );
+      }
+      rethrow;
+    }
+
+    final rawStatus = decoded is Map ? decoded['status'] : null;
+    final status = rawStatus is num ? rawStatus.toInt() : resp.statusCode;
+    final message = decoded is Map && decoded['data'] is String
+        ? decoded['data'] as String
+        : '节点返回错误（status $status）';
+
+    // 会话失效（服务端返回「未认证或会话已过期」）→ 重新登录并重试一次。
+    if (allowReauth &&
+        hasAccountCredentials &&
+        _isSessionExpired(status, message)) {
+      await ensureSession(force: true);
+      return _request(
+        method,
+        path,
+        query: query,
+        body: body,
+        retryOnce: retryOnce,
+        timeout: timeout,
+        vaultToken: vaultToken,
+        allowReauth: false,
       );
     }
 
-    final decoded = _decode(resp);
-    final status = (decoded['status'] as num?)?.toInt() ?? 500;
     if (status != 200) {
-      final data = decoded['data'];
-      final message = data is String ? data : '节点返回错误（status $status）';
       throw NodeApiException(status, message);
     }
-    return decoded['data'];
+    return decoded is Map ? decoded['data'] : null;
+  }
+
+  /// 判断响应是否表示账户会话缺失 / 过期（irix-node v1.2.0+）。
+  ///
+  /// 服务端文案见 `instance.go` 的 auth 包装器：
+  /// `未认证或会话已过期（请先登录 POST /api/auth/login）`（403）。
+  /// 保险库门禁（`vault locked` 等）与权限不足（`权限不足: ...`）不属此类，
+  /// 不触发重登。
+  bool _isSessionExpired(int status, String message) {
+    if (status != 403) return false;
+    if (message.contains('权限不足')) return false;
+    if (message.startsWith('vault ')) return false;
+    return message.contains('未认证') ||
+        message.contains('会话已过期') ||
+        message.contains('请先登录');
+  }
+
+  /// 保证账户会话可用：命中有效缓存会话则直接复用，否则登录。
+  ///
+  /// [force] 为 true 时忽略缓存强制重新登录（会话被服务端清理后使用）。
+  /// 未配置账户凭据时直接返回，凭据错误时抛出
+  /// [NodeApiException]（401「用户名或密码错误」）。
+  Future<void> ensureSession({bool force = false}) async {
+    if (!hasAccountCredentials) return;
+    final key = sessionKey;
+    final cached = sessions[key];
+    if (!force && cached != null && cached.isValid) {
+      authToken = cached.token;
+      return;
+    }
+    final session = await _login();
+    sessions[key] = session;
+    authToken = session.token;
+  }
+
+  /// 执行登录（`POST /api/auth/login`）并返回会话。
+  Future<NodeAccountSession> _login() async {
+    final data = await _request(
+      'POST',
+      '/api/auth/login',
+      body: {
+        'username': accountUser.trim(),
+        'password': accountPassword,
+      },
+      allowReauth: false,
+    );
+    final session = NodeAccountSession.fromLogin(
+      data is Map<String, dynamic> ? data : const {},
+    );
+    if (session.token.isEmpty) {
+      throw NodeApiException(401, '节点未返回会话令牌，登录失败');
+    }
+    return session;
+  }
+
+  /// 主动登录当前客户端的账户并缓存会话（供测试连接 / 手动登录使用）。
+  ///
+  /// 与 [accountLogin] 的区别：本方法以构造函数传入的账户凭据登录，
+  /// 并把会话写入静态缓存，供后续新建的客户端实例直接复用。
+  Future<NodeAccountSession> login() async {
+    final session = await _login();
+    sessions[sessionKey] = session;
+    authToken = session.token;
+    return session;
+  }
+
+  /// 退出登录并清除缓存会话（`POST /api/auth/logout`）。
+  ///
+  /// 节点不可达或会话已失效时不抛错，本地缓存一律清除。
+  Future<void> logout() async {
+    try {
+      await _request('POST', '/api/auth/logout', allowReauth: false);
+    } catch (_) {
+      // 登出属于尽力而为：会话失效或节点离线时直接清理本地状态。
+    }
+    sessions.remove(sessionKey);
+    authToken = '';
   }
 
   /// 解码响应体，兼容 UTF-8 与 GBK 等编码。
@@ -2358,8 +2576,9 @@ class NodeApiClient {
 
   /// 登录并写入会话令牌（POST /api/auth/login）。
   ///
-  /// 成功后把返回的 token 写入 [authToken] 字段，后续请求自动附带；
-  /// root 首次登录（尚未设独立密码）[mustChangePassword] 为 true。
+  /// 成功后把返回的 token 同时写入 [authToken] 字段与静态会话缓存
+  /// （见 [sessions]），使后续新建的客户端实例直接复用；首次启动时
+  /// 节点随机生成管理员账户，凭据仅在节点启动日志显示一次。
   Future<Map<String, dynamic>> accountLogin({
     required String username,
     required String password,
@@ -2368,19 +2587,28 @@ class NodeApiClient {
       'POST',
       '/api/auth/login',
       body: {'username': username, 'password': password},
+      allowReauth: false,
     );
     if (data is Map<String, dynamic>) {
-      final token = data['token'] as String? ?? '';
-      if (token.isNotEmpty) authToken = token;
+      final session = NodeAccountSession.fromLogin(data);
+      if (session.token.isNotEmpty) {
+        authToken = session.token;
+        sessions[sessionKey] = session;
+      }
       return data;
     }
     return {};
   }
 
-  /// 退出登录（POST /api/auth/logout，删除当前会话）。
+  /// 退出登录（POST /api/auth/logout，删除当前会话）并清除本地缓存。
   Future<void> accountLogout() async {
-    await _request('POST', '/api/auth/logout');
+    try {
+      await _request('POST', '/api/auth/logout', allowReauth: false);
+    } catch (_) {
+      // 会话已失效 / 节点离线：本地状态照常清理。
+    }
     authToken = '';
+    sessions.remove(sessionKey);
   }
 
   /// 当前账户信息（GET /api/accounts/me）。
@@ -2403,14 +2631,20 @@ class NodeApiClient {
     return list;
   }
 
-  /// 修改密码（PUT /api/accounts/password，两种模式）：
-  /// - 自己改密：[oldPassword] + [newPassword]（root 首次改密 oldPassword=配对码）；
-  /// - 管理员重置：[username] + [newPassword]（无需旧密码，需管理员会话）。
+  /// 修改密码（PUT /api/accounts/password，两种模式，见 accounts_handlers.go）：
+  /// - 自己改密：[oldPassword] + [newPassword]（任何已登录账户，字段名固定）；
+  /// - 管理员重置：[username] + [newPassword]（无需旧密码，需管理员会话；
+  ///   服务端该模式下读取的字段名是 `password`，故此处按服务端契约改写）。
   Future<void> changeAccountPassword({
     String? oldPassword,
     String? newPassword,
     String? username,
   }) async {
+    final isAdminReset =
+        (username != null && username.isNotEmpty) &&
+        oldPassword == null &&
+        newPassword != null &&
+        newPassword.isNotEmpty;
     await _request(
       'PUT',
       '/api/accounts/password',
@@ -2418,7 +2652,7 @@ class NodeApiClient {
         if (oldPassword != null && oldPassword.isNotEmpty)
           'oldPassword': oldPassword,
         if (newPassword != null && newPassword.isNotEmpty)
-          'newPassword': newPassword,
+          isAdminReset ? 'password' : 'newPassword': newPassword,
         if (username != null && username.isNotEmpty) 'username': username,
       },
     );

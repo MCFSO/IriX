@@ -104,11 +104,17 @@ class NodeState extends ChangeNotifier {
   }
 
   /// 添加节点并持久化，随后自动选中。
+  ///
+  /// [apiKey] 仅 MCSM 面板使用；[accountUser] / [accountPassword] 为
+  /// irix-node v1.2.0+ 的账户凭据（见 NODE_API.md §1），两者按节点类型
+  /// 二选一。
   Future<NodeInfo> addNode({
     required String name,
     required NodeType type,
     required String address,
     String apiKey = '',
+    String accountUser = '',
+    String accountPassword = '',
   }) async {
     final node = NodeInfo(
       id: _generateId(),
@@ -116,6 +122,8 @@ class NodeState extends ChangeNotifier {
       type: type,
       address: address,
       apiKey: apiKey.trim(),
+      accountUser: accountUser.trim(),
+      accountPassword: accountPassword,
     );
     await _store.addNode(node);
     _nodes.add(node);
@@ -138,19 +146,32 @@ class NodeState extends ChangeNotifier {
   }
 
   /// 更新节点连接信息并持久化。
+  ///
+  /// 变更后丢弃该节点的缓存会话：地址或凭据改变时旧会话不再适用
+  /// （irix-node 的会话与节点实例绑定）。
   Future<void> updateNodeConnection(
     String id, {
     required String address,
     required String apiKey,
+    String? accountUser,
+    String? accountPassword,
   }) async {
     final node = _nodeById(id);
     if (node == null) return;
-    final updated = node.copyWith(address: address, apiKey: apiKey);
+    final updated = node.copyWith(
+      address: address,
+      apiKey: apiKey,
+      accountUser: accountUser,
+      accountPassword: accountPassword,
+    );
     await _store.updateNode(updated);
     final index = _nodes.indexWhere((e) => e.id == id);
     if (index >= 0) {
       _nodes[index] = updated;
     }
+    NodeApiClient.forgetSession(id);
+    _online.remove(id);
+    _errors.remove(id);
     notifyListeners();
   }
 

@@ -19,6 +19,7 @@ import '../utils/apple_widgets.dart';
 import '../widgets/add_node_dialog.dart';
 import '../widgets/network_line_chart.dart';
 import '../widgets/node_card_grid.dart';
+import '../widgets/node_credentials_dialog.dart';
 import 'home_screen.dart' show showSettingsDialog;
 
 /// 集群主页。
@@ -59,6 +60,15 @@ class _ClusterHomeScreenState extends State<ClusterHomeScreen> {
     final name = await showRenameNodeDialog(context, node);
     if (name != null && name.trim().isNotEmpty && mounted) {
       await context.read<NodeState>().renameNode(node.id, name);
+    }
+  }
+
+  /// 编辑节点账户凭据（irix-node v1.2.0+ 账户会话认证）。
+  Future<void> _editCredentials(NodeInfo node) async {
+    final saved = await showNodeCredentialsDialog(context, node);
+    if (saved == true && mounted) {
+      await context.read<NodeState>().pingNode(node.id);
+      await ClusterMonitor.instance.refreshNow();
     }
   }
 
@@ -137,6 +147,7 @@ class _ClusterHomeScreenState extends State<ClusterHomeScreen> {
                 onTapNode: null, // 多机模式不进入节点详情
                 onRenameNode: _rename,
                 onDeleteNode: _delete,
+                onCredentialsNode: _editCredentials,
               ),
               SliverToBoxAdapter(
                 child: _NetworkChartCard(history: cluster.networkHistory),

@@ -1,7 +1,9 @@
 // 添加节点三步向导
 // 步骤 1：选择节点类型（MCSM / Node）
 // 步骤 2：填写节点名称与 API 地址
-// 步骤 3：填写节点 Key / API Key（本地节点可留空），并测试连接
+// 步骤 3：填写凭据并测试连接 —— MCSM 面板填 API Key；irix-node（v1.2.0+）
+//         填账户用户名与密码（该版本已移除固定 apikey 通道，全部请求走
+//         账户会话 token，见 NODE_API.md §1）
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -32,6 +34,8 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
   final _nameController = TextEditingController();
   final _addressController = TextEditingController();
   final _apiKeyController = TextEditingController();
+  final _userController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   bool _testing = false;
   String? _testResult;
@@ -41,6 +45,9 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
 
   /// API Key 是否隐藏（默认隐藏，眼睛按钮切换显示）。
   bool _obscureKey = true;
+
+  /// 账户密码是否隐藏（默认隐藏，眼睛按钮切换显示）。
+  bool _obscurePassword = true;
 
   @override
   void initState() {
@@ -54,6 +61,8 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
     _nameController.dispose();
     _addressController.dispose();
     _apiKeyController.dispose();
+    _userController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -82,17 +91,64 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
       _testing = true;
       _testResult = null;
     });
-    final client = NodeApiClient(
-      baseUrl: address,
-      apiKey: _apiKeyController.text.trim(),
-    );
-    final ok = await client.ping();
-    if (!mounted) return;
-    setState(() {
-      _testing = false;
-      _testOk = ok;
-      _testResult = ok ? l.addNode_connectSuccess : l.addNode_connectFailed;
-    });
+    // MCSM 面板走 API Key（ping 概览接口）；irix-node 走账户登录，
+    // 只有真正登录成功才算连通（避免「地址通但凭据错」被误判为可用）。
+    if (_type == NodeType.mcsm) {
+      final client = NodeApiClient(
+        baseUrl: address,
+        apiKey: _apiKeyController.text.trim(),
+        apiKeyInQuery: true,
+      );
+      final ok = await client.ping();
+      if (!mounted) return;
+      setState(() {
+        _testing = false;
+        _testOk = ok;
+        _testResult = ok ? l.addNode_connectSuccess : l.addNode_connectFailed;
+      });
+      return;
+    }
+
+    final user = _userController.text.trim();
+    final password = _passwordController.text;
+    if (user.isEmpty || password.isEmpty) {
+      setState(() {
+        _testing = false;
+        _testOk = false;
+        _testResult = l.addNode_accountRequired;
+      });
+      return;
+    }
+    try {
+      final client = NodeApiClient(
+        baseUrl: address,
+        accountUser: user,
+        accountPassword: password,
+      );
+      final session = await client.login();
+      if (!mounted) return;
+      setState(() {
+        _testing = false;
+        _testOk = true;
+        _testResult = session.isAdmin
+            ? l.addNode_loginSuccessAdmin
+            : l.addNode_loginSuccess;
+      });
+    } on NodeApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _testing = false;
+        _testOk = false;
+        _testResult = l.addNode_loginFailed(e.message);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _testing = false;
+        _testOk = false;
+        _testResult = l.addNode_loginFailed('$e');
+      });
+    }
   }
 
   /// 判断地址是否为本地回环（127.0.0.1 / localhost / ::1）。
@@ -112,15 +168,20 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
     }
     final name = _nameController.text.trim();
     final apiKey = _apiKeyController.text.trim();
-    if (_type == NodeType.mcsm && apiKey.isEmpty) {
-      setState(() => _testResult = l.addNode_mcsmApiKeyRequired);
-      return;
-    }
-    // H-6：远程 IriX 节点必须配置密钥，否则守护进程端口暴露即形成
-    // 未认证的远程文件读写 + 命令执行面；仅本机回环允许留空。
-    if (_type == NodeType.node && apiKey.isEmpty && !_isLoopback(address)) {
-      setState(() => _testResult = l.addNode_remoteNodeKeyRequired);
-      return;
+    final user = _userController.text.trim();
+    final password = _passwordController.text;
+    if (_type == NodeType.mcsm) {
+      if (apiKey.isEmpty) {
+        setState(() => _testResult = l.addNode_mcsmApiKeyRequired);
+        return;
+      }
+    } else {
+      // irix-node v1.2.0+ 已移除 apikey 通道，任何节点（含本机回环）都必须
+      // 提供账户凭据，否则全部接口返回 403 未认证。
+      if (user.isEmpty || password.isEmpty) {
+        setState(() => _testResult = l.addNode_accountRequired);
+        return;
+      }
     }
     // H-6：远程明文 HTTP 警告（凭证与全部控制流量可被窃听篡改）。
     final nodeState = context.read<NodeState>();
@@ -155,7 +216,9 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
       name: name,
       type: _type,
       address: address,
-      apiKey: apiKey,
+      apiKey: _type == NodeType.mcsm ? apiKey : '',
+      accountUser: _type == NodeType.mcsm ? '' : user,
+      accountPassword: _type == NodeType.mcsm ? '' : password,
     );
     if (!mounted) return;
     Navigator.of(context).pop(node);
@@ -368,56 +431,94 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
     );
   }
 
-  /// 步骤 3：API Key。
+  /// 步骤 3：凭据（MCSM 面板 = API Key；irix-node = 账户用户名 + 密码）。
   Widget _buildKeyStep(ThemeData theme) {
     final l = AppLocalizations.of(context);
     return Column(
       key: const ValueKey('step-key'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(l.addNode_keyTitle, style: theme.textTheme.titleMedium),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _apiKeyController,
-          obscureText: _obscureKey,
-          enableSuggestions: false,
-          autocorrect: false,
-          decoration: InputDecoration(
-            hintText: _type == NodeType.mcsm
-                ? l.addNode_mcsmKeyHint
-                : l.addNode_nodeKeyHint,
-            border: const OutlineInputBorder(),
-            suffixIcon: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.copy, size: 18),
-                  tooltip: l.common_copy,
-                  onPressed: () {
-                    Clipboard.setData(
-                      ClipboardData(text: _apiKeyController.text),
-                    );
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(l.addNode_copiedApiKey)),
-                    );
-                  },
-                ),
-                IconButton(
-                  icon: Icon(
-                    _obscureKey ? Icons.visibility : Icons.visibility_off,
-                    size: 18,
-                  ),
-                  tooltip: _obscureKey ? l.addNode_show : l.addNode_hide,
-                  onPressed: () => setState(() => _obscureKey = !_obscureKey),
-                ),
-              ],
-            ),
-            helperText: _type == NodeType.mcsm
-                ? l.addNode_mcsmKeyHelper
-                : l.addNode_nodeKeyHelper,
-          ),
-          onChanged: (_) => setState(() {}),
+        Text(
+          _type == NodeType.mcsm ? l.addNode_keyTitle : l.addNode_accountTitle,
+          style: theme.textTheme.titleMedium,
         ),
+        const SizedBox(height: 8),
+        if (_type == NodeType.mcsm)
+          TextField(
+            controller: _apiKeyController,
+            obscureText: _obscureKey,
+            enableSuggestions: false,
+            autocorrect: false,
+            decoration: InputDecoration(
+              hintText: l.addNode_mcsmKeyHint,
+              border: const OutlineInputBorder(),
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.copy, size: 18),
+                    tooltip: l.common_copy,
+                    onPressed: () {
+                      Clipboard.setData(
+                        ClipboardData(text: _apiKeyController.text),
+                      );
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(l.addNode_copiedApiKey)),
+                      );
+                    },
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      _obscureKey ? Icons.visibility : Icons.visibility_off,
+                      size: 18,
+                    ),
+                    tooltip: _obscureKey ? l.addNode_show : l.addNode_hide,
+                    onPressed: () => setState(() => _obscureKey = !_obscureKey),
+                  ),
+                ],
+              ),
+              helperText: l.addNode_mcsmKeyHelper,
+            ),
+            onChanged: (_) => setState(() {}),
+          )
+        else ...[
+          TextField(
+            controller: _userController,
+            enableSuggestions: false,
+            autocorrect: false,
+            decoration: InputDecoration(
+              labelText: l.addNode_accountUser,
+              hintText: l.addNode_accountUserHint,
+              border: const OutlineInputBorder(),
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _passwordController,
+            obscureText: _obscurePassword,
+            enableSuggestions: false,
+            autocorrect: false,
+            decoration: InputDecoration(
+              labelText: l.addNode_accountPassword,
+              border: const OutlineInputBorder(),
+              helperText: l.addNode_accountHelper,
+              helperMaxLines: 4,
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscurePassword
+                      ? Icons.visibility
+                      : Icons.visibility_off,
+                  size: 18,
+                ),
+                tooltip: _obscurePassword ? l.addNode_show : l.addNode_hide,
+                onPressed: () =>
+                    setState(() => _obscurePassword = !_obscurePassword),
+              ),
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+        ],
         if (_testResult != null) ...[
           const SizedBox(height: 12),
           Row(

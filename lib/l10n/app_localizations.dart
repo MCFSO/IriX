@@ -488,6 +488,48 @@ abstract class AppLocalizations {
   /// **'重命名'**
   String get node_renameMenu;
 
+  /// 节点菜单-账户登录
+  ///
+  /// In zh, this message translates to:
+  /// **'账户登录'**
+  String get node_credentialsMenu;
+
+  /// nodeCredentials_title
+  ///
+  /// In zh, this message translates to:
+  /// **'节点账户凭据'**
+  String get nodeCredentials_title;
+
+  /// nodeCredentials_description
+  ///
+  /// In zh, this message translates to:
+  /// **'irix-node 自 v1.2.0 起已移除密钥通道，全部接口需账户会话 token。填写节点账户后应用会自动登录，并在会话过期时重新登录。节点首次启动日志中会显示一次随机生成的管理员账户。'**
+  String get nodeCredentials_description;
+
+  /// nodeCredentials_saved
+  ///
+  /// In zh, this message translates to:
+  /// **'凭据已保存'**
+  String get nodeCredentials_saved;
+
+  /// nodeCredentials_saveAnywayTitle
+  ///
+  /// In zh, this message translates to:
+  /// **'登录校验未通过'**
+  String get nodeCredentials_saveAnywayTitle;
+
+  /// nodeCredentials_saveAnywayContent
+  ///
+  /// In zh, this message translates to:
+  /// **'以当前凭据登录节点失败（节点离线或凭据有误）。仍要保存该凭据吗？'**
+  String get nodeCredentials_saveAnywayContent;
+
+  /// nodeCredentials_saveAnyway
+  ///
+  /// In zh, this message translates to:
+  /// **'仍然保存'**
+  String get nodeCredentials_saveAnyway;
+
   /// 节点菜单-删除
   ///
   /// In zh, this message translates to:
@@ -1633,11 +1675,59 @@ abstract class AppLocalizations {
   /// **'MCSM 节点需要填写 API Key'**
   String get addNode_mcsmApiKeyRequired;
 
-  /// addNode_remoteNodeKeyRequired
+  /// addNode_accountRequired
   ///
   /// In zh, this message translates to:
-  /// **'远程 Node 节点必须填写密钥（仅本机回环地址可留空）'**
-  String get addNode_remoteNodeKeyRequired;
+  /// **'请填写节点账户用户名与密码（irix-node v1.2.0 起不再使用密钥）'**
+  String get addNode_accountRequired;
+
+  /// addNode_accountTitle
+  ///
+  /// In zh, this message translates to:
+  /// **'节点账户'**
+  String get addNode_accountTitle;
+
+  /// addNode_accountUser
+  ///
+  /// In zh, this message translates to:
+  /// **'账户用户名'**
+  String get addNode_accountUser;
+
+  /// addNode_accountUserHint
+  ///
+  /// In zh, this message translates to:
+  /// **'节点首次启动日志中显示的管理员账户名'**
+  String get addNode_accountUserHint;
+
+  /// addNode_accountPassword
+  ///
+  /// In zh, this message translates to:
+  /// **'账户密码'**
+  String get addNode_accountPassword;
+
+  /// addNode_accountHelper
+  ///
+  /// In zh, this message translates to:
+  /// **'irix-node v1.2.0 起已移除密钥通道，全部接口走账户会话 token；凭据可在节点端账户管理中修改，应用会自动登录并续期。'**
+  String get addNode_accountHelper;
+
+  /// addNode_loginSuccess
+  ///
+  /// In zh, this message translates to:
+  /// **'登录成功'**
+  String get addNode_loginSuccess;
+
+  /// addNode_loginSuccessAdmin
+  ///
+  /// In zh, this message translates to:
+  /// **'登录成功（管理员账户）'**
+  String get addNode_loginSuccessAdmin;
+
+  /// addNode_loginFailed
+  ///
+  /// In zh, this message translates to:
+  /// **'登录失败：{message}'**
+  String addNode_loginFailed(String message);
 
   /// addNode_plaintextWarningTitle
   ///
@@ -1648,7 +1738,7 @@ abstract class AppLocalizations {
   /// addNode_plaintextWarningContent
   ///
   /// In zh, this message translates to:
-  /// **'该节点地址使用明文 HTTP（非 https），API 密钥与全部控制流量（含文件读写、命令执行）可被同网段窃听或篡改。'**
+  /// **'该节点地址使用明文 HTTP（非 https），节点凭据（API Key 或账户密码/会话 token）与全部控制流量（含文件读写、命令执行）可被同网段窃听或篡改。'**
   String get addNode_plaintextWarningContent;
 
   /// addNode_continueAnyway
@@ -1702,7 +1792,7 @@ abstract class AppLocalizations {
   /// addNode_stepKey
   ///
   /// In zh, this message translates to:
-  /// **'Key'**
+  /// **'凭据'**
   String get addNode_stepKey;
 
   /// addNode_selectType
@@ -1720,7 +1810,7 @@ abstract class AppLocalizations {
   /// addNode_nodeSubtitle
   ///
   /// In zh, this message translates to:
-  /// **'IriX 本地 Go 语言节点\n本机回环可免密钥，远程必须配置密钥'**
+  /// **'IriX 本地 Go 语言节点\n使用节点账户登录（v1.2.0 起不再使用密钥）'**
   String get addNode_nodeSubtitle;
 
   /// addNode_nameHint
@@ -1759,12 +1849,6 @@ abstract class AppLocalizations {
   /// **'MCSManager 用户 API Key'**
   String get addNode_mcsmKeyHint;
 
-  /// addNode_nodeKeyHint
-  ///
-  /// In zh, this message translates to:
-  /// **'本地节点密钥（本机回环可留空）'**
-  String get addNode_nodeKeyHint;
-
   /// addNode_copiedApiKey
   ///
   /// In zh, this message translates to:
@@ -1788,12 +1872,6 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'在 MCSManager 面板「用户信息」中生成并复制'**
   String get addNode_mcsmKeyHelper;
-
-  /// addNode_nodeKeyHelper
-  ///
-  /// In zh, this message translates to:
-  /// **'远程节点必须填写密钥；仅 127.0.0.1 本机回环可留空'**
-  String get addNode_nodeKeyHelper;
 
   /// wizard_title
   ///

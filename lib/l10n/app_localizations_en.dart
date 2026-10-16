@@ -236,6 +236,29 @@ class AppLocalizationsEn extends AppLocalizations {
   String get node_renameMenu => 'Rename';
 
   @override
+  String get node_credentialsMenu => 'Account sign-in';
+
+  @override
+  String get nodeCredentials_title => 'Node account credentials';
+
+  @override
+  String get nodeCredentials_description =>
+      'irix-node removed the key channel in v1.2.0; every API request needs an account session token. Once the node account is saved the app signs in automatically and re-authenticates when the session expires. The node prints a randomly generated administrator account once on first startup.';
+
+  @override
+  String get nodeCredentials_saved => 'Credentials saved';
+
+  @override
+  String get nodeCredentials_saveAnywayTitle => 'Sign-in check failed';
+
+  @override
+  String get nodeCredentials_saveAnywayContent =>
+      'Signing in to the node with these credentials failed (node offline or credentials incorrect). Save them anyway?';
+
+  @override
+  String get nodeCredentials_saveAnyway => 'Save anyway';
+
+  @override
   String get node_deleteMenu => 'Delete';
 
   @override
@@ -886,15 +909,44 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addNode_mcsmApiKeyRequired => 'MCSM nodes require an API Key';
 
   @override
-  String get addNode_remoteNodeKeyRequired =>
-      'Remote Node requires a key (only the local loopback address may be left blank)';
+  String get addNode_accountRequired =>
+      'Enter the node account username and password (irix-node v1.2.0 removed the key channel)';
+
+  @override
+  String get addNode_accountTitle => 'Node account';
+
+  @override
+  String get addNode_accountUser => 'Account username';
+
+  @override
+  String get addNode_accountUserHint =>
+      'The admin account shown once in the node startup log';
+
+  @override
+  String get addNode_accountPassword => 'Account password';
+
+  @override
+  String get addNode_accountHelper =>
+      'irix-node v1.2.0 removed the key channel; every request uses an account session token. Credentials can be changed in the node-side account manager; the app signs in and renews automatically.';
+
+  @override
+  String get addNode_loginSuccess => 'Signed in successfully';
+
+  @override
+  String get addNode_loginSuccessAdmin =>
+      'Signed in successfully (administrator account)';
+
+  @override
+  String addNode_loginFailed(String message) {
+    return 'Sign-in failed: $message';
+  }
 
   @override
   String get addNode_plaintextWarningTitle => 'Plaintext connection warning';
 
   @override
   String get addNode_plaintextWarningContent =>
-      'This node address uses plaintext HTTP (not https); your API key and all control traffic (including file read/write and command execution) can be eavesdropped or tampered with on the same network.';
+      'This node address uses plaintext HTTP (not https); your node credentials (API key or account password/session token) and all control traffic (including file read/write and command execution) can be eavesdropped or tampered with on the same network.';
 
   @override
   String get addNode_continueAnyway => 'Continue anyway';
@@ -922,7 +974,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addNode_stepName => 'Name';
 
   @override
-  String get addNode_stepKey => 'Key';
+  String get addNode_stepKey => 'Credentials';
 
   @override
   String get addNode_selectType => 'Select node type';
@@ -933,7 +985,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get addNode_nodeSubtitle =>
-      'IriX local Go-language node\nLocal loopback can skip the key; remote nodes require a key';
+      'IriX local Go-language node\nSign in with a node account (keys were removed in v1.2.0)';
 
   @override
   String get addNode_nameHint => 'e.g. My Panel / Local Node';
@@ -956,10 +1008,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addNode_mcsmKeyHint => 'MCSManager user API Key';
 
   @override
-  String get addNode_nodeKeyHint =>
-      'Local node key (may be left blank for local loopback)';
-
-  @override
   String get addNode_copiedApiKey => 'API Key copied';
 
   @override
@@ -971,10 +1019,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get addNode_mcsmKeyHelper =>
       'Generate and copy it in the MCSManager panel \"User Info\"';
-
-  @override
-  String get addNode_nodeKeyHelper =>
-      'Remote nodes must provide a key; only the 127.0.0.1 local loopback may be left blank';
 
   @override
   String get wizard_title => 'First-time setup guide';

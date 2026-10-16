@@ -19,6 +19,7 @@ class NodeCardGrid extends StatelessWidget {
     this.onTapNode,
     required this.onRenameNode,
     required this.onDeleteNode,
+    required this.onCredentialsNode,
   });
 
   final List<NodeInfo> nodes;
@@ -29,6 +30,9 @@ class NodeCardGrid extends StatelessWidget {
   final void Function(NodeInfo node)? onTapNode;
   final void Function(NodeInfo node) onRenameNode;
   final void Function(NodeInfo node) onDeleteNode;
+
+  /// 打开节点账户凭据对话框（irix-node v1.2.0+ 账户会话认证）。
+  final void Function(NodeInfo node) onCredentialsNode;
 
   @override
   Widget build(BuildContext context) {
@@ -51,6 +55,7 @@ class NodeCardGrid extends StatelessWidget {
             onTap: onTapNode == null ? null : () => onTapNode!(node),
             onRename: () => onRenameNode(node),
             onDelete: () => onDeleteNode(node),
+            onCredentials: () => onCredentialsNode(node),
           );
         },
       ),
@@ -119,6 +124,7 @@ class _NodeCard extends StatelessWidget {
     this.onTap,
     required this.onRename,
     required this.onDelete,
+    required this.onCredentials,
   });
 
   final NodeInfo node;
@@ -127,6 +133,7 @@ class _NodeCard extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback onRename;
   final VoidCallback onDelete;
+  final VoidCallback onCredentials;
 
   @override
   Widget build(BuildContext context) {
@@ -224,6 +231,8 @@ class _NodeCard extends StatelessWidget {
             ),
             onSelected: (value) {
               switch (value) {
+                case 'credentials':
+                  onCredentials();
                 case 'rename':
                   onRename();
                 case 'delete':
@@ -231,6 +240,10 @@ class _NodeCard extends StatelessWidget {
               }
             },
             itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'credentials',
+                child: Text(l.node_credentialsMenu),
+              ),
               PopupMenuItem(value: 'rename', child: Text(l.node_renameMenu)),
               PopupMenuItem(value: 'delete', child: Text(l.node_deleteMenu)),
             ],

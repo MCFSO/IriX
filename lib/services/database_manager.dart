@@ -16,7 +16,7 @@ class DatabaseManager {
   DatabaseManager._();
 
   static const String _dbName = 'irix.db';
-  static const int _dbVersion = 6;
+  static const int _dbVersion = 7;
 
   Database? _db;
 
@@ -114,6 +114,8 @@ class DatabaseManager {
         type TEXT NOT NULL,
         address TEXT NOT NULL,
         api_key TEXT NOT NULL,
+        account_user TEXT NOT NULL DEFAULT '',
+        account_password TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL
       )
     ''');
@@ -218,6 +220,21 @@ class DatabaseManager {
       if (!cols.any((c) => c['name'] == 'container_config')) {
         await db.execute(
           'ALTER TABLE servers ADD COLUMN container_config TEXT',
+        );
+      }
+    }
+    if (oldVersion < 7) {
+      // 节点认证对齐 irix-node v1.2.0：该版本移除固定 apikey 通道，
+      // 全部请求改走账户会话 token，故节点需保存账户用户名与密码。
+      final cols = await db.rawQuery('PRAGMA table_info(nodes)');
+      if (!cols.any((c) => c['name'] == 'account_user')) {
+        await db.execute(
+          "ALTER TABLE nodes ADD COLUMN account_user TEXT NOT NULL DEFAULT ''",
+        );
+      }
+      if (!cols.any((c) => c['name'] == 'account_password')) {
+        await db.execute(
+          "ALTER TABLE nodes ADD COLUMN account_password TEXT NOT NULL DEFAULT ''",
         );
       }
     }
