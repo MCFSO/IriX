@@ -512,6 +512,14 @@ abstract class ContainerBackend {
   /// 是否远程后端（经节点 API）。
   bool get isRemote;
 
+  /// 是否支持容器归档导出 / 导入（[exportContainer] / [importContainer]）。
+  ///
+  /// - irix-node：Docker 后端经 `POST /api/container/{id}/export` +
+  ///   `POST /api/image/import` 支持；Bastille 后端经 jail export/import 支持；
+  /// - MCSM 受限模式（无 `/api/container/info`）：不支持，UI 隐藏入口；
+  /// - 本地 Docker CLI 后端：不支持（可用镜像 save/load 代替）。
+  bool get supportsArchiveTransfer;
+
   /// 能力探测：检查后端是否可用。
   ///
   /// 不可用时 [ContainerEnvironmentInfo.available] 为 false，
@@ -744,4 +752,87 @@ abstract class ContainerBackend {
 
   /// 清理运行会话（释放节点端缓冲）。
   Future<void> cleanupJailRun(String idOrName, String sessionId);
+
+  // ==================== 长任务进度 / Bastille 模板 ====================
+
+  /// 是否支持 Bastille 模板（`bastille template`，仅 FreeBSD 节点）。
+  ///
+  /// 默认 false；本地 Docker CLI 与 Docker 节点后端均不支持。
+  bool get supportsJailTemplates => false;
+
+  /// 列出节点上可用的 Bastille 模板（模板文件树 NAMESPACE/NAME）。
+  Future<List<JailTemplate>> listJailTemplates() {
+    throw const ContainerBackendException(
+      'jail 模板仅适用于 Bastille（bastille template）',
+    );
+  }
+
+  /// 应用模板到 jail，返回长任务 id（进度用 [jobProgress] 轮询）。
+  ///
+  /// [template] 取 [JailTemplate.qualifiedName]；[args] 为模板脚本可引用的
+  /// 环境变量（键值对，原样注入 `KEY=VALUE`）。
+  Future<String> applyJailTemplate(
+    String idOrName,
+    String template, {
+    Map<String, String> args = const {},
+  }) {
+    throw const ContainerBackendException(
+      'jail 模板仅适用于 Bastille（bastille template）',
+    );
+  }
+
+  /// 长任务日志进度（无百分比，节点长任务表）。
+  ///
+  /// 适用于 bootstrap（[pullImage]）、模板应用（[applyJailTemplate]）等
+  /// 服务端以长任务派发的操作。默认不支持。
+  Future<JobLogProgress> jobProgress(String jobId) {
+    throw const ContainerBackendException('当前后端不支持长任务进度查询');
+  }
+}
+
+/// Bastille 模板（模板目录树中的一层：`NAMESPACE/NAME`）。
+class JailTemplate {
+  /// 模板命名空间（如 `Minecraft`）。
+  final String namespace;
+
+  /// 模板名（如 `server`）。
+  final String name;
+
+  const JailTemplate({required this.namespace, required this.name});
+
+  factory JailTemplate.fromJson(Map<String, dynamic> json) => JailTemplate(
+    namespace: json['namespace'] as String? ?? '',
+    name: json['name'] as String? ?? '',
+  );
+
+  /// 传给 `bastille template` 的完整名（namespace 为空时退化为 name）。
+  String get qualifiedName => namespace.isEmpty ? name : '$namespace/$name';
+
+  @override
+  String toString() => qualifiedName;
+}
+
+/// 长任务日志进度（无百分比）。
+///
+/// 对应 irix-node 的 `GET /api/bastille/jobs/{jobId}`（见 container.go 的
+/// `longJob`）：`status` 取 `running` / `done` / `failed`，`log` 为按行
+/// 收集的进程输出（服务端只保留最近若干行）。
+class JobLogProgress {
+  /// 任务状态：`running` / `done` / `failed`。
+  final String status;
+
+  /// 进程输出行。
+  final List<String> log;
+
+  const JobLogProgress({this.status = '', this.log = const []});
+
+  bool get isDone => status == 'done';
+  bool get isFailed => status == 'failed';
+
+  /// 日志尾部 [lines] 行（用于展示失败原因）。
+  String tailLog([int lines = 10]) {
+    if (log.isEmpty) return '';
+    final start = log.length > lines ? log.length - lines : 0;
+    return log.sublist(start).join('\n');
+  }
 }

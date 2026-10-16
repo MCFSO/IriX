@@ -308,7 +308,11 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
     }
   }
 
-  /// 导出 jail 为归档（Bastille）。
+  /// 导出容器为归档。
+  ///
+  /// - Bastille：`bastille export` 落在**节点**备份目录，返回节点侧路径；
+  /// - Docker：节点 `docker export` 后经下载票据把 tar 拉到**本机**容器归档
+  ///   目录，返回本地路径（两种语义都以「可在导入时直接使用的归档路径」呈现）。
   Future<void> _exportContainer(ContainerInfo container) async {
     try {
       final l = AppLocalizations.of(context);
@@ -354,11 +358,11 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
     }
   }
 
-  /// 从归档导入 jail（Bastille）。
+  /// 从归档导入（Bastille 导入 jail；Docker 导入镜像并创建容器）。
   Future<void> _openImportDialog() async {
     final result = await showAppDialog<_ImportInput>(
       context,
-      (_) => const _ImportDialog(),
+      (_) => _ImportDialog(isBastille: _isBastille),
     );
     if (result == null || !mounted) return;
     try {
@@ -596,7 +600,7 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
                 tooltip: l.common_refresh,
                 onPressed: _refreshContainers,
               ),
-              if (_isBastille)
+              if (widget.backend.supportsArchiveTransfer)
                 FilledButton.tonalIcon(
                   onPressed: _openImportDialog,
                   icon: const Icon(Icons.file_upload_outlined, size: 18),
@@ -648,7 +652,9 @@ class _ContainerEnvironmentPanelState extends State<ContainerEnvironmentPanel>
                       onClone: () => _openCloneDialog(c),
                       onLimits: () => _openLimitsDialog(c),
                       onManage: _isBastille ? () => _openJailDetail(c) : null,
-                      onExport: _isBastille ? () => _exportContainer(c) : null,
+                      onExport: widget.backend.supportsArchiveTransfer
+                          ? () => _exportContainer(c)
+                          : null,
                       onRemove: () => _runContainerAction(
                         c,
                         () =>
@@ -2410,9 +2416,18 @@ class _ImportInput {
   final bool force;
 }
 
-/// 从归档导入 jail 对话框（Bastille）。
+/// 从归档导入对话框。
+///
+/// - Bastille（[isBastille] = true）：`file` 为**节点**上的归档路径，
+///   `release` 可选指定导入到哪个发行版，`force` 跳过校验和验证；
+/// - Docker（[isBastille] = false）：`file` 为**本地** tar 路径（经节点导出或
+///   `docker save` 得到），`release` 语义为目标镜像名，服务端先上传到同步区
+///   再 `docker import`，随后用该镜像创建容器。
 class _ImportDialog extends StatefulWidget {
-  const _ImportDialog();
+  const _ImportDialog({required this.isBastille});
+
+  /// 是否为 Bastille 运行时（决定字段文案与语义）。
+  final bool isBastille;
 
   @override
   State<_ImportDialog> createState() => _ImportDialogState();
@@ -2433,8 +2448,9 @@ class _ImportDialogState extends State<_ImportDialog> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    final isBastille = widget.isBastille;
     return AlertDialog(
-      title: Text(l.container_importJail),
+      title: Text(isBastille ? l.container_importJail : l.container_importImage),
       content: SizedBox(
         width: 400,
         child: Column(
@@ -2444,8 +2460,12 @@ class _ImportDialogState extends State<_ImportDialog> {
               controller: _fileController,
               autofocus: true,
               decoration: InputDecoration(
-                labelText: l.container_archivePath,
-                hintText: l.container_archivePathHint,
+                labelText: isBastille
+                    ? l.container_archivePath
+                    : l.container_localArchivePath,
+                hintText: isBastille
+                    ? l.container_archivePathHint
+                    : l.container_localArchivePathHint,
                 isDense: true,
                 border: const OutlineInputBorder(),
               ),
@@ -2454,19 +2474,25 @@ class _ImportDialogState extends State<_ImportDialog> {
             TextField(
               controller: _releaseController,
               decoration: InputDecoration(
-                labelText: l.container_specifyRelease,
-                hintText: l.container_specifyReleaseHint,
+                labelText: isBastille
+                    ? l.container_specifyRelease
+                    : l.container_targetImageName,
+                hintText: isBastille
+                    ? l.container_specifyReleaseHint
+                    : l.container_targetImageNameHint,
                 isDense: true,
                 border: const OutlineInputBorder(),
               ),
             ),
-            CheckboxListTile(
-              value: _force,
-              onChanged: (value) => setState(() => _force = value ?? false),
-              title: Text(l.container_skipChecksum),
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-            ),
+            // 校验和跳过仅 Bastille import 支持（docker import 无对应语义）。
+            if (isBastille)
+              CheckboxListTile(
+                value: _force,
+                onChanged: (value) => setState(() => _force = value ?? false),
+                title: Text(l.container_skipChecksum),
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
           ],
         ),
       ),

@@ -1286,6 +1286,36 @@ abstract class AppLocalizations {
   /// **'跳过校验和验证（-f / --force）'**
   String get container_skipChecksum;
 
+  /// container_importImage
+  ///
+  /// In zh, this message translates to:
+  /// **'导入镜像'**
+  String get container_importImage;
+
+  /// container_localArchivePath
+  ///
+  /// In zh, this message translates to:
+  /// **'本地归档路径（节点导出 / docker save 的 tar）'**
+  String get container_localArchivePath;
+
+  /// container_localArchivePathHint
+  ///
+  /// In zh, this message translates to:
+  /// **'如 /home/user/irix/container_exports/xxx.tar'**
+  String get container_localArchivePathHint;
+
+  /// container_targetImageName
+  ///
+  /// In zh, this message translates to:
+  /// **'目标镜像名（留空按归档文件名推导）'**
+  String get container_targetImageName;
+
+  /// container_targetImageNameHint
+  ///
+  /// In zh, this message translates to:
+  /// **'如 myimage:latest'**
+  String get container_targetImageNameHint;
+
   /// container_importJail
   ///
   /// In zh, this message translates to:
@@ -3426,6 +3456,78 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'设置'**
   String get jailDetail_tabSettings;
+
+  /// jailDetail_tabTemplates
+  ///
+  /// In zh, this message translates to:
+  /// **'模板'**
+  String get jailDetail_tabTemplates;
+
+  /// jailDetail_sectionTemplates
+  ///
+  /// In zh, this message translates to:
+  /// **'Jail 模板（bastille template）'**
+  String get jailDetail_sectionTemplates;
+
+  /// jailDetail_templatesHint
+  ///
+  /// In zh, this message translates to:
+  /// **'模板来自节点 bastille 模板目录，应用后以长任务执行，可查看实时日志。'**
+  String get jailDetail_templatesHint;
+
+  /// jailDetail_noTemplates
+  ///
+  /// In zh, this message translates to:
+  /// **'节点上没有可用模板'**
+  String get jailDetail_noTemplates;
+
+  /// jailDetail_applyTemplate
+  ///
+  /// In zh, this message translates to:
+  /// **'应用'**
+  String get jailDetail_applyTemplate;
+
+  /// jailDetail_applyTemplateTitle
+  ///
+  /// In zh, this message translates to:
+  /// **'应用模板：{name}'**
+  String jailDetail_applyTemplateTitle(String name);
+
+  /// jailDetail_templateArgs
+  ///
+  /// In zh, this message translates to:
+  /// **'模板参数（可选，每行 KEY=VALUE）'**
+  String get jailDetail_templateArgs;
+
+  /// jailDetail_templateArgsHint
+  ///
+  /// In zh, this message translates to:
+  /// **'如 MC_VERSION=1.21.1'**
+  String get jailDetail_templateArgsHint;
+
+  /// jailDetail_templateLog
+  ///
+  /// In zh, this message translates to:
+  /// **'任务日志'**
+  String get jailDetail_templateLog;
+
+  /// jailDetail_templateDone
+  ///
+  /// In zh, this message translates to:
+  /// **'模板应用完成'**
+  String get jailDetail_templateDone;
+
+  /// jailDetail_templateFailed
+  ///
+  /// In zh, this message translates to:
+  /// **'模板应用失败'**
+  String get jailDetail_templateFailed;
+
+  /// jailDetail_loadingTemplates
+  ///
+  /// In zh, this message translates to:
+  /// **'正在加载模板…'**
+  String get jailDetail_loadingTemplates;
 
   /// jailDetail_running
   ///

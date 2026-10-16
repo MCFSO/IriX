@@ -666,6 +666,24 @@ class AppLocalizationsEn extends AppLocalizations {
       'Skip checksum verification (-f / --force)';
 
   @override
+  String get container_importImage => 'Import image';
+
+  @override
+  String get container_localArchivePath =>
+      'Local archive path (node export / docker save tar)';
+
+  @override
+  String get container_localArchivePathHint =>
+      'e.g. /home/user/irix/container_exports/xxx.tar';
+
+  @override
+  String get container_targetImageName =>
+      'Target image name (blank = derive from file name)';
+
+  @override
+  String get container_targetImageNameHint => 'e.g. myimage:latest';
+
+  @override
   String get container_importJail => 'Import Jail';
 
   @override
@@ -1912,6 +1930,47 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get jailDetail_tabSettings => 'Settings';
+
+  @override
+  String get jailDetail_tabTemplates => 'Templates';
+
+  @override
+  String get jailDetail_sectionTemplates =>
+      'Jail templates (bastille template)';
+
+  @override
+  String get jailDetail_templatesHint =>
+      'Templates come from the node\'s bastille template directory; applying runs as a long task with live logs.';
+
+  @override
+  String get jailDetail_noTemplates => 'No templates available on the node';
+
+  @override
+  String get jailDetail_applyTemplate => 'Apply';
+
+  @override
+  String jailDetail_applyTemplateTitle(String name) {
+    return 'Apply template: $name';
+  }
+
+  @override
+  String get jailDetail_templateArgs =>
+      'Template args (optional, one KEY=VALUE per line)';
+
+  @override
+  String get jailDetail_templateArgsHint => 'e.g. MC_VERSION=1.21.1';
+
+  @override
+  String get jailDetail_templateLog => 'Task log';
+
+  @override
+  String get jailDetail_templateDone => 'Template applied';
+
+  @override
+  String get jailDetail_templateFailed => 'Template failed';
+
+  @override
+  String get jailDetail_loadingTemplates => 'Loading templates…';
 
   @override
   String get jailDetail_running => 'Running';

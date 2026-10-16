@@ -8,6 +8,11 @@
 // MCSM 面板无 /api/container/info，能力探测失败时回退到 §6 受限端点
 // （镜像列表/构建 + 容器与网络只读列表），UI 上表现为「受限模式」。
 
+import 'dart:io';
+
+import 'package:path/path.dart' as p;
+
+import '../app_paths.dart';
 import '../node_api_client.dart';
 import 'container_backend.dart';
 
@@ -37,6 +42,40 @@ abstract class NodeContainerBackend implements ContainerBackend {
 
   /// 守护进程 id（MCSM 面板多守护进程；irix-node 取 overview.remote 首个）。
   final String daemonId;
+
+  /// 受限模式（MCSM 面板无 /api/container/info）：仅镜像构建与只读列表，
+  /// 归档导出 / 导入等写入型能力不可用。
+  @override
+  bool get supportsArchiveTransfer => !restricted;
+
+  /// Docker 节点无 Bastille 模板能力（由 [NodeBastilleBackend] 覆盖）。
+  @override
+  bool get supportsJailTemplates => false;
+
+  @override
+  Future<List<JailTemplate>> listJailTemplates() {
+    throw const ContainerBackendException('jail 模板仅适用于 Bastille（bastille template）');
+  }
+
+  @override
+  Future<String> applyJailTemplate(
+    String idOrName,
+    String template, {
+    Map<String, String> args = const {},
+  }) {
+    throw const ContainerBackendException('jail 模板仅适用于 Bastille（bastille template）');
+  }
+
+  /// 长任务日志进度（GET /api/bastille/jobs/{jobId}）。
+  ///
+  /// 该端点在 irix-node 中读取的是**全局长任务表**（container.go 的
+  /// `jobs`），镜像构建、Bastille bootstrap、模板应用共用同一张表，
+  /// 因此 Docker / Bastille 两种运行时都可用。
+  @override
+  Future<JobLogProgress> jobProgress(String jobId) async {
+    final progress = await client.bastilleJobProgress(jobId);
+    return JobLogProgress(status: progress.status, log: progress.log);
+  }
 
   /// 是否受限模式（MCSM 面板回退）。
   bool restricted = false;
@@ -561,18 +600,105 @@ class NodeDockerBackend extends NodeContainerBackend {
     throw const ContainerBackendException('容器内运行仅适用于 Bastille（bastille cmd）');
   }
 
+  // ==================== 导入 / 导出（容器归档 → 镜像）====================
+
+  /// 导出容器为本地归档（irix-node `POST /api/container/{id}/export`）。
+  ///
+  /// 链路：
+  /// ① 服务端执行 `docker export` 把容器写成 tar 落在节点同步区 `.exports/`，
+  ///    并返回**目录范围下载票据**（`{password, addr, fileName}`）；
+  /// ② 用票据直连 `/download/{password}/.exports/xxx.tar` 下载到本机
+  ///    容器归档目录（Rust 下载器，多线程）。
+  ///
+  /// 返回本地归档路径 —— 与 Bastille 后端返回宿主机归档路径的语义一致：
+  /// 调用方拿到的是「可直接用于 [importContainer] 的归档路径」。
   @override
-  Future<String> exportContainer(String idOrName) {
-    throw const ContainerBackendException('Docker 不支持容器归档导出，可改用镜像保存');
+  Future<String> exportContainer(String idOrName) async {
+    if (restricted) {
+      throw const ContainerBackendException('MCSM 受限模式不支持容器导出');
+    }
+    final ticket = await client.containerExport(idOrName);
+    if (ticket.password.isEmpty || ticket.fileName.isEmpty) {
+      throw const ContainerBackendException('节点未返回导出票据（容器不存在或导出失败）');
+    }
+    final dir = Directory(await AppPaths.instance.containerExportsRoot());
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    final localPath = p.join(dir.path, p.basename(ticket.fileName));
+    try {
+      // 归档可能很大：走直连票据 + 多线程分片下载，progress 不做 UI 展示。
+      await client.directDownloadToFile(ticket, localPath, (_, _) {}, threads: 4);
+    } catch (e) {
+      throw ContainerBackendException('容器导出下载失败: $e');
+    }
+    return localPath;
   }
 
+  /// 从本地归档导入镜像并创建容器。
+  ///
+  /// irix-node 的 `POST /api/image/import` 语义是「**同步区归档** → `docker
+  /// import`」，因此归档必须先进入节点同步区：
+  /// ① 申请同步区上传票据（`POST /api/cluster/files/upload`，`upload_dir=/`）；
+  /// ② 直连上传（`POST /upload/{password}`，multipart 字段 `file`）；
+  /// ③ `POST /api/image/import` 导入为镜像；
+  /// ④ 用该镜像创建容器并返回（与 Bastille 导入直接产出 jail 的语义对齐）。
+  ///
+  /// [release] 在 Docker 后端下语义为**目标镜像名**（可含 tag），留空时由
+  /// 归档文件名推导；[force] 无对应语义（Docker 导入不做校验和验证）。
   @override
   Future<ContainerInfo> importContainer(
     String archivePath, {
     String? release,
     bool force = false,
-  }) {
-    throw const ContainerBackendException('Docker 不支持容器归档导入，可改用镜像导入');
+  }) async {
+    if (restricted) {
+      throw const ContainerBackendException('MCSM 受限模式不支持镜像导入');
+    }
+    final file = File(archivePath);
+    if (!await file.exists()) {
+      throw ContainerBackendException('归档不存在: $archivePath');
+    }
+    final fileName = p.basename(archivePath);
+    final imageName = (release != null && release.trim().isNotEmpty)
+        ? release.trim()
+        : _imageNameFrom(fileName);
+
+    // ① + ② 上传到节点同步区根目录（image/import 以同步区为根解析 fileName）。
+    try {
+      final ticket = await client.clusterUploadTicket('');
+      await client.directUpload(ticket: ticket, localPath: archivePath);
+    } on NodeApiException catch (e) {
+      throw ContainerBackendException('归档上传到节点同步区失败: ${e.message}');
+    }
+
+    // ③ docker import。
+    try {
+      await client.imageImport(fileName: fileName, name: imageName);
+    } on NodeApiException catch (e) {
+      throw ContainerBackendException('镜像导入失败: ${e.message}');
+    }
+
+    // ④ 用导入的镜像创建容器，返回可管理的容器对象。
+    return createContainer(
+      CreateContainerRequest(name: _containerNameFrom(imageName), image: imageName),
+    );
+  }
+
+  /// 由归档文件名推导镜像名：去扩展名，清理非法字符（镜像名仅允许
+  /// 小写字母 / 数字 / `.` `_` `-` `/` `:`）。
+  static String _imageNameFrom(String fileName) {
+    final base = p.basenameWithoutExtension(fileName).toLowerCase();
+    final cleaned = base.replaceAll(RegExp(r'[^a-z0-9._\-/]'), '-');
+    return cleaned.isEmpty ? 'imported-image:latest' : cleaned;
+  }
+
+  /// 由镜像名推导容器名（去掉 tag，附时间后缀避免重名）。
+  static String _containerNameFrom(String imageName) {
+    final repo = imageName.split(':').first;
+    final short = repo.split('/').last.replaceAll(RegExp(r'[^a-zA-Z0-9_.\-]'), '-');
+    final suffix = DateTime.now().millisecondsSinceEpoch.toRadixString(36);
+    return '${short.isEmpty ? 'container' : short}-$suffix';
   }
 }
 
@@ -732,6 +858,38 @@ class NodeBastilleBackend extends NodeContainerBackend {
 
   // ==================== 镜像 / 模板 ====================
 
+  /// Bastille 支持 jail 模板（`bastille template`）。
+  @override
+  bool get supportsJailTemplates => true;
+
+  /// 节点上可用的模板（GET /api/bastille/templates，模板目录树 NAMESPACE/NAME）。
+  @override
+  Future<List<JailTemplate>> listJailTemplates() async {
+    final rows = await client.bastilleTemplates();
+    return rows.map(JailTemplate.fromJson).toList();
+  }
+
+  /// 应用模板到 jail（POST /api/bastille/templates/apply），返回长任务 id。
+  ///
+  /// [args] 由服务端以 `KEY=VALUE` 注入模板进程环境变量；进度用
+  /// [jobProgress] 轮询（模板脚本可能耗时较久）。
+  @override
+  Future<String> applyJailTemplate(
+    String idOrName,
+    String template, {
+    Map<String, String> args = const {},
+  }) async {
+    final jobId = await client.bastilleTemplateApply(
+      jail: idOrName,
+      template: template,
+      args: args,
+    );
+    if (jobId.isEmpty) {
+      throw const ContainerBackendException('节点未返回模板任务 id');
+    }
+    return jobId;
+  }
+
   @override
   Future<List<ImageInfo>> listImages() async {
     final rows = await client.bastilleReleases();
@@ -746,28 +904,36 @@ class NodeBastilleBackend extends NodeContainerBackend {
   }
 
   @override
+  /// bootstrap 发行版（`bastille bootstrap`）。
+  ///
+  /// 服务端以长任务执行并返回 jobId：用 `GET /api/bastille/jobs/{jobId}`
+  /// 轮询真实状态与日志 —— 失败时立即抛出并带回日志尾部（旧实现只轮询
+  /// 发行版列表，失败要等到 120 次超时才结束且丢失原因）。
+  @override
   Future<void> pullImage(String name) async {
     final jobId = await client.bastilleBootstrap(name);
-    if (jobId.isNotEmpty) {
-      // 任务式 bootstrap：轮询发行版列表直到出现。
-      var attempts = 0;
-      while (attempts < 120) {
-        attempts++;
-        await Future<void>.delayed(const Duration(seconds: 1));
-        try {
-          final releases = await client.bastilleReleases();
-          if (releases.any(
-            (r) =>
-                (r['name']?.toString() ?? '').contains(name) ||
-                (r['version']?.toString() ?? '').contains(name),
-          )) {
-            return;
-          }
-        } catch (_) {
-          return; // 探测失败不再阻塞
-        }
+    if (jobId.isEmpty) {
+      return; // 服务端未返回任务 id：视为已提交，交由列表刷新确认。
+    }
+    // bootstrap 需拉取发行版，耗时可能到分钟级：最多轮询 300 次 × 2s。
+    for (var attempt = 0; attempt < 300; attempt++) {
+      await Future<void>.delayed(const Duration(seconds: 2));
+      JobLogProgress progress;
+      try {
+        progress = await jobProgress(jobId);
+      } catch (_) {
+        // 任务表已过期 / 节点短暂不可用：回退到列表探测，不再阻塞。
+        return;
+      }
+      if (progress.isDone) return;
+      if (progress.isFailed) {
+        final tail = progress.tailLog(8);
+        throw ContainerBackendException(
+          tail.isEmpty ? 'bootstrap $name 失败' : 'bootstrap $name 失败:\n$tail',
+        );
       }
     }
+    throw ContainerBackendException('bootstrap $name 超时（任务仍在运行）');
   }
 
   @override

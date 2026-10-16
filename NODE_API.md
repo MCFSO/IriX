@@ -168,6 +168,8 @@ GET /api/container/info
 | `POST` | `/api/image/build` | body: `{dockerfile, name, tag}` | 构建镜像 → `{jobId}` |
 | `GET` | `/api/image/build-progress` | `jobId` | `{status: building\|done\|failed, log: [..], image: "name:tag"}` |
 | `DELETE` | `/api/image/{name}` | | 删除镜像 |
+| `POST` | `/api/container/{id}/export` | | 容器导出为 tar（`docker export`）→ 目录范围下载票据 `{password, addr, fileName}`（`.exports/<id>-<ts>.tar`） |
+| `POST` | `/api/image/import` | body: `{fileName, name}` | 从**同步区**归档导入镜像（`docker import`），`fileName` 相对同步区根 |
 | `GET` | `/api/volume/list` / `DELETE /api/volume/{name}` | | 卷列表 / 删除 |
 | `GET` | `/api/network/list` | | 网络列表，条目：`{name, driver, subnet?}` |
 
@@ -194,8 +196,11 @@ GET /api/container/info
 | `GET` | `/api/bastille/jails/{name}/config` | | jail.conf 配置（`bastille config`） |
 | `POST` | `/api/bastille/jails/{name}/config` | body: `{key, value}` | 设置配置项 |
 | `DELETE` | `/api/bastille/jails/{name}/config` | `key=` | 删除配置项 |
-| `GET` | `/api/bastille/templates` | | 模板列表（project/template 格式） |
-| `POST` | `/api/bastille/templates/apply` | body: `{jail, template, args: {KEY=VALUE}}` | 应用模板 |
+| `GET` | `/api/bastille/templates` | | 模板列表，条目：`{namespace, name}`（客户端拼为 `NAMESPACE/NAME` 展示） |
+| `POST` | `/api/bastille/templates/apply` | body: `{jail, template, args: {KEY=VALUE}}` | 应用模板 → `{jobId}`（长任务，用 §6.2 的任务进度查询） |
+| `GET` | `/api/bastille/jobs/{jobId}` | | 长任务进度 `{status: running\|done\|failed, log: [..]}`（bootstrap / 模板应用等共用） |
+| `POST` | `/api/bastille/jails/{name}/export` | | 导出 jail 为归档到节点备份目录 → `{path}` |
+| `POST` | `/api/bastille/jails/import` | body: `{file, release?, force?}` | 从归档导入 jail → `{name}`（`file` 为备份目录或同步区路径） |
 | `POST` / `DELETE` | `/api/bastille/rdr` | body: `{jail, proto, hostPort, jailPort}` | 端口转发 / 删除转发 |
 | `GET` | `/api/bastille/jails/{name}/files` | `path`, `page`, `page_size` | 目录列表（jail 内路径，如 `/data`）→ `{items: [{name, path, isDir, size, mtime}], total}` |
 | `GET` | `/api/bastille/jails/{name}/files/content` | `path` | 读取文本文件 |
@@ -207,6 +212,60 @@ GET /api/container/info
 
 **回退**：MCSM 面板无 `/api/container/info`，客户端自动回退到 §6 受限模式
 （镜像构建 + 容器/网络只读列表），UI 标注「MCSM 受限模式」。
+
+### 6.2 容器归档导出 / 导入与长任务进度（客户端已接入）
+
+**Docker 容器导出**（`NodeDockerBackend.exportContainer`）：
+
+```
+POST /api/container/{id}/export            → {password, addr, fileName: ".exports/<id>-<ts>.tar"}
+GET  /download/{password}/.exports/<file>  → tar 流（直连下载票据，用 Rust downloader 多线程）
+```
+
+客户端把 tar 拉取到本机 `container_exports/` 后返回本地路径，语义与 Bastille
+后端返回节点侧归档路径一致 —— 两类运行时的导出结果都「可直接用于导入」。
+
+**Docker 镜像导入 + 建容器**（`NodeDockerBackend.importContainer`）：
+
+```
+POST /api/cluster/files/upload   body: {upload_dir: "/"}      → 上传票据 {password, addr, upload_dir}
+POST /upload/{password}          multipart 字段 file          → 归档落到同步区根
+POST /api/image/import           body: {fileName, name}       → docker import
+POST /api/container/create       body: {name, image}          → 用导入的镜像建容器
+```
+
+注意 `/api/image/import` 的 `fileName` 由服务端按**同步区根**解析
+（`clusterPath`），因此归档必须先经 `/api/cluster/files/upload` 票据上传到同步区，
+不能走 `/api/container/archive/upload`（该端点落在 `<DataDir>/archives`，两者目录不同）。
+
+**长任务进度**（`GET /api/bastille/jobs/{jobId}`）：irix-node 的 bootstrap、模板应用、
+镜像构建共用一张长任务表；客户端对 bootstrap 与模板应用统一用它轮询 `status` + `log`，
+失败时直接抛出日志尾部（不再靠轮询发行版列表间接判断）。
+
+### 6.3 集群节点 API（irix-node 已实现，客户端已接入）
+
+> 端点定义见节点仓 `docs/cluster-node-api.md`；客户端封装在
+> `NodeApiClient` 的集群段落，迁移与文件同步由 `cluster_migrator.dart` 驱动。
+
+| 方法 | 路径 | 参数 | 说明 |
+|------|------|------|------|
+| `GET` | `/api/cluster/status` | | 集群状态（自身 id / 地址 / 角色 / 同步区统计） |
+| `GET` | `/api/cluster/peers` | | 已登记对等节点 `[{id, address, available}]` |
+| `POST` | `/api/cluster/heartbeat` | body: 任意（含 `id`/`address`） | **节点间**心跳登记（本节点为接收方，写入对等列表） |
+| `POST` | `/api/cluster/events` | body: `{type, ...}` | **节点间**事件上报（崩溃 / 资源不足 / 同步完成 / 迁移） |
+| `POST` | `/api/cluster/transfer` | body: `{instanceId, source: {address, token, uuid, daemonId}, dest}` | 发起节点原生迁移（本节点为**目标**，向来源拉快照并解压到 `dest`）→ `{jobId}` |
+| `GET` | `/api/cluster/transfer` | `jobId` | 迁移进度 `{status: running\|done\|failed, bytes}` |
+| `GET` | `/api/cluster/sync/list` | `path?` | 同步区目录树 |
+| `GET` | `/api/instance/sync/list` | `uuid` | 实例工作目录树 |
+| `GET` | `/api/cluster/files/list` | `path, page, page_size` | 同步区文件列表 |
+| `POST` | `/api/cluster/files/mkdir` | body: `{path}` | 同步区建目录 |
+| `DELETE` | `/api/cluster/files` | body: `{targets: [..]}` | 删除同步区文件 / 目录 |
+| `POST` | `/api/cluster/files/download` | body: `{path}` | 归档下载票据 `{password, addr}` |
+| `POST` | `/api/cluster/files/upload` | body: `{upload_dir}` | 上传票据 `{password, addr, upload_dir}`（`upload_dir` 空 → 同步区根） |
+
+`transfer` 的来源地址由服务端做 SSRF 校验（仅 http/https；拒绝环回 / 未指定 /
+链路本地 / 组播 / 自身网卡；重定向逐跳校验），非法地址直接 400。
+`heartbeat` / `events` 是节点间通道，桌面端仅在自身作为集群成员时才调用。
 
 ---
 
@@ -221,6 +280,9 @@ GET /api/container/info
 | 实例管理页（新建 / 启动 / 优雅停止+同步 / 迁移 / 详情） | §3 实例管理 + §4 文件管理 + `GET /api/overview`（取 daemonId） |
 | 远程文件管理器 | §4 文件管理 + 直连下载 / 上传 |
 | 节点详情页各标签页 | §2 概览 + §3 实例 + §4 文件 + §5 用户 + §6 Docker（按节点类型裁剪） |
+| 容器归档导出 / 导入 | §6.1 `POST /api/container/{id}/export`（+ `/download/` 直连）/ `POST /api/image/import`（+ `/api/cluster/files/upload` 票据 + `/upload/`）/ Bastille `jails/{name}/export`、`jails/import` |
+| Bastille 模板应用 | §6.1 `GET /api/bastille/templates` + `POST /api/bastille/templates/apply` + §6.2 任务进度查询 |
+| 节点原生迁移（目标节点拉取） | §6.3 `POST /api/cluster/transfer` + `GET /api/cluster/transfer` |
 
 ---
 
@@ -230,7 +292,10 @@ GET /api/container/info
 |------|-----------|------|------|
 | 本文档 §2–§4 全部端点 | ✅ | ✅ | 现有实现，双方均已支持 |
 | §5 用户管理 / §6 Docker | ❌ | ✅ | 仅 MCSM 面板提供 |
-| 节点级文件存储 / 递归快照 / 集群自组织 | 规划中 | ❌ | 见 `docs/cluster-node-api.md`（P0–P2） |
+| 节点级文件存储 / 增量同步（§6.3） | ✅ | ❌ | 同步区列目录 / 增删 / 上传下载票据均已实现（`cluster.go`） |
+| 节点原生迁移（`cluster/transfer`） | ✅ | ❌ | 目标节点向来源拉快照；MCSM 只能「先建实例再上传」 |
+| 集群自组织（心跳 / 事件 / 对等表） | ✅ | ❌ | `cluster/heartbeat`、`cluster/events`、`cluster/peers` |
+| 容器归档导出 / 镜像导入 | ✅ | ❌ | Docker 侧见 §6.2；MCSM 仅支持镜像构建 |
 
 > 结论：MCSM 节点是多机模式中的「阉割」节点 —— 可托管实例、可作为迁移目标（先建实例再上传），
 > 但无法参与节点间直传与自组织；`irix-node` 补齐 `docs/cluster-node-api.md` 的 P0–P2 后可实现真正的节点间直传 + 自组织。

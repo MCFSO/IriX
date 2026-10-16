@@ -122,6 +122,13 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
   bool _pkgBusy = false;
   String _pkgOutput = '';
 
+  // ==================== 模板 Tab ====================
+
+  List<JailTemplate> _templates = [];
+  bool _templatesLoading = false;
+  String? _templatesError;
+  bool _templateBusy = false;
+
   // ==================== 挂载 Tab ====================
 
   List<JailMount> _mounts = [];
@@ -175,6 +182,7 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
     unawaited(_refreshConsoleLog());
     unawaited(_loadRunMemory());
     unawaited(_refreshFiles());
+    unawaited(_refreshTemplates());
   }
 
   @override
@@ -1309,7 +1317,7 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
     final theme = Theme.of(context);
     final l = AppLocalizations.of(context);
     return DefaultTabController(
-      length: 6,
+      length: 7,
       child: Scaffold(
         appBar: AppBar(
           title: Text(_name),
@@ -1366,6 +1374,10 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
                   icon: const Icon(Icons.tune),
                   text: l.jailDetail_tabSettings,
                 ),
+                Tab(
+                  icon: const Icon(Icons.extension_outlined),
+                  text: l.jailDetail_tabTemplates,
+                ),
               ],
             ),
             Expanded(
@@ -1377,6 +1389,7 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
                   _buildPkgTab(theme),
                   _buildMountsTab(theme),
                   _buildConfigTab(theme),
+                  _buildTemplatesTab(theme),
                 ],
               ),
             ),
@@ -2199,6 +2212,143 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
     );
   }
 
+  // ==================== 模板 Tab ====================
+
+  /// 加载节点可用模板（GET /api/bastille/templates）。
+  Future<void> _refreshTemplates() async {
+    setState(() {
+      _templatesLoading = true;
+      _templatesError = null;
+    });
+    try {
+      final items = await widget.backend.listJailTemplates();
+      if (!mounted) return;
+      setState(() {
+        _templates = items;
+        _templatesLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _templatesLoading = false;
+        _templatesError = e is ContainerBackendException
+            ? e.message
+            : e.toString();
+      });
+    }
+  }
+
+  /// 应用模板：先收集可选参数（每行 `KEY=VALUE`），再以长任务执行并跟踪日志。
+  Future<void> _applyTemplate(JailTemplate template) async {
+    final args = await showAppDialog<Map<String, String>>(
+      context,
+      (_) => _TemplateArgsDialog(template: template),
+    );
+    if (args == null || !mounted) return;
+    setState(() => _templateBusy = true);
+    final String jobId;
+    try {
+      jobId = await widget.backend.applyJailTemplate(
+        _name,
+        template.qualifiedName,
+        args: args,
+      );
+    } catch (e) {
+      if (mounted) setState(() => _templateBusy = false);
+      _snackError(e);
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _templateBusy = false);
+    await showAppDialog<void>(
+      context,
+      (_) => _TemplateProgressDialog(
+        backend: widget.backend,
+        jobId: jobId,
+        templateName: template.qualifiedName,
+      ),
+    );
+  }
+
+  /// 模板列表（GET /api/bastille/templates：模板目录树 NAMESPACE/NAME）。
+  Widget _buildTemplatesTab(ThemeData theme) {
+    final l = AppLocalizations.of(context);
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _SectionCard(
+          title: l.jailDetail_sectionTemplates,
+          children: [
+            Text(
+              l.jailDetail_templatesHint,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.refresh, size: 18),
+                  tooltip: l.common_refresh,
+                  onPressed: _templatesLoading ? null : _refreshTemplates,
+                ),
+                if (_templatesLoading)
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+              ],
+            ),
+            if (_templatesLoading)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  l.jailDetail_loadingTemplates,
+                  style: theme.textTheme.bodySmall,
+                ),
+              )
+            else if (_templatesError != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  _templatesError!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.error,
+                  ),
+                ),
+              )
+            else if (_templates.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  l.jailDetail_noTemplates,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              )
+            else
+              for (final template in _templates)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.extension_outlined),
+                  title: Text(template.qualifiedName),
+                  trailing: FilledButton.tonal(
+                    onPressed: _templateBusy
+                        ? null
+                        : () => _applyTemplate(template),
+                    child: Text(l.jailDetail_applyTemplate),
+                  ),
+                ),
+          ],
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
   // ==================== 挂载 Tab ====================
 
   Widget _buildMountsTab(ThemeData theme) {
@@ -2789,6 +2939,207 @@ class _AddConfigDialogState extends State<_AddConfigDialog> {
             Navigator.pop(context, (key: key, value: _value.text.trim()));
           },
           child: Text(l.common_add),
+        ),
+      ],
+    );
+  }
+}
+
+// ==================== 模板参数 / 进度对话框 ====================
+
+/// 模板参数输入对话框：每行一个 `KEY=VALUE`（可留空）。
+class _TemplateArgsDialog extends StatefulWidget {
+  const _TemplateArgsDialog({required this.template});
+
+  final JailTemplate template;
+
+  @override
+  State<_TemplateArgsDialog> createState() => _TemplateArgsDialogState();
+}
+
+class _TemplateArgsDialogState extends State<_TemplateArgsDialog> {
+  final _argsController = TextEditingController();
+
+  @override
+  void dispose() {
+    _argsController.dispose();
+    super.dispose();
+  }
+
+  /// 解析 `KEY=VALUE` 行：忽略空行与缺少 `=` 的行，键值去空白。
+  Map<String, String> _parseArgs() {
+    final result = <String, String>{};
+    for (final raw in _argsController.text.split('\n')) {
+      final line = raw.trim();
+      if (line.isEmpty) continue;
+      final index = line.indexOf('=');
+      if (index <= 0) continue;
+      final key = line.substring(0, index).trim();
+      final value = line.substring(index + 1).trim();
+      if (key.isEmpty) continue;
+      result[key] = value;
+    }
+    return result;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return AlertDialog(
+      title: Text(l.jailDetail_applyTemplateTitle(widget.template.qualifiedName)),
+      content: SizedBox(
+        width: 440,
+        child: TextField(
+          controller: _argsController,
+          autofocus: true,
+          maxLines: 6,
+          minLines: 3,
+          decoration: InputDecoration(
+            labelText: l.jailDetail_templateArgs,
+            hintText: l.jailDetail_templateArgsHint,
+            alignLabelWithHint: true,
+            border: const OutlineInputBorder(),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l.common_cancel),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_parseArgs()),
+          child: Text(l.jailDetail_applyTemplate),
+        ),
+      ],
+    );
+  }
+}
+
+/// 模板长任务进度对话框：每 2s 轮询 `GET /api/bastille/jobs/{jobId}`，
+/// 展示状态与实时日志（任务结束即停止轮询）。
+class _TemplateProgressDialog extends StatefulWidget {
+  const _TemplateProgressDialog({
+    required this.backend,
+    required this.jobId,
+    required this.templateName,
+  });
+
+  final ContainerBackend backend;
+  final String jobId;
+  final String templateName;
+
+  @override
+  State<_TemplateProgressDialog> createState() =>
+      _TemplateProgressDialogState();
+}
+
+class _TemplateProgressDialogState extends State<_TemplateProgressDialog> {
+  static const Duration _interval = Duration(seconds: 2);
+
+  JobLogProgress _progress = const JobLogProgress(status: 'running');
+  String? _error;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(_interval, (_) => _poll());
+    unawaited(_poll());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _poll() async {
+    try {
+      final progress = await widget.backend.jobProgress(widget.jobId);
+      if (!mounted) return;
+      setState(() {
+        _progress = progress;
+        _error = null;
+      });
+      if (progress.isDone || progress.isFailed) {
+        _timer?.cancel();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e is ContainerBackendException ? e.message : e.toString();
+        _timer?.cancel();
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
+    final finished = _progress.isDone || _progress.isFailed;
+    final logText = _progress.log.isNotEmpty
+        ? _progress.log.join('\n')
+        : (_error ?? '');
+    final statusText = _progress.isFailed
+        ? l.jailDetail_templateFailed
+        : _progress.isDone
+        ? l.jailDetail_templateDone
+        : l.jailDetail_executing;
+
+    return AlertDialog(
+      title: Text(
+        l.jailDetail_applyTemplateTitle(widget.templateName),
+      ),
+      content: SizedBox(
+        width: 520,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                if (!finished)
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
+                  Icon(
+                    _progress.isFailed
+                        ? Icons.error_outline
+                        : Icons.check_circle,
+                    size: 18,
+                    color: _progress.isFailed
+                        ? theme.colorScheme.error
+                        : Colors.green,
+                  ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    statusText,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: _progress.isFailed
+                          ? theme.colorScheme.error
+                          : null,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(l.jailDetail_templateLog, style: theme.textTheme.labelLarge),
+            const SizedBox(height: 6),
+            _OutputBox(text: logText.isEmpty ? '…' : logText),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l.common_close),
         ),
       ],
     );

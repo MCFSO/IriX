@@ -50,10 +50,19 @@ class DownloadTicket {
   });
 
   /// 拼接直连下载 URL。
-  String get url => 'http://$_hostPort/download/$password/$fileName';
+  ///
+  /// [_hostPort] 已按需补 `http://` 前缀，此处**不可**再拼 scheme，否则会
+  /// 得到 `http://http://host:port/...`（既有的双重前缀缺陷，会让快照下载、
+  /// 容器导出等所有票据直连下载失败）。irix-node 的 `publicAddr()` 返回
+  /// `host:port`（无 scheme），MCSM 可能返回带 scheme 的地址，两种情况
+  /// 都由 [_hostPort] 统一。
+  String get url => '$_hostPort/download/$password/$fileName';
 
-  /// 将 addr（host:port）规范化为 http://host:port。
-  String get _hostPort => addr.contains('://') ? addr : 'http://$addr';
+  /// 将 addr（host:port 或 http(s)://host:port）规范化为 http(s)://host:port。
+  String get _hostPort {
+    if (addr.contains('://')) return addr;
+    return 'http://$addr';
+  }
 }
 
 /// 上传票据。
@@ -1122,6 +1131,40 @@ class NodeApiClient {
     return data is Map<String, dynamic> ? data : null;
   }
 
+  /// 导出容器为归档（POST /api/container/{id}/export，`docker export`）。
+  ///
+  /// 服务端把容器导出为 tar 写入同步区 `.exports/`，并返回**目录范围下载
+  /// 票据**（与实例快照一致）：客户端按
+  /// `/download/{password}/{fileName}` 下载（见 [DownloadTicket.url]）。
+  ///
+  /// 注意：[DownloadTicket.fileName] 形如 `.exports/<id>-<ts>.tar`，
+  /// 拼接直连地址前不要再次编码斜杠。
+  Future<DownloadTicket> containerExport(String id) async {
+    final data = await _request('POST', '/api/container/$id/export');
+    final map = data is Map<String, dynamic> ? data : const {};
+    return DownloadTicket(
+      password: map['password'] as String? ?? '',
+      addr: map['addr'] as String? ?? '',
+      fileName: map['fileName'] as String? ?? '',
+    );
+  }
+
+  /// 从同步区归档导入镜像（POST /api/image/import，`docker import`）。
+  ///
+  /// [fileName] 为同步区（cluster root）下的归档名（相对路径，可由
+  /// [nodeArchiveUpload] 或 [clusterUploadTicket] 先上传）；[name] 为目标
+  /// 镜像名（可含 tag，如 `myimage:latest`）。
+  Future<void> imageImport({
+    required String fileName,
+    required String name,
+  }) async {
+    await _request(
+      'POST',
+      '/api/image/import',
+      body: {'fileName': fileName, 'name': name},
+    );
+  }
+
   /// 镜像列表（GET /api/image/list）。
   Future<List<Map<String, dynamic>>> imageList() async {
     final data = await _request('GET', '/api/image/list');
@@ -1250,16 +1293,31 @@ class NodeApiClient {
     return _listOfMaps(data);
   }
 
-  /// 应用模板（POST /api/bastille/templates/apply）。
-  Future<void> bastilleTemplateApply({
+  /// 应用模板（POST /api/bastille/templates/apply），返回任务 id。
+  ///
+  /// 服务端以长任务执行（响应 `{jobId}`），进度用 [bastilleJobProgress] 轮询。
+  Future<String> bastilleTemplateApply({
     required String jail,
     required String template,
     Map<String, String> args = const {},
   }) async {
-    await _request(
+    final data = await _request(
       'POST',
       '/api/bastille/templates/apply',
       body: {'jail': jail, 'template': template, 'args': args},
+    );
+    return (data is Map ? data['jobId'] : null) as String? ?? '';
+  }
+
+  /// 长任务进度（GET /api/bastille/jobs/{jobId}，见 container.go 的 longJob）。
+  ///
+  /// 适用于所有经 `jobs.create()` 派发的长任务：bootstrap（[bastilleBootstrap]）、
+  /// 模板应用（[bastilleTemplateApply]）等；返回 `{status, log}`（无百分比）。
+  /// 任务不存在或已过期时服务端返回 400「任务不存在或已过期」。
+  Future<NodeJobProgress> bastilleJobProgress(String jobId) async {
+    final data = await _request('GET', '/api/bastille/jobs/$jobId');
+    return NodeJobProgress.fromJson(
+      data is Map<String, dynamic> ? data : const {},
     );
   }
 
@@ -2729,6 +2787,60 @@ class NodeApiClient {
       }
     }
     return list;
+  }
+
+  /// 发起节点间迁移（POST /api/cluster/transfer，节点原生拉取链路），返回任务 id。
+  ///
+  /// 语义（见 cluster.go 的 runTransfer）：**本客户端**所在节点作为目标节点，
+  /// 用 [source] 的地址与 token 向来源节点申请实例快照 → 直连下载 → 解压到
+  /// [dest] 指定的同步区目录。服务端对来源地址做 SSRF 校验（仅 http/https、
+  /// 禁止环回 / 链路本地 / 自身网卡），失败返回 400。
+  ///
+  /// 进度用 [clusterTransferStatus] 轮询。
+  Future<String> clusterTransfer({
+    required String instanceId,
+    required ClusterTransferSource source,
+    String dest = '',
+  }) async {
+    final data = await _request(
+      'POST',
+      '/api/cluster/transfer',
+      body: {
+        'instanceId': instanceId,
+        'source': source.toJson(),
+        'dest': dest,
+      },
+    );
+    return (data is Map ? data['jobId'] : null) as String? ?? '';
+  }
+
+  /// 查询节点间迁移进度（GET /api/cluster/transfer?jobId=）。
+  Future<ClusterTransferProgress> clusterTransferStatus(String jobId) async {
+    final data = await _request(
+      'GET',
+      '/api/cluster/transfer',
+      query: {'jobId': jobId},
+    );
+    return ClusterTransferProgress.fromJson(
+      data is Map<String, dynamic> ? data : const {},
+    );
+  }
+
+  /// 上报节点心跳（POST /api/cluster/heartbeat）。
+  ///
+  /// 该端点是**节点间通道**：由对等节点向本节点登记自身（`{id, address}`
+  /// 会被并入对等列表，`available` 置 true）。桌面端通常不直接调用，
+  /// 仅在桌面作为集群成员参与编排时使用。
+  Future<void> clusterHeartbeat(Map<String, dynamic> payload) async {
+    await _request('POST', '/api/cluster/heartbeat', body: payload);
+  }
+
+  /// 上报集群事件（POST /api/cluster/events，`{type, ...}`）。
+  ///
+  /// 同样是节点间通道：事件按到达顺序留存在接收节点内存中（上限
+  /// maxClusterEvents），供 [clusterStatus] / 对等编排读取。
+  Future<void> clusterEvents(Map<String, dynamic> event) async {
+    await _request('POST', '/api/cluster/events', body: event);
   }
 
   /// 递归枚举同步区目录（GET /api/cluster/sync/list，单次返回整树）。

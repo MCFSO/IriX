@@ -105,6 +105,33 @@ class DockerCliBackend implements ContainerBackend {
   @override
   bool get isRemote => false;
 
+  /// 本地 Docker CLI 未实现容器归档导出 / 导入（可用镜像 save/load 代替）。
+  @override
+  bool get supportsArchiveTransfer => false;
+
+  /// 本地 Docker CLI 无 Bastille 模板能力。
+  @override
+  bool get supportsJailTemplates => false;
+
+  @override
+  Future<List<JailTemplate>> listJailTemplates() {
+    throw const ContainerBackendException('jail 模板仅适用于 Bastille（bastille template）');
+  }
+
+  @override
+  Future<String> applyJailTemplate(
+    String idOrName,
+    String template, {
+    Map<String, String> args = const {},
+  }) {
+    throw const ContainerBackendException('jail 模板仅适用于 Bastille（bastille template）');
+  }
+
+  @override
+  Future<JobLogProgress> jobProgress(String jobId) {
+    throw const ContainerBackendException('本地后端无节点长任务表');
+  }
+
   @override
   ContainerRuntime get runtime => ContainerRuntime.docker;
 

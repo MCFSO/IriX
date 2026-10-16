@@ -634,6 +634,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get container_skipChecksum => '跳过校验和验证（-f / --force）';
 
   @override
+  String get container_importImage => '导入镜像';
+
+  @override
+  String get container_localArchivePath => '本地归档路径（节点导出 / docker save 的 tar）';
+
+  @override
+  String get container_localArchivePathHint =>
+      '如 /home/user/irix/container_exports/xxx.tar';
+
+  @override
+  String get container_targetImageName => '目标镜像名（留空按归档文件名推导）';
+
+  @override
+  String get container_targetImageNameHint => '如 myimage:latest';
+
+  @override
   String get container_importJail => '导入 Jail';
 
   @override
@@ -1841,6 +1857,45 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get jailDetail_tabSettings => '设置';
+
+  @override
+  String get jailDetail_tabTemplates => '模板';
+
+  @override
+  String get jailDetail_sectionTemplates => 'Jail 模板（bastille template）';
+
+  @override
+  String get jailDetail_templatesHint =>
+      '模板来自节点 bastille 模板目录，应用后以长任务执行，可查看实时日志。';
+
+  @override
+  String get jailDetail_noTemplates => '节点上没有可用模板';
+
+  @override
+  String get jailDetail_applyTemplate => '应用';
+
+  @override
+  String jailDetail_applyTemplateTitle(String name) {
+    return '应用模板：$name';
+  }
+
+  @override
+  String get jailDetail_templateArgs => '模板参数（可选，每行 KEY=VALUE）';
+
+  @override
+  String get jailDetail_templateArgsHint => '如 MC_VERSION=1.21.1';
+
+  @override
+  String get jailDetail_templateLog => '任务日志';
+
+  @override
+  String get jailDetail_templateDone => '模板应用完成';
+
+  @override
+  String get jailDetail_templateFailed => '模板应用失败';
+
+  @override
+  String get jailDetail_loadingTemplates => '正在加载模板…';
 
   @override
   String get jailDetail_running => '运行中';

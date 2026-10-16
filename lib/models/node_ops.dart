@@ -330,3 +330,100 @@ class NodeTaskProgress {
   bool get isDone => status == 'done';
   bool get isFailed => status == 'failed';
 }
+
+/// 长任务进度（无百分比的日志型任务）。
+///
+/// 对应 irix-node 的 `GET /api/bastille/jobs/{jobId}`（见 container.go 的
+/// `longJob`）：只返回 `{status, log}`，状态取 `running` / `done` / `failed`，
+/// `log` 为按行收集的进程输出（服务端保留最近若干行）。与带百分比 / 消息的
+/// [NodeTaskProgress]（任务表 jobs.go）区分。
+class NodeJobProgress {
+  /// 任务状态：`running` / `done` / `failed`。
+  final String status;
+
+  /// 进程输出行（保留最近 N 行）。
+  final List<String> log;
+
+  const NodeJobProgress({this.status = '', this.log = const []});
+
+  factory NodeJobProgress.fromJson(Map<String, dynamic> json) {
+    final raw = json['log'];
+    final lines = <String>[];
+    if (raw is List) {
+      for (final line in raw) {
+        lines.add(line?.toString() ?? '');
+      }
+    } else if (raw is String && raw.isNotEmpty) {
+      // 兼容服务端未来把 log 收敛为整段文本的形态。
+      lines.addAll(raw.split('\n'));
+    }
+    return NodeJobProgress(
+      status: json['status'] as String? ?? '',
+      log: lines,
+    );
+  }
+
+  bool get isDone => status == 'done';
+  bool get isFailed => status == 'failed';
+
+  /// 日志尾部 [lines] 行（用于向用户展示失败原因）。
+  String tailLog([int lines = 10]) {
+    if (log.isEmpty) return '';
+    final start = log.length > lines ? log.length - lines : 0;
+    return log.sublist(start).join('\n');
+  }
+}
+
+/// 集群节点间迁移的来源节点信息（irix-node `POST /api/cluster/transfer`）。
+///
+/// [token] 为来源节点的**账户会话 token**（来源为 MCSM 节点时填其 apikey，
+/// 见 cluster.go 的 nodeRequest 说明）；目标节点用它向来源节点申请实例快照
+/// 并直连下载。
+class ClusterTransferSource {
+  /// 来源节点地址（host:port 或 http(s)://host:port）。
+  final String address;
+
+  /// 来源节点会话 token（可为空，前提是来源节点未启用账户系统）。
+  final String token;
+
+  /// 来源节点上的实例 uuid。
+  final String uuid;
+
+  /// 来源节点的 daemonId（MCSM 兼容字段，irix-node 可留空）。
+  final String daemonId;
+
+  const ClusterTransferSource({
+    required this.address,
+    this.token = '',
+    required this.uuid,
+    this.daemonId = '',
+  });
+
+  Map<String, dynamic> toJson() => {
+    'address': address,
+    'token': token,
+    'uuid': uuid,
+    'daemonId': daemonId,
+  };
+}
+
+/// 集群节点间迁移任务进度（irix-node `GET /api/cluster/transfer`）。
+class ClusterTransferProgress {
+  /// 任务状态：`running` / `done` / `failed`。
+  final String status;
+
+  /// 已传输字节数（服务端实时累计）。
+  final int bytes;
+
+  const ClusterTransferProgress({this.status = '', this.bytes = 0});
+
+  factory ClusterTransferProgress.fromJson(Map<String, dynamic> json) {
+    return ClusterTransferProgress(
+      status: json['status'] as String? ?? '',
+      bytes: (json['bytes'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  bool get isDone => status == 'done';
+  bool get isFailed => status == 'failed';
+}

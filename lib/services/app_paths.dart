@@ -74,6 +74,13 @@ class AppPaths {
   Future<String> clusterMirrorRoot() async =>
       p.join(await root(), 'cluster_mirrors');
 
+  /// 容器导出归档根目录。
+  ///
+  /// 远端 Docker 容器经 `POST /api/container/{id}/export` 导出为 tar 后，
+  /// 客户端用返回的下载票据直连拉取到本目录，供用户留档或再导入。
+  Future<String> containerExportsRoot() async =>
+      p.join(await root(), 'container_exports');
+
   /// 原生插件根目录（插件包解压后按插件 id 分目录存放）。
   Future<String> pluginsRoot() async =>
       p.join(await root(), 'plugins', 'native');
