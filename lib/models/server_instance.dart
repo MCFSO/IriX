@@ -5,6 +5,7 @@
 import 'dart:convert';
 
 import '../services/locale_settings.dart';
+import 'jvm_preset.dart';
 
 /// 实例的运行方式。
 ///
@@ -32,6 +33,29 @@ enum RunMode {
       if (mode.name == value) return mode;
     }
     return RunMode.native;
+  }
+}
+
+/// 实例使用哪个 Java 运行时的选择方式。
+///
+/// - [auto]：不覆盖启动命令。直接执行命令首项（通常是 PATH 上的 `java`），
+///   与历史行为一致，也是旧数据迁移后的默认值。
+/// - [custom]：使用实例从已检测列表中指定的可执行文件
+///   （[ServerInstance.javaBinary]）；路径失效时启动直接报错，
+///   不静默回退到 PATH，避免「改了却没生效」。
+///
+/// 旧数据里可能存在的历史值 `global`（使用 Java 管理的全局默认）
+/// 已移除：反序列化时回退为 [auto]。
+enum InstanceJavaMode {
+  auto,
+  custom;
+
+  /// 从数据库 / JSON 字符串反序列化，未知值回退为 [auto]。
+  static InstanceJavaMode fromString(String? value) {
+    for (final mode in InstanceJavaMode.values) {
+      if (mode.name == value) return mode;
+    }
+    return InstanceJavaMode.auto;
   }
 }
 
@@ -262,6 +286,27 @@ class ServerInstance {
   /// Docker 容器配置（[runMode] 为 [RunMode.docker] 时有效）。
   ContainerConfig? container;
 
+  /// Java 运行时选择方式（原生进程启动时生效；Docker 实例使用镜像内 Java）。
+  InstanceJavaMode javaMode;
+
+  /// 实例单独指定的 Java 可执行文件路径（仅 [javaMode] 为
+  /// [InstanceJavaMode.custom] 时有意义）。
+  ///
+  /// 切换回其它模式时保留该值，便于用户来回切换而不丢失已选路径。
+  String? javaBinary;
+
+  /// 是否自动分配堆内存（默认开启）。
+  ///
+  /// 自动模式下每次启动按当次系统可用内存重新计算（见
+  /// `MemoryAllocator.autoMemoryMb`），不写死到启动命令里。
+  bool memoryAuto;
+
+  /// 手动模式的最大堆（MiB）；为 null 时使用系统推荐值。
+  int? memoryMb;
+
+  /// JVM 优化参数预设（默认 [JvmPreset.none]，不注入任何参数）。
+  JvmPreset jvmPreset;
+
   /// 当前运行状态（可变，默认为 [InstanceStatus.stopped]）。
   ///
   /// 注意：该字段不会被持久化，加载时始终重置为 [InstanceStatus.stopped]。
@@ -275,6 +320,11 @@ class ServerInstance {
   /// [id]、[name]、[rootPath]、[coreFilePath]、[startCommand] 为必填参数；
   /// [coreType]、[coreVersion] 为可选参数；
   /// [runMode] 默认为 [RunMode.native]，[container] 默认 null；
+  /// [javaMode] 默认为 [InstanceJavaMode.auto]（使用启动命令里的 java），
+  /// [javaBinary] 默认为 null；
+  /// [memoryAuto] 默认为 true（每次启动按可用内存自动分配堆），
+  /// [memoryMb] 默认 null（手动模式下表示使用系统推荐值），
+  /// [jvmPreset] 默认为 [JvmPreset.none]；
   /// [status] 默认为 [InstanceStatus.stopped]；
   /// [createdAt] 默认为当前时间。
   ServerInstance({
@@ -287,6 +337,11 @@ class ServerInstance {
     this.coreVersion,
     this.runMode = RunMode.native,
     this.container,
+    this.javaMode = InstanceJavaMode.auto,
+    this.javaBinary,
+    this.memoryAuto = true,
+    this.memoryMb,
+    this.jvmPreset = JvmPreset.none,
     this.status = InstanceStatus.stopped,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
@@ -307,6 +362,11 @@ class ServerInstance {
     'coreVersion': coreVersion,
     'runMode': runMode.name,
     'container': container?.toJson(),
+    'javaMode': javaMode.name,
+    'javaBinary': javaBinary,
+    'memoryAuto': memoryAuto,
+    'memoryMb': memoryMb,
+    'jvmPreset': jvmPreset.name,
     'createdAt': createdAt.toIso8601String(),
   });
 
@@ -315,6 +375,7 @@ class ServerInstance {
   /// [status] 始终初始化为 [InstanceStatus.stopped]，
   /// 即使原数据中曾存在该字段也会被忽略。
   /// [runMode] / [container] 字段缺失时回退为原生运行，兼容旧数据。
+  /// [javaMode] / [javaBinary] 字段缺失时回退为跟随启动命令的 java。
   factory ServerInstance.fromJson(String source) {
     final map = jsonDecode(source) as Map<String, dynamic>;
     final containerJson = map['container'] as String?;
@@ -330,6 +391,11 @@ class ServerInstance {
       container: containerJson == null || containerJson.isEmpty
           ? null
           : ContainerConfig.fromJson(containerJson),
+      javaMode: InstanceJavaMode.fromString(map['javaMode'] as String?),
+      javaBinary: map['javaBinary'] as String?,
+      memoryAuto: map['memoryAuto'] as bool? ?? true,
+      memoryMb: (map['memoryMb'] as num?)?.toInt(),
+      jvmPreset: JvmPreset.fromString(map['jvmPreset'] as String?),
       createdAt: DateTime.parse(map['createdAt'] as String),
     );
   }

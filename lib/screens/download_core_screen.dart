@@ -1,6 +1,11 @@
 // 下载核心界面
-// 多步骤向导：选择核心与版本 → 下载核心文件 → 编辑启动命令并创建实例。
-// 通过 [AppState] 创建下载型实例，实例文件夹放在 APP 根目录的 instances/ 下。
+// 两步流程：选择核心与版本 → 下载核心文件 → 自动创建实例。
+//
+// 下载完成后直接创建实例并跳转详情页：
+//   - 不再要求用户手写启动命令（命令由核心文件名生成）；
+//   - 堆内存默认自动分配（HMCL 同款算法，启动时按可用内存计算）；
+//   - JVM 优化参数默认「无」，可在实例设置的「JVM 优化参数」中切换。
+// 实例文件夹放在 APP 根目录的 instances/ 下。
 
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
@@ -12,13 +17,15 @@ import '../services/app_paths.dart';
 import '../services/downloader.dart';
 import '../services/msl_api_service.dart';
 import '../state/app_state.dart';
+import '../utils/apple_widgets.dart';
+import 'instance_detail_screen.dart';
 
 /// 下载核心向导界面。
 ///
-/// 三步流程：
+/// 两步流程：
 /// 1. 选择下载源、服务器核心与版本；
-/// 2. 下载核心 jar 文件并展示实时进度；
-/// 3. 编辑启动命令并调用 [AppState.createDownloadedInstance] 创建实例。
+/// 2. 下载核心 jar 文件；下载成功后立即调用
+///    [AppState.createDownloadedInstance] 创建实例并进入详情页。
 class DownloadCoreScreen extends StatefulWidget {
   const DownloadCoreScreen({super.key});
 
@@ -60,20 +67,6 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
 
   /// MSL 源期望的 SHA-256（用于下载后完整性校验，H-1）。
   String? _expectedSha256;
-
-  late final TextEditingController _commandController;
-
-  @override
-  void initState() {
-    super.initState();
-    _commandController = TextEditingController();
-  }
-
-  @override
-  void dispose() {
-    _commandController.dispose();
-    super.dispose();
-  }
 
   String _formatBytes(double bytes) {
     if (bytes < 1024) return '${bytes.toStringAsFixed(0)} B';
@@ -228,12 +221,14 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
       if (!mounted) return;
       _coreFilePath = savedPath;
       _instanceRootDir = instanceRoot;
-      _commandController.text = 'java -Xmx1024M -jar $fileName nogui';
 
       setState(() {
         _downloading = false;
         _step = 2;
       });
+
+      // 下载完成即创建实例，不再要求用户编辑启动命令。
+      await _createInstanceAndOpen();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -243,7 +238,11 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
     }
   }
 
-  Future<void> _finishAndCreateInstance() async {
+  /// 下载完成后直接创建实例，并跳到实例详情页。
+  ///
+  /// 启动命令只保留核心 jar 与 `nogui`：堆内存由实例设置注入（默认自动分配），
+  /// 用户后续改内存不需要再改命令文本。
+  Future<void> _createInstanceAndOpen() async {
     final coreFilePath = _coreFilePath;
     final rootPath = _instanceRootDir;
     if (coreFilePath == null || rootPath == null) return;
@@ -266,23 +265,30 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
       scenarioEn: _mslDescription ?? '',
       versions: const [],
     );
-    final dummyVersion = CoreVersionInfo(
-      _downloadSource == 'MSL'
-          ? (_selectedMslVersion ?? '')
-          : _selectedVersion?.version ?? '',
-      '',
-    );
+    final version = _downloadSource == 'MSL'
+        ? (_selectedMslVersion ?? '')
+        : _selectedVersion?.version ?? '';
+    final dummyVersion = CoreVersionInfo(version, '');
 
-    await context.read<AppState>().createDownloadedInstance(
-      core: dummyCore,
-      versionInfo: dummyVersion,
-      coreFilePath: coreFilePath,
-      rootPath: rootPath,
-      startCommand: _commandController.text.trim(),
-    );
+    final fileName = p.basename(coreFilePath);
+    try {
+      final instance = await context.read<AppState>().createDownloadedInstance(
+        core: dummyCore,
+        versionInfo: dummyVersion,
+        coreFilePath: coreFilePath,
+        rootPath: rootPath,
+        startCommand: 'java -jar $fileName nogui',
+      );
 
-    if (mounted) {
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      if (!mounted) return;
+      // 清空中间路由：从详情页返回时直接回到主页，不再回到下载向导。
+      pushPageReplacingStack(
+        context,
+        (_) => InstanceDetailScreen(instanceId: instance.id),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _downloadError = e.toString());
     }
   }
 
@@ -298,7 +304,7 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
       body: switch (_step) {
         0 => _buildSelectionStep(),
         1 => _buildDownloadStep(),
-        _ => _buildCommandStep(),
+        _ => _buildCreatingStep(),
       },
     );
   }
@@ -755,47 +761,68 @@ class _DownloadCoreScreenState extends State<DownloadCoreScreen> {
 
   // ===================== STEP 3 =====================
 
-  Widget _buildCommandStep() {
+  /// 第三步：创建中（下载完成后自动进入，无需用户操作）。
+  Widget _buildCreatingStep() {
     final l = AppLocalizations.of(context);
-    String fileName;
-    if (_downloadSource == 'MSL') {
-      fileName =
-          '${_selectedMslCore ?? 'core'}-${_selectedMslVersion ?? 'unknown'}.jar';
-    } else {
-      fileName = (_selectedCore != null && _selectedVersion != null)
-          ? buildCoreFileName(_selectedCore!, _selectedVersion!)
-          : '';
+    final theme = Theme.of(context);
+    final error = _downloadError;
+    if (error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.error_outline,
+                size: 48,
+                color: Colors.redAccent,
+              ),
+              const SizedBox(height: 16),
+              Text(l.download_createFailed, style: theme.textTheme.titleMedium),
+              const SizedBox(height: 8),
+              Text(
+                error,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall,
+              ),
+              const SizedBox(height: 24),
+              FilledButton(
+                onPressed: () => setState(() {
+                  _step = 0;
+                  _downloadError = null;
+                }),
+                child: Text(l.common_back),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _stepHeader(l.download_step3),
-          const SizedBox(height: 16),
-          Text(l.download_coreFile(fileName)),
-          const SizedBox(height: 24),
-          _labelField(
-            label: l.download_command,
-            child: TextField(
-              controller: _commandController,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                hintText: 'java -Xmx1024M -jar xxx.jar nogui',
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(strokeWidth: 3),
+            ),
+            const SizedBox(height: 20),
+            Text(l.download_step3, style: theme.textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text(
+              l.download_creatingHint,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-          ),
-          const SizedBox(height: 32),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: _finishAndCreateInstance,
-              child: Text(l.download_finishCreate),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

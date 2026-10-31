@@ -171,6 +171,15 @@ class AppLocalizationsZh extends AppLocalizations {
       '开启后把一切（运行日志流、操作轨迹、网络请求明细、启动与崩溃堆栈）记录到程序所在目录 logs/ 下的会话日志文件，便于排查问题。';
 
   @override
+  String settings_pluginsBatchSize(int count) {
+    return '每次加载 $count 个';
+  }
+
+  @override
+  String get settings_pluginsBatchSizeHint =>
+      '插件/Mod 列表分批加载：滚动到底部自动加载下一批，新条目淡入显示。';
+
+  @override
   String settings_downloadThreads(int count) {
     return '下载线程数: $count';
   }
@@ -3024,20 +3033,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get instanceDetail_backingUp => '正在备份...';
 
   @override
-  String get instanceDetail_maxMemory => '最大内存';
-
-  @override
-  String get instanceDetail_notSet => '未设置';
-
-  @override
-  String get instanceDetail_noXmxHint => '当前启动命令未指定 -Xmx，拖动滑块以设置内存';
-
-  @override
   String get instanceDetail_startCommand => '启动命令';
 
   @override
   String get instanceDetail_startCommandHelper =>
-      '如：java -Xmx2G -jar paper.jar nogui';
+      '如：java -jar paper.jar nogui（内存与优化参数由下方注入，无需手写 -Xmx）';
 
   @override
   String get instanceDetail_deleteInstance => '删除实例';
@@ -4315,15 +4315,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get download_downloadingHint => '正在下载…请勿离开';
 
   @override
-  String get download_step3 => '第三步 · 编辑启动命令';
-
-  @override
-  String get download_command => '启动命令';
-
-  @override
-  String get download_finishCreate => '完成并创建实例';
-
-  @override
   String get dbScreen_saved => '已保存';
 
   @override
@@ -4727,5 +4718,94 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String remoteFile_downloadedTo(String path) {
     return '已下载到 $path';
+  }
+
+  @override
+  String get download_step3 => '正在创建实例…';
+
+  @override
+  String get download_createFailed => '创建实例失败';
+
+  @override
+  String get download_creatingHint =>
+      '已自动创建实例：堆内存按系统可用内存分配，可在实例设置的「JVM 优化参数」中调整。';
+
+  @override
+  String get instanceDetail_javaTitle => 'Java 运行时';
+
+  @override
+  String get instanceDetail_javaAuto => '跟随启动命令';
+
+  @override
+  String get instanceDetail_javaAutoDesc => '执行启动命令里的 java（通常是系统 PATH 上的 Java）';
+
+  @override
+  String get instanceDetail_javaCustom => '指定 Java';
+
+  @override
+  String get instanceDetail_javaCustomDesc => '仅对本实例生效，优先级最高';
+
+  @override
+  String get instanceDetail_javaPick => '选择 Java';
+
+  @override
+  String get instanceDetail_javaRefresh => '重新扫描';
+
+  @override
+  String get instanceDetail_javaEmpty => '未检测到 Java，可到「设置 → Java 运行时管理」安装或添加';
+
+  @override
+  String instanceDetail_javaMissing(String path) {
+    return '指定的 Java 不存在：$path';
+  }
+
+  @override
+  String get instanceDetail_javaDockerHint =>
+      'Docker 运行方式使用镜像内的 Java，本设置仅在原生进程下生效';
+
+  @override
+  String get instanceDetail_jvmDockerHint =>
+      'Docker 运行方式下使用镜像内的 JVM 与容器资源限制，本设置仅在原生进程下生效';
+
+  @override
+  String get instanceDetail_advanced => '高级设置';
+
+  @override
+  String get instanceDetail_advancedDesc => '启动命令（随 JVM 优化参数自动同步）';
+
+  @override
+  String get instanceDetail_jvmPresetHint => '预设参数会写入启动命令，可在「高级设置」中查看';
+
+  @override
+  String instanceDetail_memoryWritten(String mb) {
+    return '已写入启动命令：-Xms${mb}M -Xmx${mb}M';
+  }
+
+  @override
+  String get instanceDetail_jvmTitle => 'JVM 优化参数';
+
+  @override
+  String get instanceDetail_memoryAuto => '自动分配内存';
+
+  @override
+  String get instanceDetail_memoryAutoDesc => '按系统可用内存计算堆大小，预留 512 MB 给系统与启动器';
+
+  @override
+  String get instanceDetail_memoryManual => '手动分配';
+
+  @override
+  String instanceDetail_memoryRecommend(String mb) {
+    return '推荐 $mb MB';
+  }
+
+  @override
+  String get instanceDetail_jvmPreset => '优化参数预设';
+
+  @override
+  String get instanceDetail_jvmPresetNone => '无';
+
+  @override
+  String instanceDetail_jvmNotJava(String token) {
+    return '启动命令首项不是 java（$token），内存与优化参数不会注入';
   }
 }

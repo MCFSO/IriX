@@ -19,6 +19,7 @@ import 'services/locale_settings.dart';
 import 'state/app_state.dart';
 import 'state/cluster_state.dart';
 import 'state/node_state.dart';
+import 'widgets/app_activity_gate.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -122,6 +123,9 @@ class MyApp extends StatelessWidget {
               // 全局 UI 字体（默认内置 MiSans；空字符串 = 系统默认）。
               fontFamily: fonts.uiFontFamily,
             ),
+            // 最小化时暂停绘制/动画（AppActivityGate），恢复时原样补回。
+            builder: (context, child) =>
+                AppActivityGate(child: child ?? const SizedBox.shrink()),
             home: const HomeScreen(),
           ),
         ),

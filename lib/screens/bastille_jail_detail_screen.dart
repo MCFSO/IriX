@@ -30,6 +30,7 @@ import '../services/font_settings.dart';
 import '../services/node_api_client.dart';
 import '../utils/ansi_color.dart';
 import '../utils/apple_widgets.dart';
+import '../state/app_activity.dart';
 
 /// Jail 详情页。
 class JailDetailScreen extends StatefulWidget {
@@ -523,6 +524,7 @@ class _JailDetailScreenState extends State<JailDetailScreen> {
   void _startSessionPolling() {
     _sessionTimer?.cancel();
     _sessionTimer = Timer.periodic(_sessionPollInterval, (_) {
+      if (AppActivity.minimized) return;
       unawaited(_pollSession());
     });
   }
@@ -2986,7 +2988,9 @@ class _TemplateArgsDialogState extends State<_TemplateArgsDialog> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     return AlertDialog(
-      title: Text(l.jailDetail_applyTemplateTitle(widget.template.qualifiedName)),
+      title: Text(
+        l.jailDetail_applyTemplateTitle(widget.template.qualifiedName),
+      ),
       content: SizedBox(
         width: 440,
         child: TextField(
@@ -3044,7 +3048,10 @@ class _TemplateProgressDialogState extends State<_TemplateProgressDialog> {
   @override
   void initState() {
     super.initState();
-    _timer = Timer.periodic(_interval, (_) => _poll());
+    _timer = Timer.periodic(_interval, (_) {
+      if (AppActivity.minimized) return;
+      _poll();
+    });
     unawaited(_poll());
   }
 
@@ -3089,9 +3096,7 @@ class _TemplateProgressDialogState extends State<_TemplateProgressDialog> {
         : l.jailDetail_executing;
 
     return AlertDialog(
-      title: Text(
-        l.jailDetail_applyTemplateTitle(widget.templateName),
-      ),
+      title: Text(l.jailDetail_applyTemplateTitle(widget.templateName)),
       content: SizedBox(
         width: 520,
         child: Column(

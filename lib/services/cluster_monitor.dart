@@ -17,6 +17,7 @@ import '../services/cluster_migrator.dart';
 import '../services/node_api_client.dart';
 import '../state/cluster_state.dart';
 import '../state/node_state.dart';
+import '../state/app_activity.dart';
 
 /// 集群监控服务（协调器单例）。
 class ClusterMonitor {
@@ -111,6 +112,8 @@ class ClusterMonitor {
 
   /// 单次轮询。
   Future<void> _tick() async {
+    // 最小化时暂停集群轮询，恢复后下一拍继续。
+    if (AppActivity.minimized) return;
     final nodeState = _nodeState;
     final cluster = _clusterState;
     final migrator = _migrator;

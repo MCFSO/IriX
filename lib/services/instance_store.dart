@@ -4,6 +4,7 @@
 
 import 'package:flutter/foundation.dart';
 
+import '../models/jvm_preset.dart';
 import '../models/server_instance.dart';
 import 'database_manager.dart';
 import 'entity_store.dart';
@@ -34,6 +35,11 @@ class InstanceStore extends EntityStore<ServerInstance> {
       container: containerConfig == null || containerConfig.isEmpty
           ? null
           : ContainerConfig.fromJson(containerConfig),
+      javaMode: InstanceJavaMode.fromString(row['java_mode'] as String?),
+      javaBinary: row['java_binary'] as String?,
+      memoryAuto: (row['memory_auto'] as int?) != 0,
+      memoryMb: row['memory_mb'] as int?,
+      jvmPreset: JvmPreset.fromString(row['jvm_preset'] as String?),
       createdAt: DateTime.parse(row['created_at'] as String),
     );
   }
@@ -50,6 +56,11 @@ class InstanceStore extends EntityStore<ServerInstance> {
       'core_version': instance.coreVersion,
       'run_mode': instance.runMode.name,
       'container_config': instance.container?.toJson(),
+      'java_mode': instance.javaMode.name,
+      'java_binary': instance.javaBinary,
+      'memory_auto': instance.memoryAuto ? 1 : 0,
+      'memory_mb': instance.memoryMb,
+      'jvm_preset': instance.jvmPreset.name,
       'created_at': instance.createdAt.toIso8601String(),
     };
   }
@@ -163,6 +174,60 @@ class InstanceStore extends EntityStore<ServerInstance> {
       }
     } catch (e) {
       debugPrint('Failed to update run mode: $e');
+    }
+  }
+
+  /// 更新实例的 JVM 调参（自动分配开关 / 手动堆大小 / 优化参数预设）。
+  Future<void> updateJvmSettings(
+    String id, {
+    required bool memoryAuto,
+    int? memoryMb,
+    required JvmPreset jvmPreset,
+  }) async {
+    try {
+      await DatabaseManager.instance.updateServer(id, {
+        'memory_auto': memoryAuto ? 1 : 0,
+        'memory_mb': memoryMb,
+        'jvm_preset': jvmPreset.name,
+      });
+      if (cache != null) {
+        for (final e in cache!) {
+          if (e.id == id) {
+            e.memoryAuto = memoryAuto;
+            e.memoryMb = memoryMb;
+            e.jvmPreset = jvmPreset;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to update JVM settings: $e');
+    }
+  }
+
+  /// 更新实例的 Java 运行时选择并持久化。
+  ///
+  /// [mode] 为 [InstanceJavaMode.custom] 时 [binary] 生效；其它模式下仍把
+  /// 路径写入库中保留（便于来回切换），但不参与启动解析。
+  Future<void> updateJavaSelection(
+    String id,
+    InstanceJavaMode mode,
+    String? binary,
+  ) async {
+    try {
+      await DatabaseManager.instance.updateServer(id, {
+        'java_mode': mode.name,
+        'java_binary': binary,
+      });
+      if (cache != null) {
+        for (final e in cache!) {
+          if (e.id == id) {
+            e.javaMode = mode;
+            e.javaBinary = binary;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to update Java selection: $e');
     }
   }
 }

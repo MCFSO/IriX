@@ -18,6 +18,7 @@ import '../services/container/container_backend.dart';
 import '../services/font_settings.dart';
 import '../services/node_api_client.dart';
 import '../utils/apple_widgets.dart';
+import '../state/app_activity.dart';
 
 /// 容器环境面板。
 class ContainerEnvironmentPanel extends StatefulWidget {
@@ -2450,7 +2451,9 @@ class _ImportDialogState extends State<_ImportDialog> {
     final l = AppLocalizations.of(context);
     final isBastille = widget.isBastille;
     return AlertDialog(
-      title: Text(isBastille ? l.container_importJail : l.container_importImage),
+      title: Text(
+        isBastille ? l.container_importJail : l.container_importImage,
+      ),
       content: SizedBox(
         width: 400,
         child: Column(
@@ -2866,7 +2869,11 @@ class _BuildProgressDialogState extends State<_BuildProgressDialog> {
   }
 
   void _poll() {
-    _timer = Timer.periodic(const Duration(seconds: 2), (_) => _tick());
+    _timer = Timer.periodic(const Duration(seconds: 2), (_) {
+      // 最小化时不做容器状态轮询（会拉起 docker CLI）。
+      if (AppActivity.minimized) return;
+      _tick();
+    });
     unawaited(_tick());
   }
 

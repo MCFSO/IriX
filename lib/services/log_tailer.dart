@@ -9,6 +9,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import '../state/app_activity.dart';
 
 class LogFileTailer {
   /// 创建一个尾随 [filePath] 的日志流。
@@ -61,6 +62,8 @@ class LogFileTailer {
   Future<void> _poll() async {
     final raf = _raf;
     if (raf == null || _disposed) return;
+    // 窗口最小化时不做文件读取：300ms 一轮的 IO 是空闲时的主要开销。
+    if (AppActivity.minimized) return;
     try {
       final length = await raf.length();
       if (length < _position) {

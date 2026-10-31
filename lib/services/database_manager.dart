@@ -16,7 +16,7 @@ class DatabaseManager {
   DatabaseManager._();
 
   static const String _dbName = 'irix.db';
-  static const int _dbVersion = 7;
+  static const int _dbVersion = 9;
 
   Database? _db;
 
@@ -68,6 +68,11 @@ class DatabaseManager {
         core_version TEXT,
         run_mode TEXT NOT NULL DEFAULT 'native',
         container_config TEXT,
+        java_mode TEXT NOT NULL DEFAULT 'auto',
+        java_binary TEXT,
+        memory_auto INTEGER NOT NULL DEFAULT 1,
+        memory_mb INTEGER,
+        jvm_preset TEXT NOT NULL DEFAULT 'none',
         created_at TEXT NOT NULL
       )
     ''');
@@ -235,6 +240,40 @@ class DatabaseManager {
       if (!cols.any((c) => c['name'] == 'account_password')) {
         await db.execute(
           "ALTER TABLE nodes ADD COLUMN account_password TEXT NOT NULL DEFAULT ''",
+        );
+      }
+    }
+    if (oldVersion < 8) {
+      // 实例级 Java 选择：java_mode（auto/global/custom）+ java_binary（自定义路径）。
+      // 默认 'auto' 保持旧实例「执行启动命令里的 java」的既有行为。
+      final cols = await db.rawQuery('PRAGMA table_info(servers)');
+      if (!cols.any((c) => c['name'] == 'java_mode')) {
+        await db.execute(
+          "ALTER TABLE servers ADD COLUMN java_mode TEXT NOT NULL DEFAULT 'auto'",
+        );
+      }
+      if (!cols.any((c) => c['name'] == 'java_binary')) {
+        await db.execute('ALTER TABLE servers ADD COLUMN java_binary TEXT');
+      }
+    }
+    if (oldVersion < 9) {
+      // JVM 调参：自动分配内存开关、手动堆大小、优化参数预设。
+      // 旧实例默认「手动 + 未设置」，即沿用启动命令里已有的 -Xmx，
+      // 不因升级悄悄改变内存；新建实例由创建流程显式开启自动分配。
+      final cols = await db.rawQuery('PRAGMA table_info(servers)');
+      if (!cols.any((c) => c['name'] == 'memory_auto')) {
+        // 旧实例默认「手动 + 未设置」：沿用命令里的 -Xmx，行为与升级前一致；
+        // 新建实例由创建流程显式写入自动分配。
+        await db.execute(
+          'ALTER TABLE servers ADD COLUMN memory_auto INTEGER NOT NULL DEFAULT 0',
+        );
+      }
+      if (!cols.any((c) => c['name'] == 'memory_mb')) {
+        await db.execute('ALTER TABLE servers ADD COLUMN memory_mb INTEGER');
+      }
+      if (!cols.any((c) => c['name'] == 'jvm_preset')) {
+        await db.execute(
+          "ALTER TABLE servers ADD COLUMN jvm_preset TEXT NOT NULL DEFAULT 'none'",
         );
       }
     }

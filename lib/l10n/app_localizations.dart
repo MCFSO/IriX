@@ -392,6 +392,18 @@ abstract class AppLocalizations {
   /// **'开启后把一切（运行日志流、操作轨迹、网络请求明细、启动与崩溃堆栈）记录到程序所在目录 logs/ 下的会话日志文件，便于排查问题。'**
   String get settings_developerHint;
 
+  /// 插件列表懒加载批量
+  ///
+  /// In zh, this message translates to:
+  /// **'每次加载 {count} 个'**
+  String settings_pluginsBatchSize(int count);
+
+  /// 懒加载说明
+  ///
+  /// In zh, this message translates to:
+  /// **'插件/Mod 列表分批加载：滚动到底部自动加载下一批，新条目淡入显示。'**
+  String get settings_pluginsBatchSizeHint;
+
   /// 下载线程数
   ///
   /// In zh, this message translates to:
@@ -5497,24 +5509,6 @@ abstract class AppLocalizations {
   /// **'正在备份...'**
   String get instanceDetail_backingUp;
 
-  /// instanceDetail_maxMemory
-  ///
-  /// In zh, this message translates to:
-  /// **'最大内存'**
-  String get instanceDetail_maxMemory;
-
-  /// instanceDetail_notSet
-  ///
-  /// In zh, this message translates to:
-  /// **'未设置'**
-  String get instanceDetail_notSet;
-
-  /// instanceDetail_noXmxHint
-  ///
-  /// In zh, this message translates to:
-  /// **'当前启动命令未指定 -Xmx，拖动滑块以设置内存'**
-  String get instanceDetail_noXmxHint;
-
   /// instanceDetail_startCommand
   ///
   /// In zh, this message translates to:
@@ -5524,7 +5518,7 @@ abstract class AppLocalizations {
   /// instanceDetail_startCommandHelper
   ///
   /// In zh, this message translates to:
-  /// **'如：java -Xmx2G -jar paper.jar nogui'**
+  /// **'如：java -jar paper.jar nogui（内存与优化参数由下方注入，无需手写 -Xmx）'**
   String get instanceDetail_startCommandHelper;
 
   /// instanceDetail_deleteInstance
@@ -7787,24 +7781,6 @@ abstract class AppLocalizations {
   /// **'正在下载…请勿离开'**
   String get download_downloadingHint;
 
-  /// download_step3
-  ///
-  /// In zh, this message translates to:
-  /// **'第三步 · 编辑启动命令'**
-  String get download_step3;
-
-  /// download_command
-  ///
-  /// In zh, this message translates to:
-  /// **'启动命令'**
-  String get download_command;
-
-  /// download_finishCreate
-  ///
-  /// In zh, this message translates to:
-  /// **'完成并创建实例'**
-  String get download_finishCreate;
-
   /// dbScreen_saved
   ///
   /// In zh, this message translates to:
@@ -8488,6 +8464,162 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'已下载到 {path}'**
   String remoteFile_downloadedTo(String path);
+
+  /// 下载完成后的自动创建阶段
+  ///
+  /// In zh, this message translates to:
+  /// **'正在创建实例…'**
+  String get download_step3;
+
+  /// 创建实例失败
+  ///
+  /// In zh, this message translates to:
+  /// **'创建实例失败'**
+  String get download_createFailed;
+
+  /// 下载完成后的自动创建阶段提示
+  ///
+  /// In zh, this message translates to:
+  /// **'已自动创建实例：堆内存按系统可用内存分配，可在实例设置的「JVM 优化参数」中调整。'**
+  String get download_creatingHint;
+
+  /// 实例设置：Java 运行时卡片标题
+  ///
+  /// In zh, this message translates to:
+  /// **'Java 运行时'**
+  String get instanceDetail_javaTitle;
+
+  /// 实例设置：Java 选择-自动
+  ///
+  /// In zh, this message translates to:
+  /// **'跟随启动命令'**
+  String get instanceDetail_javaAuto;
+
+  /// 实例设置：Java 选择-自动说明
+  ///
+  /// In zh, this message translates to:
+  /// **'执行启动命令里的 java（通常是系统 PATH 上的 Java）'**
+  String get instanceDetail_javaAutoDesc;
+
+  /// 实例设置：Java 选择-指定
+  ///
+  /// In zh, this message translates to:
+  /// **'指定 Java'**
+  String get instanceDetail_javaCustom;
+
+  /// 实例设置：Java 选择-指定说明
+  ///
+  /// In zh, this message translates to:
+  /// **'仅对本实例生效，优先级最高'**
+  String get instanceDetail_javaCustomDesc;
+
+  /// 实例设置：选择 Java 下拉框
+  ///
+  /// In zh, this message translates to:
+  /// **'选择 Java'**
+  String get instanceDetail_javaPick;
+
+  /// 实例设置：重新扫描 Java
+  ///
+  /// In zh, this message translates to:
+  /// **'重新扫描'**
+  String get instanceDetail_javaRefresh;
+
+  /// 实例设置：未检测到 Java
+  ///
+  /// In zh, this message translates to:
+  /// **'未检测到 Java，可到「设置 → Java 运行时管理」安装或添加'**
+  String get instanceDetail_javaEmpty;
+
+  /// No description provided for @instanceDetail_javaMissing.
+  ///
+  /// In zh, this message translates to:
+  /// **'指定的 Java 不存在：{path}'**
+  String instanceDetail_javaMissing(String path);
+
+  /// 实例设置：Docker 下 Java 选择无效
+  ///
+  /// In zh, this message translates to:
+  /// **'Docker 运行方式使用镜像内的 Java，本设置仅在原生进程下生效'**
+  String get instanceDetail_javaDockerHint;
+
+  /// Docker 下 JVM 设置不生效
+  ///
+  /// In zh, this message translates to:
+  /// **'Docker 运行方式下使用镜像内的 JVM 与容器资源限制，本设置仅在原生进程下生效'**
+  String get instanceDetail_jvmDockerHint;
+
+  /// 折叠区：启动命令原文
+  ///
+  /// In zh, this message translates to:
+  /// **'高级设置'**
+  String get instanceDetail_advanced;
+
+  /// 折叠区副标题
+  ///
+  /// In zh, this message translates to:
+  /// **'启动命令（随 JVM 优化参数自动同步）'**
+  String get instanceDetail_advancedDesc;
+
+  /// JVM 预设提示
+  ///
+  /// In zh, this message translates to:
+  /// **'预设参数会写入启动命令，可在「高级设置」中查看'**
+  String get instanceDetail_jvmPresetHint;
+
+  /// 手动内存写入命令提示
+  ///
+  /// In zh, this message translates to:
+  /// **'已写入启动命令：-Xms{mb}M -Xmx{mb}M'**
+  String instanceDetail_memoryWritten(String mb);
+
+  /// 实例设置：JVM 卡片标题
+  ///
+  /// In zh, this message translates to:
+  /// **'JVM 优化参数'**
+  String get instanceDetail_jvmTitle;
+
+  /// 实例设置：自动分配内存开关
+  ///
+  /// In zh, this message translates to:
+  /// **'自动分配内存'**
+  String get instanceDetail_memoryAuto;
+
+  /// 实例设置：自动分配说明
+  ///
+  /// In zh, this message translates to:
+  /// **'按系统可用内存计算堆大小，预留 512 MB 给系统与启动器'**
+  String get instanceDetail_memoryAutoDesc;
+
+  /// 实例设置：手动分配内存
+  ///
+  /// In zh, this message translates to:
+  /// **'手动分配'**
+  String get instanceDetail_memoryManual;
+
+  /// No description provided for @instanceDetail_memoryRecommend.
+  ///
+  /// In zh, this message translates to:
+  /// **'推荐 {mb} MB'**
+  String instanceDetail_memoryRecommend(String mb);
+
+  /// 实例设置：优化参数预设
+  ///
+  /// In zh, this message translates to:
+  /// **'优化参数预设'**
+  String get instanceDetail_jvmPreset;
+
+  /// 实例设置：不使用优化参数
+  ///
+  /// In zh, this message translates to:
+  /// **'无'**
+  String get instanceDetail_jvmPresetNone;
+
+  /// No description provided for @instanceDetail_jvmNotJava.
+  ///
+  /// In zh, this message translates to:
+  /// **'启动命令首项不是 java（{token}），内存与优化参数不会注入'**
+  String instanceDetail_jvmNotJava(String token);
 }
 
 class _AppLocalizationsDelegate

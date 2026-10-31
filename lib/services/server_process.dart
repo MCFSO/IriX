@@ -19,10 +19,13 @@ import 'package:path/path.dart' as p;
 
 import '../models/server_instance.dart';
 import 'dev_log.dart';
+import 'java/java_launcher.dart';
+import 'jvm/jvm_args.dart';
 import 'log_persistence.dart';
 import 'log_tailer.dart';
 import 'logger_ffi.dart';
 import 'process_registry.dart';
+import '../state/app_activity.dart';
 
 /// 服务器进程管理器。
 ///
@@ -201,7 +204,9 @@ class ServerProcessManager {
     _exitCompleter = Completer<int>();
 
     try {
-      final parts = _parseCommand(instance.startCommand);
+      // 启动命令合成：实例级 Java 选择（改写首项）→ 内存与优化参数注入。
+      final command = await _resolveStartCommand();
+      final parts = _parseCommand(command);
       final executable = parts.first;
       final args = parts.skip(1).toList();
       final logPath = await LogPersistence.logFilePath(instance.id);
@@ -209,7 +214,7 @@ class ServerProcessManager {
       await _ensureTailer();
 
       if (_nativeSpawnAvailable) {
-        await _startNativeRedirect(executable, logPath);
+        await _startNativeRedirect(command, executable, logPath);
       } else {
         await _startPipeFallback(executable, args);
       }
@@ -224,10 +229,41 @@ class ServerProcessManager {
     unawaited(_checkAlive());
   }
 
+  /// 计算实际执行的启动命令。
+  ///
+  /// 顺序：先把实例级 Java 选择替换进命令首项，再注入内存与优化参数。
+  /// 启动命令首项不是 java（如 `./start.sh`）时两处都不改写，原样执行；
+  /// 指定路径失效时抛 [JavaBinaryMissingException]（由调用方向 UI 透出）。
+  Future<String> _resolveStartCommand() async {
+    var command = instance.startCommand;
+
+    final resolution = await JavaLauncher.resolveFor(instance);
+    if (resolution != null) {
+      command = JavaLauncher.replaceExecutable(command, resolution.executable);
+      DevLog.instance.devAction(
+        'server',
+        '实例 ${instance.name} 使用 ${resolution.mode.name} Java：'
+            '${resolution.executable}',
+      );
+    }
+
+    final plan = await JvmArgs.resolve(instance, baseCommand: command);
+    DevLog.instance.devAction(
+      'server',
+      '实例 ${instance.name} 堆内存 ${plan.maxMemoryMb == null ? '沿用命令' : '${plan.maxMemoryMb}M'}'
+          '（${plan.autoMemory ? '自动' : '手动'}），优化参数 ${plan.preset.name}',
+    );
+    return plan.command;
+  }
+
   /// Rust 托管启动：stdout/stderr 直写日志文件，stdin 保留管道。
-  Future<void> _startNativeRedirect(String executable, String logPath) async {
+  Future<void> _startNativeRedirect(
+    String command,
+    String executable,
+    String logPath,
+  ) async {
     final spawnedPid = LoggerNative.instance.spawnProcess(
-      instance.startCommand,
+      command,
       instance.rootPath,
       logPath,
     );
@@ -310,6 +346,8 @@ class ServerProcessManager {
   void _startLivenessPolling() {
     _livenessTimer?.cancel();
     _livenessTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      // 最小化时省掉一次进程表查询；恢复后下一拍继续，不会漏掉退出。
+      if (AppActivity.minimized) return;
       unawaited(_checkAlive());
     });
   }

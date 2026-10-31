@@ -177,6 +177,15 @@ class AppLocalizationsEn extends AppLocalizations {
       'When enabled, everything (runtime logs, operation traces, network request details, startup and crash stacks) is written to a session log file under the program directory logs/, to help troubleshoot issues.';
 
   @override
+  String settings_pluginsBatchSize(int count) {
+    return 'Load $count per batch';
+  }
+
+  @override
+  String get settings_pluginsBatchSizeHint =>
+      'Plugins and mods load in batches: scrolling to the bottom loads the next batch with a fade-in.';
+
+  @override
   String settings_downloadThreads(int count) {
     return 'Download threads: $count';
   }
@@ -3133,21 +3142,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get instanceDetail_backingUp => 'Backing up...';
 
   @override
-  String get instanceDetail_maxMemory => 'Max Memory';
-
-  @override
-  String get instanceDetail_notSet => 'Not set';
-
-  @override
-  String get instanceDetail_noXmxHint =>
-      'Current start command does not specify -Xmx; drag the slider to set memory';
-
-  @override
   String get instanceDetail_startCommand => 'Start Command';
 
   @override
   String get instanceDetail_startCommandHelper =>
-      'e.g. java -Xmx2G -jar paper.jar nogui';
+      'e.g. java -jar paper.jar nogui (memory and optimization flags are injected below)';
 
   @override
   String get instanceDetail_deleteInstance => 'Delete Instance';
@@ -4479,15 +4478,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get download_downloadingHint => 'Downloading… please do not leave';
 
   @override
-  String get download_step3 => 'Step 3 · Edit launch command';
-
-  @override
-  String get download_command => 'Launch command';
-
-  @override
-  String get download_finishCreate => 'Finish and create instance';
-
-  @override
   String get dbScreen_saved => 'Saved';
 
   @override
@@ -4906,5 +4896,100 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String remoteFile_downloadedTo(String path) {
     return 'Downloaded to $path';
+  }
+
+  @override
+  String get download_step3 => 'Creating instance…';
+
+  @override
+  String get download_createFailed => 'Failed to create instance';
+
+  @override
+  String get download_creatingHint =>
+      'Instance created automatically: heap is sized from available memory and can be tuned under JVM optimization settings.';
+
+  @override
+  String get instanceDetail_javaTitle => 'Java runtime';
+
+  @override
+  String get instanceDetail_javaAuto => 'Follow start command';
+
+  @override
+  String get instanceDetail_javaAutoDesc =>
+      'Run the java in the start command (usually the one on PATH)';
+
+  @override
+  String get instanceDetail_javaCustom => 'Custom Java';
+
+  @override
+  String get instanceDetail_javaCustomDesc =>
+      'Applies to this instance only, highest priority';
+
+  @override
+  String get instanceDetail_javaPick => 'Select Java';
+
+  @override
+  String get instanceDetail_javaRefresh => 'Rescan';
+
+  @override
+  String get instanceDetail_javaEmpty =>
+      'No Java detected. Install or add one in Settings → Java runtime management';
+
+  @override
+  String instanceDetail_javaMissing(String path) {
+    return 'Configured Java does not exist: $path';
+  }
+
+  @override
+  String get instanceDetail_javaDockerHint =>
+      'Docker mode uses the Java inside the image; this setting only applies to native processes';
+
+  @override
+  String get instanceDetail_jvmDockerHint =>
+      'Docker mode uses the JVM and resource limits inside the image; these settings apply to native processes only';
+
+  @override
+  String get instanceDetail_advanced => 'Advanced';
+
+  @override
+  String get instanceDetail_advancedDesc =>
+      'Start command (synced with JVM optimization)';
+
+  @override
+  String get instanceDetail_jvmPresetHint =>
+      'Preset flags are written into the start command; see Advanced settings';
+
+  @override
+  String instanceDetail_memoryWritten(String mb) {
+    return 'Written to start command: -Xms${mb}M -Xmx${mb}M';
+  }
+
+  @override
+  String get instanceDetail_jvmTitle => 'JVM optimization';
+
+  @override
+  String get instanceDetail_memoryAuto => 'Allocate memory automatically';
+
+  @override
+  String get instanceDetail_memoryAutoDesc =>
+      'Sizes the heap from available system memory, reserving 512 MB for the OS and launcher';
+
+  @override
+  String get instanceDetail_memoryManual => 'Manual allocation';
+
+  @override
+  String instanceDetail_memoryRecommend(String mb) {
+    return 'Recommended $mb MB';
+  }
+
+  @override
+  String get instanceDetail_jvmPreset => 'Optimization preset';
+
+  @override
+  String get instanceDetail_jvmPresetNone => 'None';
+
+  @override
+  String instanceDetail_jvmNotJava(String token) {
+    return 'The start command does not begin with java ($token); memory and optimization flags are not injected';
   }
 }

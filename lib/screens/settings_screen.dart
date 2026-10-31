@@ -26,6 +26,7 @@ import '../services/download_settings.dart';
 import '../services/font_settings.dart';
 import '../services/locale_settings.dart';
 import '../services/management_mode_settings.dart';
+import '../services/plugin_view_settings.dart';
 import '../services/vault_settings.dart';
 import '../state/app_state.dart';
 import '../state/cluster_state.dart';
@@ -38,6 +39,7 @@ enum SettingsSection {
   general('通用', Icons.tune),
   appearance('外观', Icons.palette_outlined),
   download('下载', Icons.download_outlined),
+  plugins('插件', Icons.extension_outlined),
   database('数据库', Icons.table_chart_outlined),
   java('Java 管理', Icons.coffee_outlined);
 
@@ -112,6 +114,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return const _AppearanceSection();
       case SettingsSection.download:
         return const _DownloadSection();
+      case SettingsSection.plugins:
+        return const _PluginsSection();
       case SettingsSection.database:
         return const _DatabaseSection();
       case SettingsSection.java:
@@ -480,6 +484,60 @@ class _DownloadSectionState extends State<_DownloadSection> {
               context.read<AppState>().setDownloadThreads(v.round()),
         ),
         Text(l.settings_downloadThreadsHint, style: theme.textTheme.bodySmall),
+      ],
+    );
+  }
+}
+
+// === 插件 ===
+
+/// 插件/Mod 列表的展示设置（懒加载批量）。
+class _PluginsSection extends StatefulWidget {
+  const _PluginsSection();
+
+  @override
+  State<_PluginsSection> createState() => _PluginsSectionState();
+}
+
+class _PluginsSectionState extends State<_PluginsSection> {
+  /// 当前每次加载条数；null 表示仍在读取持久化值。
+  double? _batch;
+
+  @override
+  void initState() {
+    super.initState();
+    PluginViewSettings.getBatchSize().then((value) {
+      if (mounted) setState(() => _batch = value.toDouble());
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final batch = _batch;
+
+    if (batch == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionTitle(l.settings_pluginsBatchSize(batch.round())),
+        Slider(
+          value: batch,
+          min: PluginViewSettings.minBatchSize.toDouble(),
+          max: PluginViewSettings.maxBatchSize.toDouble(),
+          divisions:
+              (PluginViewSettings.maxBatchSize -
+                  PluginViewSettings.minBatchSize) ~/
+              PluginViewSettings.batchSizeStep,
+          label: '${batch.round()}',
+          onChanged: (v) => setState(() => _batch = v),
+          onChangeEnd: (v) => PluginViewSettings.setBatchSize(v.round()),
+        ),
+        Text(l.settings_pluginsBatchSizeHint, style: theme.textTheme.bodySmall),
       ],
     );
   }

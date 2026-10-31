@@ -22,6 +22,7 @@ import '../widgets/container_environment_panel.dart';
 import 'node_detail_screen.dart' show remoteStatusChip;
 import 'remote_file_manager_screen.dart';
 import 'remote_plugins_backup_tabs.dart';
+import '../state/app_activity.dart';
 
 /// 远程实例详情页。
 class RemoteInstanceDetailScreen extends StatefulWidget {
@@ -188,6 +189,7 @@ class _RemoteInstanceDetailScreenState
   void _startPolling() {
     _pollTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       if (!mounted || _instance.status == RemoteStatus.stopped) return;
+      if (AppActivity.minimized) return;
       _fetchLog();
     });
   }

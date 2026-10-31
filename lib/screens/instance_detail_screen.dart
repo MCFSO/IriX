@@ -10,14 +10,19 @@ import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
 import '../l10n/app_localizations.dart';
+import '../models/jvm_preset.dart';
 import '../models/server_instance.dart';
 import '../services/ai_assistant_service.dart';
 import '../services/backup_ffi.dart';
 import '../services/backup_settings.dart';
 import '../services/background_tasks.dart';
 import '../services/font_settings.dart';
+import '../services/java/java_launcher.dart';
+import '../services/java/java_service.dart';
+import '../services/jvm/memory_allocator.dart';
 import '../services/log_persistence.dart';
 import '../services/log_tailer.dart';
+import '../services/system_memory.dart';
 import '../state/app_state.dart';
 import '../utils/ansi_color.dart';
 import '../utils/apple_widgets.dart';
@@ -830,71 +835,40 @@ class _BackupTabState extends State<_BackupTab> {
   }
 }
 
-/// 启动命令编辑卡片。
-class _StartCommandCard extends StatefulWidget {
-  const _StartCommandCard({required this.instanceId});
+/// 高级设置（折叠）：启动命令原文。
+///
+/// 启动命令会随「JVM 优化参数」同步改写（预设参数、手动内存），
+/// 因此默认收起：日常只需要上面的设置项，命令本身是给排障/自定义用的。
+class _AdvancedSettingsCard extends StatefulWidget {
+  const _AdvancedSettingsCard({
+    super.key,
+    required this.instanceId,
+    required this.command,
+  });
 
   final String instanceId;
 
+  /// 当前启动命令（父级以 ValueKey 绑定，外部变化时重建输入框）。
+  final String command;
+
   @override
-  State<_StartCommandCard> createState() => _StartCommandCardState();
+  State<_AdvancedSettingsCard> createState() => _AdvancedSettingsCardState();
 }
 
-class _StartCommandCardState extends State<_StartCommandCard> {
+class _AdvancedSettingsCardState extends State<_AdvancedSettingsCard> {
   late final TextEditingController _controller;
   bool _dirty = false;
-
-  /// 正则匹配 -Xmx 值（如 -Xmx2G、-Xmx0.5G、-Xmx2048M）。
-  static final _xmxRegex = RegExp(r'-Xmx(\d+(?:\.\d+)?)([gGmM]?)');
 
   @override
   void initState() {
     super.initState();
-    final instance = context
-        .read<AppState>()
-        .instances
-        .where((e) => e.id == widget.instanceId)
-        .firstOrNull;
-    _controller = TextEditingController(text: instance?.startCommand ?? '');
+    _controller = TextEditingController(text: widget.command);
   }
 
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
-  }
-
-  /// 从启动命令中解析 -Xmx 的内存值，返回以 GB 为单位的值。
-  /// 无匹配时返回 null（表示未设置 -Xmx）。
-  double? _parseXmxGb() {
-    final match = _xmxRegex.firstMatch(_controller.text);
-    if (match == null) return null;
-    final num = double.tryParse(match.group(1)!) ?? 2048;
-    final unit = match.group(2)?.toLowerCase();
-    if (unit == 'g') return num;
-    if (unit == 'm') return num / 1024;
-    // 无单位按 MB 处理
-    return num / 1024;
-  }
-
-  /// 拖动滑块时，更新启动命令中的 -Xmx 值。
-  void _onMemoryChanged(double gb) {
-    final xmxArg =
-        '-Xmx${gb == gb.truncateToDouble() ? gb.toInt().toString() : gb.toStringAsFixed(1)}G';
-    final text = _controller.text;
-    String newText;
-    if (_xmxRegex.hasMatch(text)) {
-      newText = text.replaceAll(_xmxRegex, xmxArg);
-    } else {
-      // 无 -Xmx，插入到 java 之后
-      if (text.startsWith('java')) {
-        newText = text.replaceFirst('java', 'java $xmxArg');
-      } else {
-        newText = '$xmxArg $text';
-      }
-    }
-    _controller.text = newText;
-    setState(() => _dirty = true);
   }
 
   void _save() {
@@ -911,102 +885,284 @@ class _StartCommandCardState extends State<_StartCommandCard> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final memGb = _parseXmxGb();
-    final hasXmx = memGb != null;
-    final displayGb = hasXmx ? memGb.clamp(0.5, 32).toDouble() : 2.0;
+    final theme = Theme.of(context);
     return Card(
-      margin: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+      margin: const EdgeInsets.all(8),
+      child: ExpansionTile(
+        leading: const Icon(Icons.code),
+        title: Text(l.instanceDetail_advanced),
+        subtitle: Text(
+          l.instanceDetail_advancedDesc,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        expandedCrossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 用独立标题替代 TextField 的浮动 label：ExpansionTile 的裁剪会把
+          // 浮到边框上方的 label 切掉一半（表现为文字压在边框线上）。
+          Text(
+            l.instanceDetail_startCommand,
+            style: theme.textTheme.labelLarge,
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _controller,
+            minLines: 2,
+            maxLines: 4,
+            style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+            decoration: const InputDecoration(
+              hintText: 'java -jar server.jar nogui',
+              border: OutlineInputBorder(),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
+              ),
+            ),
+            onChanged: (_) {
+              if (!_dirty) setState(() => _dirty = true);
+            },
+            onSubmitted: (_) => _dirty ? _save() : null,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            l.instanceDetail_startCommandHelper,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton.icon(
+              onPressed: _dirty ? _save : null,
+              icon: const Icon(Icons.check),
+              label: Text(l.common_save),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// JVM 优化参数卡片：内存分配方式 + 优化参数预设。
+///
+/// 展示原则（按产品要求）：
+/// - 自动分配时只显示开关，不显示任何内存数值——堆大小在启动时按可用内存计算；
+/// - 手动分配时显示滑块，并把 `-Xms/-Xmx` 直接写进启动命令；
+/// - 预设参数同样写入启动命令，可在「高级设置」中看到实际参数。
+class _JvmCard extends StatefulWidget {
+  const _JvmCard({required this.instanceId});
+
+  final String instanceId;
+
+  @override
+  State<_JvmCard> createState() => _JvmCardState();
+}
+
+class _JvmCardState extends State<_JvmCard> {
+  /// 系统内存信息（首次挂载时探测一次，仅用于滑块范围与推荐值）。
+  SystemMemoryInfo? _info;
+
+  /// 滑块拖动过程中的临时值（松手才落库）。
+  int? _pendingMb;
+
+  @override
+  void initState() {
+    super.initState();
+    SystemMemory.detect().then((info) {
+      if (mounted) setState(() => _info = info);
+    });
+  }
+
+  ServerInstance? _instance({bool listen = true}) {
+    final state = listen ? context.watch<AppState>() : context.read<AppState>();
+    return state.instances.where((e) => e.id == widget.instanceId).firstOrNull;
+  }
+
+  Future<void> _persist({bool? memoryAuto, int? memoryMb, JvmPreset? preset}) {
+    final instance = _instance(listen: false);
+    if (instance == null) return Future.value();
+    return context.read<AppState>().updateJvmSettings(
+      widget.instanceId,
+      memoryAuto: memoryAuto ?? instance.memoryAuto,
+      memoryMb: memoryMb ?? instance.memoryMb,
+      jvmPreset: preset ?? instance.jvmPreset,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final instance = _instance();
+    if (instance == null) return const SizedBox.shrink();
+
+    final info = _info;
+    final upperBound = info == null
+        ? 16384
+        : MemoryAllocator.manualUpperBoundMb(info.availableBytes);
+    final recommendedMb = info == null
+        ? 2048
+        : MemoryAllocator.suggestedMemoryMb(info.totalMb);
+    final manualMb = instance.memoryMb == null
+        ? null
+        : MemoryAllocator.clampMb(instance.memoryMb!, upperBoundMb: upperBound);
+    final sliderMb = _pendingMb ?? manualMb ?? recommendedMb;
+    final canSlide = upperBound > minMemoryMb;
+
+    final startsWithJava = JavaLauncher.usesJavaExecutable(
+      instance.startCommand,
+    );
+
+    return Card(
+      margin: const EdgeInsets.all(8),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 内存调节滑块
             Row(
               children: [
-                const Icon(Icons.memory),
+                const Icon(Icons.tune),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            l.instanceDetail_maxMemory,
-                            style: const TextStyle(fontWeight: FontWeight.w500),
-                          ),
-                          const Spacer(),
-                          Text(
-                            hasXmx
-                                ? (displayGb == displayGb.truncateToDouble()
-                                      ? '${displayGb.toInt()} GB'
-                                      : '${displayGb.toStringAsFixed(1)} GB')
-                                : l.instanceDetail_notSet,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: hasXmx
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Colors.grey,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Slider(
-                        value: displayGb,
-                        min: 0.5,
-                        max: 32,
-                        divisions: 63,
-                        label: displayGb == displayGb.truncateToDouble()
-                            ? '${displayGb.toInt()}GB'
-                            : '${displayGb.toStringAsFixed(1)}GB',
-                        onChanged: (gb) => _onMemoryChanged(gb),
-                      ),
-                      if (!hasXmx)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(
-                            l.instanceDetail_noXmxHint,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey[500],
-                            ),
-                          ),
-                        ),
-                    ],
+                  child: Text(
+                    l.instanceDetail_jvmTitle,
+                    style: theme.textTheme.titleMedium,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            // 启动命令文本框
-            Row(
-              children: [
-                const Icon(Icons.terminal),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    decoration: InputDecoration(
-                      labelText: l.instanceDetail_startCommand,
-                      helperText: l.instanceDetail_startCommandHelper,
-                      isDense: true,
-                      border: const OutlineInputBorder(),
+            const SizedBox(height: 4),
+            SwitchListTile(
+              value: instance.memoryAuto,
+              onChanged: (value) {
+                setState(() => _pendingMb = null);
+                // 切到手动时给一个可直接用的初始值，切回自动则移除命令中的内存参数。
+                _persist(
+                  memoryAuto: value,
+                  memoryMb: value ? null : (manualMb ?? recommendedMb),
+                );
+              },
+              title: Text(l.instanceDetail_memoryAuto),
+              subtitle: Text(l.instanceDetail_memoryAutoDesc),
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+            if (!instance.memoryAuto) ...[
+              Row(
+                children: [
+                  Text(
+                    l.instanceDetail_memoryManual,
+                    style: theme.textTheme.labelLarge,
+                  ),
+                  const Spacer(),
+                  Text(
+                    l.instanceDetail_memoryRecommend('$recommendedMb'),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
-                    onChanged: (_) {
-                      if (!_dirty) setState(() => _dirty = true);
-                    },
-                    onSubmitted: (_) => _dirty ? _save() : null,
                   ),
+                ],
+              ),
+              if (canSlide)
+                Slider(
+                  value: sliderMb.toDouble().clamp(
+                    minMemoryMb.toDouble(),
+                    upperBound.toDouble(),
+                  ),
+                  min: minMemoryMb.toDouble(),
+                  max: upperBound.toDouble(),
+                  divisions: ((upperBound - minMemoryMb) ~/ 128).clamp(1, 512),
+                  label: '$sliderMb MB',
+                  onChanged: (value) =>
+                      setState(() => _pendingMb = (value ~/ 128) * 128),
+                  onChangeEnd: (value) {
+                    final mb = (value ~/ 128) * 128;
+                    setState(() => _pendingMb = null);
+                    _persist(memoryMb: mb);
+                  },
                 ),
-                const SizedBox(width: 8),
-                FilledButton.icon(
-                  onPressed: _dirty ? _save : null,
-                  icon: const Icon(Icons.check),
-                  label: Text(l.common_save),
+              Text(
+                l.instanceDetail_memoryWritten('$sliderMb'),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontFamily: 'monospace',
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+            const Divider(height: 24),
+            Row(
+              children: [
+                Text(
+                  l.instanceDetail_jvmPreset,
+                  style: theme.textTheme.labelLarge,
+                ),
+                const SizedBox(width: 16),
+                DropdownButton<JvmPreset>(
+                  value: instance.jvmPreset,
+                  items: [
+                    DropdownMenuItem(
+                      value: JvmPreset.none,
+                      child: Text(l.instanceDetail_jvmPresetNone),
+                    ),
+                    DropdownMenuItem(
+                      value: JvmPreset.aikar,
+                      child: Text(JvmPreset.aikar.displayName),
+                    ),
+                  ],
+                  onChanged: (preset) {
+                    if (preset != null) _persist(preset: preset);
+                  },
                 ),
               ],
             ),
+            const SizedBox(height: 4),
+            Text(
+              l.instanceDetail_jvmPresetHint,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.outline,
+              ),
+            ),
+            if (instance.runMode == RunMode.docker) ...[
+              const SizedBox(height: 8),
+              Text(
+                l.instanceDetail_jvmDockerHint,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.outline,
+                ),
+              ),
+            ],
+            if (!startsWithJava) ...[
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    size: 16,
+                    color: theme.colorScheme.error,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      l.instanceDetail_jvmNotJava(
+                        JavaLauncher.splitFirstToken(
+                              instance.startCommand,
+                            )?.token ??
+                            '',
+                      ),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.error,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -1014,7 +1170,204 @@ class _StartCommandCardState extends State<_StartCommandCard> {
   }
 }
 
-/// 设置 Tab：实例名称 + 启动命令 + 运行方式 + 删除实例。
+/// Java 运行时卡片：跟随启动命令 / 全局默认 / 从已检测列表中选择。
+///
+/// 只提供「选择哪个 Java」，不提供路径输入：Java 管理页已负责扫描与添加，
+/// 实例侧再做一次文件选择属于重复劳动，也容易出现手填路径失效。
+class _JavaCard extends StatefulWidget {
+  const _JavaCard({required this.instanceId});
+
+  final String instanceId;
+
+  @override
+  State<_JavaCard> createState() => _JavaCardState();
+}
+
+class _JavaCardState extends State<_JavaCard> {
+  @override
+  void initState() {
+    super.initState();
+    JavaService.instance.ensureInitialized();
+  }
+
+  ServerInstance? _instance() {
+    final state = context.watch<AppState>();
+    return state.instances.where((e) => e.id == widget.instanceId).firstOrNull;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final instance = _instance();
+    if (instance == null) return const SizedBox.shrink();
+
+    final isDocker = instance.runMode == RunMode.docker;
+    final customBinary = instance.javaBinary;
+
+    return Card(
+      margin: const EdgeInsets.all(8),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: ListenableBuilder(
+          listenable: JavaService.instance,
+          builder: (context, _) {
+            final runtimes = JavaService.instance.runtimes;
+            final customRuntime = runtimes
+                .where((r) => r.binary == customBinary)
+                .firstOrNull;
+            final customMissing =
+                customBinary != null &&
+                customBinary.isNotEmpty &&
+                !File(customBinary).existsSync();
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.coffee_outlined),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(
+                        l.instanceDetail_javaTitle,
+                        style: theme.textTheme.titleMedium,
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: l.instanceDetail_javaRefresh,
+                      icon: const Icon(Icons.refresh, size: 20),
+                      onPressed: JavaService.instance.isLoading
+                          ? null
+                          : () => JavaService.instance.refresh(useCache: false),
+                    ),
+                  ],
+                ),
+                if (isDocker)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 40, bottom: 4),
+                    child: Text(
+                      l.instanceDetail_javaDockerHint,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.outline,
+                      ),
+                    ),
+                  ),
+                RadioGroup<InstanceJavaMode>(
+                  groupValue: instance.javaMode,
+                  onChanged: (mode) {
+                    if (mode == null) return;
+                    // 切到「指定 Java」时默认选中列表第一个可用运行时，
+                    // 用户不需要先学会挑路径再回来选。
+                    final fallback =
+                        customBinary ?? runtimes.firstOrNull?.binary;
+                    context.read<AppState>().updateJavaSelection(
+                      widget.instanceId,
+                      mode,
+                      mode == InstanceJavaMode.custom ? fallback : customBinary,
+                    );
+                  },
+                  child: Column(
+                    children: [
+                      RadioListTile<InstanceJavaMode>(
+                        value: InstanceJavaMode.auto,
+                        title: Text(l.instanceDetail_javaAuto),
+                        subtitle: Text(l.instanceDetail_javaAutoDesc),
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      RadioListTile<InstanceJavaMode>(
+                        value: InstanceJavaMode.custom,
+                        title: Text(l.instanceDetail_javaCustom),
+                        subtitle: Text(l.instanceDetail_javaCustomDesc),
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ],
+                  ),
+                ),
+                if (instance.javaMode == InstanceJavaMode.custom) ...[
+                  if (JavaService.instance.isLoading && runtimes.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Center(
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    )
+                  else if (runtimes.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 40, bottom: 8),
+                      child: Text(
+                        l.instanceDetail_javaEmpty,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.outline,
+                        ),
+                      ),
+                    )
+                  else
+                    Padding(
+                      padding: const EdgeInsets.only(left: 40, bottom: 8),
+                      child: DropdownButton<String>(
+                        value: customRuntime?.binary,
+                        hint: Text(l.instanceDetail_javaPick),
+                        isExpanded: true,
+                        items: [
+                          for (final runtime in runtimes)
+                            DropdownMenuItem(
+                              value: runtime.binary,
+                              child: Text(
+                                runtime.displayTitle,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          // 已选路径若不在扫描列表中（Java 被移动/删除），
+                          // 仍保留为可选项，避免下拉框值悬空报错。
+                          if (customRuntime == null &&
+                              customBinary != null &&
+                              customBinary.isNotEmpty)
+                            DropdownMenuItem(
+                              value: customBinary,
+                              child: Text(
+                                customBinary,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                        ],
+                        onChanged: (binary) {
+                          if (binary == null) return;
+                          context.read<AppState>().updateJavaSelection(
+                            widget.instanceId,
+                            InstanceJavaMode.custom,
+                            binary,
+                          );
+                        },
+                      ),
+                    ),
+                  if (customMissing)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 40, bottom: 8),
+                      child: Text(
+                        l.instanceDetail_javaMissing(customBinary),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.error,
+                        ),
+                      ),
+                    ),
+                ],
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// 设置 Tab：实例名称 + 启动命令 + JVM 调参 + Java + 运行方式 + 删除实例。
 class _SettingsTab extends StatelessWidget {
   const _SettingsTab({
     required this.instanceId,
@@ -1051,10 +1404,18 @@ class _SettingsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    final instance = context
+        .watch<AppState>()
+        .instances
+        .where((e) => e.id == instanceId)
+        .firstOrNull;
+    final command = instance?.startCommand ?? '';
     return ListView(
       children: [
         _InstanceNameCard(instanceId: instanceId),
-        _StartCommandCard(instanceId: instanceId),
+        // 产品要求：JVM 优化参数紧贴实例名称，启动命令收进最底部的高级设置。
+        _JvmCard(instanceId: instanceId),
+        _JavaCard(instanceId: instanceId),
         _RunModeCard(
           instanceId: instanceId,
           dockerAvailable: dockerAvailable,
@@ -1062,6 +1423,12 @@ class _SettingsTab extends StatelessWidget {
         ),
         _EulaCard(instanceId: instanceId),
         _CompressionSettingsCard(instanceId: instanceId),
+        // 启动命令放最底部：默认收起，随 JVM 优化参数自动同步。
+        _AdvancedSettingsCard(
+          key: ValueKey('advanced-$command'),
+          instanceId: instanceId,
+          command: command,
+        ),
         const SizedBox(height: 24),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),

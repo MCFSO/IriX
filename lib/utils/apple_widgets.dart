@@ -284,25 +284,38 @@ class AppleProgressIndicator extends StatelessWidget {
 
 /// 页面跳转，始终使用动画过渡。
 Future<T?> pushPage<T>(BuildContext context, WidgetBuilder builder) {
-  return Navigator.push<T>(
+  return Navigator.push<T>(context, _pageRoute(context, builder));
+}
+
+/// 页面跳转并清空中间路由（保留首屏），用于「创建完成后直接进入详情」。
+///
+/// 与「先 popUntil 再 push」不同，这里在同一个导航调用内完成替换，
+/// 避免出栈后原页面 context 已失效导致 push 失败。
+Future<T?> pushPageReplacingStack<T>(
+  BuildContext context,
+  WidgetBuilder builder,
+) {
+  return Navigator.pushAndRemoveUntil<T>(
     context,
-    PageRouteBuilder<T>(
-      pageBuilder: (_, _, _) => builder(context),
-      transitionDuration: const Duration(milliseconds: 300),
-      reverseTransitionDuration: const Duration(milliseconds: 300),
-      transitionsBuilder: (_, animation, _, child) {
-        return SlideTransition(
-          position:
-              Tween<Offset>(
-                begin: const Offset(1.0, 0.0),
-                end: Offset.zero,
-              ).animate(
-                CurvedAnimation(parent: animation, curve: Curves.easeInOut),
-              ),
-          child: child,
-        );
-      },
-    ),
+    _pageRoute(context, builder),
+    (route) => route.isFirst,
+  );
+}
+
+PageRouteBuilder<T> _pageRoute<T>(BuildContext context, WidgetBuilder builder) {
+  return PageRouteBuilder<T>(
+    pageBuilder: (_, _, _) => builder(context),
+    transitionDuration: const Duration(milliseconds: 300),
+    reverseTransitionDuration: const Duration(milliseconds: 300),
+    transitionsBuilder: (_, animation, _, child) {
+      return SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(1.0, 0.0),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(parent: animation, curve: Curves.easeInOut)),
+        child: child,
+      );
+    },
   );
 }
 

@@ -9,15 +9,18 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 
 import '../data/server_cores.dart';
+import '../models/jvm_preset.dart';
 import '../models/server_instance.dart';
 import '../services/container/container_backend.dart';
 import '../services/container/docker_cli_backend.dart';
 import '../services/download_settings.dart';
 import '../services/instance_store.dart';
+import '../services/jvm/jvm_command_sync.dart';
 import '../services/log_persistence.dart';
 import '../services/process_registry.dart';
 import '../services/server_process.dart';
 import '../utils/naming.dart';
+import 'app_activity.dart';
 
 /// 应用全局状态。
 ///
@@ -104,6 +107,8 @@ class AppState extends ChangeNotifier {
 
   /// 轮询所有 Docker 实例的容器状态，同步到 [InstanceStatus]。
   Future<void> _pollDockerStatuses() async {
+    // 最小化时容器状态无需实时同步，省掉 docker CLI 调用。
+    if (AppActivity.minimized) return;
     try {
       final env = await dockerCli.environment();
       if (!env.available) return;
@@ -235,6 +240,9 @@ class AppState extends ChangeNotifier {
   ///
   /// [coreFilePath] 留空，[coreType]/[coreVersion] 为 null。
   /// [name] 为空或纯空白时自动分配随机名称。
+  ///
+  /// 内存按「手动 + 未设置」创建：导入时用户已在启动命令里填了 `-Xmx`，
+  /// 不能在启动时被自动分配覆盖。
   Future<void> createImportedInstance({
     required String rootPath,
     required String startCommand,
@@ -247,6 +255,7 @@ class AppState extends ChangeNotifier {
       rootPath: rootPath,
       coreFilePath: '',
       startCommand: startCommand,
+      memoryAuto: false,
     );
     await _store.addInstance(instance);
     _instances.add(instance);
@@ -254,6 +263,8 @@ class AppState extends ChangeNotifier {
   }
 
   /// 创建一个通过"选择本地核心文件"方式的实例。
+  ///
+  /// 与 [createImportedInstance] 一致：保留用户填写的 `-Xmx`。
   Future<void> createFromCoreFile({
     required String coreFilePath,
     required String rootPath,
@@ -269,6 +280,7 @@ class AppState extends ChangeNotifier {
       startCommand: startCommand,
       coreType: coreType,
       coreVersion: coreVersion,
+      memoryAuto: false,
     );
     await _store.addInstance(instance);
     _instances.add(instance);
@@ -276,7 +288,11 @@ class AppState extends ChangeNotifier {
   }
 
   /// 创建一个通过"下载核心"方式的实例。
-  Future<void> createDownloadedInstance({
+  ///
+  /// 下载完成后直接创建：内存默认自动分配（[ServerInstance.memoryAuto]
+  /// 为 true），启动命令只保留核心 jar 与 `nogui`，堆参数在启动时注入。
+  /// 返回创建出的实例，便于调用方跳转到详情页。
+  Future<ServerInstance> createDownloadedInstance({
     required ServerCore core,
     required CoreVersionInfo versionInfo,
     required String coreFilePath,
@@ -291,10 +307,12 @@ class AppState extends ChangeNotifier {
       startCommand: startCommand,
       coreType: core.name,
       coreVersion: versionInfo.version,
+      memoryAuto: true,
     );
     await _store.addInstance(instance);
     _instances.add(instance);
     notifyListeners();
+    return instance;
   }
 
   /// 删除指定实例：强制终止进程、释放并移除其进程管理器，从持久化与内存列表中清除。
@@ -588,6 +606,67 @@ class AppState extends ChangeNotifier {
       instance.container = container ?? instance.container ?? ContainerConfig();
     }
     await _store.updateRunMode(id, instance.runMode, instance.container);
+    notifyListeners();
+  }
+
+  /// 更新实例的 Java 运行时选择并持久化。
+  ///
+  /// 切换到非 [InstanceJavaMode.custom] 时保留已选路径（便于来回切换），
+  /// 但该路径不参与启动解析。启动中的实例在下次启动时生效。
+  Future<void> updateJavaSelection(
+    String id,
+    InstanceJavaMode mode,
+    String? binary,
+  ) async {
+    final instance = _instanceById(id);
+    if (instance == null) return;
+    instance.javaMode = mode;
+    if (mode == InstanceJavaMode.custom) {
+      instance.javaBinary = binary;
+    }
+    await _store.updateJavaSelection(
+      id,
+      instance.javaMode,
+      instance.javaBinary,
+    );
+    notifyListeners();
+  }
+
+  /// 更新实例的 JVM 调参（自动分配 / 手动堆大小 / 优化参数预设）并持久化。
+  ///
+  /// 同步改写启动命令（见 [JvmCommandSync]）：
+  /// - 预设参数随选择增删，用户在「高级设置」里能看到真实参数；
+  /// - 手动内存写入 `-Xms/-Xmx`；
+  /// - 切回自动分配时移除命令里的内存参数，改由启动时按可用内存注入。
+  Future<void> updateJvmSettings(
+    String id, {
+    required bool memoryAuto,
+    int? memoryMb,
+    required JvmPreset jvmPreset,
+  }) async {
+    final instance = _instanceById(id);
+    if (instance == null) return;
+    instance.memoryAuto = memoryAuto;
+    instance.memoryMb = memoryMb ?? instance.memoryMb;
+    instance.jvmPreset = jvmPreset;
+
+    final synced = JvmCommandSync.apply(
+      instance.startCommand,
+      preset: instance.jvmPreset,
+      memoryAuto: instance.memoryAuto,
+      memoryMb: instance.memoryMb,
+    );
+    if (synced != instance.startCommand) {
+      instance.startCommand = synced;
+      await _store.updateStartCommand(id, synced);
+    }
+
+    await _store.updateJvmSettings(
+      id,
+      memoryAuto: instance.memoryAuto,
+      memoryMb: instance.memoryMb,
+      jvmPreset: instance.jvmPreset,
+    );
     notifyListeners();
   }
 
