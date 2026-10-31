@@ -2052,9 +2052,9 @@
   "@instanceDetail_startFailed": { "placeholders": { "error": { "type": "String" } } },
   "instanceDetail_restartFailed": "重启失败：",
   "@instanceDetail_restartFailed": { "placeholders": { "error": { "type": "String" } } },
-  "instanceDetail_backupSaved": "备份已保存到",
+  "instanceDetail_backupSaved": "备份已保存到 {path}",
   "@instanceDetail_backupSaved": { "placeholders": { "path": { "type": "String" } } },
-  "instanceDetail_backupFailed": "备份失败:",
+  "instanceDetail_backupFailed": "备份失败：{error}",
   "@instanceDetail_backupFailed": { "placeholders": { "error": { "type": "String" } } },
   "instanceDetail_errorCode": "错误码",
   "@instanceDetail_errorCode": { "placeholders": { "code": { "type": "int" } } },
@@ -2938,5 +2938,174 @@
   "@nodeDevices_loadFailed": {
     "description": "设备列表加载失败",
     "placeholders": { "message": { "type": "String" } }
+  },
+  "instanceDetail_backupFull": "全量备份",
+  "@instanceDetail_backupFull": { "description": "备份页：全量备份按钮" },
+  "instanceDetail_backupFullDesc": "整个实例目录打包为 ZIP 归档",
+  "@instanceDetail_backupFullDesc": { "description": "备份页：全量备份按钮说明" },
+  "instanceDetail_backupIncremental": "增量备份",
+  "@instanceDetail_backupIncremental": { "description": "备份页：增量备份按钮" },
+  "instanceDetail_backupIncrementalDesc": "只保存相对上次快照的变化内容",
+  "@instanceDetail_backupIncrementalDesc": { "description": "备份页：增量备份按钮说明" },
+  "instanceDetail_backupRepoLabel": "备份仓库",
+  "@instanceDetail_backupRepoLabel": { "description": "备份仓库路径标签" },
+  "instanceDetail_backupIncrementalMode": "增量方式",
+  "@instanceDetail_backupIncrementalMode": { "description": "增量备份策略标签" },
+  "instanceDetail_backupStrategyRsync": "Rsync 硬链接快照",
+  "@instanceDetail_backupStrategyRsync": { "description": "增量策略：rsync 硬链接快照" },
+  "instanceDetail_backupStrategyHardlink": "Rust 原生硬链接快照",
+  "@instanceDetail_backupStrategyHardlink": { "description": "增量策略：原生硬链接快照" },
+  "instanceDetail_backupStrategyCas": "哈希比对 + 内容寻址存储",
+  "@instanceDetail_backupStrategyCas": { "description": "增量策略：Windows 哈希比对 + CAS" },
+  "instanceDetail_backupStrategyZip": "ZIP 归档",
+  "@instanceDetail_backupStrategyZip": { "description": "全量备份策略名" },
+  "instanceDetail_backupRsyncMissing": "未检测到 rsync，增量备份使用 Rust 原生硬链接快照",
+  "@instanceDetail_backupRsyncMissing": { "description": "未检测到 rsync 的提示" },
+  "instanceDetail_backupHistory": "备份历史",
+  "@instanceDetail_backupHistory": { "description": "备份历史标题" },
+  "instanceDetail_backupHistorySummary": "{count} 个备份 · 实际占用 {size}",
+  "@instanceDetail_backupHistorySummary": {
+    "description": "备份历史数量与占用",
+    "placeholders": {
+      "count": { "type": "int" },
+      "size": { "type": "String" }
+    }
+  },
+  "instanceDetail_backupEmpty": "还没有备份，点击上方按钮创建第一个备份",
+  "@instanceDetail_backupEmpty": { "description": "备份为空时的提示" },
+  "instanceDetail_backupLoading": "正在读取备份列表…",
+  "@instanceDetail_backupLoading": { "description": "读取备份列表" },
+  "instanceDetail_backupLoadFailed": "读取备份列表失败：{error}",
+  "@instanceDetail_backupLoadFailed": {
+    "description": "读取备份列表失败",
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "instanceDetail_backupRunningFull": "正在全量备份",
+  "@instanceDetail_backupRunningFull": { "description": "全量备份进行中" },
+  "instanceDetail_backupRunningIncremental": "正在增量备份",
+  "@instanceDetail_backupRunningIncremental": { "description": "增量备份进行中" },
+  "instanceDetail_backupRestoring": "正在恢复备份",
+  "@instanceDetail_backupRestoring": { "description": "恢复备份进行中" },
+  "instanceDetail_backupVerifying": "正在校验备份",
+  "@instanceDetail_backupVerifying": { "description": "校验备份进行中" },
+  "instanceDetail_backupCancel": "取消操作",
+  "@instanceDetail_backupCancel": { "description": "取消备份操作" },
+  "instanceDetail_backupProgressHint": "备份在后台线程执行，可随时取消",
+  "@instanceDetail_backupProgressHint": { "description": "备份进度说明" },
+  "instanceDetail_backupElapsed": "已用 {seconds} 秒",
+  "@instanceDetail_backupElapsed": {
+    "description": "已用时间",
+    "placeholders": { "seconds": { "type": "String" } }
+  },
+  "instanceDetail_backupFullDone": "全量备份完成：{name}",
+  "@instanceDetail_backupFullDone": {
+    "description": "全量备份完成提示",
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "instanceDetail_backupIncrementalDone": "增量备份完成：{name}（新增 {added}，复用 {reused}）",
+  "@instanceDetail_backupIncrementalDone": {
+    "description": "增量备份完成提示",
+    "placeholders": {
+      "name": { "type": "String" },
+      "added": { "type": "String" },
+      "reused": { "type": "String" }
+    }
+  },
+  "instanceDetail_backupKindFull": "全量",
+  "@instanceDetail_backupKindFull": { "description": "全量备份类型" },
+  "instanceDetail_backupKindIncremental": "增量",
+  "@instanceDetail_backupKindIncremental": { "description": "增量备份类型" },
+  "instanceDetail_backupKindLabel": "类型",
+  "@instanceDetail_backupKindLabel": { "description": "备份详情：类型" },
+  "instanceDetail_backupDetailTitle": "备份详情",
+  "@instanceDetail_backupDetailTitle": { "description": "备份详情弹窗标题" },
+  "instanceDetail_backupRestore": "恢复",
+  "@instanceDetail_backupRestore": { "description": "恢复备份" },
+  "instanceDetail_backupVerify": "校验",
+  "@instanceDetail_backupVerify": { "description": "校验备份" },
+  "instanceDetail_backupRestoreConfirmTitle": "恢复备份？",
+  "@instanceDetail_backupRestoreConfirmTitle": { "description": "恢复确认标题" },
+  "instanceDetail_backupRestoreConfirmContent": "将用「{name}」覆盖实例目录中的同名文件，建议先停止实例再恢复。",
+  "@instanceDetail_backupRestoreConfirmContent": {
+    "description": "恢复确认说明",
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "instanceDetail_backupRestoreStopHint": "实例正在运行：恢复过程中写入的文件可能被服务器覆盖或锁定，建议先停止实例。",
+  "@instanceDetail_backupRestoreStopHint": { "description": "实例运行中恢复提示" },
+  "instanceDetail_backupRestoreDone": "恢复完成：{files} 个文件",
+  "@instanceDetail_backupRestoreDone": {
+    "description": "恢复完成提示",
+    "placeholders": { "files": { "type": "String" } }
+  },
+  "instanceDetail_backupDeleteConfirmTitle": "删除备份？",
+  "@instanceDetail_backupDeleteConfirmTitle": { "description": "删除确认标题" },
+  "instanceDetail_backupDeleteConfirmContent": "将删除「{name}」，删除后无法找回。",
+  "@instanceDetail_backupDeleteConfirmContent": {
+    "description": "删除确认说明",
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "instanceDetail_backupDeleted": "备份已删除",
+  "@instanceDetail_backupDeleted": { "description": "删除完成提示" },
+  "instanceDetail_backupVerifyOk": "校验通过：{checked} 个文件",
+  "@instanceDetail_backupVerifyOk": {
+    "description": "校验通过",
+    "placeholders": { "checked": { "type": "String" } }
+  },
+  "instanceDetail_backupVerifyFailed": "校验发现 {count} 个问题",
+  "@instanceDetail_backupVerifyFailed": {
+    "description": "校验失败",
+    "placeholders": { "count": { "type": "String" } }
+  },
+  "instanceDetail_backupVerifyDetail": "已比对内容哈希 {hashed} 个 · 策略：{strategy}",
+  "@instanceDetail_backupVerifyDetail": {
+    "description": "校验明细",
+    "placeholders": {
+      "hashed": { "type": "String" },
+      "strategy": { "type": "String" }
+    }
+  },
+  "instanceDetail_backupSize": "逻辑大小",
+  "@instanceDetail_backupSize": { "description": "备份逻辑大小" },
+  "instanceDetail_backupStoredSize": "实际占用",
+  "@instanceDetail_backupStoredSize": { "description": "备份实际占用" },
+  "instanceDetail_backupCreatedAt": "创建时间",
+  "@instanceDetail_backupCreatedAt": { "description": "备份创建时间" },
+  "instanceDetail_backupDuration": "耗时",
+  "@instanceDetail_backupDuration": { "description": "备份耗时" },
+  "instanceDetail_backupSecondsUnit": "秒",
+  "@instanceDetail_backupSecondsUnit": { "description": "秒单位" },
+  "instanceDetail_backupStrategy": "策略",
+  "@instanceDetail_backupStrategy": { "description": "备份策略" },
+  "instanceDetail_backupParent": "增量基线",
+  "@instanceDetail_backupParent": { "description": "增量基线快照" },
+  "instanceDetail_backupNoParent": "首个快照（全量落盘）",
+  "@instanceDetail_backupNoParent": { "description": "没有父快照" },
+  "instanceDetail_backupChangeLabel": "变化统计",
+  "@instanceDetail_backupChangeLabel": { "description": "变化统计标签" },
+  "instanceDetail_backupChangeStats": "新增 {added} · 修改 {modified} · 删除 {deleted} · 未变 {unchanged}",
+  "@instanceDetail_backupChangeStats": {
+    "description": "增量备份变化统计",
+    "placeholders": {
+      "added": { "type": "String" },
+      "modified": { "type": "String" },
+      "deleted": { "type": "String" },
+      "unchanged": { "type": "String" }
+    }
+  },
+  "instanceDetail_backupFileCount": "{count} 个文件",
+  "@instanceDetail_backupFileCount": {
+    "description": "文件数量",
+    "placeholders": { "count": { "type": "String" } }
+  },
+  "instanceDetail_backupFileCountLabel": "文件数",
+  "@instanceDetail_backupFileCountLabel": { "description": "文件数标签" },
+  "instanceDetail_backupCompression": "压缩级别",
+  "@instanceDetail_backupCompression": { "description": "全量备份压缩级别" },
+  "instanceDetail_backupNote": "备注",
+  "@instanceDetail_backupNote": { "description": "备份备注" },
+  "instanceDetail_backupSymlinksSkipped": "已跳过 {count} 个符号链接",
+  "@instanceDetail_backupSymlinksSkipped": {
+    "description": "跳过的符号链接数量",
+    "placeholders": { "count": { "type": "String" } }
   }
 }

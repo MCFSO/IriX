@@ -1955,9 +1955,9 @@
   "@instanceDetail_startFailed": { "placeholders": { "error": { "type": "String" } } },
   "instanceDetail_restartFailed": "Failed to restart:",
   "@instanceDetail_restartFailed": { "placeholders": { "error": { "type": "String" } } },
-  "instanceDetail_backupSaved": "Backup saved to",
+  "instanceDetail_backupSaved": "Backup saved to {path}",
   "@instanceDetail_backupSaved": { "placeholders": { "path": { "type": "String" } } },
-  "instanceDetail_backupFailed": "Backup failed:",
+  "instanceDetail_backupFailed": "Backup failed: {error}",
   "@instanceDetail_backupFailed": { "placeholders": { "error": { "type": "String" } } },
   "instanceDetail_errorCode": "Error code",
   "@instanceDetail_errorCode": { "placeholders": { "code": { "type": "int" } } },
@@ -2841,5 +2841,174 @@
   "@nodeDevices_loadFailed": {
     "description": "Device list load failed",
     "placeholders": { "message": { "type": "String" } }
+  },
+  "instanceDetail_backupFull": "Full Backup",
+  "@instanceDetail_backupFull": { "description": "Backup tab: full backup button" },
+  "instanceDetail_backupFullDesc": "Pack the whole instance directory into a ZIP archive",
+  "@instanceDetail_backupFullDesc": { "description": "Backup tab: full backup description" },
+  "instanceDetail_backupIncremental": "Incremental Backup",
+  "@instanceDetail_backupIncremental": { "description": "Backup tab: incremental backup button" },
+  "instanceDetail_backupIncrementalDesc": "Only store what changed since the last snapshot",
+  "@instanceDetail_backupIncrementalDesc": { "description": "Backup tab: incremental backup description" },
+  "instanceDetail_backupRepoLabel": "Backup repository",
+  "@instanceDetail_backupRepoLabel": { "description": "Backup repository path label" },
+  "instanceDetail_backupIncrementalMode": "Incremental mode",
+  "@instanceDetail_backupIncrementalMode": { "description": "Incremental strategy label" },
+  "instanceDetail_backupStrategyRsync": "Rsync hardlink snapshot",
+  "@instanceDetail_backupStrategyRsync": { "description": "Strategy: rsync hardlink snapshot" },
+  "instanceDetail_backupStrategyHardlink": "Native Rust hardlink snapshot",
+  "@instanceDetail_backupStrategyHardlink": { "description": "Strategy: native hardlink snapshot" },
+  "instanceDetail_backupStrategyCas": "Hash comparison + content-addressable storage",
+  "@instanceDetail_backupStrategyCas": { "description": "Strategy: Windows hash + CAS" },
+  "instanceDetail_backupStrategyZip": "ZIP archive",
+  "@instanceDetail_backupStrategyZip": { "description": "Full backup strategy name" },
+  "instanceDetail_backupRsyncMissing": "rsync not found: incremental backups fall back to the native Rust hardlink snapshot",
+  "@instanceDetail_backupRsyncMissing": { "description": "rsync not found hint" },
+  "instanceDetail_backupHistory": "Backup history",
+  "@instanceDetail_backupHistory": { "description": "Backup history title" },
+  "instanceDetail_backupHistorySummary": "{count} backups · {size} on disk",
+  "@instanceDetail_backupHistorySummary": {
+    "description": "Backup count and disk usage",
+    "placeholders": {
+      "count": { "type": "int" },
+      "size": { "type": "String" }
+    }
+  },
+  "instanceDetail_backupEmpty": "No backups yet. Use the buttons above to create the first one.",
+  "@instanceDetail_backupEmpty": { "description": "Empty backup list hint" },
+  "instanceDetail_backupLoading": "Loading backups…",
+  "@instanceDetail_backupLoading": { "description": "Loading backup list" },
+  "instanceDetail_backupLoadFailed": "Failed to load backups: {error}",
+  "@instanceDetail_backupLoadFailed": {
+    "description": "Backup list load failed",
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "instanceDetail_backupRunningFull": "Running full backup",
+  "@instanceDetail_backupRunningFull": { "description": "Full backup in progress" },
+  "instanceDetail_backupRunningIncremental": "Running incremental backup",
+  "@instanceDetail_backupRunningIncremental": { "description": "Incremental backup in progress" },
+  "instanceDetail_backupRestoring": "Restoring backup",
+  "@instanceDetail_backupRestoring": { "description": "Restore in progress" },
+  "instanceDetail_backupVerifying": "Verifying backup",
+  "@instanceDetail_backupVerifying": { "description": "Verification in progress" },
+  "instanceDetail_backupCancel": "Cancel",
+  "@instanceDetail_backupCancel": { "description": "Cancel backup operation" },
+  "instanceDetail_backupProgressHint": "Backups run on a background thread and can be cancelled at any time",
+  "@instanceDetail_backupProgressHint": { "description": "Backup progress hint" },
+  "instanceDetail_backupElapsed": "{seconds}s elapsed",
+  "@instanceDetail_backupElapsed": {
+    "description": "Elapsed time",
+    "placeholders": { "seconds": { "type": "String" } }
+  },
+  "instanceDetail_backupFullDone": "Full backup completed: {name}",
+  "@instanceDetail_backupFullDone": {
+    "description": "Full backup completed",
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "instanceDetail_backupIncrementalDone": "Incremental backup completed: {name} ({added} added, {reused} reused)",
+  "@instanceDetail_backupIncrementalDone": {
+    "description": "Incremental backup completed",
+    "placeholders": {
+      "name": { "type": "String" },
+      "added": { "type": "String" },
+      "reused": { "type": "String" }
+    }
+  },
+  "instanceDetail_backupKindFull": "Full",
+  "@instanceDetail_backupKindFull": { "description": "Full backup kind" },
+  "instanceDetail_backupKindIncremental": "Incremental",
+  "@instanceDetail_backupKindIncremental": { "description": "Incremental backup kind" },
+  "instanceDetail_backupKindLabel": "Type",
+  "@instanceDetail_backupKindLabel": { "description": "Backup details: type" },
+  "instanceDetail_backupDetailTitle": "Backup details",
+  "@instanceDetail_backupDetailTitle": { "description": "Backup details dialog title" },
+  "instanceDetail_backupRestore": "Restore",
+  "@instanceDetail_backupRestore": { "description": "Restore backup" },
+  "instanceDetail_backupVerify": "Verify",
+  "@instanceDetail_backupVerify": { "description": "Verify backup" },
+  "instanceDetail_backupRestoreConfirmTitle": "Restore backup?",
+  "@instanceDetail_backupRestoreConfirmTitle": { "description": "Restore confirm title" },
+  "instanceDetail_backupRestoreConfirmContent": "\"{name}\" will overwrite files with the same name in the instance directory. Stop the instance first if possible.",
+  "@instanceDetail_backupRestoreConfirmContent": {
+    "description": "Restore confirm description",
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "instanceDetail_backupRestoreStopHint": "The instance is running: restored files may be overwritten or locked. Consider stopping it first.",
+  "@instanceDetail_backupRestoreStopHint": { "description": "Restore while instance running hint" },
+  "instanceDetail_backupRestoreDone": "Restore completed: {files} files",
+  "@instanceDetail_backupRestoreDone": {
+    "description": "Restore completed",
+    "placeholders": { "files": { "type": "String" } }
+  },
+  "instanceDetail_backupDeleteConfirmTitle": "Delete backup?",
+  "@instanceDetail_backupDeleteConfirmTitle": { "description": "Delete confirm title" },
+  "instanceDetail_backupDeleteConfirmContent": "\"{name}\" will be deleted permanently.",
+  "@instanceDetail_backupDeleteConfirmContent": {
+    "description": "Delete confirm description",
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "instanceDetail_backupDeleted": "Backup deleted",
+  "@instanceDetail_backupDeleted": { "description": "Delete completed" },
+  "instanceDetail_backupVerifyOk": "Verification passed: {checked} files",
+  "@instanceDetail_backupVerifyOk": {
+    "description": "Verification passed",
+    "placeholders": { "checked": { "type": "String" } }
+  },
+  "instanceDetail_backupVerifyFailed": "Verification found {count} problems",
+  "@instanceDetail_backupVerifyFailed": {
+    "description": "Verification failed",
+    "placeholders": { "count": { "type": "String" } }
+  },
+  "instanceDetail_backupVerifyDetail": "Hashed {hashed} files · Strategy: {strategy}",
+  "@instanceDetail_backupVerifyDetail": {
+    "description": "Verification details",
+    "placeholders": {
+      "hashed": { "type": "String" },
+      "strategy": { "type": "String" }
+    }
+  },
+  "instanceDetail_backupSize": "Logical size",
+  "@instanceDetail_backupSize": { "description": "Backup logical size" },
+  "instanceDetail_backupStoredSize": "On disk",
+  "@instanceDetail_backupStoredSize": { "description": "Backup disk usage" },
+  "instanceDetail_backupCreatedAt": "Created",
+  "@instanceDetail_backupCreatedAt": { "description": "Backup creation time" },
+  "instanceDetail_backupDuration": "Duration",
+  "@instanceDetail_backupDuration": { "description": "Backup duration" },
+  "instanceDetail_backupSecondsUnit": "s",
+  "@instanceDetail_backupSecondsUnit": { "description": "Seconds unit" },
+  "instanceDetail_backupStrategy": "Strategy",
+  "@instanceDetail_backupStrategy": { "description": "Backup strategy" },
+  "instanceDetail_backupParent": "Incremental base",
+  "@instanceDetail_backupParent": { "description": "Incremental base snapshot" },
+  "instanceDetail_backupNoParent": "First snapshot (stored in full)",
+  "@instanceDetail_backupNoParent": { "description": "No parent snapshot" },
+  "instanceDetail_backupChangeLabel": "Changes",
+  "@instanceDetail_backupChangeLabel": { "description": "Change stats label" },
+  "instanceDetail_backupChangeStats": "{added} added · {modified} modified · {deleted} deleted · {unchanged} unchanged",
+  "@instanceDetail_backupChangeStats": {
+    "description": "Incremental change stats",
+    "placeholders": {
+      "added": { "type": "String" },
+      "modified": { "type": "String" },
+      "deleted": { "type": "String" },
+      "unchanged": { "type": "String" }
+    }
+  },
+  "instanceDetail_backupFileCount": "{count} files",
+  "@instanceDetail_backupFileCount": {
+    "description": "File count",
+    "placeholders": { "count": { "type": "String" } }
+  },
+  "instanceDetail_backupFileCountLabel": "Files",
+  "@instanceDetail_backupFileCountLabel": { "description": "File count label" },
+  "instanceDetail_backupCompression": "Compression level",
+  "@instanceDetail_backupCompression": { "description": "Full backup compression level" },
+  "instanceDetail_backupNote": "Note",
+  "@instanceDetail_backupNote": { "description": "Backup note" },
+  "instanceDetail_backupSymlinksSkipped": "{count} symlinks skipped",
+  "@instanceDetail_backupSymlinksSkipped": {
+    "description": "Skipped symlink count",
+    "placeholders": { "count": { "type": "String" } }
   }
 }

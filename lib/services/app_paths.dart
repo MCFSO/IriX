@@ -81,6 +81,19 @@ class AppPaths {
   Future<String> containerExportsRoot() async =>
       p.join(await root(), 'container_exports');
 
+  /// 备份仓库根目录（每个实例一个子目录）。
+  Future<String> backupsRoot() async => p.join(await root(), 'backups');
+
+  /// 指定实例的备份仓库目录。
+  ///
+  /// 仓库内由 Rust（`xmc_backup`）维护：`full/`（全量 ZIP 归档）、
+  /// `snapshots/`（硬链接快照文件树）、`cas/`（内容寻址对象）、`meta/`（清单）。
+  Future<String> instanceBackupsRoot(String instanceId) async {
+    // 实例 id 只含 base36 字符，这里再兜一层，避免任何路径分隔符进入仓库路径。
+    final safe = instanceId.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+    return p.join(await backupsRoot(), safe);
+  }
+
   /// 原生插件根目录（插件包解压后按插件 id 分目录存放）。
   Future<String> pluginsRoot() async =>
       p.join(await root(), 'plugins', 'native');

@@ -3445,12 +3445,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String instanceDetail_backupSaved(String path) {
-    return 'Backup saved to';
+    return 'Backup saved to $path';
   }
 
   @override
   String instanceDetail_backupFailed(String error) {
-    return 'Backup failed:';
+    return 'Backup failed: $error';
   }
 
   @override
@@ -5011,5 +5011,219 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String nodeDevices_loadFailed(String message) {
     return 'Failed to load devices: $message';
+  }
+
+  @override
+  String get instanceDetail_backupFull => 'Full Backup';
+
+  @override
+  String get instanceDetail_backupFullDesc =>
+      'Pack the whole instance directory into a ZIP archive';
+
+  @override
+  String get instanceDetail_backupIncremental => 'Incremental Backup';
+
+  @override
+  String get instanceDetail_backupIncrementalDesc =>
+      'Only store what changed since the last snapshot';
+
+  @override
+  String get instanceDetail_backupRepoLabel => 'Backup repository';
+
+  @override
+  String get instanceDetail_backupIncrementalMode => 'Incremental mode';
+
+  @override
+  String get instanceDetail_backupStrategyRsync => 'Rsync hardlink snapshot';
+
+  @override
+  String get instanceDetail_backupStrategyHardlink =>
+      'Native Rust hardlink snapshot';
+
+  @override
+  String get instanceDetail_backupStrategyCas =>
+      'Hash comparison + content-addressable storage';
+
+  @override
+  String get instanceDetail_backupStrategyZip => 'ZIP archive';
+
+  @override
+  String get instanceDetail_backupRsyncMissing =>
+      'rsync not found: incremental backups fall back to the native Rust hardlink snapshot';
+
+  @override
+  String get instanceDetail_backupHistory => 'Backup history';
+
+  @override
+  String instanceDetail_backupHistorySummary(int count, String size) {
+    return '$count backups · $size on disk';
+  }
+
+  @override
+  String get instanceDetail_backupEmpty =>
+      'No backups yet. Use the buttons above to create the first one.';
+
+  @override
+  String get instanceDetail_backupLoading => 'Loading backups…';
+
+  @override
+  String instanceDetail_backupLoadFailed(String error) {
+    return 'Failed to load backups: $error';
+  }
+
+  @override
+  String get instanceDetail_backupRunningFull => 'Running full backup';
+
+  @override
+  String get instanceDetail_backupRunningIncremental =>
+      'Running incremental backup';
+
+  @override
+  String get instanceDetail_backupRestoring => 'Restoring backup';
+
+  @override
+  String get instanceDetail_backupVerifying => 'Verifying backup';
+
+  @override
+  String get instanceDetail_backupCancel => 'Cancel';
+
+  @override
+  String get instanceDetail_backupProgressHint =>
+      'Backups run on a background thread and can be cancelled at any time';
+
+  @override
+  String instanceDetail_backupElapsed(String seconds) {
+    return '${seconds}s elapsed';
+  }
+
+  @override
+  String instanceDetail_backupFullDone(String name) {
+    return 'Full backup completed: $name';
+  }
+
+  @override
+  String instanceDetail_backupIncrementalDone(
+    String name,
+    String added,
+    String reused,
+  ) {
+    return 'Incremental backup completed: $name ($added added, $reused reused)';
+  }
+
+  @override
+  String get instanceDetail_backupKindFull => 'Full';
+
+  @override
+  String get instanceDetail_backupKindIncremental => 'Incremental';
+
+  @override
+  String get instanceDetail_backupKindLabel => 'Type';
+
+  @override
+  String get instanceDetail_backupDetailTitle => 'Backup details';
+
+  @override
+  String get instanceDetail_backupRestore => 'Restore';
+
+  @override
+  String get instanceDetail_backupVerify => 'Verify';
+
+  @override
+  String get instanceDetail_backupRestoreConfirmTitle => 'Restore backup?';
+
+  @override
+  String instanceDetail_backupRestoreConfirmContent(String name) {
+    return '\"$name\" will overwrite files with the same name in the instance directory. Stop the instance first if possible.';
+  }
+
+  @override
+  String get instanceDetail_backupRestoreStopHint =>
+      'The instance is running: restored files may be overwritten or locked. Consider stopping it first.';
+
+  @override
+  String instanceDetail_backupRestoreDone(String files) {
+    return 'Restore completed: $files files';
+  }
+
+  @override
+  String get instanceDetail_backupDeleteConfirmTitle => 'Delete backup?';
+
+  @override
+  String instanceDetail_backupDeleteConfirmContent(String name) {
+    return '\"$name\" will be deleted permanently.';
+  }
+
+  @override
+  String get instanceDetail_backupDeleted => 'Backup deleted';
+
+  @override
+  String instanceDetail_backupVerifyOk(String checked) {
+    return 'Verification passed: $checked files';
+  }
+
+  @override
+  String instanceDetail_backupVerifyFailed(String count) {
+    return 'Verification found $count problems';
+  }
+
+  @override
+  String instanceDetail_backupVerifyDetail(String hashed, String strategy) {
+    return 'Hashed $hashed files · Strategy: $strategy';
+  }
+
+  @override
+  String get instanceDetail_backupSize => 'Logical size';
+
+  @override
+  String get instanceDetail_backupStoredSize => 'On disk';
+
+  @override
+  String get instanceDetail_backupCreatedAt => 'Created';
+
+  @override
+  String get instanceDetail_backupDuration => 'Duration';
+
+  @override
+  String get instanceDetail_backupSecondsUnit => 's';
+
+  @override
+  String get instanceDetail_backupStrategy => 'Strategy';
+
+  @override
+  String get instanceDetail_backupParent => 'Incremental base';
+
+  @override
+  String get instanceDetail_backupNoParent => 'First snapshot (stored in full)';
+
+  @override
+  String get instanceDetail_backupChangeLabel => 'Changes';
+
+  @override
+  String instanceDetail_backupChangeStats(
+    String added,
+    String modified,
+    String deleted,
+    String unchanged,
+  ) {
+    return '$added added · $modified modified · $deleted deleted · $unchanged unchanged';
+  }
+
+  @override
+  String instanceDetail_backupFileCount(String count) {
+    return '$count files';
+  }
+
+  @override
+  String get instanceDetail_backupFileCountLabel => 'Files';
+
+  @override
+  String get instanceDetail_backupCompression => 'Compression level';
+
+  @override
+  String get instanceDetail_backupNote => 'Note';
+
+  @override
+  String instanceDetail_backupSymlinksSkipped(String count) {
+    return '$count symlinks skipped';
   }
 }

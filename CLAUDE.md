@@ -57,7 +57,7 @@ Twelve Rust crates compiled as separate `.dll`/`.so`/`.dylib` files. Dart FFI wr
 
 | Crate | Dart wrapper | Purpose |
 |-------|-------------|---------|
-| `backup` | `backup_ffi.dart` | ZIP parallel compress/decompress |
+| `backup` | `backup_ffi.dart` → `backup_manager.dart` | Instance backup: full (parallel ZIP) + incremental (rsync hardlink snapshots / SHA-256 + CAS) |
 | `downloader` | `downloader.dart` | HTTP streaming/chunked download with resume |
 | `http_client` | `http_ffi.dart` | General HTTP (GET/POST/PUT/PATCH/DELETE/HEAD) |
 | `file_ops` | `file_ops_ffi.dart` | File scan, move, trash |
@@ -73,6 +73,38 @@ Twelve Rust crates compiled as separate `.dll`/`.so`/`.dylib` files. Dart FFI wr
 **All HTTP goes through Rust** — `HttpFfiService` for general requests, `Downloader.downloadFile` for large files. Do NOT add `package:http` in Dart. Exception: local loopback servers (OAuth callback, MCP server) use `dart:io HttpServer`.
 
 **All remote DB goes through Rust** — `DbClientFfi.instance.request()` with op string. `RemoteDatabaseService` is the sole business-logic entry point for DB operations. Do NOT add Dart DB client packages.
+
+### Instance backup: full + incremental (all in Rust)
+
+`backup` (`xmc_backup`) owns both backup kinds; Dart never walks/copies files itself.
+The instance "备份" tab (`screens/instance_backup_tab.dart`) has **exactly two action
+buttons**: 全量备份 (full) and 增量备份 (incremental). Below them is a read-only backup
+history list — tapping a row opens a dialog with restore / verify / delete.
+
+- **Repository layout** (per instance, via `AppPaths.instanceBackupsRoot(id)` →
+  `<data root>/backups/<instance id>/`): `full/` (ZIP + summary), `snapshots/<name>/`
+  (hardlink trees), `cas/<xx>/<sha256>` (content-addressed objects), `meta/`
+  (snapshot summary + manifest), `temp/` (rsync logs, CAS temp files).
+- **Full backup** = the original feature: the whole instance directory is Deflate
+  compressed in parallel (rayon) into one ZIP (`backup_directory` still exported for
+  compatibility). Restore unzips it back (zip-slip guarded).
+- **Incremental backup**, chosen by platform inside Rust:
+  - Linux/macOS — `rsync -rlpt --link-dest=<previous snapshot> <src>/ <snapshot>/`
+    so unchanged files become hardlinks into the previous snapshot. `--info=progress2`
+    is used when rsync ≥ 3.1 (parsed from a redirected log file for progress); when
+    rsync is missing or fails, Rust falls back to its own hardlink snapshot.
+  - Windows — SHA-256 per file (`sha2`), content objects stored once under `cas/`
+    (dedupe across snapshots), snapshot = manifest of path → hash. Deleting a
+    snapshot runs a GC pass that removes unreferenced objects.
+- **FFI**: single entry `backup_request(op, argsJson, progressCb) -> *mut c_char`
+  returning `{"ok":true,"data":{…}}` / `{"ok":false,"error":…,"cancelled":bool}`;
+  ops: `status`, `full_create`, `full_restore`, `full_delete`, `snapshot_create`,
+  `snapshot_restore`, `snapshot_verify`, `snapshot_delete`, `gc`. `backup_ffi.dart`
+  runs it in a background isolate with a `NativeCallable` progress callback and
+  `cancel_backup()`; `backup_manager.dart` is the business entry point (paths,
+  models, progress mapping).
+- **Tests**: `cargo test -p xmc_backup` (CAS dedupe/GC, hardlink snapshots, ZIP
+  roundtrip, name traversal rejection) and `test/backup_ffi_test.dart`.
 
 ### Adding a new Rust crate
 

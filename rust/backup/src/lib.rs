@@ -1,8 +1,15 @@
-//! XMC Server Launcher 备份压缩模块
+//! XMC Server Launcher 备份模块
 //!
-//! 提供 ZIP (Deflate) 格式的压缩功能，供 Flutter 通过 FFI 调用。
-//! 使用 rayon 并行压缩多个文件，再串行写入标准 ZIP 归档，
-//! 输出可被任意标准工具解压的 .zip 文件。
+//! 提供两类备份能力，供 Flutter 通过 FFI 调用（全部在 Rust 侧实现）：
+//!
+//! 1. **全量备份**（原备份功能）：把整个实例目录用 rayon 并行 Deflate 压缩成标准
+//!    ZIP 归档，可被任意标准工具解压（[`do_backup`] / `backup_directory`）。
+//! 2. **增量备份**：Linux/macOS 用 `rsync --link-dest` 硬链接快照（rsync 不可用时
+//!    回退到 Rust 原生硬链接快照），Windows 用 SHA-256 哈希比对 + 内容寻址存储（CAS）；
+//!    统一入口为 `backup_request(op, argsJson, progressCb)`，返回 JSON。
+//!
+//! 两类备份都落在同一个“备份仓库”里（布局见 `repo.rs`），
+//! Dart 侧通过 `lib/services/backup_manager.dart` 使用。
 
 use std::cell::RefCell;
 use std::ffi::{CStr, CString};
@@ -19,13 +26,42 @@ use flate2::Compression;
 use rayon::prelude::*;
 use walkdir::WalkDir;
 
+mod api;
+mod cas;
+mod full;
+mod hardlink;
+mod hash;
+mod model;
+mod progress;
+mod repo;
+mod rsync;
+mod scan;
+mod snapshot;
+mod util;
+
+use progress::ProgressCallback;
+
 thread_local! {
     static LAST_ERROR: RefCell<Option<CString>> = const { RefCell::new(None) };
 }
 
 static CANCELLED: AtomicBool = AtomicBool::new(false);
+static TEMP_ID: AtomicU64 = AtomicU64::new(0);
 
-type ProgressCallback = extern "C" fn(u64, u64);
+/// 是否已请求取消（供各策略轮询）。
+pub(crate) fn cancel_requested() -> bool {
+    CANCELLED.load(Ordering::SeqCst)
+}
+
+/// 清空取消标志（每个新任务开始时调用）。
+pub(crate) fn clear_cancel() {
+    CANCELLED.store(false, Ordering::SeqCst);
+}
+
+/// 生成本进程内唯一的临时文件序号。
+pub(crate) fn next_temp_id() -> u64 {
+    TEMP_ID.fetch_add(1, Ordering::Relaxed)
+}
 
 fn set_last_error(msg: impl AsRef<str>) {
     LAST_ERROR.with(|cell| {
@@ -70,7 +106,7 @@ fn backup_directory_impl(
     compression_level: u32,
     progress_cb: ProgressCallback,
 ) -> libc::c_int {
-    CANCELLED.store(false, Ordering::SeqCst);
+    clear_cancel();
 
     if src_path.is_null() {
         set_last_error("源路径为空指针");
@@ -110,9 +146,9 @@ fn backup_directory_impl(
     }
 
     let level = compression_level.min(9);
-    match do_backup(src, dst, &files, level, progress_cb) {
+    match do_backup(src, dst, &files, level, Some(progress_cb), None) {
         Ok(_) => 0,
-        Err(e) if e.kind() == io::ErrorKind::Other && e.to_string() == "cancelled" => 3,
+        Err(e) if progress::is_cancel_error(&e) => 3,
         Err(e) => {
             set_last_error(e.to_string());
             2
@@ -148,6 +184,13 @@ pub extern "C" fn free_string(s: *mut libc::c_char) {
     }
 }
 
+/// 全量备份统计（压缩文件数 + 源字节数）。
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct ZipStats {
+    pub(crate) files: u64,
+    pub(crate) bytes_total: u64,
+}
+
 struct Entry {
     name: String,
     compressed: Vec<u8>,
@@ -164,22 +207,29 @@ struct FileToCompress {
     modified: Option<std::time::SystemTime>,
 }
 
-fn do_backup(
+/// 全量备份：把 [src_dir] 下 [files] 指定的条目（文件/目录）压缩为 ZIP。
+///
+/// [exclude] 用于跳过位于源目录内部的备份仓库（避免把自己打包进去）。
+pub(crate) fn do_backup(
     src_dir: &str,
     dst_file: &str,
     files: &[&str],
     compression_level: u32,
-    progress_cb: ProgressCallback,
-) -> io::Result<()> {
-    let result = do_backup_inner(src_dir, dst_file, files, compression_level, progress_cb);
-    if is_cancelled_err(&result) {
+    progress_cb: Option<ProgressCallback>,
+    exclude: Option<&Path>,
+) -> io::Result<ZipStats> {
+    let result = do_backup_inner(
+        src_dir,
+        dst_file,
+        files,
+        compression_level,
+        progress_cb,
+        exclude,
+    );
+    if matches!(&result, Err(e) if progress::is_cancel_error(e)) {
         let _ = fs::remove_file(dst_file);
     }
     result
-}
-
-fn is_cancelled_err(result: &io::Result<()>) -> bool {
-    matches!(result, Err(e) if e.kind() == io::ErrorKind::Other && e.to_string() == "cancelled")
 }
 
 fn do_backup_inner(
@@ -187,18 +237,37 @@ fn do_backup_inner(
     dst_file: &str,
     files: &[&str],
     compression_level: u32,
-    progress_cb: ProgressCallback,
-) -> io::Result<()> {
+    progress_cb: Option<ProgressCallback>,
+    exclude: Option<&Path>,
+) -> io::Result<ZipStats> {
     let src_path = Path::new(src_dir);
     let dst_path = Path::new(dst_file);
+    // Windows 上 canonicalize 会返回 `\\?\` verbatim 前缀，必须让遍历路径与
+    // 排除路径处于同一形态（都 canonicalize），前缀比较才成立。
+    let src_canonical = src_path
+        .canonicalize()
+        .unwrap_or_else(|_| src_path.to_path_buf());
+    let exclude = exclude.and_then(|p| p.canonicalize().ok());
 
     // 1. 收集所有待压缩文件并预取 metadata（一次 syscall 完成）
     let mut to_compress: Vec<FileToCompress> = Vec::new();
     let mut estimated_total: u64 = 0;
     for file_name in files {
-        let full_path = src_path.join(file_name);
+        let full_path = src_canonical.join(file_name);
         if full_path.exists() {
-            for entry in WalkDir::new(&full_path).into_iter().filter_map(|e| e.ok()) {
+            let walker = WalkDir::new(&full_path).into_iter().filter_entry(|entry| {
+                if entry.depth() == 0 {
+                    return true;
+                }
+                match exclude.as_deref() {
+                    Some(ex) => {
+                        let path = entry.path();
+                        !(path == ex || path.starts_with(ex))
+                    }
+                    None => true,
+                }
+            });
+            for entry in walker.filter_map(|e| e.ok()) {
                 if entry.file_type().is_file() {
                     let meta = entry.metadata();
                     let size = meta.as_ref().map(|m| m.len()).unwrap_or(0);
@@ -213,6 +282,10 @@ fn do_backup_inner(
             }
         }
     }
+    let stats = ZipStats {
+        files: to_compress.len() as u64,
+        bytes_total: estimated_total,
+    };
     let total_bytes = AtomicU64::new(estimated_total);
     let processed_bytes = AtomicU64::new(0);
 
@@ -227,12 +300,12 @@ fn do_backup_inner(
     let entries: Vec<Entry> = to_compress
         .par_iter()
         .map(|fc| -> io::Result<Entry> {
-            if CANCELLED.load(Ordering::SeqCst) {
-                return Err(io::Error::new(io::ErrorKind::Other, "cancelled"));
+            if cancel_requested() {
+                return Err(progress::cancelled_error());
             }
 
             let path = &fc.path_buf;
-            let rel_path = strip_prefix_fast(path, src_path);
+            let rel_path = strip_prefix_fast(path, &src_canonical);
             let name = path_to_zip_name(&rel_path);
 
             let mut file = File::open(path)?;
@@ -250,8 +323,10 @@ fn do_backup_inner(
                 hasher.finalize()
             };
 
-            let mut encoder =
-                DeflateEncoder::new(Vec::with_capacity(data.len() / 2), Compression::new(compression_level));
+            let mut encoder = DeflateEncoder::new(
+                Vec::with_capacity(data.len() / 2),
+                Compression::new(compression_level),
+            );
             encoder.write_all(&data)?;
             let compressed = encoder.finish()?;
 
@@ -262,7 +337,12 @@ fn do_backup_inner(
                 .unwrap_or((0, 0x0021));
 
             let new_processed = processed_bytes.fetch_add(real_size, Ordering::Relaxed) + real_size;
-            progress_cb(new_processed, total_bytes.load(Ordering::Relaxed));
+            if let Some(cb) = progress_cb {
+                cb(
+                    new_processed.min(total_bytes.load(Ordering::Relaxed)),
+                    total_bytes.load(Ordering::Relaxed),
+                );
+            }
 
             Ok(Entry {
                 name,
@@ -277,8 +357,8 @@ fn do_backup_inner(
 
     // 4. 串行写入 ZIP
     for entry in &entries {
-        if CANCELLED.load(Ordering::SeqCst) {
-            return Err(io::Error::new(io::ErrorKind::Other, "cancelled"));
+        if cancel_requested() {
+            return Err(progress::cancelled_error());
         }
         write_entry(buffer, entry, &mut offset, &mut central_dir)?;
     }
@@ -354,7 +434,7 @@ fn do_backup_inner(
     buffer.write_all(&0u16.to_le_bytes())?;
 
     buffer.flush()?;
-    Ok(())
+    Ok(stats)
 }
 
 fn write_entry(
@@ -392,9 +472,7 @@ fn write_entry(
     };
 
     writer.write_all(&0x04034b50u32.to_le_bytes())?;
-    writer.write_all(
-        &(if needs_entry_zip64 { 45u16 } else { 20u16 }).to_le_bytes(),
-    )?;
+    writer.write_all(&(if needs_entry_zip64 { 45u16 } else { 20u16 }).to_le_bytes())?;
     writer.write_all(&0u16.to_le_bytes())?;
     writer.write_all(&8u16.to_le_bytes())?;
     writer.write_all(&entry.dos_time.to_le_bytes())?;
@@ -461,12 +539,8 @@ fn write_entry(
     };
 
     central_dir.extend_from_slice(&0x02014b50u32.to_le_bytes());
-    central_dir.extend_from_slice(
-        &(if any_cd_zip64 { 45u16 } else { 20u16 }).to_le_bytes(),
-    );
-    central_dir.extend_from_slice(
-        &(if any_cd_zip64 { 45u16 } else { 20u16 }).to_le_bytes(),
-    );
+    central_dir.extend_from_slice(&(if any_cd_zip64 { 45u16 } else { 20u16 }).to_le_bytes());
+    central_dir.extend_from_slice(&(if any_cd_zip64 { 45u16 } else { 20u16 }).to_le_bytes());
     central_dir.extend_from_slice(&0u16.to_le_bytes());
     central_dir.extend_from_slice(&8u16.to_le_bytes());
     central_dir.extend_from_slice(&entry.dos_time.to_le_bytes());
@@ -521,7 +595,7 @@ fn epoch_to_dos(secs: u64) -> (u16, u16) {
     (dos_time, dos_date)
 }
 
-fn civil_from_days(z: i64) -> (i64, u32, u32) {
+pub(crate) fn civil_from_days(z: i64) -> (i64, u32, u32) {
     let z = z + 719468;
     let era = if z >= 0 { z } else { z - 146096 } / 146097;
     let doe = (z - era * 146097) as i64;
@@ -554,14 +628,17 @@ mod tests {
         fs::write(src.join("b.txt"), &content_b).unwrap();
 
         let dst = tmp.join("out.zip");
-        let result = do_backup(
+        let stats = do_backup(
             src.to_str().unwrap(),
             dst.to_str().unwrap(),
             &["a.txt", "b.txt"],
             6,
-            noop_cb,
-        );
-        assert!(result.is_ok(), "do_backup 失败: {:?}", result.err());
+            Some(noop_cb),
+            None,
+        )
+        .expect("do_backup 失败");
+        assert_eq!(stats.files, 2);
+        assert_eq!(stats.bytes_total, (content_a.len() + content_b.len()) as u64);
 
         let file = File::open(&dst).unwrap();
         let mut archive = zip::ZipArchive::new(file).expect("生成的 zip 无法被 zip crate 读取");
@@ -583,6 +660,35 @@ mod tests {
             buf
         };
         assert_eq!(buf_b, content_b, "b.txt 内容/CRC 不匹配");
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn do_backup_excludes_repo_subtree() {
+        let tmp = std::env::temp_dir().join(format!("xmc_backup_exclude_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        let src = tmp.join("src");
+        let repo = src.join("backups");
+        fs::create_dir_all(&repo).unwrap();
+        fs::write(src.join("a.txt"), b"a").unwrap();
+        fs::write(repo.join("old.zip"), b"zip").unwrap();
+
+        let dst = tmp.join("out.zip");
+        let stats = do_backup(
+            src.to_str().unwrap(),
+            dst.to_str().unwrap(),
+            &["a.txt", "backups"],
+            6,
+            None,
+            Some(&repo),
+        )
+        .unwrap();
+        assert_eq!(stats.files, 1, "仓库目录应被排除");
+
+        let file = File::open(&dst).unwrap();
+        let archive = zip::ZipArchive::new(file).unwrap();
+        assert_eq!(archive.len(), 1);
 
         let _ = fs::remove_dir_all(&tmp);
     }

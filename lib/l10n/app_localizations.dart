@@ -6094,13 +6094,13 @@ abstract class AppLocalizations {
   /// No description provided for @instanceDetail_backupSaved.
   ///
   /// In zh, this message translates to:
-  /// **'备份已保存到'**
+  /// **'备份已保存到 {path}'**
   String instanceDetail_backupSaved(String path);
 
   /// No description provided for @instanceDetail_backupFailed.
   ///
   /// In zh, this message translates to:
-  /// **'备份失败:'**
+  /// **'备份失败：{error}'**
   String instanceDetail_backupFailed(String error);
 
   /// No description provided for @instanceDetail_errorCode.
@@ -8662,6 +8662,351 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'加载设备列表失败：{message}'**
   String nodeDevices_loadFailed(String message);
+
+  /// 备份页：全量备份按钮
+  ///
+  /// In zh, this message translates to:
+  /// **'全量备份'**
+  String get instanceDetail_backupFull;
+
+  /// 备份页：全量备份按钮说明
+  ///
+  /// In zh, this message translates to:
+  /// **'整个实例目录打包为 ZIP 归档'**
+  String get instanceDetail_backupFullDesc;
+
+  /// 备份页：增量备份按钮
+  ///
+  /// In zh, this message translates to:
+  /// **'增量备份'**
+  String get instanceDetail_backupIncremental;
+
+  /// 备份页：增量备份按钮说明
+  ///
+  /// In zh, this message translates to:
+  /// **'只保存相对上次快照的变化内容'**
+  String get instanceDetail_backupIncrementalDesc;
+
+  /// 备份仓库路径标签
+  ///
+  /// In zh, this message translates to:
+  /// **'备份仓库'**
+  String get instanceDetail_backupRepoLabel;
+
+  /// 增量备份策略标签
+  ///
+  /// In zh, this message translates to:
+  /// **'增量方式'**
+  String get instanceDetail_backupIncrementalMode;
+
+  /// 增量策略：rsync 硬链接快照
+  ///
+  /// In zh, this message translates to:
+  /// **'Rsync 硬链接快照'**
+  String get instanceDetail_backupStrategyRsync;
+
+  /// 增量策略：原生硬链接快照
+  ///
+  /// In zh, this message translates to:
+  /// **'Rust 原生硬链接快照'**
+  String get instanceDetail_backupStrategyHardlink;
+
+  /// 增量策略：Windows 哈希比对 + CAS
+  ///
+  /// In zh, this message translates to:
+  /// **'哈希比对 + 内容寻址存储'**
+  String get instanceDetail_backupStrategyCas;
+
+  /// 全量备份策略名
+  ///
+  /// In zh, this message translates to:
+  /// **'ZIP 归档'**
+  String get instanceDetail_backupStrategyZip;
+
+  /// 未检测到 rsync 的提示
+  ///
+  /// In zh, this message translates to:
+  /// **'未检测到 rsync，增量备份使用 Rust 原生硬链接快照'**
+  String get instanceDetail_backupRsyncMissing;
+
+  /// 备份历史标题
+  ///
+  /// In zh, this message translates to:
+  /// **'备份历史'**
+  String get instanceDetail_backupHistory;
+
+  /// 备份历史数量与占用
+  ///
+  /// In zh, this message translates to:
+  /// **'{count} 个备份 · 实际占用 {size}'**
+  String instanceDetail_backupHistorySummary(int count, String size);
+
+  /// 备份为空时的提示
+  ///
+  /// In zh, this message translates to:
+  /// **'还没有备份，点击上方按钮创建第一个备份'**
+  String get instanceDetail_backupEmpty;
+
+  /// 读取备份列表
+  ///
+  /// In zh, this message translates to:
+  /// **'正在读取备份列表…'**
+  String get instanceDetail_backupLoading;
+
+  /// 读取备份列表失败
+  ///
+  /// In zh, this message translates to:
+  /// **'读取备份列表失败：{error}'**
+  String instanceDetail_backupLoadFailed(String error);
+
+  /// 全量备份进行中
+  ///
+  /// In zh, this message translates to:
+  /// **'正在全量备份'**
+  String get instanceDetail_backupRunningFull;
+
+  /// 增量备份进行中
+  ///
+  /// In zh, this message translates to:
+  /// **'正在增量备份'**
+  String get instanceDetail_backupRunningIncremental;
+
+  /// 恢复备份进行中
+  ///
+  /// In zh, this message translates to:
+  /// **'正在恢复备份'**
+  String get instanceDetail_backupRestoring;
+
+  /// 校验备份进行中
+  ///
+  /// In zh, this message translates to:
+  /// **'正在校验备份'**
+  String get instanceDetail_backupVerifying;
+
+  /// 取消备份操作
+  ///
+  /// In zh, this message translates to:
+  /// **'取消操作'**
+  String get instanceDetail_backupCancel;
+
+  /// 备份进度说明
+  ///
+  /// In zh, this message translates to:
+  /// **'备份在后台线程执行，可随时取消'**
+  String get instanceDetail_backupProgressHint;
+
+  /// 已用时间
+  ///
+  /// In zh, this message translates to:
+  /// **'已用 {seconds} 秒'**
+  String instanceDetail_backupElapsed(String seconds);
+
+  /// 全量备份完成提示
+  ///
+  /// In zh, this message translates to:
+  /// **'全量备份完成：{name}'**
+  String instanceDetail_backupFullDone(String name);
+
+  /// 增量备份完成提示
+  ///
+  /// In zh, this message translates to:
+  /// **'增量备份完成：{name}（新增 {added}，复用 {reused}）'**
+  String instanceDetail_backupIncrementalDone(
+    String name,
+    String added,
+    String reused,
+  );
+
+  /// 全量备份类型
+  ///
+  /// In zh, this message translates to:
+  /// **'全量'**
+  String get instanceDetail_backupKindFull;
+
+  /// 增量备份类型
+  ///
+  /// In zh, this message translates to:
+  /// **'增量'**
+  String get instanceDetail_backupKindIncremental;
+
+  /// 备份详情：类型
+  ///
+  /// In zh, this message translates to:
+  /// **'类型'**
+  String get instanceDetail_backupKindLabel;
+
+  /// 备份详情弹窗标题
+  ///
+  /// In zh, this message translates to:
+  /// **'备份详情'**
+  String get instanceDetail_backupDetailTitle;
+
+  /// 恢复备份
+  ///
+  /// In zh, this message translates to:
+  /// **'恢复'**
+  String get instanceDetail_backupRestore;
+
+  /// 校验备份
+  ///
+  /// In zh, this message translates to:
+  /// **'校验'**
+  String get instanceDetail_backupVerify;
+
+  /// 恢复确认标题
+  ///
+  /// In zh, this message translates to:
+  /// **'恢复备份？'**
+  String get instanceDetail_backupRestoreConfirmTitle;
+
+  /// 恢复确认说明
+  ///
+  /// In zh, this message translates to:
+  /// **'将用「{name}」覆盖实例目录中的同名文件，建议先停止实例再恢复。'**
+  String instanceDetail_backupRestoreConfirmContent(String name);
+
+  /// 实例运行中恢复提示
+  ///
+  /// In zh, this message translates to:
+  /// **'实例正在运行：恢复过程中写入的文件可能被服务器覆盖或锁定，建议先停止实例。'**
+  String get instanceDetail_backupRestoreStopHint;
+
+  /// 恢复完成提示
+  ///
+  /// In zh, this message translates to:
+  /// **'恢复完成：{files} 个文件'**
+  String instanceDetail_backupRestoreDone(String files);
+
+  /// 删除确认标题
+  ///
+  /// In zh, this message translates to:
+  /// **'删除备份？'**
+  String get instanceDetail_backupDeleteConfirmTitle;
+
+  /// 删除确认说明
+  ///
+  /// In zh, this message translates to:
+  /// **'将删除「{name}」，删除后无法找回。'**
+  String instanceDetail_backupDeleteConfirmContent(String name);
+
+  /// 删除完成提示
+  ///
+  /// In zh, this message translates to:
+  /// **'备份已删除'**
+  String get instanceDetail_backupDeleted;
+
+  /// 校验通过
+  ///
+  /// In zh, this message translates to:
+  /// **'校验通过：{checked} 个文件'**
+  String instanceDetail_backupVerifyOk(String checked);
+
+  /// 校验失败
+  ///
+  /// In zh, this message translates to:
+  /// **'校验发现 {count} 个问题'**
+  String instanceDetail_backupVerifyFailed(String count);
+
+  /// 校验明细
+  ///
+  /// In zh, this message translates to:
+  /// **'已比对内容哈希 {hashed} 个 · 策略：{strategy}'**
+  String instanceDetail_backupVerifyDetail(String hashed, String strategy);
+
+  /// 备份逻辑大小
+  ///
+  /// In zh, this message translates to:
+  /// **'逻辑大小'**
+  String get instanceDetail_backupSize;
+
+  /// 备份实际占用
+  ///
+  /// In zh, this message translates to:
+  /// **'实际占用'**
+  String get instanceDetail_backupStoredSize;
+
+  /// 备份创建时间
+  ///
+  /// In zh, this message translates to:
+  /// **'创建时间'**
+  String get instanceDetail_backupCreatedAt;
+
+  /// 备份耗时
+  ///
+  /// In zh, this message translates to:
+  /// **'耗时'**
+  String get instanceDetail_backupDuration;
+
+  /// 秒单位
+  ///
+  /// In zh, this message translates to:
+  /// **'秒'**
+  String get instanceDetail_backupSecondsUnit;
+
+  /// 备份策略
+  ///
+  /// In zh, this message translates to:
+  /// **'策略'**
+  String get instanceDetail_backupStrategy;
+
+  /// 增量基线快照
+  ///
+  /// In zh, this message translates to:
+  /// **'增量基线'**
+  String get instanceDetail_backupParent;
+
+  /// 没有父快照
+  ///
+  /// In zh, this message translates to:
+  /// **'首个快照（全量落盘）'**
+  String get instanceDetail_backupNoParent;
+
+  /// 变化统计标签
+  ///
+  /// In zh, this message translates to:
+  /// **'变化统计'**
+  String get instanceDetail_backupChangeLabel;
+
+  /// 增量备份变化统计
+  ///
+  /// In zh, this message translates to:
+  /// **'新增 {added} · 修改 {modified} · 删除 {deleted} · 未变 {unchanged}'**
+  String instanceDetail_backupChangeStats(
+    String added,
+    String modified,
+    String deleted,
+    String unchanged,
+  );
+
+  /// 文件数量
+  ///
+  /// In zh, this message translates to:
+  /// **'{count} 个文件'**
+  String instanceDetail_backupFileCount(String count);
+
+  /// 文件数标签
+  ///
+  /// In zh, this message translates to:
+  /// **'文件数'**
+  String get instanceDetail_backupFileCountLabel;
+
+  /// 全量备份压缩级别
+  ///
+  /// In zh, this message translates to:
+  /// **'压缩级别'**
+  String get instanceDetail_backupCompression;
+
+  /// 备份备注
+  ///
+  /// In zh, this message translates to:
+  /// **'备注'**
+  String get instanceDetail_backupNote;
+
+  /// 跳过的符号链接数量
+  ///
+  /// In zh, this message translates to:
+  /// **'已跳过 {count} 个符号链接'**
+  String instanceDetail_backupSymlinksSkipped(String count);
 }
 
 class _AppLocalizationsDelegate

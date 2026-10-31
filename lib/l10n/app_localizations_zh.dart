@@ -3317,12 +3317,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String instanceDetail_backupSaved(String path) {
-    return '备份已保存到';
+    return '备份已保存到 $path';
   }
 
   @override
   String instanceDetail_backupFailed(String error) {
-    return '备份失败:';
+    return '备份失败：$error';
   }
 
   @override
@@ -4827,5 +4827,212 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String nodeDevices_loadFailed(String message) {
     return '加载设备列表失败：$message';
+  }
+
+  @override
+  String get instanceDetail_backupFull => '全量备份';
+
+  @override
+  String get instanceDetail_backupFullDesc => '整个实例目录打包为 ZIP 归档';
+
+  @override
+  String get instanceDetail_backupIncremental => '增量备份';
+
+  @override
+  String get instanceDetail_backupIncrementalDesc => '只保存相对上次快照的变化内容';
+
+  @override
+  String get instanceDetail_backupRepoLabel => '备份仓库';
+
+  @override
+  String get instanceDetail_backupIncrementalMode => '增量方式';
+
+  @override
+  String get instanceDetail_backupStrategyRsync => 'Rsync 硬链接快照';
+
+  @override
+  String get instanceDetail_backupStrategyHardlink => 'Rust 原生硬链接快照';
+
+  @override
+  String get instanceDetail_backupStrategyCas => '哈希比对 + 内容寻址存储';
+
+  @override
+  String get instanceDetail_backupStrategyZip => 'ZIP 归档';
+
+  @override
+  String get instanceDetail_backupRsyncMissing =>
+      '未检测到 rsync，增量备份使用 Rust 原生硬链接快照';
+
+  @override
+  String get instanceDetail_backupHistory => '备份历史';
+
+  @override
+  String instanceDetail_backupHistorySummary(int count, String size) {
+    return '$count 个备份 · 实际占用 $size';
+  }
+
+  @override
+  String get instanceDetail_backupEmpty => '还没有备份，点击上方按钮创建第一个备份';
+
+  @override
+  String get instanceDetail_backupLoading => '正在读取备份列表…';
+
+  @override
+  String instanceDetail_backupLoadFailed(String error) {
+    return '读取备份列表失败：$error';
+  }
+
+  @override
+  String get instanceDetail_backupRunningFull => '正在全量备份';
+
+  @override
+  String get instanceDetail_backupRunningIncremental => '正在增量备份';
+
+  @override
+  String get instanceDetail_backupRestoring => '正在恢复备份';
+
+  @override
+  String get instanceDetail_backupVerifying => '正在校验备份';
+
+  @override
+  String get instanceDetail_backupCancel => '取消操作';
+
+  @override
+  String get instanceDetail_backupProgressHint => '备份在后台线程执行，可随时取消';
+
+  @override
+  String instanceDetail_backupElapsed(String seconds) {
+    return '已用 $seconds 秒';
+  }
+
+  @override
+  String instanceDetail_backupFullDone(String name) {
+    return '全量备份完成：$name';
+  }
+
+  @override
+  String instanceDetail_backupIncrementalDone(
+    String name,
+    String added,
+    String reused,
+  ) {
+    return '增量备份完成：$name（新增 $added，复用 $reused）';
+  }
+
+  @override
+  String get instanceDetail_backupKindFull => '全量';
+
+  @override
+  String get instanceDetail_backupKindIncremental => '增量';
+
+  @override
+  String get instanceDetail_backupKindLabel => '类型';
+
+  @override
+  String get instanceDetail_backupDetailTitle => '备份详情';
+
+  @override
+  String get instanceDetail_backupRestore => '恢复';
+
+  @override
+  String get instanceDetail_backupVerify => '校验';
+
+  @override
+  String get instanceDetail_backupRestoreConfirmTitle => '恢复备份？';
+
+  @override
+  String instanceDetail_backupRestoreConfirmContent(String name) {
+    return '将用「$name」覆盖实例目录中的同名文件，建议先停止实例再恢复。';
+  }
+
+  @override
+  String get instanceDetail_backupRestoreStopHint =>
+      '实例正在运行：恢复过程中写入的文件可能被服务器覆盖或锁定，建议先停止实例。';
+
+  @override
+  String instanceDetail_backupRestoreDone(String files) {
+    return '恢复完成：$files 个文件';
+  }
+
+  @override
+  String get instanceDetail_backupDeleteConfirmTitle => '删除备份？';
+
+  @override
+  String instanceDetail_backupDeleteConfirmContent(String name) {
+    return '将删除「$name」，删除后无法找回。';
+  }
+
+  @override
+  String get instanceDetail_backupDeleted => '备份已删除';
+
+  @override
+  String instanceDetail_backupVerifyOk(String checked) {
+    return '校验通过：$checked 个文件';
+  }
+
+  @override
+  String instanceDetail_backupVerifyFailed(String count) {
+    return '校验发现 $count 个问题';
+  }
+
+  @override
+  String instanceDetail_backupVerifyDetail(String hashed, String strategy) {
+    return '已比对内容哈希 $hashed 个 · 策略：$strategy';
+  }
+
+  @override
+  String get instanceDetail_backupSize => '逻辑大小';
+
+  @override
+  String get instanceDetail_backupStoredSize => '实际占用';
+
+  @override
+  String get instanceDetail_backupCreatedAt => '创建时间';
+
+  @override
+  String get instanceDetail_backupDuration => '耗时';
+
+  @override
+  String get instanceDetail_backupSecondsUnit => '秒';
+
+  @override
+  String get instanceDetail_backupStrategy => '策略';
+
+  @override
+  String get instanceDetail_backupParent => '增量基线';
+
+  @override
+  String get instanceDetail_backupNoParent => '首个快照（全量落盘）';
+
+  @override
+  String get instanceDetail_backupChangeLabel => '变化统计';
+
+  @override
+  String instanceDetail_backupChangeStats(
+    String added,
+    String modified,
+    String deleted,
+    String unchanged,
+  ) {
+    return '新增 $added · 修改 $modified · 删除 $deleted · 未变 $unchanged';
+  }
+
+  @override
+  String instanceDetail_backupFileCount(String count) {
+    return '$count 个文件';
+  }
+
+  @override
+  String get instanceDetail_backupFileCountLabel => '文件数';
+
+  @override
+  String get instanceDetail_backupCompression => '压缩级别';
+
+  @override
+  String get instanceDetail_backupNote => '备注';
+
+  @override
+  String instanceDetail_backupSymlinksSkipped(String count) {
+    return '已跳过 $count 个符号链接';
   }
 }
