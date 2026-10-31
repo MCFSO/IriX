@@ -53,7 +53,7 @@ All persistence goes through `DatabaseManager` (singleton, `sqflite_common_ffi`)
 
 ### Rust FFI layer
 
-Ten Rust crates compiled as separate `.dll`/`.so`/`.dylib` files. Dart FFI wrappers in `lib/services/`:
+Twelve Rust crates compiled as separate `.dll`/`.so`/`.dylib` files. Dart FFI wrappers in `lib/services/`:
 
 | Crate | Dart wrapper | Purpose |
 |-------|-------------|---------|
@@ -67,6 +67,8 @@ Ten Rust crates compiled as separate `.dll`/`.so`/`.dylib` files. Dart FFI wrapp
 | `nbt` | `nbt_ffi.dart` | Minecraft NBT encode/decode + tree editing |
 | `devlog` | `devlog_ffi.dart` | Developer-mode full log persistence |
 | `plugin_host` | `plugin_ffi.dart` | Native plugin host: C ABI loader, event dispatch, permission checks |
+| `orchestrator` | `orchestrator_ffi.dart` | K8s-style instance orchestration (reconcile, self-heal, autoscale) |
+| `device_auth` | `device_auth_ffi.dart` | Client device binding: ed25519/P-256 signing, HMAC request proofs, DPAPI-protected key |
 
 **All HTTP goes through Rust** — `HttpFfiService` for general requests, `Downloader.downloadFile` for large files. Do NOT add `package:http` in Dart. Exception: local loopback servers (OAuth callback, MCP server) use `dart:io HttpServer`.
 
@@ -122,6 +124,36 @@ the instance page), backed by `plugin_service.dart` → `plugin_ffi.dart`.
 - **Example plugin**: `plugins/example_plugin/` (standalone crate, not a workspace member
   since it is shipped as a zip rather than bundled as an FFI lib); package with
   `build_and_package.ps1`. FFI flow test: `test/plugin_ffi_test.dart`.
+
+### Client device binding (irix-node v1.4.0+)
+
+`device_auth` (`xmc_device_auth`) implements the client half of irix-node's
+`docs/device-binding.md`: every install gets an ed25519 (or P-256) key pair whose
+private half never leaves Rust (`dev_auth_request(op, args)`), Windows seals it with
+DPAPI (`keyProtection=os-keychain`), other platforms use a 0600 file (`file`).
+
+- **Dart layers**: `device_auth_ffi.dart` (FFI) → `device_auth.dart` (keys, sign,
+  HMAC, binding records in settings `node_device_bindings`, TLS-fingerprint TOFU) →
+  `device_auth_canonical.dart` (byte-exact canonical strings / descriptor) →
+  `node_device_service.dart` (bind / unbind / revoke orchestration).
+- **Login**: when a binding exists for the node, `NodeApiClient._login()` requests a
+  `login` challenge, verifies `tlsFingerprint` **before** signing or sending the
+  password, signs `irix-device-login-v1\n…`, and requires `deviceBound=true` in the
+  response (no silent downgrade to password-only).
+- **Per-request proof**: `deviceBound` sessions attach `X-Device-Id`,
+  `X-Session-Timestamp`, `X-Session-Seq`, `X-Session-Proof`
+  (`base64url(HMAC-SHA256(proofKey, "irix-proof-v1\nMETHOD\nrequestURI\nts\nseq"))`)
+  to every request including the WebSocket handshake. `requestURI` must be the exact
+  bytes sent — `Uri.replace(queryParameters: {})` produces a trailing `?` and breaks
+  the MAC, so `_uri()` keeps bare paths bare.
+- **Failure handling**: server texts (`设备绑定校验失败` / `必须使用已绑定设备`) become
+  `NodeDeviceBindingException`; requests are never retried without proofs.
+- **UI**: node card ⋮ → "设备管理" (`node_devices_dialog.dart`: list / revoke / bind) and
+  a device section inside `node_credentials_dialog.dart` (bind / local unbind).
+- **Tests**: `test/device_auth_ffi_test.dart` (keys, signatures, HMAC vs
+  `package:cryptography`, DPAPI roundtrip) and `test/node_device_binding_test.dart`
+  (local mock irix-node v1.4 server that verifies signatures, proof headers, seq
+  window, TLS-fingerprint mismatch).
 
 ### Key UI conventions
 

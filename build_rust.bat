@@ -1,8 +1,8 @@
 @echo off
-REM Rust 模块编译脚本 (workspace: backup + downloader + file_ops + logger + http_client + db_client + vector_store + orchestrator)
+REM Rust 模块编译脚本（编译整个 workspace，成员清单以 rust/Cargo.toml 为准）
 REM 编译 Rust FFI 库并复制到 Flutter 应用目录
 
-echo Compiling Rust workspace (backup + downloader + file_ops + logger + http_client + db_client + vector_store + orchestrator)...
+echo Compiling Rust workspace (all members of rust/Cargo.toml)...
 
 cd rust
 
@@ -27,6 +27,7 @@ copy /Y target\release\xmc_orchestrator.dll ..\windows\runner\
 copy /Y target\release\xmc_nbt.dll ..\windows\runner\
 copy /Y target\release\xmc_devlog.dll ..\windows\runner\
 copy /Y target\release\xmc_plugin_host.dll ..\windows\runner\
+copy /Y target\release\xmc_device_auth.dll ..\windows\runner\
 copy /Y target\release\xmc_backup.dll ..\
 copy /Y target\release\xmc_downloader.dll ..\
 copy /Y target\release\xmc_file_ops.dll ..\
@@ -38,6 +39,7 @@ copy /Y target\release\xmc_orchestrator.dll ..\
 copy /Y target\release\xmc_nbt.dll ..\
 copy /Y target\release\xmc_devlog.dll ..\
 copy /Y target\release\xmc_plugin_host.dll ..\
+copy /Y target\release\xmc_device_auth.dll ..\
 
 echo Done! DLLs copied to windows\runner\
 pause

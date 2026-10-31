@@ -20,6 +20,7 @@ class NodeCardGrid extends StatelessWidget {
     required this.onRenameNode,
     required this.onDeleteNode,
     required this.onCredentialsNode,
+    this.onDevicesNode,
   });
 
   final List<NodeInfo> nodes;
@@ -33,6 +34,9 @@ class NodeCardGrid extends StatelessWidget {
 
   /// 打开节点账户凭据对话框（irix-node v1.2.0+ 账户会话认证）。
   final void Function(NodeInfo node) onCredentialsNode;
+
+  /// 打开设备管理对话框（irix-node v1.4.0+ 设备绑定）；为 null 时不显示该菜单。
+  final void Function(NodeInfo node)? onDevicesNode;
 
   @override
   Widget build(BuildContext context) {
@@ -56,6 +60,7 @@ class NodeCardGrid extends StatelessWidget {
             onRename: () => onRenameNode(node),
             onDelete: () => onDeleteNode(node),
             onCredentials: () => onCredentialsNode(node),
+            onDevices: onDevicesNode == null ? null : () => onDevicesNode!(node),
           );
         },
       ),
@@ -125,6 +130,7 @@ class _NodeCard extends StatelessWidget {
     required this.onRename,
     required this.onDelete,
     required this.onCredentials,
+    this.onDevices,
   });
 
   final NodeInfo node;
@@ -134,6 +140,9 @@ class _NodeCard extends StatelessWidget {
   final VoidCallback onRename;
   final VoidCallback onDelete;
   final VoidCallback onCredentials;
+
+  /// 设备管理入口（仅 irix-node）；为 null 时不显示。
+  final VoidCallback? onDevices;
 
   @override
   Widget build(BuildContext context) {
@@ -233,6 +242,8 @@ class _NodeCard extends StatelessWidget {
               switch (value) {
                 case 'credentials':
                   onCredentials();
+                case 'devices':
+                  onDevices?.call();
                 case 'rename':
                   onRename();
                 case 'delete':
@@ -244,6 +255,11 @@ class _NodeCard extends StatelessWidget {
                 value: 'credentials',
                 child: Text(l.node_credentialsMenu),
               ),
+              if (isLocal && onDevices != null)
+                PopupMenuItem(
+                  value: 'devices',
+                  child: Text(l.nodeDevices_menu),
+                ),
               PopupMenuItem(value: 'rename', child: Text(l.node_renameMenu)),
               PopupMenuItem(value: 'delete', child: Text(l.node_deleteMenu)),
             ],

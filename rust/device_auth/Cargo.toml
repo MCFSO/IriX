@@ -1,0 +1,25 @@
+[package]
+name = "xmc_device_auth"
+version = "0.1.0"
+edition = "2021"
+description = "IriX 客户端设备绑定密码学模块（ed25519/P-256 签名、HMAC-SHA256 逐请求证明、设备密钥本地保护）"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+libc = "0.2"
+# base64url（无填充）与 deviceId 的十六进制编码
+base64 = "0.22"
+# 统一 JSON 入参 / 出参
+serde_json = "1"
+# 纯 Rust 密码学后端（ring 已作为 rustls 的依赖存在于 workspace，无新增 C 依赖）：
+# ed25519 / ECDSA P-256 签名、HMAC-SHA256、SHA-256、系统随机数
+ring = "0.17"
+
+# 私钥落盘加密（Windows DPAPI，等价于「系统密钥库」）；其他平台 0600 文件。
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.52", features = [
+    "Win32_Foundation",
+    "Win32_Security_Cryptography",
+] }

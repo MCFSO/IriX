@@ -7,14 +7,15 @@ IriX（X Minecraft Server Launcher）—— Minecraft 服务器管理工具。Fl
 ## 技术栈
 
 - **UI**: Flutter 3.x (Dart SDK >= 3.12), Provider 状态管理
-- **Rust**: workspace（backup / downloader / http_client / file_ops / logger / db_client / vector_store / nbt / devlog / plugin_host），release profile 开启 `opt-level = 3` + `lto`
+- **Rust**: workspace（backup / downloader / http_client / file_ops / logger / db_client / vector_store / nbt / devlog / plugin_host / orchestrator / device_auth），release profile 开启 `opt-level = 3` + `lto`
 - **存储**: SQLite（sqflite_common_ffi，settings 表统一存设置）
-- **FFI**: `package:ffi` 调用 `xmc_backup.dll`、`xmc_downloader.dll`、`xmc_http_client.dll`、`xmc_file_ops.dll`、`xmc_logger.dll`、`xmc_db_client.dll`、`xmc_vector_store.dll`、`xmc_nbt.dll`、`xmc_devlog.dll`、`xmc_plugin_host.dll`
+- **FFI**: `package:ffi` 调用 `xmc_backup.dll`、`xmc_downloader.dll`、`xmc_http_client.dll`、`xmc_file_ops.dll`、`xmc_logger.dll`、`xmc_db_client.dll`、`xmc_vector_store.dll`、`xmc_nbt.dll`、`xmc_devlog.dll`、`xmc_plugin_host.dll`、`xmc_orchestrator.dll`、`xmc_device_auth.dll`
 - **数据库**: 远程数据库（MySQL/MariaDB/PostgreSQL/Redis）连接与操作由 Rust 执行（`db_client` crate，mysql/postgres/redis 纯 Rust 驱动，无 OpenSSL）；本地持久化用 SQLite（sqflite_common_ffi，`DatabaseManager`）
 - **网络**: 全部 HTTP 请求由 Rust 处理（`http_client` crate 通用请求 + `downloader` crate 流式/分片下载，均为 ureq + rustls，无 OpenSSL）；Dart 侧不再使用 `package:http`（仅测试用例保留），本地回环 HTTP 服务（OAuth 回调、MCP 服务端）仍用 `dart:io HttpServer`
 - **知识库（RAG）**: `vector_store` crate（milvus-sdk-rust 官方 SDK，纯 rustls、无 OpenSSL）只负责远程 Milvus 向量存取与相似检索，不做 embedding；embedding 请求走 Rust `HttpFfiService`（http_client crate）调 AI 模型 API，`knowledge_service.dart` 组装请求并传入向量，维度需与建库时一致；Milvus 连接配置（uri/token/collection）作为独立 AI 设置项（`AiSettings.getMilvusConfig`/`setMilvusConfig`，key=`kb_milvus_config`），不进入远程数据库连接列表
 - **NBT 编辑器**: `nbt` crate（纯 Rust，无外部游戏运行时）实现 Minecraft NBT 的 gzip 大端二进制 ↔ SNBT 双向编解码与树路径增删改查；`nbt_ffi.dart`/`nbt_service.dart` 经 FFI 调用 `xmc_nbt` 动态库（`nbt_request(op,args)`），`nbt_editor_screen.dart` 复刻 AnkiNBT 的通用树/物品/实体/村民交易四领域双模式（高级树 + 简易字段）编辑 UI；数据来源为文件/粘贴 NBT 与连运行中服务器的 RCON（阶段 3），无 Minecraft 客户端运行时故不编辑玩家手持物品
 - **开发者日志**: `devlog` crate（纯 Rust，仅依赖 libc）实现开发者模式下的全量日志落盘；`devlog_ffi.dart` 经 FFI 调用 `xmc_devlog` 动态库的 `app_log_init(dir)`（在 exe 目录/logs 下新建 `dev-<时间戳>.log` 会话文件并以后台线程写盘）、`app_log_write(level,tag,msg)`、`app_log_flush()`、`app_log_shutdown()`；Dart 侧 `dev_log.dart` 仅在开发者模式开启时调用，记录运行日志流/操作轨迹/网络明细/启动与崩溃堆栈，会话文件无限增长、不滚动不清理
+- **设备绑定（irix-node v1.4.0+）**: `device_auth` crate（`ring` 提供 ed25519 / ECDSA P-256 / HMAC-SHA256 / CSPRNG）负责设备密钥与全部签名，经 `dev_auth_request(op,args)` 暴露给 `device_auth_ffi.dart`/`device_auth.dart`；私钥不进入 Dart 堆内存（Windows DPAPI 加密为 `os-keychain`，其他平台 0600 文件为 `file`），密钥目录 `AppPaths.deviceKeysDir()`。绑定记录只存公开信息（settings 表 `node_device_bindings`）；已绑定会话由 `node_api_client.dart` 自动附加 4 个逐请求证明头，`required` 策略失败抛 `NodeDeviceBindingException` 且禁止降级；协议见 irix-node `docs/device-binding.md`，接口清单见 `NODE_API.md` §10，测试 `test/device_auth_ffi_test.dart` + `test/node_device_binding_test.dart`
 
 ## 目录结构
 
@@ -37,6 +38,8 @@ rust/
 ├── logger/                # 日志
 ├── vector_store/          # 向量知识库（milvus-sdk-rust，远程 Milvus 存取与相似检索）
 ├── nbt/                   # NBT 编解码与树编辑（gzip 大端二进制 + SNBT，复刻 AnkiNBT 编辑能力）
+├── device_auth/           # 设备绑定密码学（ed25519/P-256 签名、HMAC-SHA256 证明、DPAPI 私钥保护）
+├── orchestrator/          # 编排引擎（期望状态对账、自愈、扩缩容、跨机迁移）
 └── plugin_host/           # 原生插件宿主（C ABI 加载器 + 事件分发 + 权限检查，libloading + catch_unwind）
 test/                      # Flutter 测试（FFI 集成测试需先编译并复制 Rust 动态库）
 windows/ linux/ macos/     # 平台代码（FFI 动态库：windows/runner/、linux/、macos/）

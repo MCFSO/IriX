@@ -2839,5 +2839,104 @@
   "instanceDetail_jvmPresetNone": "无",
   "@instanceDetail_jvmPresetNone": { "description": "实例设置：不使用优化参数" },
   "instanceDetail_jvmNotJava": "启动命令首项不是 java（{token}），内存与优化参数不会注入",
-  "@instanceDetail_jvmNotJava": { "placeholders": { "token": { "type": "String" } } }
+  "@instanceDetail_jvmNotJava": { "placeholders": { "token": { "type": "String" } } },
+  "deviceBinding_sectionTitle": "设备绑定（irix-node v1.4.0+）",
+  "@deviceBinding_sectionTitle": { "description": "节点凭据：设备绑定分区标题" },
+  "deviceBinding_sectionHint": "绑定后登录会用本机私钥对服务端挑战签名，之后每个请求再带会话证明（HMAC）。账户开启 required 后，未绑定设备将无法登录。",
+  "@deviceBinding_sectionHint": { "description": "节点凭据：设备绑定说明" },
+  "deviceBinding_unavailable": "设备绑定模块不可用（缺少 xmc_device_auth 动态库，请先运行 build_rust 脚本）",
+  "@deviceBinding_unavailable": { "description": "节点凭据：设备绑定模块缺失" },
+  "deviceBinding_statusUnbound": "本机尚未绑定该节点",
+  "@deviceBinding_statusUnbound": { "description": "节点凭据：未绑定状态" },
+  "deviceBinding_statusBound": "已绑定 {deviceId}…（账户 {username}）",
+  "@deviceBinding_statusBound": {
+    "description": "节点凭据：已绑定状态",
+    "placeholders": { "deviceId": { "type": "String" }, "username": { "type": "String" } }
+  },
+  "deviceBinding_keyProtection": "私钥保护：{protection}（密钥类型 {keyType}）",
+  "@deviceBinding_keyProtection": {
+    "description": "节点凭据：私钥载体",
+    "placeholders": { "protection": { "type": "String" }, "keyType": { "type": "String" } }
+  },
+  "deviceBinding_tlsPinned": "TLS 指纹已固定：{fingerprint}…",
+  "@deviceBinding_tlsPinned": {
+    "description": "节点凭据：TLS 指纹已固定",
+    "placeholders": { "fingerprint": { "type": "String" } }
+  },
+  "deviceBinding_tlsUnpinned": "TLS 指纹未固定（节点未启用 TLS，只有密码 + 设备签名保护）",
+  "@deviceBinding_tlsUnpinned": { "description": "节点凭据：TLS 指纹未固定" },
+  "deviceBinding_bind": "绑定本机设备",
+  "@deviceBinding_bind": { "description": "节点凭据：绑定设备按钮" },
+  "deviceBinding_unbind": "本地解绑",
+  "@deviceBinding_unbind": { "description": "节点凭据：本地解绑按钮" },
+  "deviceBinding_unbindTitle": "本地解绑设备",
+  "@deviceBinding_unbindTitle": { "description": "本地解绑确认标题" },
+  "deviceBinding_unbindContent": "只删除本机的绑定记录，服务端设备仍然保留，可随时用同一密钥重新绑定。解绑后若账户已启用 required 策略，将无法登录该节点。",
+  "@deviceBinding_unbindContent": { "description": "本地解绑确认内容" },
+  "deviceBinding_unbound": "已本地解绑",
+  "@deviceBinding_unbound": { "description": "本地解绑完成" },
+  "deviceBinding_bindSuccess": "设备绑定成功，登录与请求均已带设备证明",
+  "@deviceBinding_bindSuccess": { "description": "设备绑定成功" },
+  "deviceBinding_bindFailed": "设备绑定失败：{message}",
+  "@deviceBinding_bindFailed": {
+    "description": "设备绑定失败",
+    "placeholders": { "message": { "type": "String" } }
+  },
+  "deviceBinding_manage": "设备管理",
+  "@deviceBinding_manage": { "description": "打开设备管理对话框" },
+  "nodeDevices_title": "已绑定设备",
+  "@nodeDevices_title": { "description": "设备管理对话框标题" },
+  "nodeDevices_menu": "设备管理",
+  "@nodeDevices_menu": { "description": "节点卡片菜单：设备管理" },
+  "nodeDevices_empty": "该账户还没有绑定任何设备",
+  "@nodeDevices_empty": { "description": "设备列表为空" },
+  "nodeDevices_current": "当前设备",
+  "@nodeDevices_current": { "description": "列表中的当前设备标记" },
+  "nodeDevices_revoke": "撤销",
+  "@nodeDevices_revoke": { "description": "撤销设备按钮" },
+  "nodeDevices_revokeTitle": "撤销设备",
+  "@nodeDevices_revokeTitle": { "description": "撤销设备确认标题" },
+  "nodeDevices_revokeContent": "撤销设备 {deviceId}… 后，该账户的全部会话（含当前会话）立即失效，需要重新登录。",
+  "@nodeDevices_revokeContent": {
+    "description": "撤销设备确认内容",
+    "placeholders": { "deviceId": { "type": "String" } }
+  },
+  "nodeDevices_revokeSuccess": "设备已撤销",
+  "@nodeDevices_revokeSuccess": { "description": "撤销成功" },
+  "nodeDevices_revokeFailed": "撤销失败：{message}",
+  "@nodeDevices_revokeFailed": {
+    "description": "撤销失败",
+    "placeholders": { "message": { "type": "String" } }
+  },
+  "nodeDevices_passwordLabel": "账户密码",
+  "@nodeDevices_passwordLabel": { "description": "撤销/绑定所需的账户密码输入框" },
+  "nodeDevices_passwordHint": "撤销设备需要再次输入账户密码（防止仅有被窃会话 token 的人操作）",
+  "@nodeDevices_passwordHint": { "description": "账户密码输入提示" },
+  "nodeDevices_refresh": "刷新",
+  "@nodeDevices_refresh": { "description": "刷新设备列表" },
+  "nodeDevices_boundAt": "绑定时间：{time}",
+  "@nodeDevices_boundAt": {
+    "description": "设备绑定时间",
+    "placeholders": { "time": { "type": "String" } }
+  },
+  "nodeDevices_lastSeen": "最近使用：{time}",
+  "@nodeDevices_lastSeen": {
+    "description": "设备最近使用时间",
+    "placeholders": { "time": { "type": "String" } }
+  },
+  "nodeDevices_neverSeen": "最近使用：从未",
+  "@nodeDevices_neverSeen": { "description": "设备从未使用" },
+  "nodeDevices_bindTitle": "绑定本机设备",
+  "@nodeDevices_bindTitle": { "description": "绑定本机设备对话框标题" },
+  "nodeDevices_deviceNameLabel": "设备名称",
+  "@nodeDevices_deviceNameLabel": { "description": "设备名称输入框" },
+  "nodeDevices_deviceNameHint": "例如：家里的台式机",
+  "@nodeDevices_deviceNameHint": { "description": "设备名称输入提示" },
+  "nodeDevices_bindAction": "绑定",
+  "@nodeDevices_bindAction": { "description": "确认绑定的按钮" },
+  "nodeDevices_loadFailed": "加载设备列表失败：{message}",
+  "@nodeDevices_loadFailed": {
+    "description": "设备列表加载失败",
+    "placeholders": { "message": { "type": "String" } }
+  }
 }

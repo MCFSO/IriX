@@ -7,6 +7,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 
 import '../models/node.dart';
+import '../services/device_auth.dart';
 import '../services/node_api_client.dart';
 import '../services/node_store.dart';
 
@@ -178,6 +179,13 @@ class NodeState extends ChangeNotifier {
   /// 删除节点：清理选中状态与在线状态，并持久化。
   Future<void> removeNode(String id) async {
     await _store.removeNode(id);
+    // 设备绑定记录随节点一起删除，避免之后新建同名节点继承旧 deviceId。
+    try {
+      await DeviceAuthService.instance.removeBinding(id);
+    } on DeviceAuthException {
+      // 设备模块不可用（旧版 / 缺动态库）时忽略：本来就没有绑定记录。
+    }
+    NodeApiClient.forgetSession(id);
     _nodes.removeWhere((e) => e.id == id);
     _online.remove(id);
     _errors.remove(id);

@@ -15,6 +15,7 @@ import '../utils/apple_widgets.dart';
 import '../widgets/add_node_dialog.dart';
 import '../widgets/node_card_grid.dart';
 import '../widgets/node_credentials_dialog.dart';
+import '../widgets/node_devices_dialog.dart';
 import 'node_detail_screen.dart';
 
 /// 节点管理页。
@@ -70,6 +71,14 @@ class _NodesScreenState extends State<NodesScreen> {
   Future<void> _editCredentials(NodeInfo node) async {
     final saved = await showNodeCredentialsDialog(context, node);
     if (saved == true && mounted) {
+      await context.read<NodeState>().pingNode(node.id);
+    }
+  }
+
+  /// 设备管理（irix-node v1.4.0+ 设备绑定）。
+  Future<void> _manageDevices(NodeInfo node) async {
+    final changed = await showNodeDevicesDialog(context, node);
+    if (changed == true && mounted) {
       await context.read<NodeState>().pingNode(node.id);
     }
   }
@@ -146,6 +155,7 @@ class _NodesScreenState extends State<NodesScreen> {
                   onRenameNode: _rename,
                   onDeleteNode: _delete,
                   onCredentialsNode: _editCredentials,
+                  onDevicesNode: _manageDevices,
                 ),
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),

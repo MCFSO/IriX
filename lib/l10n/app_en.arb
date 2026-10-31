@@ -2742,5 +2742,104 @@
   "instanceDetail_jvmPresetNone": "None",
   "@instanceDetail_jvmPresetNone": { "description": "Instance settings: no optimization preset" },
   "instanceDetail_jvmNotJava": "The start command does not begin with java ({token}); memory and optimization flags are not injected",
-  "@instanceDetail_jvmNotJava": { "placeholders": { "token": { "type": "String" } } }
+  "@instanceDetail_jvmNotJava": { "placeholders": { "token": { "type": "String" } } },
+  "deviceBinding_sectionTitle": "Device binding (irix-node v1.4.0+)",
+  "@deviceBinding_sectionTitle": { "description": "Node credentials: device binding section title" },
+  "deviceBinding_sectionHint": "Once bound, login signs the server challenge with this machine's private key and every request carries a session proof (HMAC). With the required policy, unbound devices cannot log in.",
+  "@deviceBinding_sectionHint": { "description": "Node credentials: device binding description" },
+  "deviceBinding_unavailable": "Device binding is unavailable (xmc_device_auth library missing; run the build_rust script first)",
+  "@deviceBinding_unavailable": { "description": "Node credentials: device binding module missing" },
+  "deviceBinding_statusUnbound": "This machine is not bound to this node yet",
+  "@deviceBinding_statusUnbound": { "description": "Node credentials: unbound status" },
+  "deviceBinding_statusBound": "Bound {deviceId}… (account {username})",
+  "@deviceBinding_statusBound": {
+    "description": "Node credentials: bound status",
+    "placeholders": { "deviceId": { "type": "String" }, "username": { "type": "String" } }
+  },
+  "deviceBinding_keyProtection": "Private key protection: {protection} (key type {keyType})",
+  "@deviceBinding_keyProtection": {
+    "description": "Node credentials: key protection",
+    "placeholders": { "protection": { "type": "String" }, "keyType": { "type": "String" } }
+  },
+  "deviceBinding_tlsPinned": "TLS fingerprint pinned: {fingerprint}…",
+  "@deviceBinding_tlsPinned": {
+    "description": "Node credentials: TLS fingerprint pinned",
+    "placeholders": { "fingerprint": { "type": "String" } }
+  },
+  "deviceBinding_tlsUnpinned": "TLS fingerprint not pinned (node has no TLS; only password + device signature protect login)",
+  "@deviceBinding_tlsUnpinned": { "description": "Node credentials: TLS fingerprint not pinned" },
+  "deviceBinding_bind": "Bind this device",
+  "@deviceBinding_bind": { "description": "Node credentials: bind device button" },
+  "deviceBinding_unbind": "Unbind locally",
+  "@deviceBinding_unbind": { "description": "Node credentials: unbind button" },
+  "deviceBinding_unbindTitle": "Unbind device locally",
+  "@deviceBinding_unbindTitle": { "description": "Unbind confirmation title" },
+  "deviceBinding_unbindContent": "Only the local binding record is deleted; the device stays registered on the server and can be bound again with the same key. After unbinding, an account with the required policy can no longer log in to this node.",
+  "@deviceBinding_unbindContent": { "description": "Unbind confirmation content" },
+  "deviceBinding_unbound": "Unbound locally",
+  "@deviceBinding_unbound": { "description": "Unbind completed" },
+  "deviceBinding_bindSuccess": "Device bound: logins and requests now carry device proofs",
+  "@deviceBinding_bindSuccess": { "description": "Device bound successfully" },
+  "deviceBinding_bindFailed": "Device binding failed: {message}",
+  "@deviceBinding_bindFailed": {
+    "description": "Device binding failed",
+    "placeholders": { "message": { "type": "String" } }
+  },
+  "deviceBinding_manage": "Manage devices",
+  "@deviceBinding_manage": { "description": "Open the device management dialog" },
+  "nodeDevices_title": "Bound devices",
+  "@nodeDevices_title": { "description": "Device management dialog title" },
+  "nodeDevices_menu": "Devices",
+  "@nodeDevices_menu": { "description": "Node card menu: devices" },
+  "nodeDevices_empty": "This account has no bound devices yet",
+  "@nodeDevices_empty": { "description": "Empty device list" },
+  "nodeDevices_current": "Current device",
+  "@nodeDevices_current": { "description": "Current device badge" },
+  "nodeDevices_revoke": "Revoke",
+  "@nodeDevices_revoke": { "description": "Revoke device button" },
+  "nodeDevices_revokeTitle": "Revoke device",
+  "@nodeDevices_revokeTitle": { "description": "Revoke confirmation title" },
+  "nodeDevices_revokeContent": "Revoking {deviceId}… immediately invalidates every session of this account (including the current one), so you will have to log in again.",
+  "@nodeDevices_revokeContent": {
+    "description": "Revoke confirmation content",
+    "placeholders": { "deviceId": { "type": "String" } }
+  },
+  "nodeDevices_revokeSuccess": "Device revoked",
+  "@nodeDevices_revokeSuccess": { "description": "Revoke succeeded" },
+  "nodeDevices_revokeFailed": "Revoke failed: {message}",
+  "@nodeDevices_revokeFailed": {
+    "description": "Revoke failed",
+    "placeholders": { "message": { "type": "String" } }
+  },
+  "nodeDevices_passwordLabel": "Account password",
+  "@nodeDevices_passwordLabel": { "description": "Account password field for revoke/bind" },
+  "nodeDevices_passwordHint": "Revoking a device requires the account password again (so a stolen session token alone is not enough)",
+  "@nodeDevices_passwordHint": { "description": "Account password hint" },
+  "nodeDevices_refresh": "Refresh",
+  "@nodeDevices_refresh": { "description": "Refresh device list" },
+  "nodeDevices_boundAt": "Bound at: {time}",
+  "@nodeDevices_boundAt": {
+    "description": "Device bound time",
+    "placeholders": { "time": { "type": "String" } }
+  },
+  "nodeDevices_lastSeen": "Last used: {time}",
+  "@nodeDevices_lastSeen": {
+    "description": "Device last used time",
+    "placeholders": { "time": { "type": "String" } }
+  },
+  "nodeDevices_neverSeen": "Last used: never",
+  "@nodeDevices_neverSeen": { "description": "Device never used" },
+  "nodeDevices_bindTitle": "Bind this device",
+  "@nodeDevices_bindTitle": { "description": "Bind device dialog title" },
+  "nodeDevices_deviceNameLabel": "Device name",
+  "@nodeDevices_deviceNameLabel": { "description": "Device name field" },
+  "nodeDevices_deviceNameHint": "e.g. Home desktop",
+  "@nodeDevices_deviceNameHint": { "description": "Device name hint" },
+  "nodeDevices_bindAction": "Bind",
+  "@nodeDevices_bindAction": { "description": "Confirm bind button" },
+  "nodeDevices_loadFailed": "Failed to load devices: {message}",
+  "@nodeDevices_loadFailed": {
+    "description": "Device list load failed",
+    "placeholders": { "message": { "type": "String" } }
+  }
 }

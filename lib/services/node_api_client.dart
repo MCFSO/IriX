@@ -17,9 +17,12 @@ import 'dart:typed_data';
 import 'package:path/path.dart' as p;
 
 import '../models/node.dart';
+import '../models/node_device.dart';
 import '../models/node_ops.dart';
 import '../models/remote.dart';
 import '../models/vault.dart';
+import '../services/device_auth.dart';
+import '../services/device_auth_canonical.dart';
 import '../services/downloader.dart';
 import '../services/http_ffi.dart';
 
@@ -35,6 +38,15 @@ class NodeApiException implements Exception {
 
   @override
   String toString() => message;
+}
+
+/// 设备绑定校验失败（账户策略 `required` / 证明头被拒 / 本机密钥失效）。
+///
+/// 与普通 [NodeApiException] 区分开，便于 UI 给出可操作提示（绑定设备、
+/// 联系管理员、重新登录），并确保调用方**不会**静默降级为无证明请求
+/// （协议 §10.12）。
+class NodeDeviceBindingException extends NodeApiException {
+  const NodeDeviceBindingException(super.statusCode, super.message);
 }
 
 /// 下载票据（含直连下载地址）。
@@ -86,6 +98,10 @@ class UploadTicket {
 /// irix-node v1.2.0+ 的会话 token 有效期为 30 天、剩余不足一半时服务端
 /// 自动滑动续期，因此客户端只需在内存中保留 token，进程重启后用保存的
 /// 账户凭据重新登录即可，无需将凭据之外的信息落盘。
+///
+/// 设备绑定会话（`deviceBound=true`）额外持有逐请求证明所需的 [proofKey] 与
+/// 序号 [nextSeq]（协议 §6）：token 泄漏但没有 proofKey 仍无法伪造请求。
+/// 这些值只驻留内存，进程重启后重新用设备签名登录换取新会话。
 class NodeAccountSession {
   /// 会话令牌（`X-Auth-Token`）。
   final String token;
@@ -99,17 +115,44 @@ class NodeAccountSession {
   /// 过期时间（unix 毫秒）。
   final int expiresAt;
 
-  const NodeAccountSession({
+  /// 会话是否绑定设备（登录响应 `deviceBound`）。
+  final bool deviceBound;
+
+  /// 绑定的设备 id（登录响应 `deviceId`）。
+  final String deviceId;
+
+  /// 逐请求证明会话密钥（32 字节随机数的 base64url 无填充形式）。
+  ///
+  /// 仅 [deviceBound] 为 true 时非空；每次登录重新生成，所以 seq 也从 1 开始。
+  String proofKey;
+
+  /// 下一个待使用的请求序号（每个请求递增，重试必须用新序号）。
+  int nextSeq;
+
+  NodeAccountSession({
     required this.token,
     required this.username,
     required this.isAdmin,
     required this.expiresAt,
+    this.deviceBound = false,
+    this.deviceId = '',
+    this.proofKey = '',
+    this.nextSeq = 1,
   });
 
   /// 会话是否仍在有效期内（留 60s 余量，避免边界请求被拒）。
   bool get isValid =>
       token.isNotEmpty &&
       DateTime.now().millisecondsSinceEpoch < expiresAt - 60 * 1000;
+
+  /// 是否可用逐请求证明（设备绑定会话且已换到 proofKey）。
+  bool get canProve => deviceBound && proofKey.isNotEmpty && deviceId.isNotEmpty;
+
+  /// 分配下一个请求序号（十进制字符串，直接参与 HMAC 与请求头）。
+  ///
+  /// Dart 单 isolate 语义下 `++` 不会被打断，因此无需原子类型；即使并发
+  /// 请求交错，服务端也接受 1024 窗口内的乱序到达（协议 §6）。
+  String allocateSeq() => '${nextSeq++}';
 
   /// 由登录响应构造。
   factory NodeAccountSession.fromLogin(Map<String, dynamic> data) {
@@ -122,6 +165,8 @@ class NodeAccountSession {
           DateTime.now()
               .add(const Duration(days: 30))
               .millisecondsSinceEpoch,
+      deviceBound: data['deviceBound'] as bool? ?? false,
+      deviceId: data['deviceId'] as String? ?? '',
     );
   }
 }
@@ -237,12 +282,17 @@ class NodeApiClient {
   };
 
   /// 拼接请求 URI；仅当 [apiKeyInQuery] 时才附带 apikey 查询参数。
+  ///
+  /// 查询参数为空时**不要**调用 `replace(queryParameters: {})`：Dart 会生成带
+  /// 空查询串的 `...?`，而服务端 `r.URL.RequestURI()` 只有 path，会让协议 §6 的
+  /// 逐请求证明规范串与实际请求字节不一致（表现为 403 设备凭据校验失败）。
   Uri _uri(String path, [Map<String, String>? query]) {
     final q = <String, String>{...?query};
     if (apiKeyInQuery && apiKey.isNotEmpty) {
       q['apikey'] = apiKey;
     }
-    return Uri.parse('$baseUrl$path').replace(queryParameters: q);
+    final base = Uri.parse('$baseUrl$path');
+    return q.isEmpty ? base : base.replace(queryParameters: q);
   }
 
   /// 附加鉴权请求头（H-6：密钥经请求头传递，不进 URL）。
@@ -273,6 +323,10 @@ class NodeApiClient {
   /// [vaultToken] 覆盖 [vaultToken] 字段（一次性场景：initToken /
   /// 恢复会话令牌）。
   ///
+  /// [withProof] 为 true（默认）且当前会话 `deviceBound` 时，自动附上协议 §6
+  /// 要求的四个证明请求头；登录 / 挑战等公开端点传 false（此时还没有会话密钥，
+  /// 也不应把上一代证明带到新会话）。
+  ///
   /// 认证：配置了账户凭据（irix-node v1.2.0+）时自动保证会话可用 ——
   /// 无有效缓存会话则先登录，服务端返回「未认证或会话已过期」时
   /// 丢弃会话、重新登录并重试一次（`allowReauth: false` 用于登录请求
@@ -286,6 +340,7 @@ class NodeApiClient {
     Duration? timeout,
     String? vaultToken,
     bool allowReauth = true,
+    bool withProof = true,
   }) async {
     // 进入请求前保证会话有效（首次登录 / 会话被服务端清理后重登）。
     if (allowReauth && hasAccountCredentials) {
@@ -295,7 +350,10 @@ class NodeApiClient {
     final base = body != null
         ? _headers
         : const {'X-Requested-With': 'XMLHttpRequest'};
-    final headers = _withAuth(base, vaultToken: vaultToken);
+    final authHeaders = _withAuth(base, vaultToken: vaultToken);
+    final headers = withProof
+        ? await _withDeviceProof(authHeaders, method, uri)
+        : authHeaders;
     HttpFfiResponse resp;
     try {
       resp = await HttpFfiService.instance.request(
@@ -341,6 +399,11 @@ class NodeApiClient {
         ? decoded['data'] as String
         : '节点返回错误（status $status）';
 
+    // 设备绑定 / 会话证明失败：明确抛专用异常，绝不降级为无证明请求。
+    if (_isDeviceBindingFailure(status, message)) {
+      throw NodeDeviceBindingException(status, message);
+    }
+
     // 会话失效（服务端返回「未认证或会话已过期」）→ 重新登录并重试一次。
     if (allowReauth &&
         hasAccountCredentials &&
@@ -355,6 +418,7 @@ class NodeApiClient {
         timeout: timeout,
         vaultToken: vaultToken,
         allowReauth: false,
+        withProof: withProof,
       );
     }
 
@@ -362,6 +426,50 @@ class NodeApiClient {
       throw NodeApiException(status, message);
     }
     return decoded is Map ? decoded['data'] : null;
+  }
+
+  /// 为已绑定会话附加逐请求证明头（协议 §6）。
+  ///
+  /// 规范串 = `irix-proof-v1\n方法\nrequestURI\n时间戳原文字符串\n序号原文字符串`，
+  /// 其中 requestURI 必须与**实际发送的字节**一致（[_uri] 生成的编码形式）。
+  /// 每次调用都会分配新序号：请求重试天然拿到新证明，不会被服务端判为重放。
+  Future<Map<String, String>> _withDeviceProof(
+    Map<String, String> headers,
+    String method,
+    Uri uri,
+  ) async {
+    final current = session;
+    if (current == null || !current.canProve) return headers;
+    final timestamp = DeviceAuthProtocol.timestampText();
+    final seq = current.allocateSeq();
+    final canonical = DeviceAuthProtocol.proofCanonical(
+      method: method,
+      requestUri: DeviceAuthProtocol.requestUriOf(uri),
+      timestamp: timestamp,
+      seq: seq,
+    );
+    final proof = await DeviceAuthService.instance.hmacSha256(
+      proofKey: current.proofKey,
+      message: canonical,
+    );
+    return {
+      ...headers,
+      DeviceAuthProtocol.headerDeviceId: current.deviceId,
+      DeviceAuthProtocol.headerTimestamp: timestamp,
+      DeviceAuthProtocol.headerSeq: seq,
+      DeviceAuthProtocol.headerProof: proof,
+    };
+  }
+
+  /// 判断响应是否为设备绑定 / 逐请求证明失败（协议 §6 失败响应）。
+  bool _isDeviceBindingFailure(int status, String message) {
+    if (status != 403) return false;
+    // 只匹配服务端固定文案，避免把其他 403（权限开关、保险库门禁）误判成
+    // 设备问题而给出「请绑定设备」这类误导提示。
+    return message.contains('设备绑定校验失败') ||
+        message.contains('设备凭据校验失败') ||
+        message.contains('必须使用已绑定设备') ||
+        message.contains('需要已绑定设备');
   }
 
   /// 判断响应是否表示账户会话缺失 / 过期（irix-node v1.2.0+）。
@@ -398,15 +506,81 @@ class NodeApiClient {
   }
 
   /// 执行登录（`POST /api/auth/login`）并返回会话。
-  Future<NodeAccountSession> _login() async {
+  ///
+  /// 该节点已绑定设备（本机存在绑定记录、用户名一致且密钥可用）时走协议 §5
+  /// 的「密码 + 设备签名」登录，否则保持旧版纯密码登录（`optional` 账户仍兼容）。
+  Future<NodeAccountSession> _login({String? username, String? password}) async {
+    final user = (username ?? accountUser).trim();
+    final pass = password ?? accountPassword;
+    final binding = await _activeBinding(user);
+    if (binding != null) {
+      return _deviceLogin(binding, user, pass);
+    }
+    try {
+      return await _passwordLogin(user, pass);
+    } on NodeDeviceBindingException catch (e) {
+      // 存在绑定记录却走了密码登录，说明本机密钥缺失/已变更（换机器、清了密钥
+      // 目录）。required 策略下服务端会拒绝，这里补一句可操作的提示。
+      final stale = await _bindingRecord(user);
+      if (stale != null) {
+        throw NodeDeviceBindingException(
+          e.statusCode,
+          '${e.message}；本机设备密钥缺失或已变更，请在「设备管理」中重新绑定设备',
+        );
+      }
+      rethrow;
+    }
+  }
+
+  /// 本机对当前节点的有效绑定记录（无绑定 / 用户名不匹配 / 密钥不可用时返回 null）。
+  ///
+  /// 用户名不匹配说明节点凭据被改成了另一个账户；密钥缺失或 deviceId 与密钥
+  /// 不一致（换机器、删了密钥目录）时设备签名登录必然失败，此时退回密码登录，
+  /// 由服务端策略决定是否拒绝（`required` 会 403 并提示重新绑定）。
+  Future<NodeDeviceBinding?> _activeBinding(String username) async {
+    if (username.isEmpty) return null;
+    if (apiKey.isNotEmpty) return null; // MCSM 面板不走设备绑定
+    if (!DeviceAuthService.instance.isAvailable) return null;
+    final binding = await _bindingRecord(username);
+    if (binding == null) return null;
+    try {
+      final key = await DeviceAuthService.instance.keyStatus();
+      if (key == null || key.deviceId != binding.deviceId) return null;
+    } on DeviceAuthException {
+      return null;
+    }
+    return binding;
+  }
+
+  /// 只按记录与用户名匹配绑定（不检查密钥），用于给登录错误补充上下文。
+  Future<NodeDeviceBinding?> _bindingRecord(String username) async {
+    if (!DeviceAuthService.instance.isAvailable) return null;
+    try {
+      final binding = await DeviceAuthService.instance.bindingFor(sessionKey);
+      if (binding == null || !binding.isActive) return null;
+      if (binding.username.isNotEmpty && binding.username != username) {
+        return null;
+      }
+      return binding;
+    } on DeviceAuthException {
+      return null;
+    }
+  }
+
+  /// 纯密码登录（`optional` 策略的兼容路径）。
+  Future<NodeAccountSession> _passwordLogin(
+    String username,
+    String password,
+  ) async {
     final data = await _request(
       'POST',
       '/api/auth/login',
       body: {
-        'username': accountUser.trim(),
-        'password': accountPassword,
+        'username': username,
+        'password': password,
       },
       allowReauth: false,
+      withProof: false,
     );
     final session = NodeAccountSession.fromLogin(
       data is Map<String, dynamic> ? data : const {},
@@ -414,6 +588,92 @@ class NodeApiClient {
     if (session.token.isEmpty) {
       throw NodeApiException(401, '节点未返回会话令牌，登录失败');
     }
+    return session;
+  }
+
+  /// 设备签名登录（协议 §5）。
+  ///
+  /// 顺序严格按协议：时间戳 → proofKey 格式 → 消费挑战（一次性）→ 查设备 →
+  /// 验签，因此挑战失败后必须重新申请；本方法每次调用都重新申请挑战。
+  Future<NodeAccountSession> _deviceLogin(
+    NodeDeviceBinding binding,
+    String username,
+    String password,
+  ) async {
+    final auth = DeviceAuthService.instance;
+
+    final key = await auth.ensureKey(
+      keyType: binding.keyType.isEmpty ? 'ed25519' : binding.keyType,
+    );
+    if (!key.isValid) {
+      throw const NodeDeviceBindingException(403, '本机设备密钥不可用，请重新绑定设备');
+    }
+    if (key.deviceId != binding.deviceId) {
+      throw NodeDeviceBindingException(
+        403,
+        '本机设备密钥与绑定记录不一致（密钥被删除或换了机器），请重新绑定设备',
+      );
+    }
+
+    final challenge = await deviceChallenge(
+      username: username,
+      deviceId: binding.deviceId,
+      purpose: 'login',
+    );
+    // TLS 指纹校验必须在签名与发送密码之前完成（协议 §9/§10.5）。
+    final pinned = auth.verifyFingerprint(
+      serverFingerprint: challenge.tlsFingerprint,
+      pinnedFingerprint: binding.tlsFingerprint,
+    );
+    if (pinned != binding.tlsFingerprint) {
+      await auth.saveBinding(binding.copyWith(tlsFingerprint: pinned));
+    }
+
+    final proofKey = await auth.randomB64Url(32);
+    final timestamp = DeviceAuthProtocol.timestampText();
+    final canonical = DeviceAuthProtocol.loginCanonical(
+      username: username,
+      deviceId: binding.deviceId,
+      nonce: challenge.nonce,
+      timestamp: timestamp,
+      proofKey: proofKey,
+      tlsFingerprint: challenge.tlsFingerprint,
+    );
+    final signature = await auth.sign(canonical);
+
+    final data = await _request(
+      'POST',
+      '/api/auth/login',
+      body: {
+        'username': username,
+        'password': password,
+        'device': {
+          'deviceId': binding.deviceId,
+          'nonce': challenge.nonce,
+          'timestamp': (int.tryParse(timestamp) ?? 0),
+          'signature': signature,
+          'proofKey': proofKey,
+        },
+      },
+      allowReauth: false,
+      withProof: false,
+    );
+    final session = NodeAccountSession.fromLogin(
+      data is Map<String, dynamic> ? data : const {},
+    );
+    if (session.token.isEmpty) {
+      throw NodeApiException(401, '节点未返回会话令牌，登录失败');
+    }
+    // 服务端必须确认会话已绑定设备，否则视为旧节点不支持设备绑定并中止，
+    // 避免「以为在用设备登录、实际只是密码登录」的静默降级。
+    if (!session.deviceBound) {
+      throw const NodeDeviceBindingException(
+        403,
+        '节点未确认设备绑定（可能版本较旧不支持设备绑定），已中止登录',
+      );
+    }
+    session.proofKey = proofKey;
+    session.nextSeq = 1;
     return session;
   }
 
@@ -426,6 +686,109 @@ class NodeApiClient {
     sessions[sessionKey] = session;
     authToken = session.token;
     return session;
+  }
+
+  // ==================== 设备绑定（irix-node v1.4.0+，见 docs/device-binding.md）====================
+
+  /// 申请设备挑战（`POST /api/auth/device/challenge`，公开端点）。
+  ///
+  /// [purpose] 为 `login`（默认）或 `register`；挑战 60 秒有效、一次性，
+  /// 且只存在于签发节点的内存中，多节点部署时需要保持会话粘性。
+  Future<DeviceChallenge> deviceChallenge({
+    required String username,
+    required String deviceId,
+    String purpose = 'login',
+  }) async {
+    final data = await _request(
+      'POST',
+      '/api/auth/device/challenge',
+      body: {
+        'username': username,
+        'deviceId': deviceId,
+        'purpose': purpose,
+      },
+      allowReauth: false,
+      withProof: false,
+    );
+    if (data is! Map<String, dynamic>) {
+      throw NodeApiException(0, '节点返回了无法解析的设备挑战');
+    }
+    final challenge = DeviceChallenge.fromJson(data);
+    if (challenge.nonce.isEmpty) {
+      throw NodeApiException(0, '节点返回的设备挑战为空');
+    }
+    return challenge;
+  }
+
+  /// 注册设备（`POST /api/auth/devices`，需已登录 + 账户密码，协议 §4）。
+  ///
+  /// 调用前应先申请 `purpose=register` 的挑战并完成签名；密码用于防止
+  /// 「仅拿到被窃会话 token 的人偷偷添加设备」。
+  Future<Map<String, dynamic>> registerDevice({
+    required String deviceId,
+    required String publicKey,
+    required String keyType,
+    required String keyProtection,
+    required String descriptor,
+    required String name,
+    required String nonce,
+    required String timestamp,
+    required String signature,
+    required String password,
+  }) async {
+    final data = await _request(
+      'POST',
+      '/api/auth/devices',
+      body: {
+        'deviceId': deviceId,
+        'publicKey': publicKey,
+        'keyType': keyType,
+        'keyProtection': keyProtection,
+        'descriptor': descriptor,
+        'name': name,
+        'nonce': nonce,
+        'timestamp': (int.tryParse(timestamp) ?? 0),
+        'signature': signature,
+        'password': password,
+      },
+      withProof: false,
+    );
+    return data is Map<String, dynamic> ? data : <String, dynamic>{};
+  }
+
+  /// 当前账户的已注册设备列表（`GET /api/auth/devices`，协议 §4）。
+  Future<List<NodeDevice>> listDevices() async {
+    final data = await _request('GET', '/api/auth/devices');
+    final raw = switch (data) {
+      List<dynamic>() => data,
+      Map<String, dynamic>() =>
+        (data['devices'] ?? data['items'] ?? data['list']) is List
+            ? (data['devices'] ?? data['items'] ?? data['list']) as List
+            : const <dynamic>[],
+      _ => const <dynamic>[],
+    };
+    return raw
+        .whereType<Map<String, dynamic>>()
+        .map(NodeDevice.fromJson)
+        .where((device) => device.deviceId.isNotEmpty)
+        .toList();
+  }
+
+  /// 撤销设备（`POST /api/auth/devices/revoke`，需账户密码）。
+  ///
+  /// 服务端会立即注销该账户的全部会话（含当前会话），调用方随后需要重新登录；
+  /// `required` 策略下不能撤销最后一台设备（服务端返回 403）。
+  Future<void> revokeDevice({
+    required String deviceId,
+    required String password,
+  }) async {
+    await _request(
+      'POST',
+      '/api/auth/devices/revoke',
+      body: {'deviceId': deviceId, 'password': password},
+    );
+    sessions.remove(sessionKey);
+    authToken = '';
   }
 
   /// 退出登录并清除缓存会话（`POST /api/auth/logout`）。
@@ -2637,25 +3000,24 @@ class NodeApiClient {
   /// 成功后把返回的 token 同时写入 [authToken] 字段与静态会话缓存
   /// （见 [sessions]），使后续新建的客户端实例直接复用；首次启动时
   /// 节点随机生成管理员账户，凭据仅在节点启动日志显示一次。
+  ///
+  /// 本机对该节点已绑定设备时同样走「密码 + 设备签名」登录（见 [_login]），
+  /// 因此 `required` 策略的账户也能通过本方法登录。
   Future<Map<String, dynamic>> accountLogin({
     required String username,
     required String password,
   }) async {
-    final data = await _request(
-      'POST',
-      '/api/auth/login',
-      body: {'username': username, 'password': password},
-      allowReauth: false,
-    );
-    if (data is Map<String, dynamic>) {
-      final session = NodeAccountSession.fromLogin(data);
-      if (session.token.isNotEmpty) {
-        authToken = session.token;
-        sessions[sessionKey] = session;
-      }
-      return data;
-    }
-    return {};
+    final session = await _login(username: username, password: password);
+    authToken = session.token;
+    sessions[sessionKey] = session;
+    return {
+      'token': session.token,
+      'username': session.username,
+      'isAdmin': session.isAdmin,
+      'expiresAt': session.expiresAt,
+      'deviceBound': session.deviceBound,
+      if (session.deviceId.isNotEmpty) 'deviceId': session.deviceId,
+    };
   }
 
   /// 退出登录（POST /api/auth/logout，删除当前会话）并清除本地缓存。
@@ -2927,22 +3289,38 @@ class NodeApiClient {
   /// 旧节点 / MCSM 面板不支持升级（非 101）时抛出 [NodeConsoleUpgradeException]，
   /// 调用方捕获后回退 outputlog 轮询 + command。
   ///
-  /// 鉴权：WebSocket 握手无法自定义请求头，节点侧 `authOK` 同时接受查询参数
-  /// 的 apikey，故此处把 [apiKey] 拼到查询参数（MCSM apiKeyInQuery 不在此使用，
-  /// 升级即便成功也不应漏掉 apikey）。
+  /// 鉴权：MCSM 面板的 `authOK` 只接受查询参数 apikey，故此处把 [apiKey]
+  /// 拼到查询参数；irix-node 账户会话的 WS 握手只认 `?token=`（见 NODE_API.md §1）。
+  ///
+  /// 设备绑定会话（`deviceBound`）还必须携带协议 §6 的四个证明头：桌面端
+  /// `dart:io` 的 WebSocket 握手支持自定义请求头（浏览器不支持，故协议 §12
+  /// 明确限定 `required` 策略仅支持桌面客户端）。
   Future<NodeConsoleConnection> connectConsoleWs({
     required String uuid,
     required String daemonId,
     String? since,
   }) async {
+    if (hasAccountCredentials) {
+      await ensureSession();
+    }
     final q = <String, String>{
       'uuid': uuid,
       'daemonId': daemonId,
       if (apiKey.isNotEmpty) 'apikey': apiKey,
+      if (authToken.isNotEmpty) 'token': authToken,
       if (since != null && since.isNotEmpty) 'since': since,
     };
     final uri = _uri('/api/instance/console/ws', q);
-    return NodeConsoleConnection.connect(uri.toString(), timeout: timeout);
+    final headers = await _withDeviceProof(
+      _withAuth(const {'X-Requested-With': 'XMLHttpRequest'}),
+      'GET',
+      uri,
+    );
+    return NodeConsoleConnection.connect(
+      uri.toString(),
+      headers: headers,
+      timeout: timeout,
+    );
   }
 }
 
@@ -2979,13 +3357,16 @@ class NodeConsoleConnection {
   }
 
   /// 建立连接（含升级失败检测）。
+  ///
+  /// [headers] 为握手请求头（设备绑定会话的逐请求证明头经由这里带上）。
   static Future<NodeConsoleConnection> connect(
     String url, {
+    Map<String, String>? headers,
     Duration timeout = const Duration(seconds: 15),
   }) async {
     late final WebSocket ws;
     try {
-      ws = await WebSocket.connect(url).timeout(timeout);
+      ws = await WebSocket.connect(url, headers: headers).timeout(timeout);
     } on WebSocketException catch (e) {
       throw NodeConsoleUpgradeException('控制台 WebSocket 升级失败：$e');
     } on TimeoutException {

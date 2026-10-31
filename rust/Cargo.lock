@@ -3313,6 +3313,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "xmc_device_auth"
+version = "0.1.0"
+dependencies = [
+ "base64",
+ "libc",
+ "ring",
+ "serde_json",
+ "windows-sys 0.52.0",
+]
+
+[[package]]
 name = "xmc_devlog"
 version = "0.1.0"
 dependencies = [

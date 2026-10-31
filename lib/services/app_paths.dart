@@ -85,6 +85,13 @@ class AppPaths {
   Future<String> pluginsRoot() async =>
       p.join(await root(), 'plugins', 'native');
 
+  /// 设备绑定密钥目录（`xmc_device_auth` 生成的设备私钥落盘位置）。
+  ///
+  /// Windows 下私钥文件由 DPAPI 以当前 Windows 账户加密（`device_key.dpapi`），
+  /// 其他平台为 0600 权限的 `device_key.json`；换机器/换账户后该目录内的密钥
+  /// 无法解密，客户端会提示重新绑定设备（见 docs/device-binding.md §10.1）。
+  Future<String> deviceKeysDir() async => p.join(await root(), 'device_keys');
+
   /// 临时目录根：Windows 数据根目录不在系统盘时用 `<root>/temp`，
   /// 其余情况（回退文档目录或非 Windows 平台）沿用系统临时目录。
   Future<String> tempRoot() async {

@@ -4879,4 +4879,137 @@ class AppLocalizationsEn extends AppLocalizations {
   String instanceDetail_jvmNotJava(String token) {
     return 'The start command does not begin with java ($token); memory and optimization flags are not injected';
   }
+
+  @override
+  String get deviceBinding_sectionTitle => 'Device binding (irix-node v1.4.0+)';
+
+  @override
+  String get deviceBinding_sectionHint =>
+      'Once bound, login signs the server challenge with this machine\'s private key and every request carries a session proof (HMAC). With the required policy, unbound devices cannot log in.';
+
+  @override
+  String get deviceBinding_unavailable =>
+      'Device binding is unavailable (xmc_device_auth library missing; run the build_rust script first)';
+
+  @override
+  String get deviceBinding_statusUnbound =>
+      'This machine is not bound to this node yet';
+
+  @override
+  String deviceBinding_statusBound(String deviceId, String username) {
+    return 'Bound $deviceId… (account $username)';
+  }
+
+  @override
+  String deviceBinding_keyProtection(String protection, String keyType) {
+    return 'Private key protection: $protection (key type $keyType)';
+  }
+
+  @override
+  String deviceBinding_tlsPinned(String fingerprint) {
+    return 'TLS fingerprint pinned: $fingerprint…';
+  }
+
+  @override
+  String get deviceBinding_tlsUnpinned =>
+      'TLS fingerprint not pinned (node has no TLS; only password + device signature protect login)';
+
+  @override
+  String get deviceBinding_bind => 'Bind this device';
+
+  @override
+  String get deviceBinding_unbind => 'Unbind locally';
+
+  @override
+  String get deviceBinding_unbindTitle => 'Unbind device locally';
+
+  @override
+  String get deviceBinding_unbindContent =>
+      'Only the local binding record is deleted; the device stays registered on the server and can be bound again with the same key. After unbinding, an account with the required policy can no longer log in to this node.';
+
+  @override
+  String get deviceBinding_unbound => 'Unbound locally';
+
+  @override
+  String get deviceBinding_bindSuccess =>
+      'Device bound: logins and requests now carry device proofs';
+
+  @override
+  String deviceBinding_bindFailed(String message) {
+    return 'Device binding failed: $message';
+  }
+
+  @override
+  String get deviceBinding_manage => 'Manage devices';
+
+  @override
+  String get nodeDevices_title => 'Bound devices';
+
+  @override
+  String get nodeDevices_menu => 'Devices';
+
+  @override
+  String get nodeDevices_empty => 'This account has no bound devices yet';
+
+  @override
+  String get nodeDevices_current => 'Current device';
+
+  @override
+  String get nodeDevices_revoke => 'Revoke';
+
+  @override
+  String get nodeDevices_revokeTitle => 'Revoke device';
+
+  @override
+  String nodeDevices_revokeContent(String deviceId) {
+    return 'Revoking $deviceId… immediately invalidates every session of this account (including the current one), so you will have to log in again.';
+  }
+
+  @override
+  String get nodeDevices_revokeSuccess => 'Device revoked';
+
+  @override
+  String nodeDevices_revokeFailed(String message) {
+    return 'Revoke failed: $message';
+  }
+
+  @override
+  String get nodeDevices_passwordLabel => 'Account password';
+
+  @override
+  String get nodeDevices_passwordHint =>
+      'Revoking a device requires the account password again (so a stolen session token alone is not enough)';
+
+  @override
+  String get nodeDevices_refresh => 'Refresh';
+
+  @override
+  String nodeDevices_boundAt(String time) {
+    return 'Bound at: $time';
+  }
+
+  @override
+  String nodeDevices_lastSeen(String time) {
+    return 'Last used: $time';
+  }
+
+  @override
+  String get nodeDevices_neverSeen => 'Last used: never';
+
+  @override
+  String get nodeDevices_bindTitle => 'Bind this device';
+
+  @override
+  String get nodeDevices_deviceNameLabel => 'Device name';
+
+  @override
+  String get nodeDevices_deviceNameHint => 'e.g. Home desktop';
+
+  @override
+  String get nodeDevices_bindAction => 'Bind';
+
+  @override
+  String nodeDevices_loadFailed(String message) {
+    return 'Failed to load devices: $message';
+  }
 }

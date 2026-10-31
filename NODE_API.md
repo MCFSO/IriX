@@ -354,3 +354,47 @@ POST /api/container/create       body: {name, image}          → 用导入的�
 > - 无有效会话时先 `POST /api/auth/login`；服务端返回 403「未认证或会话已过期」时自动重登并重试一次；
 >   `403 权限不足` / `403 vault *` 不触发重登，按业务错误抛出；
 > - 节点列表卡片的 ⋮ 菜单提供「账户登录」入口，用于为升级前创建的节点补录或更正凭据。
+
+---
+
+## 10. 设备绑定（irix-node v1.4.0+）
+
+字节级协议见 irix-node 仓库的 `docs/device-binding.md`（v1.4.0）。要点：
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `POST` | `/api/auth/device/challenge` | 公开端点，申请 `login` / `register` 挑战；60s 有效、一次性，返回 `nonce`、`expiresAt`、`tlsFingerprint` |
+| `POST` | `/api/auth/devices` | 注册设备（需 `X-Auth-Token` + 账户密码），提交 `deviceId`/`publicKey`/`keyType`/`keyProtection`/`descriptor`/`nonce`/`timestamp`/`signature` |
+| `GET` | `/api/auth/devices` | 当前账户已注册设备列表 |
+| `POST` | `/api/auth/devices/revoke` | 撤销设备（需账户密码）；会注销该账户全部会话 |
+| `POST` | `/api/auth/login` | 带 `device`（`deviceId`/`nonce`/`timestamp`/`signature`/`proofKey`）时为设备登录，响应含 `deviceBound`/`deviceId` |
+| `PUT` | `/api/accounts/device-policy` | 管理员设置 `optional` / `required` |
+| `GET` | `/api/accounts/devices?username=` | 管理员查看指定账户设备 |
+| `DELETE` | `/api/accounts/devices?username=&deviceId=` | 管理员删除设备（必要时自动降级策略） |
+
+- 密钥：`ed25519`（默认）或 `p256`；`deviceId = hex(SHA-256(公钥))[:32]`；签名与公钥均为
+  base64url 无填充；`proofKey` 为客户端生成的 32 字节随机数。
+- 签名输入是**逐字节拼接的规范串**（`irix-device-register-v1` / `irix-device-login-v1`），
+  字段顺序、`\n`、原文时间戳、空 `tlsFingerprint` 占位都不能变（见协议 §4/§5）。
+- `deviceBound=true` 的会话**每个请求**都要带 `X-Device-Id`、`X-Session-Timestamp`、
+  `X-Session-Seq`、`X-Session-Proof`（`base64url(HMAC-SHA256(proofKey, "irix-proof-v1\nMETHOD\nrequestURI\nts\nseq"))`）。
+  序号从 1 递增，服务端接受 1024 窗口内乱序，重复序号判为重放；重试必须换新序号。
+- 设备登录与已绑定会话都要求节点启用 TLS；`required` 策略在 TLS 关闭时不可开启。
+
+> **客户端实现**
+> - Rust `rust/device_auth`（`xmc_device_auth`）负责全部密码学与私钥：`ring` 提供
+>   ed25519 / ECDSA P-256（P1363）/ HMAC-SHA256 / CSPRNG，私钥**不进入 Dart 堆内存**；
+>   Windows 用 DPAPI 加密落盘（`keyProtection=os-keychain`），其他平台为 0600 文件（`file`），
+>   密钥目录见 `AppPaths.deviceKeysDir()`（`<数据根目录>/device_keys`）。
+> - Dart：`device_auth_ffi.dart`（`dev_auth_request`）→ `device_auth.dart`（密钥/签名/HMAC/
+>   绑定记录）、`device_auth_canonical.dart`（规范串与 descriptor）、`node_device_service.dart`
+>   （绑定/解绑/撤销编排）；绑定记录存 settings 表 `node_device_bindings`（只含公开信息）。
+> - `node_api_client.dart`：`_activeBinding()` 命中绑定记录时 `_login()` 走设备签名登录，
+>   `_request()` 为已绑定会话自动附加 4 个证明头（WebSocket 握手同样带头）；服务端返回
+>   「设备绑定校验失败 / 必须使用已绑定设备」时抛 `NodeDeviceBindingException`，**不会**降级为
+>   无证明请求。
+> - TLS 指纹采用 TOFU：配对（注册）时记录挑战响应里的 `tlsFingerprint`，之后每次登录比对，
+>   不一致立即中止（不签名、不发密码）。私钥丢失或更换机器时绑定记录会与 deviceId 不一致，
+>   需在「节点 → 设备管理」重新绑定。
+> - UI：节点卡片 ⋮ →「设备管理」，以及账户凭据对话框内的「设备绑定」分区
+>   （绑定 / 本地解绑 / 设备管理）。

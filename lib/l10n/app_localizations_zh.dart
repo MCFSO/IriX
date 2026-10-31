@@ -4699,4 +4699,133 @@ class AppLocalizationsZh extends AppLocalizations {
   String instanceDetail_jvmNotJava(String token) {
     return '启动命令首项不是 java（$token），内存与优化参数不会注入';
   }
+
+  @override
+  String get deviceBinding_sectionTitle => '设备绑定（irix-node v1.4.0+）';
+
+  @override
+  String get deviceBinding_sectionHint =>
+      '绑定后登录会用本机私钥对服务端挑战签名，之后每个请求再带会话证明（HMAC）。账户开启 required 后，未绑定设备将无法登录。';
+
+  @override
+  String get deviceBinding_unavailable =>
+      '设备绑定模块不可用（缺少 xmc_device_auth 动态库，请先运行 build_rust 脚本）';
+
+  @override
+  String get deviceBinding_statusUnbound => '本机尚未绑定该节点';
+
+  @override
+  String deviceBinding_statusBound(String deviceId, String username) {
+    return '已绑定 $deviceId…（账户 $username）';
+  }
+
+  @override
+  String deviceBinding_keyProtection(String protection, String keyType) {
+    return '私钥保护：$protection（密钥类型 $keyType）';
+  }
+
+  @override
+  String deviceBinding_tlsPinned(String fingerprint) {
+    return 'TLS 指纹已固定：$fingerprint…';
+  }
+
+  @override
+  String get deviceBinding_tlsUnpinned => 'TLS 指纹未固定（节点未启用 TLS，只有密码 + 设备签名保护）';
+
+  @override
+  String get deviceBinding_bind => '绑定本机设备';
+
+  @override
+  String get deviceBinding_unbind => '本地解绑';
+
+  @override
+  String get deviceBinding_unbindTitle => '本地解绑设备';
+
+  @override
+  String get deviceBinding_unbindContent =>
+      '只删除本机的绑定记录，服务端设备仍然保留，可随时用同一密钥重新绑定。解绑后若账户已启用 required 策略，将无法登录该节点。';
+
+  @override
+  String get deviceBinding_unbound => '已本地解绑';
+
+  @override
+  String get deviceBinding_bindSuccess => '设备绑定成功，登录与请求均已带设备证明';
+
+  @override
+  String deviceBinding_bindFailed(String message) {
+    return '设备绑定失败：$message';
+  }
+
+  @override
+  String get deviceBinding_manage => '设备管理';
+
+  @override
+  String get nodeDevices_title => '已绑定设备';
+
+  @override
+  String get nodeDevices_menu => '设备管理';
+
+  @override
+  String get nodeDevices_empty => '该账户还没有绑定任何设备';
+
+  @override
+  String get nodeDevices_current => '当前设备';
+
+  @override
+  String get nodeDevices_revoke => '撤销';
+
+  @override
+  String get nodeDevices_revokeTitle => '撤销设备';
+
+  @override
+  String nodeDevices_revokeContent(String deviceId) {
+    return '撤销设备 $deviceId… 后，该账户的全部会话（含当前会话）立即失效，需要重新登录。';
+  }
+
+  @override
+  String get nodeDevices_revokeSuccess => '设备已撤销';
+
+  @override
+  String nodeDevices_revokeFailed(String message) {
+    return '撤销失败：$message';
+  }
+
+  @override
+  String get nodeDevices_passwordLabel => '账户密码';
+
+  @override
+  String get nodeDevices_passwordHint => '撤销设备需要再次输入账户密码（防止仅有被窃会话 token 的人操作）';
+
+  @override
+  String get nodeDevices_refresh => '刷新';
+
+  @override
+  String nodeDevices_boundAt(String time) {
+    return '绑定时间：$time';
+  }
+
+  @override
+  String nodeDevices_lastSeen(String time) {
+    return '最近使用：$time';
+  }
+
+  @override
+  String get nodeDevices_neverSeen => '最近使用：从未';
+
+  @override
+  String get nodeDevices_bindTitle => '绑定本机设备';
+
+  @override
+  String get nodeDevices_deviceNameLabel => '设备名称';
+
+  @override
+  String get nodeDevices_deviceNameHint => '例如：家里的台式机';
+
+  @override
+  String get nodeDevices_bindAction => '绑定';
+
+  @override
+  String nodeDevices_loadFailed(String message) {
+    return '加载设备列表失败：$message';
+  }
 }

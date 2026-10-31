@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rust 模块编译脚本 (workspace: backup + downloader + file_ops + logger + http_client + db_client + vector_store + orchestrator)
+# Rust 模块编译脚本（编译整个 workspace，成员清单以 rust/Cargo.toml 为准）
 # Linux/macOS 使用；Windows 请使用 build_rust.bat
 #
 # 编译 Rust FFI 动态库并复制到对应 Flutter 平台目录：
@@ -8,7 +8,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/rust"
 
-echo "Compiling Rust workspace (backup + downloader + file_ops + logger + http_client + db_client + vector_store + orchestrator)..."
+echo "Compiling Rust workspace (all members of rust/Cargo.toml)..."
 cargo build --release
 
 case "$(uname -s)" in
@@ -25,6 +25,7 @@ case "$(uname -s)" in
     cp -f target/release/libxmc_nbt.so ../linux/
     cp -f target/release/libxmc_devlog.so ../linux/
     cp -f target/release/libxmc_plugin_host.so ../linux/
+    cp -f target/release/libxmc_device_auth.so ../linux/
     ;;
   Darwin)
     echo "Copying .dylib files to macos/ ..."
@@ -39,6 +40,7 @@ case "$(uname -s)" in
     cp -f target/release/libxmc_nbt.dylib ../macos/
     cp -f target/release/libxmc_devlog.dylib ../macos/
     cp -f target/release/libxmc_plugin_host.dylib ../macos/
+    cp -f target/release/libxmc_device_auth.dylib ../macos/
     ;;
   *)
     echo "Unsupported platform: $(uname -s)" >&2
