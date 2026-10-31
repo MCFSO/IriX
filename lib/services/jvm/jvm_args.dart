@@ -9,8 +9,6 @@
 // 自动内存不落库的原因：可用内存在每次启动时都可能不同，
 // 写死进命令会让「自动分配」退化为一次性快照。
 
-import 'package:path/path.dart' as p;
-
 import '../../models/jvm_preset.dart';
 import '../../models/server_instance.dart';
 import '../system_memory.dart';
@@ -118,7 +116,9 @@ class JvmArgs {
     if (split == null) return command;
 
     final executable = split.token;
-    if (!_javaNames.contains(p.basename(executable).toLowerCase())) {
+    if (!_javaNames.contains(
+      JavaLauncher.basenameOf(executable).toLowerCase(),
+    )) {
       return command;
     }
 

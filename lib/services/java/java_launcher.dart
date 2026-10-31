@@ -12,8 +12,6 @@
 
 import 'dart:io';
 
-import 'package:path/path.dart' as p;
-
 import '../../models/server_instance.dart';
 
 /// 实例指定的 Java 不存在时抛出（不静默回退，避免「改了却没生效」）。
@@ -59,8 +57,18 @@ class JavaLauncher {
   static bool usesJavaExecutable(String command) {
     final token = splitFirstToken(command)?.token;
     if (token == null) return false;
-    final name = p.basename(token.trim()).toLowerCase();
-    return _javaExecutableNames.contains(name);
+    return _javaExecutableNames.contains(basenameOf(token).toLowerCase());
+  }
+
+  /// 取路径最后一段文件名（同时识别 `\\` 与 `/`）。
+  ///
+  /// 不能用 `package:path` 的 `basename`：它按**宿主平台**分隔符切分，
+  /// 在 Linux/macOS 上解析 `C://Program Files\...\java.exe` 会原样返回整串，
+  /// 导致「自定义 Java」在跨平台场景（CI、配置文件迁移）下识别失败。
+  static String basenameOf(String path) {
+    final normalized = path.replaceAll('\\', '/');
+    final index = normalized.lastIndexOf('/');
+    return index >= 0 ? normalized.substring(index + 1) : normalized;
   }
 
   /// 解析实例实际应使用的 Java。

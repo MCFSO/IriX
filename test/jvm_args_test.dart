@@ -166,6 +166,17 @@ void main() {
       expect(JavaLauncher.usesJavaExecutable(''), isFalse);
     });
 
+    test('文件名切分不依赖宿主平台分隔符', () {
+      // 回归：Linux 上 p.basename 解析 Windows 路径会返回整串，
+      // 导致自定义 Java 在 CI/跨平台配置下识别失败。
+      expect(
+        JavaLauncher.basenameOf(r'C:\Program Files\Java\bin\java.exe'),
+        'java.exe',
+      );
+      expect(JavaLauncher.basenameOf('/opt/jdk/bin/java'), 'java');
+      expect(JavaLauncher.basenameOf('java'), 'java');
+    });
+
     test('splitFirstToken 保留剩余原文', () {
       final split = JavaLauncher.splitFirstToken('  java   -jar a.jar ');
       expect(split!.token, 'java');
