@@ -102,9 +102,13 @@ pub(crate) fn restore(
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("ZIP 条目损坏: {e}")))?;
         // enclosed_name 会拒绝绝对路径与 `..`，防 zip-slip。
         let Some(rel) = entry.enclosed_name() else {
+            let label = entry
+                .name()
+                .map(|n| n.into_owned())
+                .unwrap_or_else(|_| String::from("<无法解码的条目名>"));
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("ZIP 条目路径非法: {}", entry.name()),
+                format!("ZIP 条目路径非法: {label}"),
             ));
         };
         let dest = target_root.join(&rel);

@@ -81,7 +81,9 @@ fn read_entry_bytes_ci(archive: &mut ZipArchive<File>, name: &str) -> Option<Vec
     let matched = (0..archive.len()).find(|i| {
         archive
             .by_index(*i)
-            .map(|f| f.name().to_lowercase() == lower)
+            // zip 9：ZipFile::name() 返回 ZipResult<Cow<str>>，解码失败按不匹配处理
+            .ok()
+            .and_then(|f| f.name().ok().map(|n| n.to_lowercase() == lower))
             .unwrap_or(false)
     })?;
     let mut entry = archive.by_index(matched).ok()?;

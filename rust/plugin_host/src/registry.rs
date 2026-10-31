@@ -330,7 +330,12 @@ impl PluginRegistry {
             let mut entry = archive
                 .by_index(i)
                 .map_err(|e| format!("读取 zip 条目失败: {e}"))?;
-            let name = entry.name().to_string();
+            // zip 9：ZipFile::name() 返回 ZipResult<Cow<str>>（编码非法时报错），
+            // 这里解码失败按“非法路径”拒绝，宁可不装也不猜路径。
+            let name = entry
+                .name()
+                .map_err(|e| format!("读取 zip 条目名失败: {e}"))?
+                .to_string();
             let out_path = manifest::safe_entry_path(dest, &name)
                 .ok_or_else(|| format!("zip 内含非法路径，已拒绝: {name}"))?;
             if entry.is_dir() {

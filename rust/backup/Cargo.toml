@@ -20,4 +20,5 @@ serde_json = "1"
 # Windows 增量备份：文件内容 SHA-256（内容寻址存储的对象键）
 sha2 = "0.10"
 # 全量备份恢复（ZIP 解包）。与 file_ops 共用同一 deflate 后端，避免重复引入 miniz_oxide
-zip = { version = "2", default-features = false, features = ["deflate-zlib-ng"] }
+# zip 9.x：deflate 后端特性改名为 deflate-flate2-zlib-ng（修复 3 个安全公告）
+zip = { version = "9", default-features = false, features = ["deflate-flate2-zlib-ng"] }
