@@ -51,6 +51,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get common_loading => 'Loading…';
 
   @override
+  String get common_unknownError => 'Unknown error';
+
+  @override
   String get common_error => 'Error';
 
   @override
@@ -1048,123 +1051,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Generate and copy it in the MCSManager panel \"User Info\"';
 
   @override
-  String get wizard_title => 'First-time setup guide';
-
-  @override
-  String get wizard_detectingNat => 'Detecting NAT type...';
-
-  @override
-  String get wizard_jdk8Note => 'Minecraft 1.16.5 and earlier';
-
-  @override
-  String get wizard_jdk17Note => 'Minecraft 1.18+ (officially recommended)';
-
-  @override
-  String get wizard_jdk21Note => 'Minecraft 1.20.5+ (recommended)';
-
-  @override
-  String get wizard_jdk25Note => 'Latest LTS (new server versions)';
-
-  @override
-  String get wizard_skipThisStep => 'Skip this step';
-
-  @override
-  String get wizard_skipHint =>
-      'Tip: you can click \"Skip\" in the top-left corner at any time to exit the guide.';
-
-  @override
-  String get wizard_stepCreateInstance => 'Step 5 · Create the first instance';
-
-  @override
-  String get wizard_createInstanceDesc =>
-      'Download or import a server core to create your first Minecraft server instance.\nAfter completion, the network environment (NAT type) will be detected automatically and an intranet penetration suggestion will be given.';
-
-  @override
-  String get wizard_createFirstInstance => 'Create the first instance';
-
-  @override
-  String get wizard_noInstanceCreated =>
-      'No instance created yet; please finish creating an instance first';
-
-  @override
-  String get wizard_done => 'Setup complete!';
-
-  @override
-  String get wizard_natUncertain => '(result uncertain)';
-
-  @override
-  String get wizard_frpNeeded =>
-      'Your network is behind NAT; friends may not be able to connect directly.\nWould you like to configure FRP intranet penetration so external players can join?';
-
-  @override
-  String get wizard_frpNotNeeded =>
-      'Your network is directly reachable on the public internet; players can connect via your public IP directly, no penetration needed.';
-
-  @override
-  String get wizard_configureFrp => 'Yes, configure FRP';
-
-  @override
-  String get wizard_notNow => 'Not now';
-
-  @override
-  String get wizard_adoptiumSource =>
-      'From Adoptium (Eclipse Temurin), about 200MB download';
-
-  @override
-  String get wizard_unknownError => 'Unknown error';
-
-  @override
   String get common_skip => 'Skip';
-
-  @override
-  String wizard_totalSteps(int count) {
-    return '$count steps total; complete them in order';
-  }
-
-  @override
-  String wizard_installJdk(String name) {
-    return 'Install $name';
-  }
-
-  @override
-  String wizard_stepInstallJdk(int step, String name) {
-    return 'Step $step · Install $name';
-  }
-
-  @override
-  String wizard_startInstall(String name) {
-    return 'Start installing $name';
-  }
-
-  @override
-  String wizard_downloading(String name, String percent) {
-    return 'Downloading $name ... $percent%';
-  }
-
-  @override
-  String wizard_jdkInstalled(String name) {
-    return '$name installed';
-  }
-
-  @override
-  String wizard_installFailed(String error) {
-    return 'Installation failed: $error';
-  }
-
-  @override
-  String wizard_natType(String label) {
-    return 'NAT type: $label';
-  }
-
-  @override
-  String wizard_natMapped(String addr) {
-    return '($addr)';
-  }
-
-  @override
-  String wizard_stepNumber(int index, String title) {
-    return '$index. $title';
-  }
 
   @override
   String get ai_stop => 'Stop';

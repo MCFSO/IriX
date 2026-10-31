@@ -51,6 +51,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get common_loading => '加载中…';
 
   @override
+  String get common_unknownError => '未知错误';
+
+  @override
   String get common_error => '错误';
 
   @override
@@ -1007,119 +1010,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get addNode_mcsmKeyHelper => '在 MCSManager 面板「用户信息」中生成并复制';
 
   @override
-  String get wizard_title => '首次配置引导';
-
-  @override
-  String get wizard_detectingNat => '正在检测 NAT 类型...';
-
-  @override
-  String get wizard_jdk8Note => 'Minecraft 1.16.5 及更早版本';
-
-  @override
-  String get wizard_jdk17Note => 'Minecraft 1.18+ 官方推荐';
-
-  @override
-  String get wizard_jdk21Note => 'Minecraft 1.20.5+ 推荐';
-
-  @override
-  String get wizard_jdk25Note => '最新 LTS（新版本服务端）';
-
-  @override
-  String get wizard_skipThisStep => '跳过此步';
-
-  @override
-  String get wizard_skipHint => '提示：可随时点击左上角「跳过」退出引导。';
-
-  @override
-  String get wizard_stepCreateInstance => '第 5 步 · 创建第一个实例';
-
-  @override
-  String get wizard_createInstanceDesc =>
-      '下载或导入服务端核心，创建你的第一个 Minecraft 服务器实例。\n完成后将自动检测网络环境（NAT 类型）并给出内网穿透建议。';
-
-  @override
-  String get wizard_createFirstInstance => '创建第一个实例';
-
-  @override
-  String get wizard_noInstanceCreated => '还没有创建实例，请先完成实例创建';
-
-  @override
-  String get wizard_done => '引导完成！';
-
-  @override
-  String get wizard_natUncertain => '（结果不确定）';
-
-  @override
-  String get wizard_frpNeeded =>
-      '你的网络处于 NAT 之后，好友可能无法直接连接服务器。\n是否需要配置 FRP 内网穿透，让外网玩家可以加入？';
-
-  @override
-  String get wizard_frpNotNeeded => '你的网络为公网直连，玩家可直接通过你的公网 IP 连接，无需内网穿透。';
-
-  @override
-  String get wizard_configureFrp => '需要，去配置 FRP';
-
-  @override
-  String get wizard_notNow => '暂不需要';
-
-  @override
-  String get wizard_adoptiumSource => '来自 Adoptium（Eclipse Temurin），下载约 200MB';
-
-  @override
-  String get wizard_unknownError => '未知错误';
-
-  @override
   String get common_skip => '跳过';
-
-  @override
-  String wizard_totalSteps(int count) {
-    return '共 $count 步，按顺序完成';
-  }
-
-  @override
-  String wizard_installJdk(String name) {
-    return '安装 $name';
-  }
-
-  @override
-  String wizard_stepInstallJdk(int step, String name) {
-    return '第 $step 步 · 安装 $name';
-  }
-
-  @override
-  String wizard_startInstall(String name) {
-    return '开始安装 $name';
-  }
-
-  @override
-  String wizard_downloading(String name, String percent) {
-    return '正在下载 $name ... $percent%';
-  }
-
-  @override
-  String wizard_jdkInstalled(String name) {
-    return '$name 已安装';
-  }
-
-  @override
-  String wizard_installFailed(String error) {
-    return '安装失败：$error';
-  }
-
-  @override
-  String wizard_natType(String label) {
-    return 'NAT 类型：$label';
-  }
-
-  @override
-  String wizard_natMapped(String addr) {
-    return '（$addr）';
-  }
-
-  @override
-  String wizard_stepNumber(int index, String title) {
-    return '$index. $title';
-  }
 
   @override
   String get ai_stop => '停止';

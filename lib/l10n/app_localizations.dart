@@ -182,6 +182,12 @@ abstract class AppLocalizations {
   /// **'加载中…'**
   String get common_loading;
 
+  /// 未知错误（兜底提示）
+  ///
+  /// In zh, this message translates to:
+  /// **'未知错误'**
+  String get common_unknownError;
+
   /// 错误
   ///
   /// In zh, this message translates to:
@@ -1915,191 +1921,11 @@ abstract class AppLocalizations {
   /// **'在 MCSManager 面板「用户信息」中生成并复制'**
   String get addNode_mcsmKeyHelper;
 
-  /// wizard_title
-  ///
-  /// In zh, this message translates to:
-  /// **'首次配置引导'**
-  String get wizard_title;
-
-  /// wizard_detectingNat
-  ///
-  /// In zh, this message translates to:
-  /// **'正在检测 NAT 类型...'**
-  String get wizard_detectingNat;
-
-  /// wizard_jdk8Note
-  ///
-  /// In zh, this message translates to:
-  /// **'Minecraft 1.16.5 及更早版本'**
-  String get wizard_jdk8Note;
-
-  /// wizard_jdk17Note
-  ///
-  /// In zh, this message translates to:
-  /// **'Minecraft 1.18+ 官方推荐'**
-  String get wizard_jdk17Note;
-
-  /// wizard_jdk21Note
-  ///
-  /// In zh, this message translates to:
-  /// **'Minecraft 1.20.5+ 推荐'**
-  String get wizard_jdk21Note;
-
-  /// wizard_jdk25Note
-  ///
-  /// In zh, this message translates to:
-  /// **'最新 LTS（新版本服务端）'**
-  String get wizard_jdk25Note;
-
-  /// wizard_skipThisStep
-  ///
-  /// In zh, this message translates to:
-  /// **'跳过此步'**
-  String get wizard_skipThisStep;
-
-  /// wizard_skipHint
-  ///
-  /// In zh, this message translates to:
-  /// **'提示：可随时点击左上角「跳过」退出引导。'**
-  String get wizard_skipHint;
-
-  /// wizard_stepCreateInstance
-  ///
-  /// In zh, this message translates to:
-  /// **'第 5 步 · 创建第一个实例'**
-  String get wizard_stepCreateInstance;
-
-  /// wizard_createInstanceDesc
-  ///
-  /// In zh, this message translates to:
-  /// **'下载或导入服务端核心，创建你的第一个 Minecraft 服务器实例。\n完成后将自动检测网络环境（NAT 类型）并给出内网穿透建议。'**
-  String get wizard_createInstanceDesc;
-
-  /// wizard_createFirstInstance
-  ///
-  /// In zh, this message translates to:
-  /// **'创建第一个实例'**
-  String get wizard_createFirstInstance;
-
-  /// wizard_noInstanceCreated
-  ///
-  /// In zh, this message translates to:
-  /// **'还没有创建实例，请先完成实例创建'**
-  String get wizard_noInstanceCreated;
-
-  /// wizard_done
-  ///
-  /// In zh, this message translates to:
-  /// **'引导完成！'**
-  String get wizard_done;
-
-  /// wizard_natUncertain
-  ///
-  /// In zh, this message translates to:
-  /// **'（结果不确定）'**
-  String get wizard_natUncertain;
-
-  /// wizard_frpNeeded
-  ///
-  /// In zh, this message translates to:
-  /// **'你的网络处于 NAT 之后，好友可能无法直接连接服务器。\n是否需要配置 FRP 内网穿透，让外网玩家可以加入？'**
-  String get wizard_frpNeeded;
-
-  /// wizard_frpNotNeeded
-  ///
-  /// In zh, this message translates to:
-  /// **'你的网络为公网直连，玩家可直接通过你的公网 IP 连接，无需内网穿透。'**
-  String get wizard_frpNotNeeded;
-
-  /// wizard_configureFrp
-  ///
-  /// In zh, this message translates to:
-  /// **'需要，去配置 FRP'**
-  String get wizard_configureFrp;
-
-  /// wizard_notNow
-  ///
-  /// In zh, this message translates to:
-  /// **'暂不需要'**
-  String get wizard_notNow;
-
-  /// wizard_adoptiumSource
-  ///
-  /// In zh, this message translates to:
-  /// **'来自 Adoptium（Eclipse Temurin），下载约 200MB'**
-  String get wizard_adoptiumSource;
-
-  /// wizard_unknownError
-  ///
-  /// In zh, this message translates to:
-  /// **'未知错误'**
-  String get wizard_unknownError;
-
   /// common_skip
   ///
   /// In zh, this message translates to:
   /// **'跳过'**
   String get common_skip;
-
-  /// No description provided for @wizard_totalSteps.
-  ///
-  /// In zh, this message translates to:
-  /// **'共 {count} 步，按顺序完成'**
-  String wizard_totalSteps(int count);
-
-  /// No description provided for @wizard_installJdk.
-  ///
-  /// In zh, this message translates to:
-  /// **'安装 {name}'**
-  String wizard_installJdk(String name);
-
-  /// No description provided for @wizard_stepInstallJdk.
-  ///
-  /// In zh, this message translates to:
-  /// **'第 {step} 步 · 安装 {name}'**
-  String wizard_stepInstallJdk(int step, String name);
-
-  /// No description provided for @wizard_startInstall.
-  ///
-  /// In zh, this message translates to:
-  /// **'开始安装 {name}'**
-  String wizard_startInstall(String name);
-
-  /// No description provided for @wizard_downloading.
-  ///
-  /// In zh, this message translates to:
-  /// **'正在下载 {name} ... {percent}%'**
-  String wizard_downloading(String name, String percent);
-
-  /// No description provided for @wizard_jdkInstalled.
-  ///
-  /// In zh, this message translates to:
-  /// **'{name} 已安装'**
-  String wizard_jdkInstalled(String name);
-
-  /// No description provided for @wizard_installFailed.
-  ///
-  /// In zh, this message translates to:
-  /// **'安装失败：{error}'**
-  String wizard_installFailed(String error);
-
-  /// No description provided for @wizard_natType.
-  ///
-  /// In zh, this message translates to:
-  /// **'NAT 类型：{label}'**
-  String wizard_natType(String label);
-
-  /// No description provided for @wizard_natMapped.
-  ///
-  /// In zh, this message translates to:
-  /// **'（{addr}）'**
-  String wizard_natMapped(String addr);
-
-  /// No description provided for @wizard_stepNumber.
-  ///
-  /// In zh, this message translates to:
-  /// **'{index}. {title}'**
-  String wizard_stepNumber(int index, String title);
 
   /// ai_stop
   ///

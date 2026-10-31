@@ -190,7 +190,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
     if (node == null || _client == null) {
       return Scaffold(
         appBar: AppBar(title: Text(l.nodeDetail_title)),
-        body: Center(child: Text(_error ?? l.wizard_unknownError)),
+        body: Center(child: Text(_error ?? l.common_unknownError)),
       );
     }
     final tabs = _tabs(node);

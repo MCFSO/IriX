@@ -10,14 +10,12 @@ import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../models/server_instance.dart';
 import '../services/cluster_monitor.dart';
-import '../services/database_manager.dart';
 import '../services/management_mode_settings.dart';
 import '../services/mcp_server.dart';
 import '../state/app_state.dart';
 import '../state/cluster_state.dart';
 import '../state/node_state.dart';
 import '../utils/apple_widgets.dart';
-import '../widgets/first_run_wizard.dart';
 import 'ai_screen.dart';
 import 'cluster_home_screen.dart';
 import 'cluster_instances_screen.dart';
@@ -50,19 +48,12 @@ class _HomeScreenState extends State<HomeScreen> {
   /// 是否已弹出 MCP 权限对话框（防止重复弹窗）。
   bool _mcpDialogOpen = false;
 
-  /// 首次启动引导向导是否展示。
-  bool _wizardVisible = false;
-
   @override
   void initState() {
     super.initState();
     McpServer.instance.attachState(context.read<AppState>());
     McpServer.instance.currentRequest.addListener(_onMcpRequest);
     _startMcpServer();
-    // 首次启动：无实例且未完成/跳过过引导时，展示线性引导向导。
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _maybeShowFirstRunWizard();
-    });
     // 若已处于多机模式，启动集群监控循环。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -141,47 +132,37 @@ class _HomeScreenState extends State<HomeScreen> {
     _lastModeWasMulti = multi;
 
     return Scaffold(
-      body: Stack(
+      body: Row(
         children: [
-          Row(
-            children: [
-              // 左侧导航栏（自绘：图标与文字并列）
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  // 窄窗口收起文字，仅保留图标，避免内容区被挤压。
-                  final compact = constraints.maxWidth < 720;
-                  return _Sidebar(
-                    destinations: destinations,
-                    selectedIndex: index,
-                    showSettings: _showSettings,
-                    compact: compact,
-                    onSelect: (value) {
-                      setState(() {
-                        _showSettings = false;
-                        _selectedIndex = value;
-                      });
-                    },
-                    onOpenSettings: () => setState(() => _showSettings = true),
-                  );
+          // 左侧导航栏（自绘：图标与文字并列）
+          LayoutBuilder(
+            builder: (context, constraints) {
+              // 窄窗口收起文字，仅保留图标，避免内容区被挤压。
+              final compact = constraints.maxWidth < 720;
+              return _Sidebar(
+                destinations: destinations,
+                selectedIndex: index,
+                showSettings: _showSettings,
+                compact: compact,
+                onSelect: (value) {
+                  setState(() {
+                    _showSettings = false;
+                    _selectedIndex = value;
+                  });
                 },
-              ),
-              const VerticalDivider(thickness: 1, width: 1),
-              // 右侧内容区
-              Expanded(
-                child: _showSettings
-                    ? const SettingsScreen()
-                    : (multi
-                          ? _buildMultiContent(index)
-                          : _buildContent(index)),
-              ),
-            ],
+                onOpenSettings: () => setState(() => _showSettings = true),
+              );
+            },
           ),
-          // 首次启动引导（变暗 30% + 阻断点击）
-          if (_wizardVisible)
-            FirstRunWizardOverlay(
-              onSkip: () => _dismissWizard('skipped'),
-              onFinish: (goFrp) => _dismissWizard('done', goFrp: goFrp),
-            ),
+          const VerticalDivider(thickness: 1, width: 1),
+          // 右侧内容区
+          Expanded(
+            child: _showSettings
+                ? const SettingsScreen()
+                : (multi
+                      ? _buildMultiContent(index)
+                      : _buildContent(index)),
+          ),
         ],
       ),
     );
@@ -213,30 +194,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// 上一次 build 的管理模式（用于推断索引含义）。
   bool _lastModeWasMulti = false;
-
-  Future<void> _maybeShowFirstRunWizard() async {
-    final done = await DatabaseManager.instance.getSetting('first_run_wizard');
-    if (done != null || !mounted) return;
-    if (context.read<AppState>().instances.isNotEmpty) {
-      // 已有实例（老用户升级）：直接标记完成，不打扰
-      await DatabaseManager.instance.setSetting('first_run_wizard', 'done');
-      return;
-    }
-    setState(() => _wizardVisible = true);
-  }
-
-  /// 关闭向导并持久化状态；[goFrp] 为 true 时跳转 FRP 页面。
-  Future<void> _dismissWizard(String value, {bool goFrp = false}) async {
-    await DatabaseManager.instance.setSetting('first_run_wizard', value);
-    if (!mounted) return;
-    setState(() {
-      _wizardVisible = false;
-      if (goFrp) {
-        final multi = context.read<ClusterState>().mode == ManagementMode.multi;
-        _selectedIndex = multi ? 7 : 5;
-      }
-    });
-  }
 
   /// 单机模式导航（默认 6 个标签）。
   List<NavItem> _singleDestinations(BuildContext context) {
