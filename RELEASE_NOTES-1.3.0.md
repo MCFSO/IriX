@@ -136,13 +136,15 @@ Not covered, by design:
 
 ## Downloads
 
-Artifacts are produced by the Package workflow (`workflow_dispatch`):
+The Package workflow (`workflow_dispatch`) produces the platform packages. Asset
+names follow the existing release naming, so rename the workflow artifacts before
+uploading them:
 
 | Platform | Files |
 |----------|-------|
-| Windows x64 | `irix-1.3.0-windows-x64.exe`, `irix-1.3.0-windows-x64.msix`, `irix-1.3.0-windows-x64.zip` |
-| Linux x64 | `irix-1.3.0-linux-x64.AppImage`, `irix-1.3.0-linux-x64.deb`, `irix-1.3.0-linux-x64.rpm`, `irix-1.3.0-linux-x64.zip` |
-| macOS arm64 | `irix-1.3.0-macOS-arm64.dmg`, `irix-1.3.0-macOS-arm64.zip` |
+| Windows x64 | `irix-1.3.0-windows-x64.exe`, `irix-1.3.0-windows-x64.msix` |
+| Linux x64 | `irix-1.3.0-linux-x64.AppImage`, `irix-1.3.0-linux-x64.deb`, `irix-1.3.0-linux-x64.rpm` |
+| macOS arm64 | `irix-1.3.0-macOS-arm64.dmg` |
 
 Install over the previous version. Settings, instances, and node credentials are
 kept. Windows users who installed from the Microsoft Store should use the MSIX
