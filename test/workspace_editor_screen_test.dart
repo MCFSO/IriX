@@ -40,11 +40,17 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 50));
       }
     });
-    await tester.pump();
+    // 保存是异步链路：文件写完后还要一次 setState 才会把 dirty 置回 false。
+    // 只等文件内容会与界面状态产生竞态——CI 上偶发「关闭」弹出未保存确认框。
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      if (find.textContaining('已保存').evaluate().isNotEmpty) break;
+    }
 
     expect(file.readAsStringSync(), 'motd=World\r\n');
     await tester.tap(find.byTooltip('关闭'));
-    await tester.pump();
+    // 关闭同样是 async（内部 await 脏检查），单帧不足以保证移除编辑区。
+    await tester.pumpAndSettle();
     expect(find.byType(TextField), findsNothing);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
