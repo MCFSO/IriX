@@ -12,6 +12,8 @@ use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
 use serde_json::Value;
 
+mod jar_meta;
+
 thread_local! {
     static LAST_ERROR: RefCell<Option<CString>> = const { RefCell::new(None) };
 }

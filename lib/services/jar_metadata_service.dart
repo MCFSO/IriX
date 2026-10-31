@@ -4,12 +4,17 @@
 // Bukkit/Paper (plugin.yml / paper-plugin.yml)。
 
 import 'dart:convert';
+import 'dart:ffi';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
+import 'package:ffi/ffi.dart';
 import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
+
+import 'rust_lib.dart';
 
 /// JAR 元数据。
 class JarMetadata {
@@ -31,6 +36,22 @@ class JarMetadata {
 
   /// JAR 类型（插件 / Fabric / Forge / 未知）。
   final JarKind kind;
+
+  /// 从 Rust 返回的 JSON 构造（字段名与 `rust/file_ops/src/jar_meta.rs` 对齐）。
+  factory JarMetadata.fromJson(Map<String, dynamic> json) {
+    final icon = json['icon_base64'] as String?;
+    return JarMetadata(
+      name: json['name'] as String?,
+      description: json['description'] as String?,
+      iconBytes: icon == null || icon.isEmpty ? null : base64Decode(icon),
+      kind: switch (json['kind'] as String?) {
+        'fabric' => JarKind.fabric,
+        'forge' => JarKind.forge,
+        'plugin' => JarKind.plugin,
+        _ => JarKind.unknown,
+      },
+    );
+  }
 }
 
 /// JAR 类型。
@@ -75,6 +96,59 @@ class JarMetadataService {
       return _parse(archive);
     } catch (_) {
       return const JarMetadata();
+    }
+  }
+
+  /// 批量解析（Rust 实现，跑在后台 isolate）。
+  ///
+  /// 解压 jar 与解析描述文件都是 CPU 密集操作：Dart 的 `ZipDecoder` 是同步的，
+  /// 在 UI isolate 上处理上百个 jar 会直接卡住帧。现在由 Rust
+  /// （`rust/file_ops/src/jar_meta.rs` 的 `scan_jar_meta`）完成，Dart 只在
+  /// 后台 isolate 里发起一次 FFI 调用，UI 线程全程不被占用。
+  ///
+  /// 返回顺序与 [jarPaths] 一一对应；Rust 不可用时回退到 Dart 解析
+  /// （同样在后台 isolate，只是慢一些）。
+  static Future<List<JarMetadata>> readAllInBackground(
+    List<String> jarPaths,
+  ) async {
+    if (jarPaths.isEmpty) return const <JarMetadata>[];
+    try {
+      return await Isolate.run(() => _readAllViaRust(jarPaths));
+    } catch (_) {
+      try {
+        return await Isolate.run(
+          () => <JarMetadata>[for (final path in jarPaths) readSync(path)],
+        );
+      } catch (_) {
+        return <JarMetadata>[for (final _ in jarPaths) const JarMetadata()];
+      }
+    }
+  }
+
+  /// 在后台 isolate 内调用 Rust 批量扫描。
+  static List<JarMetadata> _readAllViaRust(List<String> jarPaths) {
+    final lib = openRustLibrary('file_ops');
+    final scan = lib
+        .lookupFunction<
+          Pointer<Utf8> Function(Pointer<Utf8>),
+          Pointer<Utf8> Function(Pointer<Utf8>)
+        >('scan_jar_meta');
+
+    final input = jsonEncode(jarPaths).toNativeUtf8();
+    Pointer<Utf8> output = nullptr;
+    try {
+      output = scan(input);
+      if (output == nullptr) {
+        throw StateError('scan_jar_meta 返回空指针');
+      }
+      final decoded = jsonDecode(output.toDartString()) as List<dynamic>;
+      return [
+        for (final item in decoded)
+          JarMetadata.fromJson(item as Map<String, dynamic>),
+      ];
+    } finally {
+      if (output != nullptr) freeRustString(lib, output);
+      calloc.free(input);
     }
   }
 

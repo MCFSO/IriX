@@ -3331,11 +3331,13 @@ dependencies = [
 name = "xmc_file_ops"
 version = "0.1.0"
 dependencies = [
+ "base64",
  "chrono",
  "libc",
  "serde",
  "serde_json",
  "walkdir",
+ "zip",
 ]
 
 [[package]]
