@@ -45,7 +45,7 @@ jobs:
           Copy-Item rust/target/release/xmc_nbt.dll windows/runner/ -Force
           Copy-Item rust/target/release/xmc_devlog.dll windows/runner/ -Force
           Copy-Item rust/target/release/xmc_plugin_host.dll windows/runner/ -Force
-Copy-Item rust/target/release/xmc_device_auth.dll windows/runner/ -Force
+          Copy-Item rust/target/release/xmc_device_auth.dll windows/runner/ -Force
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -138,7 +138,7 @@ Copy-Item rust/target/release/xmc_device_auth.dll windows/runner/ -Force
           cp rust/target/release/libxmc_nbt.so linux/
           cp rust/target/release/libxmc_devlog.so linux/
           cp rust/target/release/libxmc_plugin_host.so linux/
-cp rust/target/release/libxmc_device_auth.so linux/
+          cp rust/target/release/libxmc_device_auth.so linux/
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2

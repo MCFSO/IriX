@@ -52,7 +52,7 @@ jobs:
           cp rust/target/release/libxmc_nbt.so linux/
           cp rust/target/release/libxmc_devlog.so linux/
           cp rust/target/release/libxmc_plugin_host.so linux/
-cp rust/target/release/libxmc_device_auth.so linux/
+          cp rust/target/release/libxmc_device_auth.so linux/
 
       # 示例插件包（plugins/irix-example-plugin.zip）已入库，但其中内置的是 Windows
       # 动态库；插件按平台选择 lib/<entry>.<platform>.<ext>，所以这里为当前 runner
@@ -145,7 +145,7 @@ cp rust/target/release/libxmc_device_auth.so linux/
           Copy-Item rust/target/release/xmc_nbt.dll windows/runner/ -Force
           Copy-Item rust/target/release/xmc_devlog.dll windows/runner/ -Force
           Copy-Item rust/target/release/xmc_plugin_host.dll windows/runner/ -Force
-Copy-Item rust/target/release/xmc_device_auth.dll windows/runner/ -Force
+          Copy-Item rust/target/release/xmc_device_auth.dll windows/runner/ -Force
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -237,7 +237,7 @@ Copy-Item rust/target/release/xmc_device_auth.dll windows/runner/ -Force
           cp rust/target/release/libxmc_nbt.so linux/
           cp rust/target/release/libxmc_devlog.so linux/
           cp rust/target/release/libxmc_plugin_host.so linux/
-cp rust/target/release/libxmc_device_auth.so linux/
+          cp rust/target/release/libxmc_device_auth.so linux/
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
