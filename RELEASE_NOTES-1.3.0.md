@@ -140,11 +140,13 @@ Artifacts are produced by the Package workflow (`workflow_dispatch`):
 
 | Platform | Files |
 |----------|-------|
-| Windows x64 | `irix-1.3.0-windows-x64.exe`, `irix-1.3.0-windows-x64.msix` |
-| Linux x64 | `irix-1.3.0-linux-x64.AppImage`, `irix-1.3.0-linux-x64.deb`, `irix-1.3.0-linux-x64.rpm` |
-| macOS universal | `irix-1.3.0-macOS-universal.dmg` |
+| Windows x64 | `irix-1.3.0-windows-x64.exe`, `irix-1.3.0-windows-x64.msix`, `irix-1.3.0-windows-x64.zip` |
+| Linux x64 | `irix-1.3.0-linux-x64.AppImage`, `irix-1.3.0-linux-x64.deb`, `irix-1.3.0-linux-x64.rpm`, `irix-1.3.0-linux-x64.zip` |
+| macOS arm64 | `irix-1.3.0-macOS-arm64.dmg`, `irix-1.3.0-macOS-arm64.zip` |
 
-SHA-256 checksums are published as `SHA256SUMS-1.3.0.txt` next to the artifacts.
+Install over the previous version. Settings, instances, and node credentials are
+kept. Windows users who installed from the Microsoft Store should use the MSIX
+package.
 
 ## Verification
 
