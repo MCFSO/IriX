@@ -84,6 +84,18 @@ authorized, on login and on every request that follows.
   request URI observed by the server, and device-bound sessions failed with a 403
   proof error. Bare paths are now kept bare.
 
+## Other changes in this build
+
+- Instance backup was reworked. Full backup still compresses the whole instance
+  directory into one ZIP in parallel, and incremental backup is new: Linux and
+  macOS create hardlink snapshots with `rsync --link-dest` (falling back to a
+  native hardlink snapshot), while Windows uses SHA-256 content-addressed storage
+  that deduplicates unchanged files across snapshots and reclaims unreferenced
+  objects when a snapshot is deleted. The backup tab now has two actions, full and
+  incremental, with a backup history list underneath.
+- The `zip` dependency was upgraded to 9.2.0, which addresses three security
+  advisories (one critical, one high, one medium) in archive handling.
+
 ## Compatibility and upgrade notes
 
 - Device binding requires IriX node v1.4.0 or newer. Older nodes keep working
@@ -136,19 +148,25 @@ Not covered, by design:
 
 ## Downloads
 
-The Package workflow (`workflow_dispatch`) produces the platform packages. Asset
-names follow the existing release naming, so rename the workflow artifacts before
-uploading them:
+Installers are built by the Package workflow and the portable archives are the
+complete application directory from the Build and Test workflow. Install over the
+previous version: settings, instances, and node credentials are kept. Windows users
+who installed from the Microsoft Store should use the MSIX package.
 
-| Platform | Files |
-|----------|-------|
-| Windows x64 | `irix-1.3.0-windows-x64.exe`, `irix-1.3.0-windows-x64.msix` |
-| Linux x64 | `irix-1.3.0-linux-x64.AppImage`, `irix-1.3.0-linux-x64.deb`, `irix-1.3.0-linux-x64.rpm` |
-| macOS arm64 | `irix-1.3.0-macOS-arm64.dmg` |
+| File | Size | SHA-256 |
+|------|------|---------|
+| irix-1.3.0-windows-x64.exe | 24.8 MB | `f190066c49a1bd6826d00c6a76369c1dc3e951ff5245fe1101d020eb3d6933f9` |
+| irix-1.3.0-windows-x64.msix | 37.2 MB | `cfb56eab35976c597a583898a2a7599d62b7ca57cef8144c9a92bd77fc1553ef` |
+| irix-1.3.0-windows-x64.zip | 35.1 MB | `22914ab199e9b86ce1727a134fffafca8bda9041cd5c82883eafedb9747768d4` |
+| irix-1.3.0-linux-x64.AppImage | 43.7 MB | `e286359a1a0f4f918dba19bf4cfeb225eab20528610151b91ce5335a5798e460` |
+| irix-1.3.0-linux-x64.deb | 25.1 MB | `d45332a9b7982970cdd8678ebfbbafe55347301d72e1581c63cd963825dbb698` |
+| irix-1.3.0-linux-x64.rpm | 34.1 MB | `d8eae34d367d75dfde3e55f85645ed92a7ff3b310b06256d6bd67b5a54380822` |
+| irix-1.3.0-linux-x64.zip | 35.1 MB | `e7b565c70222e1416d80f5209f92164ef74fa7ade58c3f9f0042aa97d9895fa1` |
+| irix-1.3.0-macOS-arm64.dmg | 56.5 MB | `8c63acaa4a8a39b3a65ee54eef6ff63de9c0826cd36fe1fcebae5a101414e07a` |
+| irix-1.3.0-macOS-arm64.zip | 119.7 MB | `33965cab4bb0576a3dd65a06051ad0bbaa424c5f79616628c9c347b3e0c6c37c` |
 
-Install over the previous version. Settings, instances, and node credentials are
-kept. Windows users who installed from the Microsoft Store should use the MSIX
-package.
+The `windows-x64.zip` and `linux-x64.zip` archives unpack into a runnable
+directory; the `macOS-arm64.zip` contains `lrix.app`.
 
 ## Verification
 
