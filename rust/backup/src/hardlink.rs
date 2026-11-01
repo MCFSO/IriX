@@ -53,6 +53,7 @@ pub(crate) fn build_tree(
         }
 
         let parent_entry = parent_index.get(file.rel.as_str()).copied();
+        // 大小 + 纳秒级 mtime 判断未变化：秒级精度会漏掉"同秒内改写且大小不变"。
         let unchanged = parent_entry
             .map(|e| e.size == file.size && e.mtime == file.mtime)
             .unwrap_or(false);
@@ -131,6 +132,7 @@ pub(crate) fn manifest_from_scan(
 
     for file in &scan.files {
         let parent_entry = parent_index.get(file.rel.as_str()).copied();
+        // 与 build_tree 同一判据：大小 + 纳秒级 mtime。
         let unchanged = parent_entry
             .map(|e| e.size == file.size && e.mtime == file.mtime)
             .unwrap_or(false);

@@ -30,7 +30,10 @@ pub(crate) struct ManifestEntry {
     pub path: String,
     /// 源文件字节数。
     pub size: u64,
-    /// 源文件最后修改时间（Unix 秒）。
+    /// 源文件最后修改时间（Unix 纳秒）。
+    ///
+    /// 旧版清单记录的是秒，读取后与新值必然不等，因此升级后第一次增量备份
+    /// 会重建整份快照（正确但较慢），之后恢复正常增量。
     pub mtime: i64,
     /// 内容 SHA-256（CAS 策略必然存在；硬链接策略不计算，避免全量读取）。
     #[serde(default, skip_serializing_if = "Option::is_none")]

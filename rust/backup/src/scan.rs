@@ -20,7 +20,7 @@ pub(crate) struct ScannedFile {
     /// 绝对路径。
     pub(crate) abs: PathBuf,
     pub(crate) size: u64,
-    /// 源文件最后修改时间（Unix 秒）。
+    /// 源文件最后修改时间（Unix 纳秒，见下方精度说明）。
     pub(crate) mtime: i64,
 }
 
@@ -98,7 +98,9 @@ pub(crate) fn scan_source(root: &Path, exclude: Option<&Path>) -> io::Result<Sca
             .modified()
             .ok()
             .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-            .map(|d| d.as_secs() as i64)
+            // 纳秒精度：秒级 mtime 会把"同一秒内改写、大小不变"的文件误判为未变化，
+            // 使增量快照漏掉真实改动（CI 上跑得快时必现）。i64 纳秒可表示到 2262 年。
+            .map(|d| d.as_nanos().min(i64::MAX as u128) as i64)
             .unwrap_or(0);
         result.total_bytes += meta.len();
         result.files.push(ScannedFile {
@@ -138,6 +140,40 @@ mod tests {
         // 仓库不在源目录内时，排除项不应影响结果
         let result2 = scan_source(&src, None).unwrap();
         assert_eq!(result2.files.len(), 2);
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn mtime_has_sub_second_precision() {
+        let tmp = std::env::temp_dir().join(format!(
+            "xmc_scan_mtime_{}_{}",
+            std::process::id(),
+            crate::next_temp_id()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+        fs::write(tmp.join("a.bin"), b"1234").unwrap();
+
+        let result = scan_source(&tmp, None).unwrap();
+        let mtime = result.files[0].mtime;
+        // 秒级时间戳约 1.7e9，纳秒级约 1.7e18：后者大于 1.5e18 才算纳秒精度。
+        assert!(
+            mtime > 1_500_000_000_000_000_000,
+            "mtime 应为 Unix 纳秒（同秒改写才能被识别），实际 {mtime}"
+        );
+
+        // 大小相同、仅内容与 mtime 变化的文件必须被判为"已修改"，
+        // 这正是旧实现（秒级 mtime）在 CI 上偶发漏判的场景。
+        // 睡 2ms 以跨过 Windows NTFS 的 100ns 时间戳粒度，避免测试自身抖动。
+        std::thread::sleep(std::time::Duration::from_millis(2));
+        fs::write(tmp.join("a.bin"), b"5678").unwrap();
+        let result2 = scan_source(&tmp, None).unwrap();
+        assert_eq!(result2.files[0].size, result.files[0].size);
+        assert_ne!(
+            result2.files[0].mtime, mtime,
+            "同尺寸改写后 mtime 必须变化（纳秒精度）"
+        );
 
         let _ = fs::remove_dir_all(&tmp);
     }

@@ -89,10 +89,13 @@ history list — tapping a row opens a dialog with restore / verify / delete.
   compressed in parallel (rayon) into one ZIP (`backup_directory` still exported for
   compatibility). Restore unzips it back (zip-slip guarded).
 - **Incremental backup**, chosen by platform inside Rust:
-  - Linux/macOS — `rsync -rlpt --link-dest=<previous snapshot> <src>/ <snapshot>/`
-    so unchanged files become hardlinks into the previous snapshot. `--info=progress2`
-    is used when rsync ≥ 3.1 (parsed from a redirected log file for progress); when
-    rsync is missing or fails, Rust falls back to its own hardlink snapshot.
+  - Linux/macOS — `rsync -rlpt --checksum --link-dest=<previous snapshot> <src>/ <snapshot>/`
+    so unchanged files become hardlinks into the previous snapshot. `--checksum` is
+    mandatory: the default quick check (size plus second-granularity mtime) silently
+    misses same-size edits made within one second and would hardlink stale content.
+    `--info=progress2` is used when rsync ≥ 3.1 (parsed from a redirected log file
+    for progress); when rsync is missing or fails, Rust falls back to its own
+    hardlink snapshot, which compares size plus nanosecond mtime.
   - Windows — SHA-256 per file (`sha2`), content objects stored once under `cas/`
     (dedupe across snapshots), snapshot = manifest of path → hash. Deleting a
     snapshot runs a GC pass that removes unreferenced objects.

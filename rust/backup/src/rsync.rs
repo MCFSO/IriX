@@ -3,12 +3,16 @@
 //! 命令形如：
 //!
 //! ```text
-//! rsync -rlpt --link-dest=<上一个快照绝对路径> <源>/ <新快照>/
+//! rsync -rlpt --checksum --link-dest=<上一个快照绝对路径> <源>/ <新快照>/
 //! ```
 //!
 //! - `-r` 递归、`-l` 保留符号链接、`-p` 权限、`-t` 时间戳（与 `-a` 相比
 //!   不要求 root 才能保留 owner/group，普通用户可用；macOS 自带 rsync 2.6.9
 //!   与 openrsync 都支持）；
+//! - `--checksum` 按内容校验：rsync 默认的 quick check 只比大小与秒级 mtime，
+//!   同尺寸文件在同一秒内被改写（或 mtime 被工具保留）时会被误判为未变并
+//!   硬链到旧内容，产生"备份显示成功、内容却是旧的"这类静默错误。备份以
+//!   内容正确性优先，故每次按内容校验；代价是每次快照都要读取一遍源文件；
 //! - `--link-dest` 让内容未变化的文件硬链接到上一个快照，实现“只存增量”；
 //! - rsync 3.1+ 额外加 `--info=progress2 --no-inc-recursive` 以回传整体百分比，
 //!   老版本则退化为不确定进度（UI 显示转圈）。
@@ -98,8 +102,24 @@ pub(crate) fn create_snapshot(
 
     fs::create_dir_all(dest)?;
 
-    let mut args: Vec<String> = vec!["-rlpt".to_string()];
-    if supports_progress2() {
+    let args = build_args(src, dest, link_dest, exclude, supports_progress2());
+    run_with_fallback(repo, &args, progress)
+}
+
+/// 构造 rsync 参数（抽成独立函数便于单测，不依赖本机是否安装 rsync）。
+///
+/// 除了 `-rlpt`，这里固定带 `--checksum`：rsync 默认 quick check 为
+/// "大小 + 秒级 mtime"，同尺寸同秒改写或 mtime 被保留时会漏掉变更，
+/// 导致新快照硬链到旧内容。备份工具不能接受这种静默错误。
+fn build_args(
+    src: &Path,
+    dest: &Path,
+    link_dest: Option<&Path>,
+    exclude: Option<&Path>,
+    with_progress: bool,
+) -> Vec<String> {
+    let mut args: Vec<String> = vec!["-rlpt".to_string(), "--checksum".to_string()];
+    if with_progress {
         args.push("--info=progress2".to_string());
         args.push("--no-inc-recursive".to_string());
     }
@@ -119,8 +139,7 @@ pub(crate) fn create_snapshot(
     }
     args.push(with_trailing_slash(src));
     args.push(with_trailing_slash(dest));
-
-    run_with_fallback(repo, &args, progress)
+    args
 }
 
 /// 执行 rsync；遇到老版本不支持的进度参数时去掉后重试一次。
@@ -296,5 +315,40 @@ mod tests {
         let plain = with_trailing_slash(Path::new("/tmp/a"));
         assert!(plain.ends_with('/'), "应以分隔符结尾: {plain}");
         assert_eq!(with_trailing_slash(Path::new("/tmp/a/")), "/tmp/a/");
+    }
+
+    #[test]
+    fn args_force_content_checksum_and_link_dest() {
+        let tmp = std::env::temp_dir().join(format!(
+            "xmc_rsync_args_{}_{}",
+            std::process::id(),
+            crate::next_temp_id()
+        ));
+        let src = tmp.join("instance");
+        let dest = tmp.join("snapshot");
+        let link = tmp.join("previous");
+        for dir in [&src, &dest, &link] {
+            fs::create_dir_all(dir).unwrap();
+        }
+
+        let args = build_args(&src, &dest, Some(&link), None, true);
+        assert_eq!(args[0], "-rlpt");
+        assert!(
+            args.iter().any(|a| a == "--checksum"),
+            "必须按内容校验，否则同尺寸同秒改动会被漏掉: {args:?}"
+        );
+        assert!(
+            args.iter()
+                .any(|a| a.starts_with("--link-dest=") && a.contains("previous")),
+            "--link-dest 应指向上一个快照: {args:?}"
+        );
+        assert_eq!(args[args.len() - 2], with_trailing_slash(&src));
+        assert_eq!(args[args.len() - 1], with_trailing_slash(&dest));
+        // 源目录内部的备份仓库必须被排除，避免自我递归。
+        fs::create_dir_all(src.join("repo")).unwrap();
+        let exclude = build_args(&src, &dest, None, Some(&src.join("repo")), false);
+        assert!(exclude.iter().any(|a| a == "--exclude=/repo/"));
+
+        let _ = fs::remove_dir_all(&tmp);
     }
 }
