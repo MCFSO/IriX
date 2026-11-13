@@ -9,6 +9,8 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 libc = "0.2"
+# 统一时间系统：对账/退避/冷却/迁移时间戳与全局时钟一致
+xmc_time_base = { path = "../time_base" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # SQLite（bundled）持久化服务/副本/迁移任务状态。

@@ -8,3 +8,5 @@ crate-type = ["cdylib"]
 
 [dependencies]
 libc = "0.2"
+# 统一时间系统：日志时间戳与其它模块使用同一个 NTP 校准时钟
+xmc_time_base = { path = "../time_base" }

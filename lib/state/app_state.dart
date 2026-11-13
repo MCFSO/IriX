@@ -19,6 +19,7 @@ import '../services/jvm/jvm_command_sync.dart';
 import '../services/log_persistence.dart';
 import '../services/process_registry.dart';
 import '../services/server_process.dart';
+import '../services/time_service.dart';
 import '../utils/naming.dart';
 import 'app_activity.dart';
 
@@ -151,7 +152,7 @@ class AppState extends ChangeNotifier {
     // L-9：使用 Random.secure()（密码学安全随机），避免可预测后缀。
     final random = Random.secure();
     final suffix = random.nextInt(1 << 20).toRadixString(36).padLeft(4, '0');
-    return '${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}-$suffix';
+    return '${TimeService.instance.nowUnixMicros().toRadixString(36)}-$suffix';
   }
 
   /// 按 id 查找内存中的实例。
@@ -462,7 +463,7 @@ class AppState extends ChangeNotifier {
       RunningProcessRecord(
         pid: manager.pid ?? 0,
         imageName: manager.imageName ?? '',
-        startedAt: DateTime.now().toIso8601String(),
+        startedAt: TimeService.instance.nowLocal().toIso8601String(),
       ),
     );
     _watchExit(id, manager);
@@ -581,7 +582,7 @@ class AppState extends ChangeNotifier {
       RunningProcessRecord(
         pid: manager.pid ?? 0,
         imageName: manager.imageName ?? '',
-        startedAt: DateTime.now().toIso8601String(),
+        startedAt: TimeService.instance.nowLocal().toIso8601String(),
       ),
     );
     _watchExit(id, manager);

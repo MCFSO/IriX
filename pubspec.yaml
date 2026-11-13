@@ -97,6 +97,9 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  assets:
+    - assets/adb/windows/
+
   # 启用 gen-l10n：根据 l10n.yaml 从 lib/l10n/*.arb 生成 AppLocalizations。
   generate: true
 

@@ -10,12 +10,14 @@ import 'dart:async';
 
 import 'l10n/app_localizations.dart';
 import 'screens/home_screen.dart';
+import 'services/adb_bridge.dart';
 import 'services/app_paths.dart';
 import 'services/config_annotation_service.dart';
 import 'services/database_manager.dart';
 import 'services/dev_log.dart';
 import 'services/font_settings.dart';
 import 'services/locale_settings.dart';
+import 'services/time_service.dart';
 import 'state/app_state.dart';
 import 'state/cluster_state.dart';
 import 'state/node_state.dart';
@@ -27,6 +29,12 @@ void main() async {
   // 数据库等小文件，必须在数据库初始化前完成。
   await AppPaths.instance.ensureInitialized();
   await DatabaseManager.instance.init(dataDir: AppPaths.instance.rootSync);
+  // 统一时间系统：启动 NTP 校准线程，之后所有“现在”都走 TimeService。
+  // 失败（未编译 xmc_time）时内部自动退化为 DateTime.now()，不阻塞启动。
+  await TimeService.instance.initialize();
+  // 自动把手机 GNSS 时间桥的端口经 USB 映射到桌面（adb reverse）。
+  // 失败（无设备/未授权/无 adb）不阻塞启动，时间系统页会显示状态。
+  unawaited(AdbBridge.instance.applyReverse());
   await ConfigAnnotationService.instance.init();
   // 旧文档目录下的大数据（日志 / JDK / frpc / 集群镜像）后台搬迁到数据根目录。
   AppPaths.instance.startBackgroundMigration();

@@ -10,6 +10,7 @@ import '../models/node.dart';
 import '../services/device_auth.dart';
 import '../services/node_api_client.dart';
 import '../services/node_store.dart';
+import '../services/time_service.dart';
 
 /// 节点全局状态。
 class NodeState extends ChangeNotifier {
@@ -53,7 +54,7 @@ class NodeState extends ChangeNotifier {
   String _generateId() {
     final random = Random();
     final suffix = random.nextInt(1 << 20).toRadixString(36).padLeft(4, '0');
-    return 'n-${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}-$suffix';
+    return 'n-${TimeService.instance.nowUnixMicros().toRadixString(36)}-$suffix';
   }
 
   /// 初始化：加载持久化节点列表并选中第一个节点。

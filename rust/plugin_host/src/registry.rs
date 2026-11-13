@@ -587,10 +587,5 @@ fn write_file(path: &Path, bytes: &[u8]) -> Result<(), String> {
 }
 
 fn rand_suffix() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let ns = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or(0);
-    format!("{ns:x}")
+    format!("{:x}", xmc_time_base::now_unix_ns())
 }

@@ -105,6 +105,9 @@ class AppPaths {
   /// 无法解密，客户端会提示重新绑定设备（见 docs/device-binding.md §10.1）。
   Future<String> deviceKeysDir() async => p.join(await root(), 'device_keys');
 
+  /// 时间系统状态目录（`xmc_time` 保存上次同步偏移/漂移认知，供热启动 holdover）。
+  Future<String> clockStateDir() async => p.join(await root(), 'clock');
+
   /// 临时目录根：Windows 数据根目录不在系统盘时用 `<root>/temp`，
   /// 其余情况（回退文档目录或非 Windows 平台）沿用系统临时目录。
   Future<String> tempRoot() async {

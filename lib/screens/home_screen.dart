@@ -30,6 +30,7 @@ import 'nodes_screen.dart';
 import 'onboarding_screen.dart';
 import 'plugins_screen.dart';
 import 'settings_screen.dart';
+import 'time_screen.dart';
 
 /// 主页 — 左侧 NavigationRail + 右侧内容区。
 class HomeScreen extends StatefulWidget {
@@ -415,6 +416,11 @@ class _ToolsRow extends StatelessWidget {
             icon: Icons.edit_note,
             label: l.home_nbtEditor,
             onTap: () => pushPage(context, (_) => const NbtEditorScreen()),
+          ),
+          _ToolTile(
+            icon: Icons.schedule,
+            label: '时间系统',
+            onTap: () => pushPage(context, (_) => const TimeScreen()),
           ),
         ],
       ),

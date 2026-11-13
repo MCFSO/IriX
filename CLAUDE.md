@@ -53,7 +53,7 @@ All persistence goes through `DatabaseManager` (singleton, `sqflite_common_ffi`)
 
 ### Rust FFI layer
 
-Twelve Rust crates compiled as separate `.dll`/`.so`/`.dylib` files. Dart FFI wrappers in `lib/services/`:
+Thirteen Rust crates compiled as separate `.dll`/`.so`/`.dylib` files (plus two rlib-only support crates: `time_base`, `time_tls`). Dart FFI wrappers in `lib/services/`:
 
 | Crate | Dart wrapper | Purpose |
 |-------|-------------|---------|
@@ -69,10 +69,74 @@ Twelve Rust crates compiled as separate `.dll`/`.so`/`.dylib` files. Dart FFI wr
 | `plugin_host` | `plugin_ffi.dart` | Native plugin host: C ABI loader, event dispatch, permission checks |
 | `orchestrator` | `orchestrator_ffi.dart` | K8s-style instance orchestration (reconcile, self-heal, autoscale) |
 | `device_auth` | `device_auth_ffi.dart` | Client device binding: ed25519/P-256 signing, HMAC request proofs, DPAPI-protected key |
+| `time` | `time_ffi.dart` → `time_service.dart` | Unified clock: NTP (rusty_time-core), drift compensation, TSC precision, TLS time provider |
 
 **All HTTP goes through Rust** — `HttpFfiService` for general requests, `Downloader.downloadFile` for large files. Do NOT add `package:http` in Dart. Exception: local loopback servers (OAuth callback, MCP server) use `dart:io HttpServer`.
 
 **All remote DB goes through Rust** — `DbClientFfi.instance.request()` with op string. `RemoteDatabaseService` is the sole business-logic entry point for DB operations. Do NOT add Dart DB client packages.
+
+### Unified time system (`xmc_time`)
+
+Every "now" in the app must come from the same time authority. `rust/time` builds
+`xmc_time.dll` (cdylib), `rust/time_base` is an rlib with `zeitstempel`, calendar/HTTP
+date helpers and the cross-DLL bridge, `rust/time_tls` is an rlib with the rustls
+`TimeProvider`.
+
+- **Clock model**: `app_time = anchor_unix + (mono - anchor_mono) * (1 + rate_ppm*1e-6) + drain`.
+  The OS clock is read once at startup and never adjusted; `zeitstempel` provides the
+  monotonic axis; `high_water` prevents intra-process backwards steps (freezes at most 5s).
+- **NTP**: `rusty_time-core` supplies the NTPv4 codec, weighted regression filter and
+  discipline loop. The crate adds UDP I/O, CSPRNG nonce anti-spoofing, response validation
+  (origin, mode, stratum, leap, RTT bounds, Kiss-o'-Death), multi-source falseticker
+  selection, and `poll_drain` scheduling.
+- **Drift**: a 4-state Kalman filter (offset, frequency, daily aging, temperature
+  coefficient) replaces the old regression-frequency model. It fuses NTP offsets with
+  temperature and history; `clock.rate = freq + temp_coeff*(T - T_ref)`. Aging is a state,
+  so holdover continues to evolve; `KalmanSnapshot` persists frequency/aging/temp
+  coefficient across restarts. The per-source regression is retained only for
+  falseticker pre-screening and step/drain policy.
+- **Batch timestamps**: NTP t1/t4 use `precise::batch_stamp(9)` — 9 TSC/monotonic pairs,
+  MAD outlier rejection, residual-based uncertainty fed into the Kalman R.
+- **Temperature**: Linux reads thermal/hwmon sysfs; Windows/macOS accept FFI
+  `time_request("temperature", …)`; EMA + 60s throttle. Temperature is a covariate, not
+  a claim that the sensor equals crystal temperature.
+- **GNSS**: `Service::ingest_gnss` + FFI `time_request("gnss_sample", …)` accept
+  Android GPS/BeiDou samples (`utc_ns`, `mono_ns`, `uncertainty_ns`, constellation, SV
+  count, fix, leap seconds, discontinuity). Stale mono (>2s), invalid fixes and >50ms
+  uncertainty are rejected; 2D/low-SV are down-weighted. GNSS feeds the same Kalman
+  filter, so it can drive the clock without NTP. Cross-device samples require
+  `transport_delay_ns`; same-device native Android uses the JNI bridge
+  (`TimeNative` + `libxmc_time.so` arm64) in `D:\Irix-android`. 32-bit/x86 ABIs and the
+  Android rustls TimeProvider remain to be integrated; see
+  `docs/android-gnss-time-calibration.md`.
+- **Physical limit**: 24h error = ppm × 86.4ms; 1ms/day needs <0.0116ppm residual. The
+  code can reach ms-level only with a stable TCXO/OCXO and good thermal sensing; a
+  motherboard crystal + CPU sensor realistically lands at a few-to-tens of ms/day.
+- **Accuracy**: same quartz as the OS, so absolute accuracy is bounded by NTP paths; the win
+  is independence from a wrong/unsynced/jumping OS clock plus better filtering, monotonicity
+  and TSC resolution. `status.system_skew_ms` reports app clock minus OS clock.
+- **Precision**: on x86_64, `high_precision_clock` (TSC) interpolates between
+  `zeitstempel` samples (least-squares fit, 250ms sampling, 100µs sanity reset,
+  auto-disable). NTP t1/t4 additionally use batch sampling with MAD rejection. Other
+  architectures fall back to `zeitstempel`.
+- **HTTPS**: `xmc_time_tls::client_config()` builds a rustls config with
+  `builder_with_details(ring_provider, AppTimeProvider)`, so certificate
+  `notBefore`/`notAfter` are judged by the NTP-disciplined clock. `http_client` and
+  `downloader` set it on their ureq agents. HTTP `Date` headers are only reported as
+  `date_skew_ms` — never used to steer the clock.
+- **Dart**: `TimeService.instance` is the only entry point (`nowUnixMs`, `nowUnixSeconds`,
+  `nowUnixMicros`, `nowUtc`, `nowLocal`, `httpDate`, `syncNow`, `probe`, `configure`). FFI ops go through
+  `TimeFfi`/`time_request`; hot paths use the exported `xmc_time_now_unix_ms/ns` symbols.
+  Use it for login/device-proof timestamps (`DeviceAuthProtocol.timestampText`), challenge
+  expiry, TOTP, token expiry, migration deadlines, backup/log timestamps. UI display and
+  pure ID naming may still use `DateTime.now()`.
+- **Cross-DLL**: each FFI DLL statically links its own copy of Rust code, so
+  `xmc_time_base::link` loads `xmc_time.dll` at runtime and calls its C exports; if the
+  DLL is absent it falls back to a monotonic-anchored system-time estimate.
+- **Tests**: `cargo test -p xmc_time_base -p xmc_time -p xmc_time_tls` and
+  `flutter test test/time_ffi_test.dart` (local UDP NTP mock, no public network).
+  Full design: `docs/time-system.md`.
+
 
 ### Instance backup: full + incremental (all in Rust)
 
@@ -120,7 +184,9 @@ When adding a crate, update ALL of these:
 6. `.github/workflows/build-and-test.yml` and `.github/workflows/package.yml`
 
 Then run `dart tool/ffi_dlls.dart lists` — it checks every list above against
-`rust/Cargo.toml` (CI runs the same check). Missing an entry is how v1.2.0 shipped
+`rust/Cargo.toml` (CI runs the same check). The tool skips rlib-only members
+(`time_base`, `time_tls`), so only crates declaring `crate-type = [..., "cdylib"]`
+need entries in the seven manifest files. Missing an entry is how v1.2.0 shipped
 a Windows installer with only 3 of 8 `xmc_*.dll`, breaking the marketplace with
 "Rust http_client library not found".
 
@@ -195,7 +261,7 @@ DPAPI (`keyProtection=os-keychain`), other platforms use a 0600 file (`file`).
 - Dark theme only (`Brightness.dark`, green seed color, Material 3)
 - `AppleButton` from `apple_widgets.dart` for primary actions — provides press-down scale animation
 - Use `pushPage()` / `showAppDialog()` from `apple_widgets.dart` instead of raw `Navigator.push` / `showDialog`
-- ID generation: `DateTime.now().microsecondsSinceEpoch.toRadixString(36)` + random suffix — see `AppState._generateId()`
+- ID generation: `TimeService.instance.nowUnixMicros().toRadixString(36)` + random suffix — see `AppState._generateId()`
 
 ### Server instance lifecycle
 

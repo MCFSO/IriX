@@ -63,6 +63,7 @@ set(XMC_RUST_DLLS
   xmc_devlog
   xmc_plugin_host
   xmc_device_auth
+  xmc_time
 )
 foreach(XMC_DLL ${XMC_RUST_DLLS})
   if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${XMC_DLL}.dll")

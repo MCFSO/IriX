@@ -3,17 +3,13 @@
 use std::fs::{self, File};
 use std::io::{self, Read, Write};
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-/// 当前 Unix 秒。
+/// 当前 Unix 秒（IriX 时间系统，NTP 校准过）。
 pub(crate) fn now_secs() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
+    xmc_time_base::now_unix_s()
 }
 
 /// 小写十六进制编码（避免为 CAS 对象键引入额外依赖）。

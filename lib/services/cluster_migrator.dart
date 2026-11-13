@@ -15,6 +15,7 @@ import '../models/remote.dart';
 import '../services/app_paths.dart';
 import '../services/database_manager.dart';
 import '../services/node_api_client.dart';
+import '../services/time_service.dart';
 import '../state/cluster_state.dart';
 import '../state/node_state.dart';
 
@@ -139,7 +140,7 @@ class ClusterMigrator {
       instance.id,
       newManifest,
     );
-    await clusterState.markSynced(instance.id, DateTime.now());
+    await clusterState.markSynced(instance.id, TimeService.instance.nowLocal());
   }
 
   /// 递归枚举本地镜像目录，返回扁平文件列表（相对路径 → 文件）。
@@ -199,8 +200,8 @@ class ClusterMigrator {
     String daemonId,
     String uuid,
   ) async {
-    final deadline = DateTime.now().add(stopTimeout);
-    while (DateTime.now().isBefore(deadline)) {
+    final deadline = TimeService.instance.nowLocal().add(stopTimeout);
+    while (TimeService.instance.nowLocal().isBefore(deadline)) {
       final instance = await client.getInstance(uuid: uuid, daemonId: daemonId);
       if (instance.status == RemoteStatus.stopped) return;
       await Future.delayed(const Duration(seconds: 2));

@@ -6,6 +6,8 @@
 // - [NodeDeviceBinding] 本机对某个节点的绑定记录（仅存公开信息，不存私钥）
 // - [NodeDevice]        节点侧已注册设备列表项（§4）
 
+import '../services/time_service.dart';
+
 /// 设备挑战（`POST /api/auth/device/challenge` 的 data）。
 class DeviceChallenge {
   /// 一次性随机挑战（base64url 无填充，32 字节）。
@@ -42,7 +44,7 @@ class DeviceChallenge {
   /// 挑战是否还在有效期内（留 5s 余量，避免边界请求被拒）。
   bool get isValid =>
       nonce.isNotEmpty &&
-      DateTime.now().millisecondsSinceEpoch < expiresAt - 5 * 1000;
+      TimeService.instance.nowUnixMs() < expiresAt - 5 * 1000;
 }
 
 /// 本机设备密钥信息（`xmc_device_auth` 的 `ensure_key` / `key_status` 返回值）。

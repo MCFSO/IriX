@@ -197,7 +197,12 @@ fn do_request(
         .timeout_connect(Duration::from_secs(30))
         .timeout_read(read_timeout)
         .redirects(max_redirects.max(1))
+        // HTTPS 的证书有效期由 IriX 时间系统裁决（NTP 校准后的应用时钟），
+        // 不使用可能被手动改错的操作系统时间。
+        .tls_config(xmc_time_tls::client_config())
         .build();
+
+    let started = std::time::Instant::now();
 
     // 构建请求
     let request = match method.to_ascii_uppercase().as_str() {
@@ -238,6 +243,8 @@ fn do_request(
     };
 
     let status = response.status();
+    // 记录服务器 Date（在响应被消费前），用于时间偏差诊断。
+    let date_header = response.header("date").map(|s| s.to_string());
 
     // 组装响应头（同名头合并为数组），需在 into_reader 消费响应前收集
     let mut header_map = serde_json::Map::new();
@@ -262,11 +269,22 @@ fn do_request(
         return Err(format!("响应体超过上限 {MAX_BODY_BYTES} 字节"));
     }
 
+    // HTTPS 的 Date 头只作为偏差诊断：时间系统不会因为单个服务器的日期而拨钟。
+    let rtt_ms = started.elapsed().as_millis().min(i64::MAX as u128) as i64;
+    let server_date_unix = date_header
+        .as_deref()
+        .and_then(xmc_time_base::httpdate::parse_http_date);
+    let date_skew_ms = server_date_unix
+        .map(|server_s| xmc_time_base::note_http_date(server_s, rtt_ms));
+
     Ok(json!({
         "ok": true,
         "status": status,
         "headers": header_map,
         "body_b64": BASE64.encode(&buf),
+        "server_date_unix": server_date_unix,
+        "date_skew_ms": date_skew_ms,
+        "rtt_ms": rtt_ms,
     })
     .to_string())
 }

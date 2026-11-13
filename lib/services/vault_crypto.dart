@@ -24,6 +24,8 @@ import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
 
+import 'time_service.dart';
+
 /// 解锁挑战签名消息前缀（与 irix-node 服务端约定，docs/vault-design.md §7.1）。
 ///
 /// 签名消息 = 前缀 + 挑战字符串（UTF-8 编码后签名，base64 无填充输出）。
@@ -964,7 +966,7 @@ Future<String> totpCode(
     throw const VaultCryptoException('TOTP 密钥为空');
   }
   final counter =
-      ((at ?? DateTime.now()).millisecondsSinceEpoch ~/ 1000) ~/ period;
+      ((at?.millisecondsSinceEpoch ?? TimeService.instance.nowUnixMs()) ~/ 1000) ~/ period;
   final msg = _bigIntToBytes(BigInt.from(counter), 8);
   final mac = await Hmac.sha1().calculateMac(msg, secretKey: SecretKey(key));
   final h = mac.bytes;

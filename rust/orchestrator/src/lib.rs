@@ -336,8 +336,5 @@ fn parse_observed(args: &Json) -> Result<Vec<ReplicaObserved>, String> {
 }
 
 fn now_ms() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis() as i64)
-        .unwrap_or(0)
+    xmc_time_base::now_unix_ms()
 }

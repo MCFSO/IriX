@@ -16,7 +16,6 @@ use std::path::Path;
 use std::sync::mpsc::{self, Sender};
 use std::sync::Mutex;
 use std::thread::JoinHandle;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use std::ffi::{CStr, CString};
 
@@ -66,41 +65,16 @@ static HANDLE: Mutex<Option<JoinHandle<()>>> = Mutex::new(None);
 
 /// 本地时区时间戳：YYYY-MM-DD HH:MM:SS.mmm
 fn local_timestamp() -> String {
-    // Rust 标准库无跨平台本地时区 API，这里用 UTC（带日期计算）保证可移植；
-    // 文件名时间戳同理。按 UTC 对齐排障即可。
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default();
-    let secs = now.as_secs();
-    let millis = now.subsec_millis();
-
-    // 将 Unix 秒拆为 (年-月-日 时:分:秒)，用 Howard Hinnant 的 civil_from_days
-    // 算法（准确处理闰年，不依赖 chrono）。
-    let days = (secs / 86_400) as i64;
-    let secs_of_day = (secs % 86_400) as i64;
-    let (y, mo, d) = civil_from_days(days);
-    let h = (secs_of_day / 3600) as u32;
-    let mi = ((secs_of_day % 3600) / 60) as u32;
-    let s = (secs_of_day % 60) as u32;
+    // 时间来自 IriX 时间系统（NTP 校准后的应用时钟），与 UI/备份/HTTPS 同源；
+    // 格式保持 UTC，避免 Rust 标准库缺少跨平台时区 API 的问题。
+    let unix_ns = xmc_time_base::now_unix_ns();
+    let secs = unix_ns.div_euclid(1_000_000_000);
+    let millis = (unix_ns.rem_euclid(1_000_000_000) / 1_000_000) as u32;
+    let (y, mo, d, h, mi, s) = xmc_time_base::civil::civil_from_unix(secs);
     format!(
         "{:04}-{:02}-{:02} {:02}:{:02}:{:02}.{:03}",
         y, mo, d, h, mi, s, millis
     )
-}
-
-/// days_from_civil 的逆：自 1970-01-01 起的天数 -> (年, 月, 日)。
-/// 来源：Howard Hinnant "date" 算法。
-fn civil_from_days(z: i64) -> (i64, u32, u32) {
-    let z = z + 719_468;
-    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
-    let doe = (z - era * 146_097) as i64; // [0, 146096]
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365; // [0, 399]
-    let y = yoe + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100); // [0, 365]
-    let mp = (5 * doy + 2) / 153; // [0, 11]
-    let d = (doy - (153 * mp + 2) / 5 + 1) as u32; // [1, 31]
-    let m = if mp < 10 { mp + 3 } else { mp - 9 } as u32; // [1, 12]
-    (if m <= 2 { y + 1 } else { y }, m, d)
 }
 
 /// 格式化一行：时间戳 + [LEVEL] + [TAG] + 消息。

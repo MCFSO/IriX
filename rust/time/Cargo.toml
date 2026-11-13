@@ -1,0 +1,22 @@
+[package]
+name = "xmc_time"
+version = "0.1.0"
+edition = "2021"
+description = "IriX unified time system: disciplined monotonic clock, NTP, drift compensation, high-precision interpolation and TLS time provider"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+libc = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# 共享基础层：单调时钟、日历/HTTP 日期、跨 DLL 时间桥
+xmc_time_base = { path = "../time_base" }
+# rusty_time 的 NTPv4 协议编解码 + 回归滤波器 + 时钟纪律算法（纯 Rust，无 I/O）
+rusty_time-core = "0.3"
+getrandom = "0.3"
+
+# TSC（rdtsc）纳秒插值：仅在 x86_64 上可用，其它架构自动退化为纯 zeitstempel
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+high_precision_clock = "0.1"

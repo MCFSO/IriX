@@ -148,6 +148,8 @@ fn build_agent(user_agent: &str) -> ureq::Agent {
         .user_agent(user_agent)
         .timeout_connect(Duration::from_secs(30))
         .timeout_read(Duration::from_secs(60))
+        // 证书 notBefore/notAfter 用 IriX 时间系统判断，而不是操作系统时钟
+        .tls_config(xmc_time_tls::client_config())
         .build()
 }
 

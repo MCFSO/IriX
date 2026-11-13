@@ -599,10 +599,7 @@ fn now_ms(input: i64) -> i64 {
     if input > 0 {
         return input;
     }
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis() as i64)
-        .unwrap_or(0)
+    xmc_time_base::now_unix_ms()
 }
 
 /// 供其它模块使用的当前时间入口。

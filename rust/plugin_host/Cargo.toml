@@ -7,6 +7,8 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+# 统一时间系统（基础层）：插件 id 的唯一后缀使用应用时钟
+xmc_time_base = { path = "../time_base" }
 # 原生插件动态库加载（不依赖具体 Rust ABI，插件按 C ABI 导出符号）
 libloading = "0.8"
 # zip 解包（安装插件包用），配合安全路径校验防 zip-slip

@@ -26,6 +26,7 @@ case "$(uname -s)" in
     cp -f target/release/libxmc_devlog.so ../linux/
     cp -f target/release/libxmc_plugin_host.so ../linux/
     cp -f target/release/libxmc_device_auth.so ../linux/
+    cp -f target/release/libxmc_time.so ../linux/
     ;;
   Darwin)
     echo "Copying .dylib files to macos/ ..."
@@ -41,6 +42,7 @@ case "$(uname -s)" in
     cp -f target/release/libxmc_devlog.dylib ../macos/
     cp -f target/release/libxmc_plugin_host.dylib ../macos/
     cp -f target/release/libxmc_device_auth.dylib ../macos/
+    cp -f target/release/libxmc_time.dylib ../macos/
     ;;
   *)
     echo "Unsupported platform: $(uname -s)" >&2

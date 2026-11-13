@@ -7,15 +7,16 @@ IriX（X Minecraft Server Launcher）—— Minecraft 服务器管理工具。Fl
 ## 技术栈
 
 - **UI**: Flutter 3.x (Dart SDK >= 3.12), Provider 状态管理
-- **Rust**: workspace（backup / downloader / http_client / file_ops / logger / db_client / vector_store / nbt / devlog / plugin_host / orchestrator / device_auth），release profile 开启 `opt-level = 3` + `lto`
+- **Rust**: workspace（backup / downloader / http_client / file_ops / logger / db_client / vector_store / nbt / devlog / plugin_host / orchestrator / device_auth / time；另有 time_base、time_tls 两个纯 rlib 基础层），release profile 开启 `opt-level = 3` + `lto`
 - **存储**: SQLite（sqflite_common_ffi，settings 表统一存设置）
-- **FFI**: `package:ffi` 调用 `xmc_backup.dll`、`xmc_downloader.dll`、`xmc_http_client.dll`、`xmc_file_ops.dll`、`xmc_logger.dll`、`xmc_db_client.dll`、`xmc_vector_store.dll`、`xmc_nbt.dll`、`xmc_devlog.dll`、`xmc_plugin_host.dll`、`xmc_orchestrator.dll`、`xmc_device_auth.dll`
+- **FFI**: `package:ffi` 调用 `xmc_backup.dll`、`xmc_downloader.dll`、`xmc_http_client.dll`、`xmc_file_ops.dll`、`xmc_logger.dll`、`xmc_db_client.dll`、`xmc_vector_store.dll`、`xmc_nbt.dll`、`xmc_devlog.dll`、`xmc_plugin_host.dll`、`xmc_orchestrator.dll`、`xmc_device_auth.dll`、`xmc_time.dll`
 - **数据库**: 远程数据库（MySQL/MariaDB/PostgreSQL/Redis）连接与操作由 Rust 执行（`db_client` crate，mysql/postgres/redis 纯 Rust 驱动，无 OpenSSL）；本地持久化用 SQLite（sqflite_common_ffi，`DatabaseManager`）
 - **网络**: 全部 HTTP 请求由 Rust 处理（`http_client` crate 通用请求 + `downloader` crate 流式/分片下载，均为 ureq + rustls，无 OpenSSL）；Dart 侧不再使用 `package:http`（仅测试用例保留），本地回环 HTTP 服务（OAuth 回调、MCP 服务端）仍用 `dart:io HttpServer`
 - **知识库（RAG）**: `vector_store` crate（milvus-sdk-rust 官方 SDK，纯 rustls、无 OpenSSL）只负责远程 Milvus 向量存取与相似检索，不做 embedding；embedding 请求走 Rust `HttpFfiService`（http_client crate）调 AI 模型 API，`knowledge_service.dart` 组装请求并传入向量，维度需与建库时一致；Milvus 连接配置（uri/token/collection）作为独立 AI 设置项（`AiSettings.getMilvusConfig`/`setMilvusConfig`，key=`kb_milvus_config`），不进入远程数据库连接列表
 - **NBT 编辑器**: `nbt` crate（纯 Rust，无外部游戏运行时）实现 Minecraft NBT 的 gzip 大端二进制 ↔ SNBT 双向编解码与树路径增删改查；`nbt_ffi.dart`/`nbt_service.dart` 经 FFI 调用 `xmc_nbt` 动态库（`nbt_request(op,args)`），`nbt_editor_screen.dart` 复刻 AnkiNBT 的通用树/物品/实体/村民交易四领域双模式（高级树 + 简易字段）编辑 UI；数据来源为文件/粘贴 NBT 与连运行中服务器的 RCON（阶段 3），无 Minecraft 客户端运行时故不编辑玩家手持物品
-- **开发者日志**: `devlog` crate（纯 Rust，仅依赖 libc）实现开发者模式下的全量日志落盘；`devlog_ffi.dart` 经 FFI 调用 `xmc_devlog` 动态库的 `app_log_init(dir)`（在 exe 目录/logs 下新建 `dev-<时间戳>.log` 会话文件并以后台线程写盘）、`app_log_write(level,tag,msg)`、`app_log_flush()`、`app_log_shutdown()`；Dart 侧 `dev_log.dart` 仅在开发者模式开启时调用，记录运行日志流/操作轨迹/网络明细/启动与崩溃堆栈，会话文件无限增长、不滚动不清理
+- **开发者日志**: `devlog` crate（纯 Rust，仅依赖 libc + `time_base`）实现开发者模式下的全量日志落盘；`devlog_ffi.dart` 经 FFI 调用 `xmc_devlog` 动态库的 `app_log_init(dir)`（在 exe 目录/logs 下新建 `dev-<时间戳>.log` 会话文件并以后台线程写盘）、`app_log_write(level,tag,msg)`、`app_log_flush()`、`app_log_shutdown()`；Dart 侧 `dev_log.dart` 仅在开发者模式开启时调用，记录运行日志流/操作轨迹/网络明细/启动与崩溃堆栈，会话文件无限增长、不滚动不清理
 - **设备绑定（irix-node v1.4.0+）**: `device_auth` crate（`ring` 提供 ed25519 / ECDSA P-256 / HMAC-SHA256 / CSPRNG）负责设备密钥与全部签名，经 `dev_auth_request(op,args)` 暴露给 `device_auth_ffi.dart`/`device_auth.dart`；私钥不进入 Dart 堆内存（Windows DPAPI 加密为 `os-keychain`，其他平台 0600 文件为 `file`），密钥目录 `AppPaths.deviceKeysDir()`。绑定记录只存公开信息（settings 表 `node_device_bindings`）；已绑定会话由 `node_api_client.dart` 自动附加 4 个逐请求证明头，`required` 策略失败抛 `NodeDeviceBindingException` 且禁止降级；协议见 irix-node `docs/device-binding.md`，接口清单见 `NODE_API.md` §10，测试 `test/device_auth_ffi_test.dart` + `test/node_device_binding_test.dart`
+- **统一时间系统（xmc_time）**: 应用内所有“现在”的权威来源。`time` crate（`xmc_time.dll`）用 `zeitstempel` 单调时钟 + `rusty_time-core` 的 NTPv4 客户端/多源选择，时钟核心是一个 **4 状态卡尔曼滤波**（偏移/频率/日老化率/温度系数），融合 NTP 历史、温度与 Android GPS/北斗样本；NTP t1/t4 采用批量采样 + MAD 剔除调度抖动；x86_64 上用 `high_precision_clock` 的 TSC 插值把时间戳做到亚百纳秒。`time_base`（rlib）提供单调时钟、日历/HTTP 日期与跨 DLL 时间桥，`time_tls`（rlib）提供 rustls `TimeProvider`——http_client/downloader 的证书 `notBefore/notAfter` 由应用时钟裁决。Dart 侧 `TimeService`（`time_ffi.dart`）是唯一业务入口，登录/注册/逐请求证明时间戳、设备挑战过期、TOTP、Token 过期、迁移超时等必须用它；主页“时间系统”磁贴可查看同步状态/服务器/卡尔曼/GNSS 状态并手动同步。FFI 入口 `time_request(op,args)`，热路径 `xmc_time_now_unix_ns/ms`，另有 `temperature`/`accuracy`/`gnss_sample` op；跨 DLL 桥只加载 `xmc_time.dll`，不要在各 crate 里重复实现 NTP。详见 `docs/time-system.md`（含 24h 物理误差分析）与 `docs/android-gnss-time-calibration.md`，测试 `cargo test -p xmc_time_base -p xmc_time -p xmc_time_tls` + `test/time_ffi_test.dart`
 - **实例备份（全量 + 增量）**: `backup` crate 提供两类备份，**全部在 Rust 内实现**，Dart 只经 FFI 调用。①全量备份 = 原备份功能：整个实例目录用 rayon 并行 Deflate 压缩为单个 ZIP（`backup_directory`，兼容旧调用）。②增量备份：Linux/macOS 用 `rsync -rlpt --checksum --link-dest=<上一个快照>` 硬链接快照（`--checksum` 按内容校验，避免「大小相同 + 同一秒内改写」被 quick check 漏判；rsync 缺失/失败回退 Rust 原生硬链接快照，按大小 + 纳秒级 mtime 比对），Windows 用 SHA-256 哈希比对 + 内容寻址存储（`cas/<hash前两位>/<hash>`，跨快照自动去重、删除快照时回收孤立对象）。两类备份统一落在一个仓库：`AppPaths.instanceBackupsRoot(instanceId)` = `<数据根>/backups/<实例 id>/`（`full/`、`snapshots/`、`cas/`、`meta/`、`temp/`）。统一 FFI 入口 `backup_request(op, argsJson, progressCb)` 返回 JSON（`status`/`full_create`/`full_restore`/`full_delete`/`snapshot_create`/`snapshot_restore`/`snapshot_verify`/`snapshot_delete`/`gc`），Dart 侧 `backup_ffi.dart`（isolate + NativeCallable 进度/取消）→ `backup_manager.dart`（唯一业务入口）→ `screens/instance_backup_tab.dart`（备份页**只有两个按钮**：全量备份 / 增量备份，下方为备份历史列表，点按行在弹窗里恢复/校验/删除）。测试：`rust/backup/src/*.rs` 单元测试（`cargo test -p xmc_backup`）+ `test/backup_ffi_test.dart`
 
 ## 目录结构
@@ -31,6 +32,9 @@ lib/
 ├── widgets/               # 通用组件
 └── data/                  # 静态数据（config_descriptions、server_cores）
 rust/
+├── time_base/             # 时间基础层（rlib）：zeitstempel 单调时钟、日历/HTTP 日期、跨 DLL 时间桥
+├── time_tls/              # 时间系统的 rustls TimeProvider（rlib，供 http_client/downloader 使用）
+├── time/                  # 统一时间系统（xmc_time.dll）：NTP 客户端、纪律环、应用时钟、FFI
 ├── backup/                # 实例备份：全量（并行 ZIP）+ 增量（rsync 硬链接快照 / 哈希比对+CAS）
 ├── downloader/            # HTTP 流式/分片下载（断点续传）
 ├── http_client/           # 通用 HTTP 请求（GET/POST/PUT/PATCH/DELETE/HEAD，响应含 base64 体）
@@ -78,10 +82,11 @@ flutter test test/knowledge_ffi_test.dart
 ## 关键约定
 
 - **修改 Rust 代码后**必须先重新编译并复制动态库到平台目录（Windows `windows/runner/`、Linux `linux/`、macOS `macos/`），否则运行的是旧动态库
-- **新增 Rust crate 时**需同步更新：`rust/Cargo.toml` members、`build_rust.bat` / `build_rust.sh`、`linux/CMakeLists.txt`、`windows/runner/CMakeLists.txt`、`macos/Runner.xcodeproj/project.pbxproj`（dylib 复制+签名脚本），以及 **两个** CI workflow：`.github/workflows/build-and-test.yml` 和 `.github/workflows/package.yml`（后者极易漏改）；改完跑 `dart tool/ffi_dlls.dart lists` 自检（以 `rust/Cargo.toml` members 为准，CI 同样会校验）
+- **新增 Rust crate 时**需同步更新：`rust/Cargo.toml` members、`build_rust.bat` / `build_rust.sh`、`linux/CMakeLists.txt`、`windows/runner/CMakeLists.txt`、`macos/Runner.xcodeproj/project.pbxproj`（dylib 复制+签名脚本），以及 **两个** CI workflow：`.github/workflows/build-and-test.yml` 和 `.github/workflows/package.yml`（后者极易漏改）；改完跑 `dart tool/ffi_dlls.dart lists` 自检（以 `rust/Cargo.toml` members 为准，CI 同样会校验）。纯 rlib 成员（如 `time_base`、`time_tls`）不产出动态库，工具会自动跳过，不需要加入 7 个清单文件
 - **发布包里的 FFI 动态库只由 CMake / Xcode 构建阶段决定**：`fastforge package` 打包前会先 `flutter clean` 再重建，往里手工补动态库是无效的；Release 缺库时构建会直接失败（Windows：`windows/runner/check_rust_dlls.cmake`，Linux：`linux/CMakeLists.txt`），三个平台的打包 job 在打包后还会用 `dart tool/ffi_dlls.dart bundle <产物目录> --ext .dll` 复核产物
 - **FFI 集成测试**（`test/*_ffi_test.dart`）需要动态库已编译并复制到 `windows/runner/` 或项目根目录（`build_rust.bat` 会复制到两处）；本地回环 HTTP 测试（http_ffi 等）用 `dart:io HttpServer` 自起服务，无需外部依赖
 - Rust 导出函数通过 FFI 调用，Dart 侧封装在 `lib/services/*_ffi.dart`（如 `backup_ffi.dart`、`file_ops_ffi.dart`、`logger_ffi.dart`）
+- **所有“现在”统一走时间系统**：Rust 侧用 `xmc_time_base::now_unix_*`（跨 DLL 桥，拿 NTP 校准后的应用时间），Dart 侧用 `TimeService.instance`（`nowUnixMs/nowUnixSeconds/nowUnixMicros`）；安全/时间敏感路径（登录与逐请求证明时间戳、设备挑战、TOTP、Token 过期、TLS 证书有效期、日志/备份/编排时间戳）禁止直接 `SystemTime::now()` / `DateTime.now()`。Rust 新 crate 若要时间，加 `xmc_time_base = { path = "../time_base" }`，不要依赖 `xmc_time`（cdylib）
 - **所有 HTTP 请求统一走 Rust**：通用请求用 `lib/services/http_ffi.dart`（`HttpFfiService`，小/中响应），大文件下载用 `lib/services/downloader.dart`（`Downloader.downloadFile`，流式写盘）；新增 API 服务禁止使用 `package:http`，本地回环 HTTP 服务端（OAuth 回调、MCP）例外
 - **所有远程数据库操作统一走 Rust**：通过 `lib/services/db_client_ffi.dart`（`DbClientFfi`）调用 `xmc_db_client` 动态库的 `db_request` 入口（MySQL/MariaDB/PostgreSQL/Redis 连接测试、浏览、查询、管理）；禁止在 Dart 侧新增数据库客户端依赖；`remote_db_service.dart` 是唯一业务入口
 - 状态管理统一走 `lib/state/`（Provider），不在 widget 内直接持有全局状态

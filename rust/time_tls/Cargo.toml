@@ -1,0 +1,14 @@
+[package]
+name = "xmc_time_tls"
+version = "0.1.0"
+edition = "2021"
+description = "IriX 时间系统的 rustls 时间提供者：证书有效期由 NTP 校准后的应用时钟裁决"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+xmc_time_base = { path = "../time_base" }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-pki-types = "1"
+webpki-roots = "1"

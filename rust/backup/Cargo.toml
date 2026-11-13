@@ -7,6 +7,7 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
+xmc_time_base = { path = "../time_base" }
 rayon = "1"
 # 用 zlib-ng 后端 (C 库, 含 SSE2/AVX2 优化的 deflate, 运行时 cpuid 检测并自动降级)
 flate2 = { version = "1", default-features = false, features = ["zlib-ng"] }

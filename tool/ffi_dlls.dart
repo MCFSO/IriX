@@ -67,6 +67,9 @@ void main(List<String> args) {
 Directory _repoRoot() => File.fromUri(Platform.script).parent.parent;
 
 /// 解析 `[workspace] members = [...]` 里的成员名，作为动态库清单的事实来源。
+///
+/// 只返回声明了 `crate-type = [..., "cdylib"]` 的成员：像 `time_base` / `time_tls`
+/// 这种纯 rlib 基础层不产出 `xmc_*.dll`，不应要求 7 个清单文件都提到它。
 List<String> _readWorkspaceCrates(Directory root) {
   final file = File('${root.path}/$_cargoToml');
   if (!file.existsSync()) return const <String>[];
@@ -76,9 +79,20 @@ List<String> _readWorkspaceCrates(Directory root) {
     dotAll: true,
   ).firstMatch(file.readAsStringSync());
   if (match == null) return const <String>[];
-  return RegExp(
+  final members = RegExp(
     r'"([^"]+)"',
   ).allMatches(match.group(1)!).map((m) => m.group(1)!).toList();
+  final crates = <String>[];
+  for (final member in members) {
+    final manifest = File('${root.path}/rust/$member/Cargo.toml');
+    if (!manifest.existsSync()) continue;
+    final crateType = RegExp(
+      r'crate-type\s*=\s*\[([^\]]*)\]',
+    ).firstMatch(manifest.readAsStringSync())?.group(1) ??
+        '';
+    if (crateType.contains('cdylib')) crates.add(member);
+  }
+  return crates;
 }
 
 /// 每个清单文件都必须提到每个 crate 对应的动态库名。

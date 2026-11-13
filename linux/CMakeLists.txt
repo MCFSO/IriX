@@ -130,6 +130,7 @@ set(XMC_RUST_LIBS
   "${CMAKE_CURRENT_SOURCE_DIR}/libxmc_devlog.so"
   "${CMAKE_CURRENT_SOURCE_DIR}/libxmc_plugin_host.so"
   "${CMAKE_CURRENT_SOURCE_DIR}/libxmc_device_auth.so"
+  "${CMAKE_CURRENT_SOURCE_DIR}/libxmc_time.so"
 )
 set(XMC_RUST_LIBS_MISSING "")
 foreach(rust_lib ${XMC_RUST_LIBS})

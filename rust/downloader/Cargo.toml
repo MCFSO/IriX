@@ -8,6 +8,8 @@ crate-type = ["cdylib"]
 
 [dependencies]
 libc = "0.2"
+# 统一时间系统：HTTPS 证书有效期由应用时钟裁决
+xmc_time_tls = { path = "../time_tls" }
 # 纯 Rust HTTP 客户端 (无 OpenSSL 依赖)，使用 rustls 后端
 # tls 特性启用 HTTPS 支持；禁用默认特性避免引入 charset/encoding 等多余功能
 ureq = { version = "2", default-features = false, features = ["tls", "gzip"] }

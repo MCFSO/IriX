@@ -8,6 +8,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 import '../services/database_manager.dart';
+import '../services/time_service.dart';
 
 class TrashItem {
   final String id;
@@ -58,7 +59,7 @@ class TrashStore {
   String _trashDir(String rootPath) => p.join(rootPath, _trashDirName);
 
   String _generateId() {
-    final now = DateTime.now().microsecondsSinceEpoch;
+    final now = TimeService.instance.nowUnixMicros();
     final suffix = (now % (1 << 20)).toRadixString(36).padLeft(4, '0');
     return '${now.toRadixString(36)}-$suffix';
   }
@@ -80,7 +81,7 @@ class TrashStore {
       id: id,
       originalPath: entity.path,
       trashPath: trashPath,
-      deletedAt: DateTime.now(),
+      deletedAt: TimeService.instance.nowLocal(),
     );
     await DatabaseManager.instance.insertTrashItem(item.toDbRow(rootPath));
   }

@@ -7,7 +7,7 @@ use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
-use chrono::{Utc, Duration};
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
 use serde_json::Value;
@@ -496,13 +496,7 @@ pub extern "C" fn delete_to_trash(
         }
     };
 
-    let uuid = format!(
-        "{:x}",
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    );
+    let uuid = format!("{:x}", xmc_time_base::now_unix_ns());
     let unique_name = format!("{}_{}", uuid, original_name);
     let trash_path = trash_dir.join(&unique_name);
 
@@ -517,7 +511,7 @@ pub extern "C" fn delete_to_trash(
         original_path: file_str.to_string(),
         file_name: original_name.to_string(),
         size: file_size,
-        deleted_at: Utc::now().to_rfc3339(),
+        deleted_at: xmc_time_base::format_iso8601_ms(xmc_time_base::now_unix_ms()),
     };
 
     let mut entries: Vec<TrashEntry> = match fs::read_to_string(&meta_path) {
@@ -940,7 +934,9 @@ pub extern "C" fn auto_clean_trash(root_path: *const libc::c_char) -> libc::c_in
         Err(_) => return 0,
     };
 
-    let cutoff = Utc::now() - Duration::days(7);
+    let now_s = xmc_time_base::now_unix_s();
+    let cutoff = chrono::DateTime::from_timestamp(now_s - 7 * 86_400, 0)
+        .unwrap_or_else(|| chrono::DateTime::from_timestamp(now_s, 0).unwrap());
     let mut purged_count: i32 = 0;
 
     entries.retain(|entry| {

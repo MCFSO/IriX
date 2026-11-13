@@ -16,6 +16,7 @@ import 'package:flutter/foundation.dart';
 
 import 'app_paths.dart';
 import 'backup_ffi.dart';
+import 'time_service.dart';
 
 /// 备份类型。
 enum BackupKind {
@@ -374,7 +375,7 @@ class BackupManager implements BackupOperations {
   ///
   /// Rust 侧会在重名时自动追加 `-2`、`-3`，因此这里不需要查重。
   String newBackupName([DateTime? now]) {
-    final t = now ?? DateTime.now();
+    final t = now ?? TimeService.instance.nowLocal();
     String two(int v) => v.toString().padLeft(2, '0');
     return '${t.year}${two(t.month)}${two(t.day)}-'
         '${two(t.hour)}${two(t.minute)}${two(t.second)}';

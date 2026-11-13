@@ -15,6 +15,7 @@ import '../models/remote.dart';
 import '../services/container/node_container_backend.dart';
 import '../services/font_settings.dart';
 import '../services/node_api_client.dart';
+import '../services/time_service.dart';
 import '../utils/ansi_color.dart';
 import '../utils/apple_widgets.dart';
 import '../utils/docker_visibility.dart';
@@ -172,7 +173,7 @@ class _RemoteInstanceDetailScreenState
   /// 追加一行日志（保留 ANSI），并在挂载后滚动到底部。
   void _appendLog(String line) {
     if (line.isEmpty) return;
-    _lastLogMs ??= DateTime.now().millisecondsSinceEpoch;
+    _lastLogMs ??= TimeService.instance.nowUnixMs();
     setState(() => _log = '$_log$line\n');
     _scrollToBottom();
   }
@@ -205,7 +206,7 @@ class _RemoteInstanceDetailScreenState
       setState(() => _log = log);
       // 保留整段轮询结果用于 since 补发（若后续升级到 WS）。
       if (_log.isNotEmpty) {
-        _lastLogMs = DateTime.now().millisecondsSinceEpoch;
+        _lastLogMs = TimeService.instance.nowUnixMs();
       }
       // 保持滚动到底部
       if (_scrollController.hasClients) {

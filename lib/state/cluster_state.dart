@@ -10,6 +10,7 @@ import '../models/cluster_instance.dart';
 import '../models/remote.dart';
 import '../services/cluster_instance_store.dart';
 import '../services/management_mode_settings.dart';
+import '../services/time_service.dart';
 
 /// 集群全局状态。
 class ClusterState extends ChangeNotifier {
@@ -57,7 +58,7 @@ class ClusterState extends ChangeNotifier {
   String _generateId() {
     final random = Random();
     final suffix = random.nextInt(1 << 20).toRadixString(36).padLeft(4, '0');
-    return 'c-${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}-$suffix';
+    return 'c-${TimeService.instance.nowLocal().microsecondsSinceEpoch.toRadixString(36)}-$suffix';
   }
 
   /// 初始化：加载模式、监控节点与集群实例列表。
@@ -103,7 +104,7 @@ class ClusterState extends ChangeNotifier {
   /// 追加一个聚合网络采样点（限长 [maxNetworkSamples]）。
   void pushNetworkSample(double download, double upload) {
     _networkHistory.add(
-      NetworkSample(DateTime.now(), download: download, upload: upload),
+      NetworkSample(TimeService.instance.nowLocal(), download: download, upload: upload),
     );
     if (_networkHistory.length > maxNetworkSamples) {
       _networkHistory.removeRange(

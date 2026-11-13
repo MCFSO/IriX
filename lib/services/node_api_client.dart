@@ -25,6 +25,7 @@ import '../services/device_auth.dart';
 import '../services/device_auth_canonical.dart';
 import '../services/downloader.dart';
 import '../services/http_ffi.dart';
+import '../services/time_service.dart';
 
 /// 节点 API 异常。
 class NodeApiException implements Exception {
@@ -143,7 +144,7 @@ class NodeAccountSession {
   /// 会话是否仍在有效期内（留 60s 余量，避免边界请求被拒）。
   bool get isValid =>
       token.isNotEmpty &&
-      DateTime.now().millisecondsSinceEpoch < expiresAt - 60 * 1000;
+      TimeService.instance.nowUnixMs() < expiresAt - 60 * 1000;
 
   /// 是否可用逐请求证明（设备绑定会话且已换到 proofKey）。
   bool get canProve => deviceBound && proofKey.isNotEmpty && deviceId.isNotEmpty;
@@ -162,9 +163,8 @@ class NodeAccountSession {
       isAdmin: data['isAdmin'] as bool? ?? false,
       expiresAt:
           (data['expiresAt'] as num?)?.toInt() ??
-          DateTime.now()
-              .add(const Duration(days: 30))
-              .millisecondsSinceEpoch,
+          TimeService.instance.nowUnixMs() +
+              const Duration(days: 30).inMilliseconds,
       deviceBound: data['deviceBound'] as bool? ?? false,
       deviceId: data['deviceId'] as String? ?? '',
     );
@@ -1282,7 +1282,7 @@ class NodeApiClient {
     if (!await file.exists()) {
       throw NodeApiException(0, '本地文件不存在: $localPath');
     }
-    final boundary = 'IriX${DateTime.now().microsecondsSinceEpoch}';
+    final boundary = 'IriX${TimeService.instance.nowUnixMicros()}';
     final bytes = await file.readAsBytes();
     final body = BytesBuilder()
       ..add(
@@ -2074,7 +2074,7 @@ class NodeApiClient {
     if (!await file.exists()) {
       throw NodeApiException(0, '本地文件不存在: $localPath');
     }
-    final boundary = 'IriX${DateTime.now().microsecondsSinceEpoch}';
+    final boundary = 'IriX${TimeService.instance.nowUnixMicros()}';
     final fileName = p.basename(localPath);
     final bytes = await file.readAsBytes();
     final body = BytesBuilder()
@@ -2172,7 +2172,7 @@ class NodeApiClient {
 
   /// 上传归档到节点（POST /api/container/archive/upload，multipart 字段 file）。
   Future<void> nodeArchiveUpload(String fileName, List<int> bytes) async {
-    final boundary = 'IriX${DateTime.now().microsecondsSinceEpoch}';
+    final boundary = 'IriX${TimeService.instance.nowUnixMicros()}';
     final body = BytesBuilder()
       ..add(
         utf8.encode(
@@ -2931,7 +2931,7 @@ class NodeApiClient {
     if (!await file.exists()) {
       throw NodeApiException(0, '本地文件不存在: $localPath');
     }
-    final boundary = 'IriX${DateTime.now().microsecondsSinceEpoch}';
+    final boundary = 'IriX${TimeService.instance.nowUnixMicros()}';
     final fileName = p.basename(localPath);
     final bytes = await file.readAsBytes();
     final body = BytesBuilder()

@@ -13,6 +13,8 @@ import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 
+import 'time_service.dart';
+
 /// 设备绑定协议常量与规范串构造。
 abstract final class DeviceAuthProtocol {
   /// 注册规范串前缀（§4）。
@@ -129,8 +131,12 @@ abstract final class DeviceAuthProtocol {
   }
 
   /// 生成 Unix 秒时间戳的十进制原文字符串（不得带空格或前导零）。
-  static String timestampText([DateTime? now]) =>
-      '${(now ?? DateTime.now()).millisecondsSinceEpoch ~/ 1000}';
+  ///
+  /// 默认使用 IriX 时间系统（NTP 校准后的应用时钟），这是所有登录/注册/逐请求
+  /// 证明签名的唯一时间来源；测试可显式传入 [now] 固定时间。
+  static String timestampText([DateTime? now]) => now == null
+      ? '${TimeService.instance.nowUnixSeconds()}'
+      : '${now.millisecondsSinceEpoch ~/ 1000}';
 
   /// 运行架构标签（与 Go 服务端 `runtime.GOARCH` 风格对齐）。
   static String archLabel() {

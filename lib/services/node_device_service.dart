@@ -14,6 +14,7 @@ import '../models/node_device.dart';
 import 'device_auth.dart';
 import 'device_auth_canonical.dart';
 import 'node_api_client.dart';
+import 'time_service.dart';
 
 /// 设备绑定 / 解绑 / 设备管理业务流程。
 class NodeDeviceService {
@@ -120,7 +121,7 @@ class NodeDeviceService {
       tlsFingerprint: challenge.tlsFingerprint.isNotEmpty
           ? pinned
           : (existing?.tlsFingerprint ?? ''),
-      boundAt: DateTime.now().millisecondsSinceEpoch,
+      boundAt: TimeService.instance.nowUnixMs(),
       deviceName:
           (result['name'] as String?)?.trim().isNotEmpty == true
           ? (result['name'] as String).trim()

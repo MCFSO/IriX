@@ -13,6 +13,7 @@ import '../services/database_manager.dart';
 import '../services/frp_provider.dart';
 import '../services/frpc_manager.dart';
 import '../services/http_ffi.dart';
+import '../services/time_service.dart';
 
 /// ChmlFrp 面板 API 基础地址。
 ///
@@ -164,7 +165,7 @@ class ChmlFrpProvider extends FrpProvider {
     if (refreshToken != null && refreshToken.isNotEmpty) {
       await DatabaseManager.instance.setSetting(_keyRefreshToken, refreshToken);
     }
-    final now = DateTime.now().millisecondsSinceEpoch;
+    final now = TimeService.instance.nowUnixMs();
     int? expires = expiresAt is num ? expiresAt.toInt() : null;
     if (expires == null && expiresIn is num) {
       expires = now + expiresIn.toInt() * 1000;

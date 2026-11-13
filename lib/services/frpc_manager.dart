@@ -19,6 +19,7 @@ import '../services/app_paths.dart';
 import '../services/downloader.dart';
 import '../services/http_ffi.dart';
 import '../services/ofrp_service.dart';
+import '../services/time_service.dart';
 
 /// frpc 进程管理器（单例）。
 ///
@@ -547,7 +548,7 @@ class FrpcManager extends ChangeNotifier {
         p.join(logsDir, 'frpc-$key.log'),
       ).openWrite(mode: FileMode.append);
       logSink.writeln(
-        '===== ${DateTime.now().toIso8601String()} frpc 启动 (flavor: $flavor) =====',
+        '===== ${TimeService.instance.nowLocal().toIso8601String()} frpc 启动 (flavor: $flavor) =====',
       );
     } catch (e) {
       debugPrint('frpc log file open failed: $e');
@@ -570,7 +571,7 @@ class FrpcManager extends ChangeNotifier {
       process.exitCode.then((code) async {
         try {
           logSink?.writeln(
-            '\n===== ${DateTime.now().toIso8601String()} frpc 退出 (code: $code) =====\n',
+            '\n===== ${TimeService.instance.nowLocal().toIso8601String()} frpc 退出 (code: $code) =====\n',
           );
           await logSink?.close();
         } catch (_) {}
