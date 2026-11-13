@@ -93,6 +93,7 @@ pub struct ThermalMonitor {
     interval: Duration,
     last_source: &'static str,
     injected: Mutex<Option<f64>>,
+    platform_reads: bool,
 }
 
 impl ThermalMonitor {
@@ -103,7 +104,13 @@ impl ThermalMonitor {
             interval,
             last_source: "none",
             injected: Mutex::new(None),
+            platform_reads: true,
         }
+    }
+
+    #[cfg(test)]
+    fn disable_platform_reads(&mut self) {
+        self.platform_reads = false;
     }
 
     /// 外部注入温度（FFI / 测试）。下一次 `sample()` 会优先使用它。
@@ -143,8 +150,12 @@ impl ThermalMonitor {
             .and_then(|g| *g);
         let (raw, source) = if let Some(c) = injected {
             (Some(c), "external")
-        } else if let Some(r) = read_celsius() {
-            (Some(r.celsius), r.source)
+        } else if self.platform_reads {
+            if let Some(r) = read_celsius() {
+                (Some(r.celsius), r.source)
+            } else {
+                (None, "none")
+            }
         } else {
             (None, "none")
         };
@@ -184,6 +195,7 @@ mod tests {
     #[test]
     fn invalid_temperature_is_ignored() {
         let mut m = ThermalMonitor::new(Duration::ZERO);
+        m.disable_platform_reads();
         m.inject(999.0);
         assert_eq!(m.sample(true), None);
     }
