@@ -11,6 +11,7 @@ use std::cell::RefCell;
 use std::ffi::{CStr, CString};
 use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom, Write};
+use std::net::{SocketAddr, ToSocketAddrs};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -19,6 +20,23 @@ use std::time::Duration;
 
 thread_local! {
     static LAST_ERROR: RefCell<Option<CString>> = const { RefCell::new(None) };
+}
+
+/// 优先 IPv4 的 DNS 解析器（与 http_client 保持一致）。
+///
+/// 无 IPv6 路由的机器上，先试 AAAA 记录要等系统 SYN 超时（Windows 约 20s）
+/// 才回落 IPv4；下载 20–120 MB 的更新包时这段等待尤其明显。IPv4 优先可让
+/// 连接立即建立，IPv6 只作为没有 A 记录时的退路。
+struct Ipv4FirstResolver;
+
+impl ureq::Resolver for Ipv4FirstResolver {
+    fn resolve(&self, netloc: &str) -> io::Result<Vec<SocketAddr>> {
+        let addrs: Vec<SocketAddr> = netloc.to_socket_addrs()?.collect();
+        let (mut v4, v6): (Vec<SocketAddr>, Vec<SocketAddr>) =
+            addrs.into_iter().partition(|a| a.is_ipv4());
+        v4.extend(v6);
+        Ok(v4)
+    }
 }
 
 static DOWNLOAD_CANCELLED: AtomicBool = AtomicBool::new(false);
@@ -146,7 +164,9 @@ pub extern "C" fn free_string(s: *mut libc::c_char) {
 fn build_agent(user_agent: &str) -> ureq::Agent {
     ureq::AgentBuilder::new()
         .user_agent(user_agent)
-        .timeout_connect(Duration::from_secs(30))
+        // IPv4 优先 + 连接超时 10s：避免无 IPv6 路由的机器先等 20s 才回落。
+        .resolver(Ipv4FirstResolver)
+        .timeout_connect(Duration::from_secs(10))
         .timeout_read(Duration::from_secs(60))
         // 证书 notBefore/notAfter 用 IriX 时间系统判断，而不是操作系统时钟
         .tls_config(xmc_time_tls::client_config())

@@ -12,7 +12,8 @@
 
 use std::cell::RefCell;
 use std::ffi::{CStr, CString};
-use std::io::Read;
+use std::io::{self, Read};
+use std::net::{SocketAddr, ToSocketAddrs};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::time::Duration;
 
@@ -22,6 +23,26 @@ use serde_json::json;
 
 thread_local! {
     static LAST_ERROR: RefCell<Option<CString>> = const { RefCell::new(None) };
+}
+
+/// 优先 IPv4 的 DNS 解析器。
+///
+/// 很多网络（国内家宽/办公网、以及没有可用 IPv6 路由的机器）解析结果里
+/// AAAA 与 A 混排，ureq 会**按顺序**逐个尝试连接：若先连 IPv6，就要等系统
+/// SYN 超时（Windows 实测约 20–23s）才回落到 IPv4，表现为「检查更新/接口
+/// 请求卡 20 多秒」，甚至会先撞上客户端自己的超时。
+///
+/// 这里把 IPv4 排到前面：有 A 记录就先用 IPv4，没有才退回 IPv6。
+struct Ipv4FirstResolver;
+
+impl ureq::Resolver for Ipv4FirstResolver {
+    fn resolve(&self, netloc: &str) -> io::Result<Vec<SocketAddr>> {
+        let addrs: Vec<SocketAddr> = netloc.to_socket_addrs()?.collect();
+        let (mut v4, v6): (Vec<SocketAddr>, Vec<SocketAddr>) =
+            addrs.into_iter().partition(|a| a.is_ipv4());
+        v4.extend(v6);
+        Ok(v4)
+    }
 }
 
 /// 响应体大小上限 (256 MiB)。
@@ -194,7 +215,11 @@ fn do_request(
 
     let agent = ureq::AgentBuilder::new()
         .user_agent(DEFAULT_USER_AGENT)
-        .timeout_connect(Duration::from_secs(30))
+        // IPv4 优先，避免无 IPv6 路由的机器每次都要等 20s 的 IPv6 连接超时。
+        .resolver(Ipv4FirstResolver)
+        // 单个地址的连接超时压到 10s：配合上面的 IPv4 优先，正常情况下
+        // 首个地址即可连通；只有网络确实不通时才走到超时。
+        .timeout_connect(Duration::from_secs(10))
         .timeout_read(read_timeout)
         .redirects(max_redirects.max(1))
         // HTTPS 的证书有效期由 IriX 时间系统裁决（NTP 校准后的应用时钟），
