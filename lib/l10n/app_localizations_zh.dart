@@ -5035,4 +5035,196 @@ class AppLocalizationsZh extends AppLocalizations {
   String instanceDetail_backupSymlinksSkipped(String count) {
     return '已跳过 $count 个符号链接';
   }
+
+  @override
+  String update_availableTitle(String version) {
+    return '发现新版本 $version';
+  }
+
+  @override
+  String update_transition(String current, String latest) {
+    return '$current → $latest';
+  }
+
+  @override
+  String update_publishedAt(String date) {
+    return '发布于 $date';
+  }
+
+  @override
+  String update_assetInfo(String name, String size) {
+    return '$name（$size）';
+  }
+
+  @override
+  String get update_packageType => '安装包';
+
+  @override
+  String update_runningInstancesWarning(String count) {
+    return '检测到 $count 个实例正在运行：更新会重启 IriX，重启后会自动接管这些服务器进程，建议先在控制台停服。';
+  }
+
+  @override
+  String get update_releaseNotes => '更新内容';
+
+  @override
+  String get update_releaseNotesEmpty => '该版本没有填写更新说明。';
+
+  @override
+  String get update_downloading => '正在下载更新…';
+
+  @override
+  String update_downloadProgress(
+    String percent,
+    String downloaded,
+    String total,
+  ) {
+    return '$percent% · $downloaded / $total';
+  }
+
+  @override
+  String update_downloadProgressUnknown(String downloaded) {
+    return '已下载 $downloaded';
+  }
+
+  @override
+  String update_downloadSpeed(String speed) {
+    return '速度 $speed/s';
+  }
+
+  @override
+  String get update_downloadDone => '下载完成，安装包已校验。';
+
+  @override
+  String get update_later => '稍后提醒';
+
+  @override
+  String get update_skipVersion => '跳过此版本';
+
+  @override
+  String get update_openReleasePage => '前往发布页';
+
+  @override
+  String get update_downloadAndInstall => '下载并安装';
+
+  @override
+  String get update_keepRunningHint => '下载在后台进行，关闭窗口不会中断本次更新。';
+
+  @override
+  String get update_background => '后台下载';
+
+  @override
+  String get update_revealFile => '打开文件位置';
+
+  @override
+  String get update_installAndRestart => '安装并重启';
+
+  @override
+  String update_exitCountdown(String seconds) {
+    return 'IriX 将在 $seconds 秒后退出以完成更新，安装完成后会自动重新启动。';
+  }
+
+  @override
+  String get settings_update => '软件更新';
+
+  @override
+  String settings_updateVersionLine(String version, String platform) {
+    return '当前版本 $version（$platform）';
+  }
+
+  @override
+  String settings_updateLatestKnown(String version) {
+    return '最新已知版本：$version';
+  }
+
+  @override
+  String settings_updateLastChecked(String time) {
+    return '上次检查：$time';
+  }
+
+  @override
+  String get settings_updateNeverChecked => '尚未检查过更新';
+
+  @override
+  String get settings_updateCheckNow => '检查更新';
+
+  @override
+  String get settings_updateChecking => '正在检查…';
+
+  @override
+  String settings_updateFound(String version) {
+    return '发现新版本 $version';
+  }
+
+  @override
+  String settings_updateUpToDate(String version) {
+    return '已是最新版本（$version）';
+  }
+
+  @override
+  String settings_updateError(String error) {
+    return '检查失败：$error';
+  }
+
+  @override
+  String settings_updateSkipped(String version) {
+    return '已跳过版本：$version';
+  }
+
+  @override
+  String get settings_updateClearSkip => '取消跳过';
+
+  @override
+  String get settings_updateOpenReleases => '打开发布页';
+
+  @override
+  String get settings_updateAutoCheck => '启动时自动检查更新';
+
+  @override
+  String settings_updateAutoCheckHint(String hours) {
+    return '发现新版本时弹窗提醒；每 $hours 小时最多自动检查一次。';
+  }
+
+  @override
+  String get settings_updateIncludePrerelease => '包含预发布版本';
+
+  @override
+  String get settings_updateIncludePrereleaseHint => '预发布版本可能不稳定，仅在参与测试时开启。';
+
+  @override
+  String get settings_updateHint =>
+      '更新来自 GitHub Releases：检查 api.github.com → 下载 → 校验 SHA-256 → 安装。提示请求过于频繁时，稍后再试即可。';
+
+  @override
+  String get settings_updateInstallHintWindows =>
+      'Windows 安装版：下载后自动静默安装并重启；MSIX 与便携版会打开安装包由你确认。';
+
+  @override
+  String get settings_updateInstallHintMacos =>
+      'macOS：下载 DMG 后自动挂载，请把 lrix.app 拖到“应用程序”覆盖旧版本。';
+
+  @override
+  String get settings_updateInstallHintLinux =>
+      'Linux：AppImage 会自我替换并重启；deb / rpm 交给系统包管理器安装。';
+
+  @override
+  String get settings_updateFeed => '更新源';
+
+  @override
+  String get settings_updateFeedSave => '保存';
+
+  @override
+  String get settings_updateFeedReset => '用回默认';
+
+  @override
+  String get settings_updateFeedHint =>
+      '留空则默认走项目自建的 Cloudflare Worker（update.mcfso.org），失败时自动回退 GitHub 官方 Releases；也可填其它 Worker / 镜像根地址（会自动补 /api/releases）。';
+
+  @override
+  String settings_updateFeedCurrent(String url) {
+    return '当前生效：$url';
+  }
+
+  @override
+  String get settings_updateFeedSaved => '更新源已保存。';
 }

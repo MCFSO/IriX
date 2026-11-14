@@ -15,6 +15,7 @@ import 'dart:convert';
 
 import '../models/node_device.dart';
 import 'app_paths.dart';
+import 'app_version.dart';
 import 'database_manager.dart';
 import 'device_auth_canonical.dart';
 import 'device_auth_ffi.dart';
@@ -22,8 +23,9 @@ import 'device_auth_ffi.dart';
 // 调用方（NodeApiClient / UI）通常只需要业务服务，故把异常类型一并导出。
 export 'device_auth_ffi.dart' show DeviceAuthException, DeviceAuthFfi;
 
-/// 应用版本（写进设备 descriptor 的 `appVersion`，与 pubspec.yaml 保持一致）。
-const String kIrixAppVersion = '1.0.0';
+// 应用版本真源在 app_version.dart（同一常量也用于 OTA 更新检查），这里转出
+// 以保持既有调用方（`kIrixAppVersion`）不受影响。
+export 'app_version.dart' show kIrixAppVersion, kIrixAppVersionLabel;
 
 /// 设备绑定业务服务（单例）。
 class DeviceAuthService {

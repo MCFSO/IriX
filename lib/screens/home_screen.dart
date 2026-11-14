@@ -12,10 +12,12 @@ import '../models/server_instance.dart';
 import '../services/cluster_monitor.dart';
 import '../services/management_mode_settings.dart';
 import '../services/mcp_server.dart';
+import '../services/update_service.dart';
 import '../state/app_state.dart';
 import '../state/cluster_state.dart';
 import '../state/node_state.dart';
 import '../utils/apple_widgets.dart';
+import '../widgets/update_dialog.dart';
 import 'ai_screen.dart';
 import 'cluster_home_screen.dart';
 import 'cluster_instances_screen.dart';
@@ -65,6 +67,30 @@ class _HomeScreenState extends State<HomeScreen> {
         ClusterMonitor.instance.start(context.read<NodeState>(), cluster);
       }
     });
+    // 启动后台检查更新（OTA）：受「启动时自动检查」开关与限频约束，
+    // 发现新版本时弹窗提醒；任何失败都静默，不影响启动。
+    unawaited(_maybeCheckUpdate());
+  }
+
+  /// 启动后台检查 GitHub 版本，有新版本时弹出更新提醒窗。
+  ///
+  /// 延时几秒等启动期 IO（实例加载、Docker 轮询）先跑完，避免抢带宽/卡顿。
+  Future<void> _maybeCheckUpdate() async {
+    if (Platform.environment['FLUTTER_TEST'] == 'true') return;
+    await Future<void>.delayed(const Duration(seconds: 3));
+    if (!mounted) return;
+    final info = await UpdateService.instance.autoCheckOnStartup();
+    if (info == null || !mounted) return;
+    final runningInstances = context
+        .read<AppState>()
+        .instances
+        .where((i) => i.status.isActive)
+        .length;
+    await showUpdateDialog(
+      context,
+      info: info,
+      runningInstances: runningInstances,
+    );
   }
 
   @override

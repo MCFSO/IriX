@@ -1,0 +1,15 @@
+{
+  "name": "irix-update-feed",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "IriX 更新分发 Worker：GitHub Releases 摘要 + 安装包代理（可选 R2）",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node --test test/smoke.test.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

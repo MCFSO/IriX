@@ -3107,5 +3107,172 @@
   "@instanceDetail_backupSymlinksSkipped": {
     "description": "跳过的符号链接数量",
     "placeholders": { "count": { "type": "String" } }
-  }
+  },
+
+  "update_availableTitle": "发现新版本 {version}",
+  "@update_availableTitle": {
+    "description": "更新提醒窗标题",
+    "placeholders": { "version": { "type": "String" } }
+  },
+  "update_transition": "{current} → {latest}",
+  "@update_transition": {
+    "description": "当前版本 → 新版本",
+    "placeholders": {
+      "current": { "type": "String" },
+      "latest": { "type": "String" }
+    }
+  },
+  "update_publishedAt": "发布于 {date}",
+  "@update_publishedAt": {
+    "description": "发布时间",
+    "placeholders": { "date": { "type": "String" } }
+  },
+  "update_assetInfo": "{name}（{size}）",
+  "@update_assetInfo": {
+    "description": "安装包名称与大小",
+    "placeholders": {
+      "name": { "type": "String" },
+      "size": { "type": "String" }
+    }
+  },
+  "update_packageType": "安装包",
+  "@update_packageType": { "description": "安装包类型选择标签" },
+  "update_runningInstancesWarning": "检测到 {count} 个实例正在运行：更新会重启 IriX，重启后会自动接管这些服务器进程，建议先在控制台停服。",
+  "@update_runningInstancesWarning": {
+    "description": "更新前有实例在运行的提示",
+    "placeholders": { "count": { "type": "String" } }
+  },
+  "update_releaseNotes": "更新内容",
+  "@update_releaseNotes": { "description": "更新说明标题" },
+  "update_releaseNotesEmpty": "该版本没有填写更新说明。",
+  "@update_releaseNotesEmpty": { "description": "更新说明为空" },
+  "update_downloading": "正在下载更新…",
+  "@update_downloading": { "description": "下载中提示" },
+  "update_downloadProgress": "{percent}% · {downloaded} / {total}",
+  "@update_downloadProgress": {
+    "description": "下载进度",
+    "placeholders": {
+      "percent": { "type": "String" },
+      "downloaded": { "type": "String" },
+      "total": { "type": "String" }
+    }
+  },
+  "update_downloadProgressUnknown": "已下载 {downloaded}",
+  "@update_downloadProgressUnknown": {
+    "description": "总大小未知时的下载进度",
+    "placeholders": { "downloaded": { "type": "String" } }
+  },
+  "update_downloadSpeed": "速度 {speed}/s",
+  "@update_downloadSpeed": {
+    "description": "下载速度",
+    "placeholders": { "speed": { "type": "String" } }
+  },
+  "update_downloadDone": "下载完成，安装包已校验。",
+  "@update_downloadDone": { "description": "下载完成提示" },
+  "update_later": "稍后提醒",
+  "@update_later": { "description": "关闭更新提醒，下次启动再提示" },
+  "update_skipVersion": "跳过此版本",
+  "@update_skipVersion": { "description": "跳过该版本，不再提示" },
+  "update_openReleasePage": "前往发布页",
+  "@update_openReleasePage": { "description": "打开发布页" },
+  "update_downloadAndInstall": "下载并安装",
+  "@update_downloadAndInstall": { "description": "下载并安装更新" },
+  "update_keepRunningHint": "下载在后台进行，关闭窗口不会中断本次更新。",
+  "@update_keepRunningHint": { "description": "下载期间关闭窗口的说明" },
+  "update_background": "后台下载",
+  "@update_background": { "description": "关闭窗口、后台继续下载" },
+  "update_revealFile": "打开文件位置",
+  "@update_revealFile": { "description": "在文件管理器中定位安装包" },
+  "update_installAndRestart": "安装并重启",
+  "@update_installAndRestart": { "description": "安装更新并重启应用" },
+  "update_exitCountdown": "IriX 将在 {seconds} 秒后退出以完成更新，安装完成后会自动重新启动。",
+  "@update_exitCountdown": {
+    "description": "退出倒计时",
+    "placeholders": { "seconds": { "type": "String" } }
+  },
+
+  "settings_update": "软件更新",
+  "@settings_update": { "description": "软件更新分区标题" },
+  "settings_updateVersionLine": "当前版本 {version}（{platform}）",
+  "@settings_updateVersionLine": {
+    "description": "当前版本与平台",
+    "placeholders": {
+      "version": { "type": "String" },
+      "platform": { "type": "String" }
+    }
+  },
+  "settings_updateLatestKnown": "最新已知版本：{version}",
+  "@settings_updateLatestKnown": {
+    "description": "上次检查到的最新版本",
+    "placeholders": { "version": { "type": "String" } }
+  },
+  "settings_updateLastChecked": "上次检查：{time}",
+  "@settings_updateLastChecked": {
+    "description": "上次检查时间",
+    "placeholders": { "time": { "type": "String" } }
+  },
+  "settings_updateNeverChecked": "尚未检查过更新",
+  "@settings_updateNeverChecked": { "description": "从未检查过更新" },
+  "settings_updateCheckNow": "检查更新",
+  "@settings_updateCheckNow": { "description": "立即检查更新" },
+  "settings_updateChecking": "正在检查…",
+  "@settings_updateChecking": { "description": "检查中" },
+  "settings_updateFound": "发现新版本 {version}",
+  "@settings_updateFound": {
+    "description": "检查结果为有新版本",
+    "placeholders": { "version": { "type": "String" } }
+  },
+  "settings_updateUpToDate": "已是最新版本（{version}）",
+  "@settings_updateUpToDate": {
+    "description": "检查结果为已是最新",
+    "placeholders": { "version": { "type": "String" } }
+  },
+  "settings_updateError": "检查失败：{error}",
+  "@settings_updateError": {
+    "description": "检查更新失败",
+    "placeholders": { "error": { "type": "String" } }
+  },
+  "settings_updateSkipped": "已跳过版本：{version}",
+  "@settings_updateSkipped": {
+    "description": "已跳过的版本",
+    "placeholders": { "version": { "type": "String" } }
+  },
+  "settings_updateClearSkip": "取消跳过",
+  "@settings_updateClearSkip": { "description": "清除跳过此版本的记录" },
+  "settings_updateOpenReleases": "打开发布页",
+  "@settings_updateOpenReleases": { "description": "在浏览器打开 GitHub 发布页" },
+  "settings_updateAutoCheck": "启动时自动检查更新",
+  "@settings_updateAutoCheck": { "description": "启动自动检查更新开关" },
+  "settings_updateAutoCheckHint": "发现新版本时弹窗提醒；每 {hours} 小时最多自动检查一次。",
+  "@settings_updateAutoCheckHint": {
+    "description": "自动检查更新说明",
+    "placeholders": { "hours": { "type": "String" } }
+  },
+  "settings_updateIncludePrerelease": "包含预发布版本",
+  "@settings_updateIncludePrerelease": { "description": "预发布版本开关" },
+  "settings_updateIncludePrereleaseHint": "预发布版本可能不稳定，仅在参与测试时开启。",
+  "@settings_updateIncludePrereleaseHint": { "description": "预发布版本开关说明" },
+  "settings_updateHint": "更新来自 GitHub Releases：检查 api.github.com → 下载 → 校验 SHA-256 → 安装。提示请求过于频繁时，稍后再试即可。",
+  "@settings_updateHint": { "description": "更新来源与流程说明" },
+  "settings_updateInstallHintWindows": "Windows 安装版：下载后自动静默安装并重启；MSIX 与便携版会打开安装包由你确认。",
+  "@settings_updateInstallHintWindows": { "description": "Windows 安装方式说明" },
+  "settings_updateInstallHintMacos": "macOS：下载 DMG 后自动挂载，请把 lrix.app 拖到“应用程序”覆盖旧版本。",
+  "@settings_updateInstallHintMacos": { "description": "macOS 安装方式说明" },
+  "settings_updateInstallHintLinux": "Linux：AppImage 会自我替换并重启；deb / rpm 交给系统包管理器安装。",
+  "@settings_updateInstallHintLinux": { "description": "Linux 安装方式说明" },
+  "settings_updateFeed": "更新源",
+  "@settings_updateFeed": { "description": "自定义更新源标题" },
+  "settings_updateFeedSave": "保存",
+  "@settings_updateFeedSave": { "description": "保存更新源" },
+  "settings_updateFeedReset": "用回默认",
+  "@settings_updateFeedReset": { "description": "清除自定义更新源" },
+  "settings_updateFeedHint": "留空则默认走项目自建的 Cloudflare Worker（update.mcfso.org），失败时自动回退 GitHub 官方 Releases；也可填其它 Worker / 镜像根地址（会自动补 /api/releases）。",
+  "@settings_updateFeedHint": { "description": "自定义更新源说明" },
+  "settings_updateFeedCurrent": "当前生效：{url}",
+  "@settings_updateFeedCurrent": {
+    "description": "当前实际使用的更新源",
+    "placeholders": { "url": { "type": "String" } }
+  },
+  "settings_updateFeedSaved": "更新源已保存。",
+  "@settings_updateFeedSaved": { "description": "更新源保存成功提示" }
 }

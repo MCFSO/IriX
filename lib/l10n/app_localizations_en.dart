@@ -5226,4 +5226,198 @@ class AppLocalizationsEn extends AppLocalizations {
   String instanceDetail_backupSymlinksSkipped(String count) {
     return '$count symlinks skipped';
   }
+
+  @override
+  String update_availableTitle(String version) {
+    return 'Version $version is available';
+  }
+
+  @override
+  String update_transition(String current, String latest) {
+    return '$current → $latest';
+  }
+
+  @override
+  String update_publishedAt(String date) {
+    return 'Published $date';
+  }
+
+  @override
+  String update_assetInfo(String name, String size) {
+    return '$name ($size)';
+  }
+
+  @override
+  String get update_packageType => 'Package';
+
+  @override
+  String update_runningInstancesWarning(String count) {
+    return '$count instance(s) are running. Updating restarts IriX and the restarted app takes over those server processes; stop them in the console first if you prefer.';
+  }
+
+  @override
+  String get update_releaseNotes => 'What is new';
+
+  @override
+  String get update_releaseNotesEmpty => 'This release has no notes.';
+
+  @override
+  String get update_downloading => 'Downloading update…';
+
+  @override
+  String update_downloadProgress(
+    String percent,
+    String downloaded,
+    String total,
+  ) {
+    return '$percent% · $downloaded / $total';
+  }
+
+  @override
+  String update_downloadProgressUnknown(String downloaded) {
+    return '$downloaded downloaded';
+  }
+
+  @override
+  String update_downloadSpeed(String speed) {
+    return '$speed/s';
+  }
+
+  @override
+  String get update_downloadDone => 'Download finished and verified.';
+
+  @override
+  String get update_later => 'Later';
+
+  @override
+  String get update_skipVersion => 'Skip this version';
+
+  @override
+  String get update_openReleasePage => 'Release page';
+
+  @override
+  String get update_downloadAndInstall => 'Download and install';
+
+  @override
+  String get update_keepRunningHint =>
+      'The download continues in the background if you close this window.';
+
+  @override
+  String get update_background => 'Background';
+
+  @override
+  String get update_revealFile => 'Show in folder';
+
+  @override
+  String get update_installAndRestart => 'Install and restart';
+
+  @override
+  String update_exitCountdown(String seconds) {
+    return 'IriX exits in ${seconds}s to finish the update and restarts automatically.';
+  }
+
+  @override
+  String get settings_update => 'Software update';
+
+  @override
+  String settings_updateVersionLine(String version, String platform) {
+    return 'Version $version ($platform)';
+  }
+
+  @override
+  String settings_updateLatestKnown(String version) {
+    return 'Latest known version: $version';
+  }
+
+  @override
+  String settings_updateLastChecked(String time) {
+    return 'Last checked: $time';
+  }
+
+  @override
+  String get settings_updateNeverChecked => 'Never checked for updates';
+
+  @override
+  String get settings_updateCheckNow => 'Check for updates';
+
+  @override
+  String get settings_updateChecking => 'Checking…';
+
+  @override
+  String settings_updateFound(String version) {
+    return 'Version $version is available';
+  }
+
+  @override
+  String settings_updateUpToDate(String version) {
+    return 'You are up to date ($version)';
+  }
+
+  @override
+  String settings_updateError(String error) {
+    return 'Check failed: $error';
+  }
+
+  @override
+  String settings_updateSkipped(String version) {
+    return 'Skipped version: $version';
+  }
+
+  @override
+  String get settings_updateClearSkip => 'Un-skip';
+
+  @override
+  String get settings_updateOpenReleases => 'Open releases';
+
+  @override
+  String get settings_updateAutoCheck => 'Check for updates at startup';
+
+  @override
+  String settings_updateAutoCheckHint(String hours) {
+    return 'Shows a reminder when a new version is found; checks at most once every $hours hours.';
+  }
+
+  @override
+  String get settings_updateIncludePrerelease => 'Include pre-releases';
+
+  @override
+  String get settings_updateIncludePrereleaseHint =>
+      'Pre-releases can be unstable; enable only when testing.';
+
+  @override
+  String get settings_updateHint =>
+      'Updates come from GitHub Releases: check api.github.com, download, verify SHA-256, then install. If GitHub rate limits the check, try again later.';
+
+  @override
+  String get settings_updateInstallHintWindows =>
+      'Windows installer: downloaded, installed silently and restarted automatically. MSIX and portable builds open the package for you to confirm.';
+
+  @override
+  String get settings_updateInstallHintMacos =>
+      'macOS: the DMG is mounted automatically, drag lrix.app into Applications to replace the old version.';
+
+  @override
+  String get settings_updateInstallHintLinux =>
+      'Linux: AppImage replaces itself and restarts; deb and rpm are handed to the system package manager.';
+
+  @override
+  String get settings_updateFeed => 'Update source';
+
+  @override
+  String get settings_updateFeedSave => 'Save';
+
+  @override
+  String get settings_updateFeedReset => 'Use default';
+
+  @override
+  String get settings_updateFeedHint =>
+      'Leave empty to use the built-in Cloudflare Worker (update.mcfso.org) and fall back to GitHub Releases when it fails. You can also enter another Worker or mirror root URL; /api/releases is appended automatically.';
+
+  @override
+  String settings_updateFeedCurrent(String url) {
+    return 'In use: $url';
+  }
+
+  @override
+  String get settings_updateFeedSaved => 'Update source saved.';
 }

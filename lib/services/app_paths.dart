@@ -84,6 +84,12 @@ class AppPaths {
   /// 备份仓库根目录（每个实例一个子目录）。
   Future<String> backupsRoot() async => p.join(await root(), 'backups');
 
+  /// 应用更新包下载目录（OTA 更新下载的安装包与 `<文件名>.sha256` 校验记录）。
+  ///
+  /// 安装包体积 20–120 MB，统一放在数据根目录下而不是系统临时目录，
+  /// 这样「下载完成但用户稍后安装」时文件不会被系统清理掉。
+  Future<String> updatesRoot() async => p.join(await root(), 'updates');
+
   /// 指定实例的备份仓库目录。
   ///
   /// 仓库内由 Rust（`xmc_backup`）维护：`full/`（全量 ZIP 归档）、

@@ -16,7 +16,11 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+1
+#
+# 发布时这里的版本号必须与 lib/services/app_version.dart 的 kIrixAppVersion 一致：
+# OTA 更新检查用后者比较 GitHub Release 版本，二者不一致会导致「一直提示有更新」
+# 或「漏掉更新」（test/app_version_test.dart 会校验，不一致时 CI 失败）。
+version: 1.3.0+1
 
 environment:
   sdk: ^3.12.2

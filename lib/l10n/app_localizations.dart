@@ -9007,6 +9007,304 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'已跳过 {count} 个符号链接'**
   String instanceDetail_backupSymlinksSkipped(String count);
+
+  /// 更新提醒窗标题
+  ///
+  /// In zh, this message translates to:
+  /// **'发现新版本 {version}'**
+  String update_availableTitle(String version);
+
+  /// 当前版本 → 新版本
+  ///
+  /// In zh, this message translates to:
+  /// **'{current} → {latest}'**
+  String update_transition(String current, String latest);
+
+  /// 发布时间
+  ///
+  /// In zh, this message translates to:
+  /// **'发布于 {date}'**
+  String update_publishedAt(String date);
+
+  /// 安装包名称与大小
+  ///
+  /// In zh, this message translates to:
+  /// **'{name}（{size}）'**
+  String update_assetInfo(String name, String size);
+
+  /// 安装包类型选择标签
+  ///
+  /// In zh, this message translates to:
+  /// **'安装包'**
+  String get update_packageType;
+
+  /// 更新前有实例在运行的提示
+  ///
+  /// In zh, this message translates to:
+  /// **'检测到 {count} 个实例正在运行：更新会重启 IriX，重启后会自动接管这些服务器进程，建议先在控制台停服。'**
+  String update_runningInstancesWarning(String count);
+
+  /// 更新说明标题
+  ///
+  /// In zh, this message translates to:
+  /// **'更新内容'**
+  String get update_releaseNotes;
+
+  /// 更新说明为空
+  ///
+  /// In zh, this message translates to:
+  /// **'该版本没有填写更新说明。'**
+  String get update_releaseNotesEmpty;
+
+  /// 下载中提示
+  ///
+  /// In zh, this message translates to:
+  /// **'正在下载更新…'**
+  String get update_downloading;
+
+  /// 下载进度
+  ///
+  /// In zh, this message translates to:
+  /// **'{percent}% · {downloaded} / {total}'**
+  String update_downloadProgress(
+    String percent,
+    String downloaded,
+    String total,
+  );
+
+  /// 总大小未知时的下载进度
+  ///
+  /// In zh, this message translates to:
+  /// **'已下载 {downloaded}'**
+  String update_downloadProgressUnknown(String downloaded);
+
+  /// 下载速度
+  ///
+  /// In zh, this message translates to:
+  /// **'速度 {speed}/s'**
+  String update_downloadSpeed(String speed);
+
+  /// 下载完成提示
+  ///
+  /// In zh, this message translates to:
+  /// **'下载完成，安装包已校验。'**
+  String get update_downloadDone;
+
+  /// 关闭更新提醒，下次启动再提示
+  ///
+  /// In zh, this message translates to:
+  /// **'稍后提醒'**
+  String get update_later;
+
+  /// 跳过该版本，不再提示
+  ///
+  /// In zh, this message translates to:
+  /// **'跳过此版本'**
+  String get update_skipVersion;
+
+  /// 打开发布页
+  ///
+  /// In zh, this message translates to:
+  /// **'前往发布页'**
+  String get update_openReleasePage;
+
+  /// 下载并安装更新
+  ///
+  /// In zh, this message translates to:
+  /// **'下载并安装'**
+  String get update_downloadAndInstall;
+
+  /// 下载期间关闭窗口的说明
+  ///
+  /// In zh, this message translates to:
+  /// **'下载在后台进行，关闭窗口不会中断本次更新。'**
+  String get update_keepRunningHint;
+
+  /// 关闭窗口、后台继续下载
+  ///
+  /// In zh, this message translates to:
+  /// **'后台下载'**
+  String get update_background;
+
+  /// 在文件管理器中定位安装包
+  ///
+  /// In zh, this message translates to:
+  /// **'打开文件位置'**
+  String get update_revealFile;
+
+  /// 安装更新并重启应用
+  ///
+  /// In zh, this message translates to:
+  /// **'安装并重启'**
+  String get update_installAndRestart;
+
+  /// 退出倒计时
+  ///
+  /// In zh, this message translates to:
+  /// **'IriX 将在 {seconds} 秒后退出以完成更新，安装完成后会自动重新启动。'**
+  String update_exitCountdown(String seconds);
+
+  /// 软件更新分区标题
+  ///
+  /// In zh, this message translates to:
+  /// **'软件更新'**
+  String get settings_update;
+
+  /// 当前版本与平台
+  ///
+  /// In zh, this message translates to:
+  /// **'当前版本 {version}（{platform}）'**
+  String settings_updateVersionLine(String version, String platform);
+
+  /// 上次检查到的最新版本
+  ///
+  /// In zh, this message translates to:
+  /// **'最新已知版本：{version}'**
+  String settings_updateLatestKnown(String version);
+
+  /// 上次检查时间
+  ///
+  /// In zh, this message translates to:
+  /// **'上次检查：{time}'**
+  String settings_updateLastChecked(String time);
+
+  /// 从未检查过更新
+  ///
+  /// In zh, this message translates to:
+  /// **'尚未检查过更新'**
+  String get settings_updateNeverChecked;
+
+  /// 立即检查更新
+  ///
+  /// In zh, this message translates to:
+  /// **'检查更新'**
+  String get settings_updateCheckNow;
+
+  /// 检查中
+  ///
+  /// In zh, this message translates to:
+  /// **'正在检查…'**
+  String get settings_updateChecking;
+
+  /// 检查结果为有新版本
+  ///
+  /// In zh, this message translates to:
+  /// **'发现新版本 {version}'**
+  String settings_updateFound(String version);
+
+  /// 检查结果为已是最新
+  ///
+  /// In zh, this message translates to:
+  /// **'已是最新版本（{version}）'**
+  String settings_updateUpToDate(String version);
+
+  /// 检查更新失败
+  ///
+  /// In zh, this message translates to:
+  /// **'检查失败：{error}'**
+  String settings_updateError(String error);
+
+  /// 已跳过的版本
+  ///
+  /// In zh, this message translates to:
+  /// **'已跳过版本：{version}'**
+  String settings_updateSkipped(String version);
+
+  /// 清除跳过此版本的记录
+  ///
+  /// In zh, this message translates to:
+  /// **'取消跳过'**
+  String get settings_updateClearSkip;
+
+  /// 在浏览器打开 GitHub 发布页
+  ///
+  /// In zh, this message translates to:
+  /// **'打开发布页'**
+  String get settings_updateOpenReleases;
+
+  /// 启动自动检查更新开关
+  ///
+  /// In zh, this message translates to:
+  /// **'启动时自动检查更新'**
+  String get settings_updateAutoCheck;
+
+  /// 自动检查更新说明
+  ///
+  /// In zh, this message translates to:
+  /// **'发现新版本时弹窗提醒；每 {hours} 小时最多自动检查一次。'**
+  String settings_updateAutoCheckHint(String hours);
+
+  /// 预发布版本开关
+  ///
+  /// In zh, this message translates to:
+  /// **'包含预发布版本'**
+  String get settings_updateIncludePrerelease;
+
+  /// 预发布版本开关说明
+  ///
+  /// In zh, this message translates to:
+  /// **'预发布版本可能不稳定，仅在参与测试时开启。'**
+  String get settings_updateIncludePrereleaseHint;
+
+  /// 更新来源与流程说明
+  ///
+  /// In zh, this message translates to:
+  /// **'更新来自 GitHub Releases：检查 api.github.com → 下载 → 校验 SHA-256 → 安装。提示请求过于频繁时，稍后再试即可。'**
+  String get settings_updateHint;
+
+  /// Windows 安装方式说明
+  ///
+  /// In zh, this message translates to:
+  /// **'Windows 安装版：下载后自动静默安装并重启；MSIX 与便携版会打开安装包由你确认。'**
+  String get settings_updateInstallHintWindows;
+
+  /// macOS 安装方式说明
+  ///
+  /// In zh, this message translates to:
+  /// **'macOS：下载 DMG 后自动挂载，请把 lrix.app 拖到“应用程序”覆盖旧版本。'**
+  String get settings_updateInstallHintMacos;
+
+  /// Linux 安装方式说明
+  ///
+  /// In zh, this message translates to:
+  /// **'Linux：AppImage 会自我替换并重启；deb / rpm 交给系统包管理器安装。'**
+  String get settings_updateInstallHintLinux;
+
+  /// 自定义更新源标题
+  ///
+  /// In zh, this message translates to:
+  /// **'更新源'**
+  String get settings_updateFeed;
+
+  /// 保存更新源
+  ///
+  /// In zh, this message translates to:
+  /// **'保存'**
+  String get settings_updateFeedSave;
+
+  /// 清除自定义更新源
+  ///
+  /// In zh, this message translates to:
+  /// **'用回默认'**
+  String get settings_updateFeedReset;
+
+  /// 自定义更新源说明
+  ///
+  /// In zh, this message translates to:
+  /// **'留空则默认走项目自建的 Cloudflare Worker（update.mcfso.org），失败时自动回退 GitHub 官方 Releases；也可填其它 Worker / 镜像根地址（会自动补 /api/releases）。'**
+  String get settings_updateFeedHint;
+
+  /// 当前实际使用的更新源
+  ///
+  /// In zh, this message translates to:
+  /// **'当前生效：{url}'**
+  String settings_updateFeedCurrent(String url);
+
+  /// 更新源保存成功提示
+  ///
+  /// In zh, this message translates to:
+  /// **'更新源已保存。'**
+  String get settings_updateFeedSaved;
 }
 
 class _AppLocalizationsDelegate

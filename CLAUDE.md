@@ -277,6 +277,60 @@ Two screens for remote DB:
 
 `McpServer` runs a local HTTP server (`dart:io`) for external AI tools to inspect/control instances. Sensitive operations trigger a global permission dialog in `HomeScreen`. Test environments skip MCP startup (`FLUTTER_TEST=true`).
 
+### In-app update (OTA)
+
+IriX updates itself from GitHub Releases (optionally through a self-hosted Cloudflare
+Worker). `lib/services/app_version.dart` is the single Dart-side version source
+(`kIrixAppVersion`, overridable with `--dart-define=IRIX_VERSION=x.y.z`); it must stay
+equal to `pubspec.yaml`'s `version:` and `test/app_version_test.dart` fails CI when they
+drift. `SemVersion` handles `Stable-v1.3.0` / `v1.3.0` tags, missing segments and
+pre-release ordering.
+
+- **Feed chain**: `UpdateService.feedCandidates()` tries the user-configured feed
+  (`update_feed_url`, normalised by `normalizeFeedUrl()` so a bare Worker domain becomes
+  `/api/releases`), then the build-time default (`--dart-define=IRIX_UPDATE_FEED`), then
+  the GitHub API. Any failure falls through to the next source; only when all fail does
+  the check error out. `parseReleasesPayload()` accepts a raw GitHub array,
+  `{releases|data: [...]}` or a single `{release: {...}}`, so a custom feed only has to
+  emit GitHub-compatible fields.
+- **Check**: `UpdateService.checkForUpdates()` GETs the feed through `HttpFfiService`,
+  drops drafts and non-version tags, filters pre-releases unless the setting is on,
+  and compares with `SemVersion`. Startup auto-check (`home_screen.dart`) is throttled
+  to `UpdateSettings.autoCheckInterval` (6h) because unauthenticated GitHub allows
+  60 requests/hour; 403/429 surfaces as a rate-limited `UpdateException`.
+- **Asset selection**: `UpdateService.selectAsset()` scores assets per platform/arch —
+  Windows `.exe` > `.msix` > `.zip`, macOS `.dmg` > `.zip`, Linux `.AppImage` when
+  running inside one else `.deb`/`.rpm` > `.AppImage` > `.zip`; matching arch +20,
+  other arch −50; `SHA256SUMS-*.txt` is never an installer.
+- **Download**: Rust `Downloader.downloadFile` into `AppPaths.updatesRoot()`
+  (`<data root>/updates/`) with a `<file>.sha256` sidecar for reuse, verified against
+  the asset `digest` (or `SHA256SUMS-<version>.txt`); stale `<target>` / `<target>.part`
+  are deleted first so a previous chunked resume cannot corrupt the new package.
+- **Install** (`UpdateInstallResult.mode`): Windows `.exe` runs the Inno installer
+  silently (`/SILENT /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS /NORESTART /SP-`, falling
+  back to `powershell Start-Process -Verb RunAs` on error 740) → `automatic` with
+  `appMustExit`; Linux AppImage writes a small `sh` script that swaps the file after the
+  process exits and relaunches → `automatic`; MSIX / portable zip / `.deb` / `.rpm` /
+  DMG are opened or revealed → `assisted` / `manual`. On `appMustExit` the dialog
+  (`lib/widgets/update_dialog.dart`) counts down and calls `exit(0)`; the restarted app
+  adopts surviving server processes via `AppState._adoptOrphanedProcesses()`.
+- **UI**: reminder dialog `update_dialog.dart` (Markdown release notes, progress,
+  skip-this-version) shown from startup check and from the "软件更新" settings section
+  (`settings_screen.dart`, `SettingsSection.update`), which also hosts the feed URL field.
+- **Settings keys**: `update_auto_check`, `update_include_prerelease`,
+  `update_skipped_version`, `update_last_check_at_ms`, `update_last_known_latest`,
+  `update_feed_url` (custom/Worker source, empty = built-in → GitHub).
+- **Cloudflare Workers feed** (`workers/update-feed/`, zero deps): `/api/releases` and
+  `/api/latest` return GitHub-compatible releases whose `assets[].browser_download_url`
+  is rewritten to `<worker>/dl/<tag>/<asset>` (keeping `digest`); `/dl/...` serves from
+  an optional R2 bucket first and otherwise proxies GitHub with Range passthrough and
+  edge caching. Release still happens on GitHub, so the GitHub fallback always works.
+  Smoke test: `node --test workers/update-feed/test/smoke.test.mjs`. Deploy/config:
+  `workers/update-feed/README.md`.
+- **Release requirements**: bump `kIrixAppVersion` + `pubspec.yaml` together, tag
+  `Stable-vX.Y.Z`, keep asset names `irix-<version>-<platform>-<arch>.<ext>` and upload
+  them to GitHub so the API exposes `digest`. Full design: `docs/ota-update.md`.
+
 ### Test conventions
 
 - Pure Dart unit tests: `test/` root
