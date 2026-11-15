@@ -100,6 +100,19 @@ class AppPaths {
     return p.join(await backupsRoot(), safe);
   }
 
+  /// 陶瓦联机（Terracotta）联机核心根目录。
+  ///
+  /// 目录结构：`<root>/terracotta/<版本>/`（解包后的联机核心可执行文件与运行库）、
+  /// `<root>/terracotta/logs/`（导出的联机核心日志 ZIP）、
+  /// `<root>/terracotta/temp/`（联机核心握手用的临时端口文件）。
+  /// 见 `lib/services/terracotta/` 与 docs/terracotta-multiplayer.md。
+  Future<String> terracottaRoot() async =>
+      p.join(await root(), 'terracotta');
+
+  /// 联机核心导出的日志归档目录。
+  Future<String> terracottaLogsDir() async =>
+      p.join(await terracottaRoot(), 'logs');
+
   /// 原生插件根目录（插件包解压后按插件 id 分目录存放）。
   Future<String> pluginsRoot() async =>
       p.join(await root(), 'plugins', 'native');

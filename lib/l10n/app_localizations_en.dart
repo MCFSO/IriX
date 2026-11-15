@@ -5420,4 +5420,292 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settings_updateFeedSaved => 'Update source saved.';
+
+  @override
+  String get multiplayer_tabTitle => 'Multiplayer';
+
+  @override
+  String get multiplayer_statusBootstrap => 'Collecting information';
+
+  @override
+  String get multiplayer_statusUninitialized =>
+      'Multiplayer core not installed';
+
+  @override
+  String get multiplayer_statusPreparing =>
+      'Downloading multiplayer core (do not quit the launcher)';
+
+  @override
+  String get multiplayer_statusLaunching => 'Starting multiplayer core';
+
+  @override
+  String get multiplayer_statusWaiting => 'Multiplayer core ready';
+
+  @override
+  String get multiplayer_statusScanning => 'Scanning for LAN worlds';
+
+  @override
+  String get multiplayer_statusHostStarting => 'Creating room';
+
+  @override
+  String get multiplayer_statusHostOk => 'Room created';
+
+  @override
+  String get multiplayer_statusGuestStarting => 'Joining room';
+
+  @override
+  String get multiplayer_statusGuestOk => 'Joined room';
+
+  @override
+  String get multiplayer_statusException => 'Room error';
+
+  @override
+  String get multiplayer_downloadCore => 'Download multiplayer core (~8 MiB)';
+
+  @override
+  String get multiplayer_updateCore => 'Update multiplayer core (~8 MiB)';
+
+  @override
+  String get multiplayer_installLocal => 'Install from a local package';
+
+  @override
+  String get multiplayer_installLocalDesc =>
+      'If the automatic download fails, download the official core package manually and import it here';
+
+  @override
+  String get multiplayer_installLocalInvalid =>
+      'The package is unusable or does not match this platform';
+
+  @override
+  String get multiplayer_installLocalDone => 'Multiplayer core installed';
+
+  @override
+  String get multiplayer_downloadSources => 'Third-party download sources';
+
+  @override
+  String get multiplayer_downloadSourcesDesc =>
+      'The built-in source may be slow or unstable in some regions';
+
+  @override
+  String multiplayer_downloadExpected(String name) {
+    return 'Download the core package named $name';
+  }
+
+  @override
+  String get multiplayer_hostTitle => 'Host a room';
+
+  @override
+  String get multiplayer_hostDesc =>
+      'Create a room and share the invite code with friends';
+
+  @override
+  String get multiplayer_hostNeedRunningTitle => 'The instance is not running';
+
+  @override
+  String get multiplayer_hostNeedRunningDesc =>
+      'Hosting tunnels a LAN world on this machine: open a single-player world in the Minecraft client and choose \"Open to LAN\". You can start this instance first, or scan right away.';
+
+  @override
+  String get multiplayer_hostStartInstance => 'Start instance';
+
+  @override
+  String get multiplayer_hostSkip => 'Scan anyway';
+
+  @override
+  String get multiplayer_guestTitle => 'Join a room';
+
+  @override
+  String get multiplayer_guestDesc =>
+      'Enter the invite code provided by the host';
+
+  @override
+  String get multiplayer_guestPromptTitle =>
+      'Enter the invite code from the host';
+
+  @override
+  String get multiplayer_guestPromptHint => 'Invite code';
+
+  @override
+  String get multiplayer_guestEmpty => 'The invite code cannot be empty';
+
+  @override
+  String get multiplayer_guestInvalid => 'Invalid invite code';
+
+  @override
+  String get multiplayer_scanningDesc =>
+      'Start the Minecraft client, open a single-player world, press ESC, choose \"Open to LAN\" and click \"Start LAN World\".';
+
+  @override
+  String get multiplayer_scanningBack =>
+      'This also stops scanning for LAN worlds.';
+
+  @override
+  String get multiplayer_hostStartingBack => 'This cancels room creation.';
+
+  @override
+  String get multiplayer_hostOkBack =>
+      'This closes the room; other guests leave and cannot rejoin.';
+
+  @override
+  String get multiplayer_guestBack =>
+      'This does not affect other guests in this room.';
+
+  @override
+  String get multiplayer_roomCode => 'Invite code (copied to clipboard)';
+
+  @override
+  String get multiplayer_roomCodeDesc =>
+      'Ask your friend to choose the guest mode in a launcher that supports Terracotta and enter this code.';
+
+  @override
+  String get multiplayer_copyRoomCode => 'Copy invite code';
+
+  @override
+  String get multiplayer_roomCodeCopied => 'Invite code copied to clipboard';
+
+  @override
+  String get multiplayer_guestOkTitle =>
+      'Start Minecraft, open Multiplayer and double-click the Terracotta lobby.';
+
+  @override
+  String multiplayer_guestOkUrl(String url) {
+    return 'Fallback address: $url';
+  }
+
+  @override
+  String get multiplayer_copyUrl => 'Copy join address';
+
+  @override
+  String get multiplayer_exceptionBack => 'You can try again';
+
+  @override
+  String get multiplayer_exceptionPingHostFail =>
+      'Failed to join: the room is closed or the network is unstable';
+
+  @override
+  String get multiplayer_exceptionPingHostRst =>
+      'Connection lost: the room is closed or the network is unstable';
+
+  @override
+  String get multiplayer_exceptionGuestEtCrash =>
+      'Failed to join: EasyTier crashed, please report this issue';
+
+  @override
+  String get multiplayer_exceptionHostEtCrash =>
+      'Failed to create the room: EasyTier crashed, please report this issue';
+
+  @override
+  String get multiplayer_exceptionPingServerRst =>
+      'Room closed: you left the world, so the room was closed';
+
+  @override
+  String get multiplayer_exceptionScaffoldingInvalid =>
+      'Protocol error: the peer sent an invalid response, please report this issue';
+
+  @override
+  String get multiplayer_fatalOs =>
+      'Multiplayer is not supported on this platform (Windows 10+ / 64-bit required)';
+
+  @override
+  String get multiplayer_fatalNetwork =>
+      'Failed to download the multiplayer core. Check your network and try again';
+
+  @override
+  String get multiplayer_fatalInstall =>
+      'Fatal: failed to install the multiplayer core';
+
+  @override
+  String get multiplayer_fatalTerracotta =>
+      'Fatal: cannot communicate with the multiplayer core';
+
+  @override
+  String get multiplayer_fatalUnknown => 'Fatal: unknown reason';
+
+  @override
+  String get multiplayer_retry => 'Retry';
+
+  @override
+  String get multiplayer_actionBack => 'Quit';
+
+  @override
+  String get multiplayer_actionCancel => 'Cancel';
+
+  @override
+  String multiplayer_actionFailed(String error) {
+    return 'Action failed: $error';
+  }
+
+  @override
+  String get multiplayer_exportLog => 'Export multiplayer core log';
+
+  @override
+  String get multiplayer_exportLogDesc =>
+      'Provides more details for troubleshooting';
+
+  @override
+  String multiplayer_exportLogDone(String path) {
+    return 'Log exported: $path';
+  }
+
+  @override
+  String get multiplayer_exportLogFailed => 'Failed to export the log';
+
+  @override
+  String get multiplayer_playerList => 'Players';
+
+  @override
+  String get multiplayer_playerKindHost => 'Host';
+
+  @override
+  String get multiplayer_playerKindLocal => 'You';
+
+  @override
+  String get multiplayer_playerKindGuest => 'Guest';
+
+  @override
+  String get multiplayer_difficultyUnknown =>
+      'Estimating the current network quality…';
+
+  @override
+  String get multiplayer_difficultyEasiest =>
+      'Excellent network: should connect right away!';
+
+  @override
+  String get multiplayer_difficultySimple =>
+      'Good network: connecting may take a while…';
+
+  @override
+  String get multiplayer_difficultyMedium =>
+      'Fair network: fallback routes enabled, the connection may fail';
+
+  @override
+  String get multiplayer_difficultyTough =>
+      'Poor network: fallback routes enabled, the connection may fail';
+
+  @override
+  String get multiplayer_difficultyNote =>
+      'The success rate is estimated from the NAT types of the host and the guest; for reference only.';
+
+  @override
+  String get multiplayer_attributionTitle => 'About multiplayer';
+
+  @override
+  String multiplayer_attribution(String license) {
+    return 'Multiplayer is provided by the third-party open-source project Terracotta, licensed under $license. This app only downloads, verifies and launches the unmodified official core and talks to it through its local HTTP API; the binary itself is never modified.';
+  }
+
+  @override
+  String get multiplayer_openHomepage => 'Project homepage';
+
+  @override
+  String get multiplayer_resetCore => 'Reset multiplayer core';
+
+  @override
+  String multiplayer_corePort(int port) {
+    return 'Local control port: $port';
+  }
+
+  @override
+  String get multiplayer_notice =>
+      'Terracotta is third-party free software; please report issues through its project channels.';
 }

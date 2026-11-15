@@ -68,6 +68,9 @@ dependencies:
   # Archive (ZIP/JAR) handling
   archive: ^4.0.0
 
+  # SHA-512 摘要校验（陶瓦联机核心包完整性，见 lib/services/terracotta/）
+  crypto: ^3.0.6
+
   # Remote database clients are handled by Rust (xmc_db_client via FFI)
   url_launcher: ^6.3.2
   cryptography: ^2.9.0

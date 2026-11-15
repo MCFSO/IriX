@@ -7,6 +7,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
 import 'dart:async';
+import 'dart:ui' show AppExitResponse;
 
 import 'l10n/app_localizations.dart';
 import 'screens/home_screen.dart';
@@ -17,6 +18,7 @@ import 'services/database_manager.dart';
 import 'services/dev_log.dart';
 import 'services/font_settings.dart';
 import 'services/locale_settings.dart';
+import 'services/terracotta/terracotta_manager.dart';
 import 'services/time_service.dart';
 import 'state/app_state.dart';
 import 'state/cluster_state.dart';
@@ -57,6 +59,14 @@ void main() async {
       '${details.exception}\n${details.stack ?? ""}'.trim(),
     );
   };
+  // 关窗退出时结束陶瓦联机核心子进程（否则它会被系统当成孤儿进程常驻）。
+  // AppLifecycleListener 自己会注册到 WidgetsBinding 观察者列表，无需外部持有。
+  AppLifecycleListener(
+    onExitRequested: () async {
+      await TerracottaManager.instance.shutdown();
+      return AppExitResponse.exit;
+    },
+  );
   runZonedGuarded(() => runApp(const MyApp()), (error, stack) {
     devLog.devError('uncaught', '$error\n$stack'.trim());
   });

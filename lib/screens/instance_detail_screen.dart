@@ -30,6 +30,7 @@ import 'ai_screen.dart';
 import 'config_editor_screen.dart';
 import 'file_manager_screen.dart';
 import 'instance_backup_tab.dart';
+import 'instance_multiplayer_tab.dart';
 import 'plugins_tab.dart';
 
 /// 实例详情页。
@@ -320,6 +321,11 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
                 icon: const Icon(Icons.backup),
                 text: l.instanceDetail_tabBackup,
               ),
+              // 联机（陶瓦联机 Terracotta）：见 instance_multiplayer_tab.dart
+              Tab(
+                icon: const Icon(Icons.wifi_tethering),
+                text: l.multiplayer_tabTitle,
+              ),
               Tab(
                 icon: const Icon(Icons.settings),
                 text: l.instanceDetail_tabSettings,
@@ -370,13 +376,18 @@ class _InstanceDetailScreenState extends State<InstanceDetailScreen> {
                     rootPath: instance.rootPath,
                     instanceId: widget.instanceId,
                   ),
-                  // Tab 6: 设置 — 实例名称 + 启动命令
+                  // Tab 6: 联机 — 陶瓦联机（Terracotta）房间/邀请码
+                  InstanceMultiplayerTab(
+                    instanceId: widget.instanceId,
+                    instanceName: instance.name,
+                  ),
+                  // Tab 7: 设置 — 实例名称 + 启动命令
                   _SettingsTab(
                     instanceId: widget.instanceId,
                     dockerAvailable: _dockerAvailable,
                     dockerProbing: _dockerProbing,
                   ),
-                  // Tab 7: 容器 — 本机 Docker 全功能管理（不可用时展示原因与重新检测）
+                  // Tab 8: 容器 — 本机 Docker 全功能管理（不可用时展示原因与重新检测）
                   ContainerEnvironmentPanel(
                     backend: state.dockerCli,
                     highlightName: instance.runMode == RunMode.docker

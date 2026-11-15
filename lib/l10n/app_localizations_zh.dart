@@ -5227,4 +5227,264 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settings_updateFeedSaved => '更新源已保存。';
+
+  @override
+  String get multiplayer_tabTitle => '联机';
+
+  @override
+  String get multiplayer_statusBootstrap => '正在收集信息';
+
+  @override
+  String get multiplayer_statusUninitialized => '未下载联机核心';
+
+  @override
+  String get multiplayer_statusPreparing => '正在下载联机核心（请勿退出启动器）';
+
+  @override
+  String get multiplayer_statusLaunching => '正在初始化联机核心';
+
+  @override
+  String get multiplayer_statusWaiting => '联机核心已就绪';
+
+  @override
+  String get multiplayer_statusScanning => '正在扫描局域网世界';
+
+  @override
+  String get multiplayer_statusHostStarting => '正在启动房间';
+
+  @override
+  String get multiplayer_statusHostOk => '已启动房间';
+
+  @override
+  String get multiplayer_statusGuestStarting => '正在加入房间';
+
+  @override
+  String get multiplayer_statusGuestOk => '已加入房间';
+
+  @override
+  String get multiplayer_statusException => '房间出现异常';
+
+  @override
+  String get multiplayer_downloadCore => '下载联机核心（约 8 MiB）';
+
+  @override
+  String get multiplayer_updateCore => '更新联机核心（约 8 MiB）';
+
+  @override
+  String get multiplayer_installLocal => '从本地安装包安装';
+
+  @override
+  String get multiplayer_installLocalDesc => '若自动下载失败，可手动下载官方联机核心包后在这里导入';
+
+  @override
+  String get multiplayer_installLocalInvalid => '安装包不可用或与当前平台不匹配';
+
+  @override
+  String get multiplayer_installLocalDone => '联机核心已安装';
+
+  @override
+  String get multiplayer_downloadSources => '联机核心第三方下载渠道';
+
+  @override
+  String get multiplayer_downloadSourcesDesc => '在部分地区，内置下载渠道可能不稳定或连接缓慢';
+
+  @override
+  String multiplayer_downloadExpected(String name) {
+    return '请下载名为 $name 的联机核心包';
+  }
+
+  @override
+  String get multiplayer_hostTitle => '我想当房主';
+
+  @override
+  String get multiplayer_hostDesc => '创建房间并生成邀请码，与好友一起畅玩';
+
+  @override
+  String get multiplayer_hostNeedRunningTitle => '实例似乎还没启动';
+
+  @override
+  String get multiplayer_hostNeedRunningDesc =>
+      '房主模式需要本机已有一个「对局域网开放」的世界：请先在 Minecraft 客户端里进入单人世界并按 ESC 选择「对局域网开放」。可以先启动本实例，也可以直接开始扫描局域网。';
+
+  @override
+  String get multiplayer_hostStartInstance => '启动实例';
+
+  @override
+  String get multiplayer_hostSkip => '直接开始扫描';
+
+  @override
+  String get multiplayer_guestTitle => '我想当房客';
+
+  @override
+  String get multiplayer_guestDesc => '输入房主提供的邀请码加入游戏世界';
+
+  @override
+  String get multiplayer_guestPromptTitle => '请输入房主提供的邀请码';
+
+  @override
+  String get multiplayer_guestPromptHint => '邀请码';
+
+  @override
+  String get multiplayer_guestEmpty => '邀请码不能为空';
+
+  @override
+  String get multiplayer_guestInvalid => '邀请码错误';
+
+  @override
+  String get multiplayer_scanningDesc =>
+      '请启动 Minecraft 客户端，进入单人世界，按 ESC 键选择「对局域网开放」，点击「创建局域网世界」。';
+
+  @override
+  String get multiplayer_scanningBack => '这将同时停止扫描局域网世界。';
+
+  @override
+  String get multiplayer_hostStartingBack => '这将会取消创建房间。';
+
+  @override
+  String get multiplayer_hostOkBack => '这将彻底关闭房间，其他房客将退出且无法再加入。';
+
+  @override
+  String get multiplayer_guestBack => '这不会影响其他房客加入当前房间。';
+
+  @override
+  String get multiplayer_roomCode => '邀请码（已自动复制到剪贴板）';
+
+  @override
+  String get multiplayer_roomCodeDesc => '请提醒好友在支持陶瓦联机的启动器里选择房客模式，并输入该邀请码。';
+
+  @override
+  String get multiplayer_copyRoomCode => '复制邀请码';
+
+  @override
+  String get multiplayer_roomCodeCopied => '已将邀请码复制到剪贴板';
+
+  @override
+  String get multiplayer_guestOkTitle => '请启动 Minecraft，选择「多人游戏」，双击进入陶瓦联机大厅。';
+
+  @override
+  String multiplayer_guestOkUrl(String url) {
+    return '备用联机地址：$url';
+  }
+
+  @override
+  String get multiplayer_copyUrl => '复制联机地址';
+
+  @override
+  String get multiplayer_exceptionBack => '可再试一次';
+
+  @override
+  String get multiplayer_exceptionPingHostFail => '加入房间失败：房间已关闭或网络不稳定';
+
+  @override
+  String get multiplayer_exceptionPingHostRst => '房间连接断开：房间已关闭或网络不稳定';
+
+  @override
+  String get multiplayer_exceptionGuestEtCrash =>
+      '加入房间失败：EasyTier 已崩溃，请向开发者反馈该问题';
+
+  @override
+  String get multiplayer_exceptionHostEtCrash =>
+      '创建房间失败：EasyTier 已崩溃，请向开发者反馈该问题';
+
+  @override
+  String get multiplayer_exceptionPingServerRst => '房间已关闭：您已退出游戏世界，房间已自动关闭';
+
+  @override
+  String get multiplayer_exceptionScaffoldingInvalid =>
+      '协议错误：对端发送了错误的响应数据，请向开发者反馈该问题';
+
+  @override
+  String get multiplayer_fatalOs => '当前平台暂不支持多人联机（需要 Windows 10 及以上 / 64 位系统）';
+
+  @override
+  String get multiplayer_fatalNetwork => '未能下载联机核心。请检查网络连接，然后再试一次';
+
+  @override
+  String get multiplayer_fatalInstall => '严重错误：无法安装联机核心';
+
+  @override
+  String get multiplayer_fatalTerracotta => '严重错误：无法与联机核心通讯';
+
+  @override
+  String get multiplayer_fatalUnknown => '严重错误：原因未知';
+
+  @override
+  String get multiplayer_retry => '重试';
+
+  @override
+  String get multiplayer_actionBack => '退出';
+
+  @override
+  String get multiplayer_actionCancel => '取消';
+
+  @override
+  String multiplayer_actionFailed(String error) {
+    return '操作失败：$error';
+  }
+
+  @override
+  String get multiplayer_exportLog => '导出联机核心日志';
+
+  @override
+  String get multiplayer_exportLogDesc => '便于分析错误原因';
+
+  @override
+  String multiplayer_exportLogDone(String path) {
+    return '日志已导出：$path';
+  }
+
+  @override
+  String get multiplayer_exportLogFailed => '导出日志失败';
+
+  @override
+  String get multiplayer_playerList => '玩家列表';
+
+  @override
+  String get multiplayer_playerKindHost => '房主';
+
+  @override
+  String get multiplayer_playerKindLocal => '你';
+
+  @override
+  String get multiplayer_playerKindGuest => '房客';
+
+  @override
+  String get multiplayer_difficultyUnknown => '正在评估当前网络状态…';
+
+  @override
+  String get multiplayer_difficultyEasiest => '当前网络状态极好：稍等一下就成功！';
+
+  @override
+  String get multiplayer_difficultySimple => '当前网络状态较好：建立连接需要一段时间……';
+
+  @override
+  String get multiplayer_difficultyMedium => '当前网络状态中等：已启用抗干扰备用线路，连接可能失败';
+
+  @override
+  String get multiplayer_difficultyTough => '当前网络状态极差：已启用抗干扰备用线路，连接可能失败';
+
+  @override
+  String get multiplayer_difficultyNote => '连接成功率由房主和房客的 NAT 类型推算得到，仅供参考。';
+
+  @override
+  String get multiplayer_attributionTitle => '关于多人联机';
+
+  @override
+  String multiplayer_attribution(String license) {
+    return '多人联机由第三方开源项目 Terracotta（陶瓦联机）提供，许可协议 $license。本应用只负责下载、校验并启动未经修改的官方联机核心，通过其本地 HTTP 接口交互，不修改其二进制。';
+  }
+
+  @override
+  String get multiplayer_openHomepage => '项目主页';
+
+  @override
+  String get multiplayer_resetCore => '重置联机核心';
+
+  @override
+  String multiplayer_corePort(int port) {
+    return '本地控制端口：$port';
+  }
+
+  @override
+  String get multiplayer_notice => '陶瓦联机是第三方开源自由软件，使用中遇到的问题请通过项目渠道反馈。';
 }

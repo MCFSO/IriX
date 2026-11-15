@@ -173,6 +173,47 @@ history list — tapping a row opens a dialog with restore / verify / delete.
 - **Tests**: `cargo test -p xmc_backup` (CAS dedupe/GC, hardlink snapshots, ZIP
   roundtrip, name traversal rejection) and `test/backup_ffi_test.dart`.
 
+### Terracotta multiplayer (陶瓦联机, instance "联机" tab)
+
+Multiplayer rooms are provided by the third-party project **Terracotta**
+(AGPL-3.0-or-later, by burningtnt). This app only *downloads, verifies and
+launches* the unmodified official core and talks to it over its local HTTP API —
+the binary is never patched, relinked or repacked. That IPC usage is allowed by
+the AGPL exception **only if the UI credits the project**, so
+`instance_multiplayer_tab.dart` keeps an attribution card (homepage + license +
+log export) that must not be removed.
+
+- **All Dart**, under `lib/services/terracotta/`:
+  `terracotta_metadata.dart` (core version 0.4.2, per-platform SHA-512 package
+  digests, mirror order, node-list URL, platform/arch gating) →
+  `terracotta_state.dart` (`/state` model) → `terracotta_bundle.dart`
+  (download + verify + tar.gz extraction inside an isolate + legacy cleanup) →
+  `terracotta_launcher.dart` (`--hmcl <port file>` handshake + log pump) →
+  `terracotta_control_api.dart` (control endpoints, HTTP via Rust
+  `HttpFfiService`) → `terracotta_manager.dart` (global singleton state machine).
+- **Control protocol** (GET only, port from the handshake file):
+  `/state`, `/state/ide`, `/state/scanning?player=&public_nodes=…`,
+  `/state/guesting?room=&player=&public_nodes=…`, `/log?fetch=true`. Public
+  nodes come from `https://terracotta.glavo.site/nodes`; unlike HMCL the app
+  does not filter by machine region (no reliable region source here).
+- **State machine**: `Bootstrap → Uninitialized/Preparing → Launching →
+  Unknown(port) → Waiting → HostScanning/HostStarting/HostOk |
+  GuestConnecting/GuestStarting/GuestOk | ExceptionState | Fatal`. `/state`
+  snapshots carry a monotonic `index`; older snapshots are ignored, and local
+  optimistic states use `index = -1`. `profile_index` + `isForkOf()` distinguish
+  "player list refreshed" from "new room".
+- **Polling**: 500 ms while the tab is visible, 15 s otherwise; 5 consecutive
+  failures (or the child process exiting) ⇒ `Fatal(terracotta)` with a retry.
+- **Paths**: `AppPaths.terracottaRoot()` = `<data root>/terracotta/<version>/`
+  plus `temp/` (handshake files) and `logs/` (exported diagnostic ZIPs).
+- **Lifecycle**: `main.dart` installs an `AppLifecycleListener` that calls
+  `TerracottaManager.instance.shutdown()` on window close so the child process
+  does not survive as an orphan.
+- **Tests**: `test/terracotta_state_test.dart`, `test/terracotta_bundle_test.dart`,
+  `test/terracotta_manager_test.dart`, `test/instance_multiplayer_tab_test.dart`,
+  sharing `test/support/terracotta_fakes.dart` (no network, no real process).
+  Design/ops notes: `docs/terracotta-multiplayer.md`.
+
 ### Adding a new Rust crate
 
 When adding a crate, update ALL of these:
